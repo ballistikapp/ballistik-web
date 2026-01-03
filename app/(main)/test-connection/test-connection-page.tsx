@@ -12,6 +12,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import type { CreateTestInput, TestTableOutput } from "@/server/schemas";
+import { toast } from "sonner";
 
 export function TestConnectionPage() {
   const [name, setName] = useState("");
@@ -29,6 +30,10 @@ export function TestConnectionPage() {
     onSuccess: () => {
       setName("");
       refetch();
+      toast.success("Record created successfully!");
+    },
+    onError: (error) => {
+      toast.error(error.message);
     },
   });
 
@@ -68,16 +73,6 @@ export function TestConnectionPage() {
                 {createTest.isPending ? "Creating..." : "Insert"}
               </Button>
             </form>
-            {createTest.error && (
-              <p className="text-red-500 mt-2 text-sm">
-                Error: {createTest.error.message}
-              </p>
-            )}
-            {createTest.isSuccess && (
-              <p className="text-green-500 mt-2 text-sm">
-                ✓ Record created successfully!
-              </p>
-            )}
           </CardContent>
         </Card>
 

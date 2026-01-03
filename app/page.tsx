@@ -1,5 +1,5 @@
-import { ComponentExample } from "@/components/template/component-example";
+import { redirect } from "next/navigation";
 
 export default function Page() {
-  return <ComponentExample />;
+  return redirect("/dashboard");
 }
