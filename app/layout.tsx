@@ -4,6 +4,7 @@ import {
   Roboto,
 } from "next/font/google";
 import "./globals.css";
+import { TRPCProvider } from "@/lib/trpc/provider";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -33,7 +34,7 @@ export default function RootLayout({
         // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
         className={`antialiased`}
       >
-        {children}
+        <TRPCProvider>{children}</TRPCProvider>
       </body>
     </html>
   );
