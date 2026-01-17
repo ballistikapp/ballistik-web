@@ -3,6 +3,8 @@ import { SiteHeader } from "@/components/layout/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { tokenService } from "@/server/services/token.service";
 
+export const dynamic = "force-dynamic";
+
 export default async function MainLayout({
   children,
 }: Readonly<{

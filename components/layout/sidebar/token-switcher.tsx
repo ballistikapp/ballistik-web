@@ -48,13 +48,6 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
     tokenQueryParser
   );
 
-  if (tokens.length === 0)
-    return (
-      <Button asChild size="xl" className="w-full text-lg font-semibold">
-        <Link href="/launch">Launch New Token</Link>
-      </Button>
-    );
-
   const [storedTokenPublicKey] = React.useState<string | null>(() => {
     if (typeof window !== "undefined") {
       return localStorage.getItem(SELECTED_TOKEN_KEY);
@@ -109,6 +102,14 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   );
 
   const [open, setOpen] = React.useState(false);
+
+  if (tokens.length === 0) {
+    return (
+      <Button asChild size="xl" className="w-full text-lg font-semibold">
+        <Link href="/launch">Launch New Token</Link>
+      </Button>
+    );
+  }
 
   return (
     <Popover open={open} onOpenChange={setOpen}>

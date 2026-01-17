@@ -44,7 +44,12 @@ async function insertTestWallets() {
 
     const tokens = await prisma.token.findMany({
       include: {
-        wallets: true,
+        operationalWallets: true,
+        devWallets: {
+          include: {
+            wallet: true,
+          },
+        },
       },
     });
 
@@ -62,9 +67,14 @@ async function insertTestWallets() {
       console.log(
         `\n🪙 Processing token: ${token.name} (${token.symbol}) - ${token.publicKey}`
       );
-      console.log(`   Existing wallets: ${token.wallets.length}`);
+      const existingWalletsCount =
+        token.operationalWallets.length + token.devWallets.length;
+      console.log(`   Existing wallets: ${existingWalletsCount}`);
 
-      const existingWalletTypes = new Set(token.wallets.map((w) => w.type));
+      const existingWalletTypes = new Set([
+        ...token.operationalWallets.map((wallet) => wallet.type),
+        ...token.devWallets.map((entry) => entry.wallet.type),
+      ]);
 
       for (const walletType of WALLET_TYPES) {
         if (existingWalletTypes.has(walletType)) {
@@ -83,13 +93,26 @@ async function insertTestWallets() {
               publicKey,
               privateKey,
               type: walletType,
-              tokens: {
-                connect: {
-                  publicKey: token.publicKey,
-                },
-              },
+              ...(walletType === WalletType.DEV
+                ? {}
+                : {
+                    token: {
+                      connect: {
+                        publicKey: token.publicKey,
+                      },
+                    },
+                  }),
             },
           });
+
+          if (walletType === WalletType.DEV) {
+            await prisma.tokenDevWallet.create({
+              data: {
+                tokenPublicKey: token.publicKey,
+                walletPublicKey: wallet.publicKey,
+              },
+            });
+          }
 
           console.log(
             `   ✅ Created ${walletType} wallet: ${publicKey.substring(

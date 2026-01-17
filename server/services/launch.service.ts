@@ -13,6 +13,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
+import { bundleCreateAndBuy } from "@/server/solana/bundle-launch";
 
 const SLIPPAGE_BASIS_POINTS = BigInt(10000);
 const MIN_BUY_AMOUNT_SOL = 0.003;
@@ -319,6 +320,12 @@ export const launchService = {
           400
         );
       }
+      if (input.bundleBuyEnabled && numberOfWallets > 11) {
+        throw new AppError(
+          "Bundle buy supports up to 11 wallets per launch",
+          400
+        );
+      }
 
       await updateProgress(launchId, 6, "wallets");
       await appendLog(launchId, "STEP", "Loading wallets", "wallets");
@@ -444,72 +451,106 @@ export const launchService = {
       await appendLog(launchId, "STEP", "Creating token", "create");
 
       const pumpSdk = await createPumpSdk(devWalletKeypair);
-      const createResult = await pumpSdk.createAndBuy(
-        devWalletKeypair,
-        mintKeypair,
-        metadata,
-        toLamports(devBuyAmount)
-      );
-
-      await appendLog(launchId, "INFO", "Token created", "create", {
-        signature: (createResult as { signature?: string })?.signature,
-      });
+      let bundleResult: { bundleId: string; signatures: string[] } | null = null;
+      if (input.bundleBuyEnabled) {
+        const buyTargets = bundlerWalletKeypairs
+          .map((wallet) => {
+            const variance = buyAmountPerWallet * (buyAmountVariance / 100);
+            const amount = Math.max(
+              0,
+              buyAmountPerWallet + (Math.random() * 2 - 1) * variance
+            );
+            return { wallet, amountLamports: toLamports(amount) };
+          })
+          .filter((target) => target.amountLamports > BigInt(0));
+        const buyerWallets = buyTargets.map((target) => target.wallet);
+        const buyAmountsLamport = buyTargets.map(
+          (target) => target.amountLamports
+        );
+        bundleResult = await bundleCreateAndBuy({
+          creator: devWalletKeypair,
+          mint: mintKeypair,
+          metadata,
+          creatorBuyAmountLamport: toLamports(devBuyAmount),
+          buyerWallets,
+          buyAmountsLamport,
+          tipper: mainWalletKeypair,
+          tipLamports: Math.max(
+            0,
+            Math.floor(parseNumber(input.jitoTipAmount, 0) * LAMPORTS_PER_SOL)
+          ),
+          slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
+        });
+        await appendLog(launchId, "INFO", "Token created", "create", {
+          bundleId: bundleResult.bundleId,
+          signatures: bundleResult.signatures,
+        });
+      } else {
+        const createResult = await pumpSdk.createAndBuy(
+          devWalletKeypair,
+          mintKeypair,
+          metadata,
+          toLamports(devBuyAmount)
+        );
+        await appendLog(launchId, "INFO", "Token created", "create", {
+          signature: (createResult as { signature?: string })?.signature,
+        });
+      }
 
       const mintPublicKey = mintKeypair.publicKey.toBase58();
       const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
 
-      await updateProgress(launchId, 65, "buys");
-      await appendLog(launchId, "STEP", "Executing bundle buys", "buys");
-
-      if (input.bundleBuyEnabled && bundlerWalletKeypairs.length > 0) {
-        const connection = getSolanaConnection();
-        for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
-          if (await isCancelRequested(launchId)) {
-            await appendLog(
-              launchId,
-              "WARN",
-              "Launch canceled before bundle buys completed",
-              "cancel"
-            );
-            break;
-          }
-          const buyer = bundlerWalletKeypairs[i];
-          const variance = buyAmountPerWallet * (buyAmountVariance / 100);
-          const amount = Math.max(
-            0,
-            buyAmountPerWallet + (Math.random() * 2 - 1) * variance
-          );
-          const amountLamports = toLamports(amount);
-          if (amountLamports <= BigInt(0)) {
-            continue;
-          }
-
-          const tx = await pumpSdk.getBuyInstructionsBySolAmount(
-            buyer.publicKey,
-            mintKeypair.publicKey,
-            amountLamports,
-            SLIPPAGE_BASIS_POINTS,
-            "confirmed"
-          );
-          tx.feePayer = buyer.publicKey;
-          const latestBlockhash = await connection.getLatestBlockhash(
-            "confirmed"
-          );
-          tx.recentBlockhash = latestBlockhash.blockhash;
-          const signature = await sendAndConfirmTransaction(
-            connection,
-            tx,
-            [buyer],
-            {
-              commitment: "confirmed",
+      if (!input.bundleBuyEnabled) {
+        await updateProgress(launchId, 65, "buys");
+        await appendLog(launchId, "STEP", "Executing bundle buys", "buys");
+        if (bundlerWalletKeypairs.length > 0) {
+          const connection = getSolanaConnection();
+          for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
+            if (await isCancelRequested(launchId)) {
+              await appendLog(
+                launchId,
+                "WARN",
+                "Launch canceled before bundle buys completed",
+                "cancel"
+              );
+              break;
             }
-          );
-
-          await appendLog(launchId, "INFO", "Bundle buy executed", "buys", {
-            wallet: buyer.publicKey.toBase58(),
-            amount,
-            signature,
-          });
+            const buyer = bundlerWalletKeypairs[i];
+            const variance = buyAmountPerWallet * (buyAmountVariance / 100);
+            const amount = Math.max(
+              0,
+              buyAmountPerWallet + (Math.random() * 2 - 1) * variance
+            );
+            const amountLamports = toLamports(amount);
+            if (amountLamports <= BigInt(0)) {
+              continue;
+            }
+            const tx = await pumpSdk.getBuyInstructionsBySolAmount(
+              buyer.publicKey,
+              mintKeypair.publicKey,
+              amountLamports,
+              SLIPPAGE_BASIS_POINTS,
+              "confirmed"
+            );
+            tx.feePayer = buyer.publicKey;
+            const latestBlockhash = await connection.getLatestBlockhash(
+              "confirmed"
+            );
+            tx.recentBlockhash = latestBlockhash.blockhash;
+            const signature = await sendAndConfirmTransaction(
+              connection,
+              tx,
+              [buyer],
+              {
+                commitment: "confirmed",
+              }
+            );
+            await appendLog(launchId, "INFO", "Bundle buy executed", "buys", {
+              wallet: buyer.publicKey.toBase58(),
+              amount,
+              signature,
+            });
+          }
         }
       }
 
@@ -528,17 +569,30 @@ export const launchService = {
           telegramUrl: input.telegram?.trim() || null,
           websiteUrl: input.website?.trim() || null,
           userId: user.id,
-          wallets: {
-            connect: [
-              { publicKey: user.mainWallet.publicKey },
-              { publicKey: devWalletPublicKey },
-              ...bundlerWalletKeypairs.map((wallet) => ({
-                publicKey: wallet.publicKey.toBase58(),
-              })),
-            ],
-          },
         },
       });
+
+      await prisma.tokenDevWallet.create({
+        data: {
+          tokenPublicKey: token.publicKey,
+          walletPublicKey: devWalletPublicKey,
+        },
+      });
+
+      if (bundlerWalletKeypairs.length > 0) {
+        await prisma.wallet.updateMany({
+          where: {
+            publicKey: {
+              in: bundlerWalletKeypairs.map((wallet) =>
+                wallet.publicKey.toBase58()
+              ),
+            },
+          },
+          data: {
+            tokenPublicKey: token.publicKey,
+          },
+        });
+      }
 
       if (reservedVanityId) {
         await prisma.vanityMint.update({
@@ -564,17 +618,8 @@ export const launchService = {
               privateKey: bs58.encode(wallet.secretKey),
               type: "DISTRIBUTION",
               userId: user.id,
+              tokenPublicKey: token.publicKey,
             })),
-          });
-          await prisma.token.update({
-            where: { publicKey: token.publicKey },
-            data: {
-              wallets: {
-                connect: distributionWallets.map((wallet) => ({
-                  publicKey: wallet.publicKey.toBase58(),
-                })),
-              },
-            },
           });
           await appendLog(
             launchId,

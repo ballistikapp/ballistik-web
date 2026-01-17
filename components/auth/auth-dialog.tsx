@@ -435,7 +435,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     .min(1, "Account name is required")
                     .max(100, "Account name is too long"),
                 }}
-                children={(field) => {
+              >
+                {(field) => {
                   const isInvalid =
                     (field.state.meta.isTouched || field.state.meta.isDirty) &&
                     field.state.meta.errors.length > 0;
@@ -464,13 +465,12 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     </Field>
                   );
                 }}
-              />
+              </registerForm.Field>
 
               <div className="space-y-4">
                 <Label>Wallet Setup</Label>
-                <registerForm.Field
-                  name="walletMode"
-                  children={(field) => (
+                <registerForm.Field name="walletMode">
+                  {(field) => (
                     <Tabs
                       value={field.state.value}
                       onValueChange={(v) => field.handleChange(v as WalletMode)}
@@ -493,7 +493,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
                         <registerForm.Subscribe
                           selector={(state) => state.values.walletMode}
-                          children={(walletMode) => (
+                        >
+                          {(walletMode) => (
                             <registerForm.Field
                               name="privateKey"
                               validators={{
@@ -507,7 +508,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                   return undefined;
                                 },
                               }}
-                              children={(privateKeyField) => {
+                            >
+                              {(privateKeyField) => {
                                 const isInvalid =
                                   (privateKeyField.state.meta.isTouched ||
                                     privateKeyField.state.meta.isDirty) &&
@@ -565,9 +567,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                                   </div>
                                 );
                               }}
-                            />
+                            </registerForm.Field>
                           )}
-                        />
+                        </registerForm.Subscribe>
                       </TabsContent>
 
                       <TabsContent value="generate" className="space-y-4">
@@ -585,7 +587,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                       </TabsContent>
                     </Tabs>
                   )}
-                />
+                </registerForm.Field>
               </div>
 
               <div className="space-y-4 pt-4">
@@ -634,7 +636,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     return undefined;
                   },
                 }}
-                children={(privateKeyField) => {
+              >
+                {(privateKeyField) => {
                   const isInvalid =
                     (privateKeyField.state.meta.isTouched ||
                       privateKeyField.state.meta.isDirty) &&
@@ -667,7 +670,7 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                     </Field>
                   );
                 }}
-              />
+              </signinForm.Field>
 
               <div className="space-y-4 pt-4">
                 <Button

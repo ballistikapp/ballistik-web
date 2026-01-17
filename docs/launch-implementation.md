@@ -60,6 +60,12 @@ If bundle buys are enabled, server generates `BUNDLER` wallets and uses them for
 ### Distribution Wallets
 When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and links them to the token. Token distribution logic is intentionally separate for later extension.
 
+### Wallet Associations
+
+- Operational wallets (`BUNDLER`, `VOLUME`, `DISTRIBUTION`) are token-scoped via `Wallet.tokenPublicKey`
+- Dev wallets are linked through `TokenDevWallet` to allow sharing across multiple tokens
+- Main wallet remains user-scoped via `User.mainWallet`
+
 ## Launch Job Steps
 - Validate inputs and thresholds
 - Load main wallet and prepare dev wallet
@@ -89,6 +95,17 @@ When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and l
 
 ## Environment Requirements
 - `SOLANA_RPC_URL` must be set for on-chain operations.
+- `JITO_BLOCK_ENGINE_URL` must be set for bundle launches.
+
+## Bundle Launch
+- When bundle buy is enabled, create + dev buy + bundle buys are sent as a Jito bundle.
+- The bundle is packed into 5 transactions with a maximum of 11 buyer wallets.
+- See `docs/bundle-implementation.md` for packing details and ALT extension notes.
+
+## Balance Refresh Strategy
+
+- Balances are refreshed on demand only
+- Server enforces a 15-second debounce per wallet
 
 ## Extension Points
 - Add distribution transfer logic to move tokens into distribution wallets.

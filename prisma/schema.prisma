@@ -38,12 +38,15 @@ model Wallet {
   user User? @relation("WalletUser", fields: [userId], references: [id])
   userId String?
   mainWalletUser User? @relation("UserMainWallet")
-  tokens Token[] @relation("TokenWallets")
+  tokenPublicKey String?
+  token Token? @relation("TokenOperationalWallets", fields: [tokenPublicKey], references: [publicKey])
   balanceSol Decimal @default(0)
+  tokenBalance Decimal @default(0)
   balanceRefreshedAt DateTime?
   isImported Boolean @default(false)
   holdings Holding[] @relation("WalletHoldings")
   transactions Transaction[] @relation("WalletTransactions")
+  devWalletTokens TokenDevWallet[] @relation("DevWalletTokens")
   @@map("Wallet")
 }
 
@@ -69,12 +72,22 @@ model Token {
   updatedAt DateTime @updatedAt
   userId String
   user User @relation("TokenUser", fields: [userId], references: [id])
-  wallets Wallet[] @relation("TokenWallets")
+  operationalWallets Wallet[] @relation("TokenOperationalWallets")
+  devWallets TokenDevWallet[] @relation("TokenDevWallets")
   holdings Holding[] @relation("TokenHoldings")
   transactions Transaction[] @relation("TokenTransactions")
   launches Launch[] @relation("LaunchToken")
   vanityMints VanityMint[]
   @@map("Token")
+}
+
+model TokenDevWallet {
+  tokenPublicKey String
+  walletPublicKey String
+  token Token @relation("TokenDevWallets", fields: [tokenPublicKey], references: [publicKey])
+  wallet Wallet @relation("DevWalletTokens", fields: [walletPublicKey], references: [publicKey])
+  @@id([tokenPublicKey, walletPublicKey])
+  @@map("TokenDevWallet")
 }
 
 enum LaunchStatus {

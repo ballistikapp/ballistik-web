@@ -311,9 +311,8 @@ export function LaunchForm() {
             <CardContent>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
-                  <form.Field
-                    name="tokenName"
-                    children={(field) => {
+                  <form.Field name="tokenName">
+                    {(field) => {
                       const isInvalid =
                         field.state.meta.isTouched && !field.state.meta.isValid;
                       return (
@@ -337,10 +336,9 @@ export function LaunchForm() {
                         </Field>
                       );
                     }}
-                  />
-                  <form.Field
-                    name="tokenSymbol"
-                    children={(field) => {
+                  </form.Field>
+                  <form.Field name="tokenSymbol">
+                    {(field) => {
                       const isInvalid =
                         field.state.meta.isTouched && !field.state.meta.isValid;
                       return (
@@ -366,7 +364,7 @@ export function LaunchForm() {
                         </Field>
                       );
                     }}
-                  />
+                  </form.Field>
                 </div>
 
                 <Field>
@@ -420,9 +418,8 @@ export function LaunchForm() {
                     </div>
                   </div>
                 </Field>
-                <form.Field
-                  name="description"
-                  children={(field) => {
+                <form.Field name="description">
+                  {(field) => {
                     const isInvalid =
                       field.state.meta.isTouched && !field.state.meta.isValid;
                     return (
@@ -454,15 +451,14 @@ export function LaunchForm() {
                       </Field>
                     );
                   }}
-                />
+                </form.Field>
                 <div className="col-span-2 border-t pt-4">
                   <p className="text-sm font-medium mb-3">
                     Social Links (optional)
                   </p>
                   <div className="grid grid-cols-3 gap-4">
-                    <form.Field
-                      name="twitter"
-                      children={(field) => {
+                    <form.Field name="twitter">
+                      {(field) => {
                         const isInvalid =
                           field.state.meta.isTouched &&
                           !field.state.meta.isValid;
@@ -489,10 +485,9 @@ export function LaunchForm() {
                           </Field>
                         );
                       }}
-                    />
-                    <form.Field
-                      name="telegram"
-                      children={(field) => {
+                    </form.Field>
+                    <form.Field name="telegram">
+                      {(field) => {
                         const isInvalid =
                           field.state.meta.isTouched &&
                           !field.state.meta.isValid;
@@ -519,10 +514,9 @@ export function LaunchForm() {
                           </Field>
                         );
                       }}
-                    />
-                    <form.Field
-                      name="website"
-                      children={(field) => {
+                    </form.Field>
+                    <form.Field name="website">
+                      {(field) => {
                         const isInvalid =
                           field.state.meta.isTouched &&
                           !field.state.meta.isValid;
@@ -549,7 +543,7 @@ export function LaunchForm() {
                           </Field>
                         );
                       }}
-                    />
+                    </form.Field>
                   </div>
                 </div>
               </div>
@@ -580,9 +574,8 @@ export function LaunchForm() {
                     </TooltipContent>
                   </Tooltip>
                 </div>
-                <form.Field
-                  name="devWalletOption"
-                  children={(field) => (
+                <form.Field name="devWalletOption">
+                  {(field) => (
                     <div className="flex gap-2">
                       <button
                         type="button"
@@ -625,15 +618,13 @@ export function LaunchForm() {
                       </button>
                     </div>
                   )}
-                />
-                <form.Subscribe
-                  selector={(state) => state.values.devWalletOption}
-                  children={(devWalletOption) => (
+                </form.Field>
+                <form.Subscribe selector={(state) => state.values.devWalletOption}>
+                  {(devWalletOption) => (
                     <div className="mt-2 h-9">
                       {devWalletOption === "import" && (
-                        <form.Field
-                          name="importedDevWalletKey"
-                          children={(field) => (
+                        <form.Field name="importedDevWalletKey">
+                          {(field) => (
                             <Input
                               className="font-mono text-sm"
                               placeholder="Enter private key..."
@@ -643,7 +634,7 @@ export function LaunchForm() {
                               }
                             />
                           )}
-                        />
+                        </form.Field>
                       )}
                       {devWalletOption === "generate" && (
                         <p className="text-sm text-muted-foreground flex items-center h-full">
@@ -657,13 +648,12 @@ export function LaunchForm() {
                       )}
                     </div>
                   )}
-                />
+                </form.Subscribe>
               </Field>
 
               <div className="grid grid-cols-2 gap-6">
-                <form.Field
-                  name="devBuyAmount"
-                  children={(field) => (
+                <form.Field name="devBuyAmount">
+                  {(field) => (
                     <Field>
                       <div className="flex items-center gap-2 mb-1">
                         <FieldLabel htmlFor={field.name}>
@@ -690,10 +680,9 @@ export function LaunchForm() {
                       />
                     </Field>
                   )}
-                />
-                <form.Field
-                  name="jitoTipAmount"
-                  children={(field) => (
+                </form.Field>
+                <form.Field name="jitoTipAmount">
+                  {(field) => (
                     <Field>
                       <div className="flex items-center gap-2 mb-1">
                         <FieldLabel htmlFor={field.name}>
@@ -720,20 +709,19 @@ export function LaunchForm() {
                       />
                     </Field>
                   )}
-                />
+                </form.Field>
               </div>
 
               <div className="flex items-center space-x-3 pt-2">
-                <form.Field
-                  name="vanityMint"
-                  children={(field) => (
+                <form.Field name="vanityMint">
+                  {(field) => (
                     <Switch
                       id="vanity-mint"
                       checked={field.state.value}
                       onCheckedChange={field.handleChange}
                     />
                   )}
-                />
+                </form.Field>
                 <div className="flex items-center gap-2">
                   <Label htmlFor="vanity-mint">Vanity Token Address</Label>
                   <Tooltip>
@@ -741,7 +729,7 @@ export function LaunchForm() {
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      Generate a custom token address starting with "pump"
+                      Generate a custom token address starting with &quot;pump&quot;
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -761,9 +749,8 @@ export function LaunchForm() {
                     Configure bundle buy wallets and distribution
                   </CardDescription>
                 </div>
-                <form.Field
-                  name="bundleBuyEnabled"
-                  children={(field) => (
+                <form.Field name="bundleBuyEnabled">
+                  {(field) => (
                     <Switch
                       id="bundle-buy"
                       size="lg"
@@ -771,20 +758,18 @@ export function LaunchForm() {
                       onCheckedChange={field.handleChange}
                     />
                   )}
-                />
+                </form.Field>
               </div>
             </CardHeader>
             <Separator />
             <CardContent>
-              <form.Subscribe
-                selector={(state) => state.values.bundleBuyEnabled}
-                children={(bundleBuyEnabled) =>
+              <form.Subscribe selector={(state) => state.values.bundleBuyEnabled}>
+                {(bundleBuyEnabled) =>
                   bundleBuyEnabled && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 gap-6">
-                        <form.Field
-                          name="numberOfWallets"
-                          children={(field) => (
+                        <form.Field name="numberOfWallets">
+                          {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
                                 Number of Wallets
@@ -793,7 +778,7 @@ export function LaunchForm() {
                                 id={field.name}
                                 type="number"
                                 min="1"
-                                max="10"
+                                max="11"
                                 value={field.state.value}
                                 onChange={(e) =>
                                   field.handleChange(e.target.value)
@@ -801,14 +786,13 @@ export function LaunchForm() {
                                 placeholder="5"
                               />
                               <FieldDescription>
-                                How many wallets to use for bundle buy (max 10)
+                                How many wallets to use for bundle buy (max 11)
                               </FieldDescription>
                             </Field>
                           )}
-                        />
-                        <form.Field
-                          name="buyAmountPerWallet"
-                          children={(field) => (
+                        </form.Field>
+                        <form.Field name="buyAmountPerWallet">
+                          {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
                                 Buy Amount per Wallet (SOL)
@@ -829,13 +813,12 @@ export function LaunchForm() {
                               </FieldDescription>
                             </Field>
                           )}
-                        />
+                        </form.Field>
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
-                        <form.Field
-                          name="buyAmountVariance"
-                          children={(field) => (
+                        <form.Field name="buyAmountVariance">
+                          {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
                                 Buy Amount Variance (%)
@@ -856,10 +839,9 @@ export function LaunchForm() {
                               </FieldDescription>
                             </Field>
                           )}
-                        />
-                        <form.Field
-                          name="distributionMultiplier"
-                          children={(field) => (
+                        </form.Field>
+                        <form.Field name="distributionMultiplier">
+                          {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
                                 Distribution Multiplier
@@ -881,7 +863,7 @@ export function LaunchForm() {
                               </FieldDescription>
                             </Field>
                           )}
-                        />
+                        </form.Field>
                       </div>
 
                       <form.Subscribe
@@ -891,7 +873,8 @@ export function LaunchForm() {
                           distributionMultiplier:
                             state.values.distributionMultiplier,
                         })}
-                        children={({
+                      >
+                        {({
                           numberOfWallets,
                           buyAmountPerWallet,
                           distributionMultiplier,
@@ -926,11 +909,11 @@ export function LaunchForm() {
                             </div>
                           );
                         }}
-                      />
+                      </form.Subscribe>
                     </div>
                   )
                 }
-              />
+              </form.Subscribe>
             </CardContent>
           </Card>
 
@@ -944,9 +927,8 @@ export function LaunchForm() {
             </CardHeader>
             <Separator />
             <CardContent>
-              <form.Subscribe
-                selector={(state) => state.values}
-                children={(values) => (
+              <form.Subscribe selector={(state) => state.values}>
+                {(values) => (
                   <div className="space-y-6">
                     <div className="flex items-start gap-4">
                       {imagePreview ? (
@@ -1100,7 +1082,7 @@ export function LaunchForm() {
                     </div>
                   </div>
                 )}
-              />
+              </form.Subscribe>
             </CardContent>
           </Card>
           <div className="flex items-center justify-end gap-4">

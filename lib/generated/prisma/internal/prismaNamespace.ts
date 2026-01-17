@@ -388,6 +388,7 @@ export const ModelName = {
   User: 'User',
   Wallet: 'Wallet',
   Token: 'Token',
+  TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
   VanityMint: 'VanityMint',
@@ -408,7 +409,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "launch" | "launchLog" | "vanityMint" | "holding" | "transaction"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "vanityMint" | "holding" | "transaction"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -705,6 +706,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.TokenCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.TokenCountAggregateOutputType> | number
+        }
+      }
+    }
+    TokenDevWallet: {
+      payload: Prisma.$TokenDevWalletPayload<ExtArgs>
+      fields: Prisma.TokenDevWalletFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TokenDevWalletFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TokenDevWalletFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        findFirst: {
+          args: Prisma.TokenDevWalletFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TokenDevWalletFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        findMany: {
+          args: Prisma.TokenDevWalletFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>[]
+        }
+        create: {
+          args: Prisma.TokenDevWalletCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        createMany: {
+          args: Prisma.TokenDevWalletCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TokenDevWalletCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>[]
+        }
+        delete: {
+          args: Prisma.TokenDevWalletDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        update: {
+          args: Prisma.TokenDevWalletUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        deleteMany: {
+          args: Prisma.TokenDevWalletDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TokenDevWalletUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TokenDevWalletUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>[]
+        }
+        upsert: {
+          args: Prisma.TokenDevWalletUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenDevWalletPayload>
+        }
+        aggregate: {
+          args: Prisma.TokenDevWalletAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTokenDevWallet>
+        }
+        groupBy: {
+          args: Prisma.TokenDevWalletGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TokenDevWalletGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TokenDevWalletCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TokenDevWalletCountAggregateOutputType> | number
         }
       }
     }
@@ -1144,7 +1219,9 @@ export const WalletScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
   balanceSol: 'balanceSol',
+  tokenBalance: 'tokenBalance',
   balanceRefreshedAt: 'balanceRefreshedAt',
   isImported: 'isImported'
 } as const
@@ -1168,6 +1245,14 @@ export const TokenScalarFieldEnum = {
 } as const
 
 export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
+
+
+export const TokenDevWalletScalarFieldEnum = {
+  tokenPublicKey: 'tokenPublicKey',
+  walletPublicKey: 'walletPublicKey'
+} as const
+
+export type TokenDevWalletScalarFieldEnum = (typeof TokenDevWalletScalarFieldEnum)[keyof typeof TokenDevWalletScalarFieldEnum]
 
 
 export const LaunchScalarFieldEnum = {
@@ -1572,6 +1657,7 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   wallet?: Prisma.WalletOmit
   token?: Prisma.TokenOmit
+  tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
   launchLog?: Prisma.LaunchLogOmit
   vanityMint?: Prisma.VanityMintOmit

@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { tokenService } from "@/server/services/token.service";
 
+export const dynamic = "force-dynamic";
+
 export default async function Page() {
   const tokens = await tokenService.getUserTokens();
 

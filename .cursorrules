@@ -304,6 +304,7 @@ export const appRouter = router({
 ### Database
 
 - Always use migrations for schema changes, never direct SQL in production
+- Do not create migration files manually; use Prisma migrate commands
 - Test migrations on a copy of production data when possible
 - Keep migrations small and focused
 - Document breaking changes in migration files
@@ -326,3 +327,11 @@ export const appRouter = router({
 - Reference sollabv0 for feature requirements, not implementation details
 - Improve upon v0 implementation with better error handling and type safety
 - Ask for clarification rather than making assumptions
+
+## Docs Discipline
+
+- Always refer to relevant files in the `docs/` directory before making changes, except for small insignificant development
+- Always add or update a `docs/` file when making a change or adding a feature so future agents can stay consistent and bug-free
+- Use a docs-first checklist for non-trivial changes: read existing docs, update docs with behavior changes, then implement
+- When modifying Prisma schema, update `docs/` to reflect data model and relationship changes
+- When adding or modifying tRPC procedures, update the relevant `docs/` entries with new endpoints and behavior

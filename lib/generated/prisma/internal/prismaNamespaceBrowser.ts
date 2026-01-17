@@ -55,6 +55,7 @@ export const ModelName = {
   User: 'User',
   Wallet: 'Wallet',
   Token: 'Token',
+  TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
   VanityMint: 'VanityMint',
@@ -105,7 +106,9 @@ export const WalletScalarFieldEnum = {
   createdAt: 'createdAt',
   updatedAt: 'updatedAt',
   userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
   balanceSol: 'balanceSol',
+  tokenBalance: 'tokenBalance',
   balanceRefreshedAt: 'balanceRefreshedAt',
   isImported: 'isImported'
 } as const
@@ -129,6 +132,14 @@ export const TokenScalarFieldEnum = {
 } as const
 
 export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
+
+
+export const TokenDevWalletScalarFieldEnum = {
+  tokenPublicKey: 'tokenPublicKey',
+  walletPublicKey: 'walletPublicKey'
+} as const
+
+export type TokenDevWalletScalarFieldEnum = (typeof TokenDevWalletScalarFieldEnum)[keyof typeof TokenDevWalletScalarFieldEnum]
 
 
 export const LaunchScalarFieldEnum = {

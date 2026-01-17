@@ -60,6 +60,11 @@ export type Wallet = Prisma.WalletModel
  */
 export type Token = Prisma.TokenModel
 /**
+ * Model TokenDevWallet
+ * 
+ */
+export type TokenDevWallet = Prisma.TokenDevWalletModel
+/**
  * Model Launch
  * 
  */
