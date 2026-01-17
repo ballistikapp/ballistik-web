@@ -1,4 +1,4 @@
-import { initTRPC, TRPCError } from "@trpc/server";
+import { initTRPC, TRPCError, type TRPC_ERROR_CODE_KEY } from "@trpc/server";
 import { type Context } from "./context";
 import superjson from "superjson";
 import { ZodError } from "zod";
@@ -53,22 +53,41 @@ const t = initTRPC.context<Context>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-/**
- * Protected procedure - requires authentication
- *
- * TODO: Uncomment and update when authentication is implemented
- */
-// export const protectedProcedure = t.procedure.use(({ ctx, next }) => {
-//   if (!ctx.user) {
-//     throw new TRPCError({ code: 'UNAUTHORIZED' });
-//   }
-//   return next({
-//     ctx: {
-//       // Infers the `user` as non-nullable
-//       user: ctx.user,
-//     },
-//   });
-// });
+const errorMapperMiddleware = t.middleware(async ({ next }) => {
+  try {
+    return await next();
+  } catch (error) {
+    if (isAppError(error)) {
+      const codeMap: Record<number, TRPC_ERROR_CODE_KEY> = {
+        400: "BAD_REQUEST",
+        401: "UNAUTHORIZED",
+        403: "FORBIDDEN",
+        404: "NOT_FOUND",
+        409: "CONFLICT",
+        500: "INTERNAL_SERVER_ERROR",
+      };
+      throw new TRPCError({
+        code: codeMap[error.statusCode] || "INTERNAL_SERVER_ERROR",
+        message: error.message,
+        cause: error,
+      });
+    }
+    throw error;
+  }
+});
+
+export const protectedProcedure = t.procedure
+  .use(({ ctx, next }) => {
+    if (!ctx.user) {
+      throw new TRPCError({ code: "UNAUTHORIZED" });
+    }
+    return next({
+      ctx: {
+        user: ctx.user,
+      },
+    });
+  })
+  .use(errorMapperMiddleware);
 
 /**
  * Middleware example - logging

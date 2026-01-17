@@ -1,182 +1,90 @@
 "use client";
 
 import * as React from "react";
+import { useQueryState } from "nuqs";
 import {
-  IconCamera,
-  IconChartBar,
-  IconDashboard,
-  IconDatabase,
-  IconFileAi,
-  IconFileDescription,
-  IconFileWord,
-  IconFolder,
-  IconHelp,
-  IconInnerShadowTop,
   IconListDetails,
-  IconReport,
-  IconSearch,
-  IconSettings,
-  IconUsers,
+  IconRocket,
+  IconWallet,
+  IconLayoutDashboard,
 } from "@tabler/icons-react";
 
-import { NavDocuments } from "@/components/layout/sidebar/nav-documents";
 import { NavMain } from "@/components/layout/sidebar/nav-main";
 import { NavSecondary } from "@/components/layout/sidebar/nav-secondary";
-import { NavUser } from "@/components/layout/sidebar/nav-user";
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
-  SidebarMenu,
-  SidebarMenuButton,
-  SidebarMenuItem,
 } from "@/components/ui/sidebar";
-import Link from "next/link";
+import { TokenSwitcher } from "./token-switcher";
+import { UserTokensOutput } from "@/server/services/token.service";
+import { tokenQueryParser } from "@/lib/utils/token-query";
 
 const data = {
-  user: {
-    name: "shadcn",
-    email: "m@example.com",
-    avatar: "/avatars/shadcn.jpg",
-  },
-  navMain: [
+  tokenSpecificRoutes: [
     {
       title: "Dashboard",
       url: "/dashboard",
-      icon: IconDashboard,
+      icon: IconLayoutDashboard,
     },
     {
-      title: "Lifecycle",
-      url: "#",
+      title: "Holdings",
+      url: "/holdings",
       icon: IconListDetails,
     },
     {
-      title: "Analytics",
-      url: "#",
-      icon: IconChartBar,
+      title: "Transactions",
+      url: "/transactions",
+      icon: IconListDetails,
     },
     {
-      title: "Projects",
-      url: "#",
-      icon: IconFolder,
-    },
-    {
-      title: "Team",
-      url: "#",
-      icon: IconUsers,
-    },
-  ],
-  navClouds: [
-    {
-      title: "Capture",
-      icon: IconCamera,
-      isActive: true,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Proposal",
-      icon: IconFileDescription,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
-    },
-    {
-      title: "Prompts",
-      icon: IconFileAi,
-      url: "#",
-      items: [
-        {
-          title: "Active Proposals",
-          url: "#",
-        },
-        {
-          title: "Archived",
-          url: "#",
-        },
-      ],
+      title: "Wallets",
+      url: "/wallets",
+      icon: IconWallet,
     },
   ],
   navSecondary: [
     {
-      title: "Settings",
-      url: "#",
-      icon: IconSettings,
-    },
-    {
-      title: "Get Help",
-      url: "#",
-      icon: IconHelp,
-    },
-    {
-      title: "Search",
-      url: "#",
-      icon: IconSearch,
-    },
-  ],
-  documents: [
-    {
-      name: "Data Library",
-      url: "#",
-      icon: IconDatabase,
-    },
-    {
-      name: "Reports",
-      url: "#",
-      icon: IconReport,
-    },
-    {
-      name: "Word Assistant",
-      url: "#",
-      icon: IconFileWord,
+      title: "Launch Token",
+      url: "/launch",
+      icon: IconRocket,
     },
   ],
 };
 
-export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
+type Props = React.ComponentProps<typeof Sidebar> & {
+  tokens: UserTokensOutput;
+};
+
+const SELECTED_TOKEN_KEY = "selected-token-public-key";
+
+export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
+  const [currentTokenPublicKey] = useQueryState("token", tokenQueryParser);
+
+  const [storedTokenPublicKey] = React.useState<string | null>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem(SELECTED_TOKEN_KEY);
+    }
+    return null;
+  });
+
+  const effectiveToken = React.useMemo(
+    () => currentTokenPublicKey || storedTokenPublicKey || undefined,
+    [currentTokenPublicKey, storedTokenPublicKey]
+  );
+
   return (
     <Sidebar collapsible="icon" {...props}>
       <SidebarHeader>
-        <SidebarMenu>
-          <SidebarMenuItem>
-            <SidebarMenuButton
-              asChild
-              className="data-[slot=sidebar-menu-button]:!p-1.5"
-            >
-              <Link href="#">
-                <IconInnerShadowTop className="!size-5" />
-                <span className="text-base font-semibold">Acme Inc.</span>
-              </Link>
-            </SidebarMenuButton>
-          </SidebarMenuItem>
-        </SidebarMenu>
+        <TokenSwitcher tokens={props.tokens} />
       </SidebarHeader>
       <SidebarContent>
-        <NavMain items={data.navMain} />
-        <NavDocuments items={data.documents} />
+        <NavMain
+          items={data.tokenSpecificRoutes}
+          currentToken={effectiveToken}
+        />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>
-      <SidebarFooter>
-        <NavUser user={data.user} />
-      </SidebarFooter>
     </Sidebar>
   );
-}
+});

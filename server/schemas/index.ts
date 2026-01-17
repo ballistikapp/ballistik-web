@@ -4,7 +4,5 @@
  */
 
 export * from "./test.schema";
-// Add more schema exports as you create them:
-// export * from './project.schema';
-// export * from './wallet.schema';
-// export * from './token.schema';
+export * from "./auth.schema";
+export * from "./wallet.schema";

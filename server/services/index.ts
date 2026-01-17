@@ -4,6 +4,5 @@
  */
 
 export * from "./test.service";
-// export * from './project.service';
-// export * from './wallet.service';
-// export * from './token.service';
+export * from "./auth.service";
+export * from "./wallet.service";

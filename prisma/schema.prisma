@@ -9,8 +9,118 @@ datasource db {
 
 model TestTable {
   id          String   @id @default(cuid())
-  name        String
+  name        String @unique
   createdAt   DateTime @default(now())
 
   @@map("TestTable")
+}
+
+model User {
+  id String @id @default(cuid())
+  name String
+  mainWalletPublicKey String @unique
+  mainWallet Wallet @relation("UserMainWallet", fields: [mainWalletPublicKey], references: [publicKey])
+  wallets Wallet[] @relation("WalletUser")
+  tokens Token[] @relation("TokenUser")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("User")
+}
+
+model Wallet {
+  publicKey String @id @unique
+  privateKey String @unique
+  type WalletType
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User? @relation("WalletUser", fields: [userId], references: [id])
+  userId String?
+  mainWalletUser User? @relation("UserMainWallet")
+  tokens Token[] @relation("TokenWallets")
+  balanceSol Decimal @default(0)
+  balanceRefreshedAt DateTime?
+  isImported Boolean @default(false)
+  holdings Holding[] @relation("WalletHoldings")
+  transactions Transaction[] @relation("WalletTransactions")
+  @@map("Wallet")
+}
+
+enum WalletType {
+  MAIN_WALLET
+  DEV
+  BUNDLER
+  VOLUME
+  DISTRIBUTION
+}
+
+model Token {
+  publicKey String @id @unique
+  privateKey String @unique
+  name String
+  symbol String
+  description String?
+  imageUrl String?
+  websiteUrl String?
+  twitterUrl String?
+  telegramUrl String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  userId String
+  user User @relation("TokenUser", fields: [userId], references: [id])
+  wallets Wallet[] @relation("TokenWallets")
+  holdings Holding[] @relation("TokenHoldings")
+  transactions Transaction[] @relation("TokenTransactions")
+  @@map("Token")
+}
+
+model Holding {
+  id String @id @default(cuid())
+  walletPublicKey String
+  tokenPublicKey String
+  tokenBalance Decimal
+  totalBuyAmount Decimal
+  totalSellAmount Decimal
+  averageBuyPrice Decimal
+  lastTransactionSignature String
+  lastUpdated DateTime @default(now())
+  createdAt DateTime @default(now())
+  wallet Wallet @relation("WalletHoldings", fields: [walletPublicKey], references: [publicKey])
+  token Token @relation("TokenHoldings", fields: [tokenPublicKey], references: [publicKey])
+  mintAddress String
+  tokenName String
+  tokenSymbol String
+  tokenImageUrl String
+  tokenDecimals Int
+  @@map("Holding")
+}
+
+enum TransactionType {
+  BUY
+  SELL
+  CREATE
+}
+
+enum TransactionStatus {
+  PENDING
+  CONFIRMED
+  FAILED
+}
+model Transaction {
+  id String @id @default(cuid())
+  walletPublicKey String
+  wallet Wallet @relation("WalletTransactions", fields: [walletPublicKey], references: [publicKey])
+  tokenPublicKey String
+  token Token @relation("TokenTransactions", fields: [tokenPublicKey], references: [publicKey])
+  transactionType TransactionType
+  status TransactionStatus
+  transactionSignature String
+  solAmount Decimal
+  tokenAmount Decimal
+  pricePerToken Decimal
+  slippageBps Int
+  feeAmount Decimal
+  blockTime DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@map("Transaction")
 }

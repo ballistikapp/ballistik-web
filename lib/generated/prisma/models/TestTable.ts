@@ -176,12 +176,12 @@ export type TestTableOrderByWithRelationInput = {
 
 export type TestTableWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  name?: string
   AND?: Prisma.TestTableWhereInput | Prisma.TestTableWhereInput[]
   OR?: Prisma.TestTableWhereInput[]
   NOT?: Prisma.TestTableWhereInput | Prisma.TestTableWhereInput[]
-  name?: Prisma.StringFilter<"TestTable"> | string
   createdAt?: Prisma.DateTimeFilter<"TestTable"> | Date | string
-}, "id">
+}, "id" | "name">
 
 export type TestTableOrderByWithAggregationInput = {
   id?: Prisma.SortOrder

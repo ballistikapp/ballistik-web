@@ -22,3 +22,28 @@ export * from './enums';
  * 
  */
 export type TestTable = Prisma.TestTableModel
+/**
+ * Model User
+ * 
+ */
+export type User = Prisma.UserModel
+/**
+ * Model Wallet
+ * 
+ */
+export type Wallet = Prisma.WalletModel
+/**
+ * Model Token
+ * 
+ */
+export type Token = Prisma.TokenModel
+/**
+ * Model Holding
+ * 
+ */
+export type Holding = Prisma.HoldingModel
+/**
+ * Model Transaction
+ * 
+ */
+export type Transaction = Prisma.TransactionModel

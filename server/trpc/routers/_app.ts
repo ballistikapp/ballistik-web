@@ -1,16 +1,14 @@
 import { router } from "../trpc";
 import { testRouter } from "./test.router";
+import { authRouter } from "./auth.router";
+import { tokenRouter } from "./token.router";
+import { walletRouter } from "./wallet.router";
 
-/**
- * Main app router - combines all sub-routers
- * Add new routers here as you create them
- */
 export const appRouter = router({
   test: testRouter,
-  // Add more routers here:
-  // project: projectRouter,
-  // wallet: walletRouter,
-  // token: tokenRouter,
+  auth: authRouter,
+  token: tokenRouter,
+  wallet: walletRouter,
 });
 
 export type AppRouter = typeof appRouter;

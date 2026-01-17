@@ -51,7 +51,12 @@ export const AnyNull = runtime.AnyNull
 
 
 export const ModelName = {
-  TestTable: 'TestTable'
+  TestTable: 'TestTable',
+  User: 'User',
+  Wallet: 'Wallet',
+  Token: 'Token',
+  Holding: 'Holding',
+  Transaction: 'Transaction'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -79,6 +84,91 @@ export const TestTableScalarFieldEnum = {
 export type TestTableScalarFieldEnum = (typeof TestTableScalarFieldEnum)[keyof typeof TestTableScalarFieldEnum]
 
 
+export const UserScalarFieldEnum = {
+  id: 'id',
+  name: 'name',
+  mainWalletPublicKey: 'mainWalletPublicKey',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const WalletScalarFieldEnum = {
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  type: 'type',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  userId: 'userId',
+  balanceSol: 'balanceSol',
+  balanceRefreshedAt: 'balanceRefreshedAt',
+  isImported: 'isImported'
+} as const
+
+export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof WalletScalarFieldEnum]
+
+
+export const TokenScalarFieldEnum = {
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  name: 'name',
+  symbol: 'symbol',
+  description: 'description',
+  imageUrl: 'imageUrl',
+  websiteUrl: 'websiteUrl',
+  twitterUrl: 'twitterUrl',
+  telegramUrl: 'telegramUrl',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt',
+  userId: 'userId'
+} as const
+
+export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
+
+
+export const HoldingScalarFieldEnum = {
+  id: 'id',
+  walletPublicKey: 'walletPublicKey',
+  tokenPublicKey: 'tokenPublicKey',
+  tokenBalance: 'tokenBalance',
+  totalBuyAmount: 'totalBuyAmount',
+  totalSellAmount: 'totalSellAmount',
+  averageBuyPrice: 'averageBuyPrice',
+  lastTransactionSignature: 'lastTransactionSignature',
+  lastUpdated: 'lastUpdated',
+  createdAt: 'createdAt',
+  mintAddress: 'mintAddress',
+  tokenName: 'tokenName',
+  tokenSymbol: 'tokenSymbol',
+  tokenImageUrl: 'tokenImageUrl',
+  tokenDecimals: 'tokenDecimals'
+} as const
+
+export type HoldingScalarFieldEnum = (typeof HoldingScalarFieldEnum)[keyof typeof HoldingScalarFieldEnum]
+
+
+export const TransactionScalarFieldEnum = {
+  id: 'id',
+  walletPublicKey: 'walletPublicKey',
+  tokenPublicKey: 'tokenPublicKey',
+  transactionType: 'transactionType',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  solAmount: 'solAmount',
+  tokenAmount: 'tokenAmount',
+  pricePerToken: 'pricePerToken',
+  slippageBps: 'slippageBps',
+  feeAmount: 'feeAmount',
+  blockTime: 'blockTime',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -93,4 +183,12 @@ export const QueryMode = {
 } as const
 
 export type QueryMode = (typeof QueryMode)[keyof typeof QueryMode]
+
+
+export const NullsOrder = {
+  first: 'first',
+  last: 'last'
+} as const
+
+export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
 

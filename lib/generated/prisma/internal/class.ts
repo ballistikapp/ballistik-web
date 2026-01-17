@@ -20,7 +20,7 @@ const config: runtime.GetPrismaClientConfig = {
   "clientVersion": "7.2.0",
   "engineVersion": "0c8ef2ce45c83248ab3df073180d5eda9e8be7a3",
   "activeProvider": "postgresql",
-  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../lib/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel TestTable {\n  id        String   @id @default(cuid())\n  name      String\n  createdAt DateTime @default(now())\n\n  @@map(\"TestTable\")\n}\n",
+  "inlineSchema": "generator client {\n  provider = \"prisma-client\"\n  output   = \"../lib/generated/prisma\"\n}\n\ndatasource db {\n  provider = \"postgresql\"\n}\n\nmodel TestTable {\n  id        String   @id @default(cuid())\n  name      String   @unique\n  createdAt DateTime @default(now())\n\n  @@map(\"TestTable\")\n}\n\nmodel User {\n  id                  String   @id @default(cuid())\n  name                String\n  mainWalletPublicKey String   @unique\n  mainWallet          Wallet   @relation(\"UserMainWallet\", fields: [mainWalletPublicKey], references: [publicKey])\n  wallets             Wallet[] @relation(\"WalletUser\")\n  tokens              Token[]  @relation(\"TokenUser\")\n  createdAt           DateTime @default(now())\n  updatedAt           DateTime @updatedAt\n\n  @@map(\"User\")\n}\n\nmodel Wallet {\n  publicKey          String        @id @unique\n  privateKey         String        @unique\n  type               WalletType\n  createdAt          DateTime      @default(now())\n  updatedAt          DateTime      @updatedAt\n  user               User?         @relation(\"WalletUser\", fields: [userId], references: [id])\n  userId             String?\n  mainWalletUser     User?         @relation(\"UserMainWallet\")\n  tokens             Token[]       @relation(\"TokenWallets\")\n  balanceSol         Decimal       @default(0)\n  balanceRefreshedAt DateTime?\n  isImported         Boolean       @default(false)\n  holdings           Holding[]     @relation(\"WalletHoldings\")\n  transactions       Transaction[] @relation(\"WalletTransactions\")\n\n  @@map(\"Wallet\")\n}\n\nenum WalletType {\n  MAIN_WALLET\n  DEV\n  BUNDLER\n  VOLUME\n  DISTRIBUTION\n}\n\nmodel Token {\n  publicKey    String        @id @unique\n  privateKey   String        @unique\n  name         String\n  symbol       String\n  description  String?\n  imageUrl     String?\n  websiteUrl   String?\n  twitterUrl   String?\n  telegramUrl  String?\n  createdAt    DateTime      @default(now())\n  updatedAt    DateTime      @updatedAt\n  userId       String\n  user         User          @relation(\"TokenUser\", fields: [userId], references: [id])\n  wallets      Wallet[]      @relation(\"TokenWallets\")\n  holdings     Holding[]     @relation(\"TokenHoldings\")\n  transactions Transaction[] @relation(\"TokenTransactions\")\n\n  @@map(\"Token\")\n}\n\nmodel Holding {\n  id                       String   @id @default(cuid())\n  walletPublicKey          String\n  tokenPublicKey           String\n  tokenBalance             Decimal\n  totalBuyAmount           Decimal\n  totalSellAmount          Decimal\n  averageBuyPrice          Decimal\n  lastTransactionSignature String\n  lastUpdated              DateTime @default(now())\n  createdAt                DateTime @default(now())\n  wallet                   Wallet   @relation(\"WalletHoldings\", fields: [walletPublicKey], references: [publicKey])\n  token                    Token    @relation(\"TokenHoldings\", fields: [tokenPublicKey], references: [publicKey])\n  mintAddress              String\n  tokenName                String\n  tokenSymbol              String\n  tokenImageUrl            String\n  tokenDecimals            Int\n\n  @@map(\"Holding\")\n}\n\nenum TransactionType {\n  BUY\n  SELL\n  CREATE\n}\n\nenum TransactionStatus {\n  PENDING\n  CONFIRMED\n  FAILED\n}\n\nmodel Transaction {\n  id                   String            @id @default(cuid())\n  walletPublicKey      String\n  wallet               Wallet            @relation(\"WalletTransactions\", fields: [walletPublicKey], references: [publicKey])\n  tokenPublicKey       String\n  token                Token             @relation(\"TokenTransactions\", fields: [tokenPublicKey], references: [publicKey])\n  transactionType      TransactionType\n  status               TransactionStatus\n  transactionSignature String\n  solAmount            Decimal\n  tokenAmount          Decimal\n  pricePerToken        Decimal\n  slippageBps          Int\n  feeAmount            Decimal\n  blockTime            DateTime?\n  createdAt            DateTime          @default(now())\n  updatedAt            DateTime          @updatedAt\n\n  @@map(\"Transaction\")\n}\n",
   "runtimeDataModel": {
     "models": {},
     "enums": {},
@@ -28,7 +28,7 @@ const config: runtime.GetPrismaClientConfig = {
   }
 }
 
-config.runtimeDataModel = JSON.parse("{\"models\":{\"TestTable\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":\"TestTable\"}},\"enums\":{},\"types\":{}}")
+config.runtimeDataModel = JSON.parse("{\"models\":{\"TestTable\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":\"TestTable\"},\"User\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"mainWalletPublicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"mainWallet\",\"kind\":\"object\",\"type\":\"Wallet\",\"relationName\":\"UserMainWallet\"},{\"name\":\"wallets\",\"kind\":\"object\",\"type\":\"Wallet\",\"relationName\":\"WalletUser\"},{\"name\":\"tokens\",\"kind\":\"object\",\"type\":\"Token\",\"relationName\":\"TokenUser\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":\"User\"},\"Wallet\":{\"fields\":[{\"name\":\"publicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"privateKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"type\",\"kind\":\"enum\",\"type\":\"WalletType\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"WalletUser\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"mainWalletUser\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"UserMainWallet\"},{\"name\":\"tokens\",\"kind\":\"object\",\"type\":\"Token\",\"relationName\":\"TokenWallets\"},{\"name\":\"balanceSol\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"balanceRefreshedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"isImported\",\"kind\":\"scalar\",\"type\":\"Boolean\"},{\"name\":\"holdings\",\"kind\":\"object\",\"type\":\"Holding\",\"relationName\":\"WalletHoldings\"},{\"name\":\"transactions\",\"kind\":\"object\",\"type\":\"Transaction\",\"relationName\":\"WalletTransactions\"}],\"dbName\":\"Wallet\"},\"Token\":{\"fields\":[{\"name\":\"publicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"privateKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"name\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"symbol\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"description\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"imageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"websiteUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"twitterUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"telegramUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"userId\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"user\",\"kind\":\"object\",\"type\":\"User\",\"relationName\":\"TokenUser\"},{\"name\":\"wallets\",\"kind\":\"object\",\"type\":\"Wallet\",\"relationName\":\"TokenWallets\"},{\"name\":\"holdings\",\"kind\":\"object\",\"type\":\"Holding\",\"relationName\":\"TokenHoldings\"},{\"name\":\"transactions\",\"kind\":\"object\",\"type\":\"Transaction\",\"relationName\":\"TokenTransactions\"}],\"dbName\":\"Token\"},\"Holding\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"walletPublicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenPublicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenBalance\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"totalBuyAmount\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"totalSellAmount\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"averageBuyPrice\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"lastTransactionSignature\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"lastUpdated\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"wallet\",\"kind\":\"object\",\"type\":\"Wallet\",\"relationName\":\"WalletHoldings\"},{\"name\":\"token\",\"kind\":\"object\",\"type\":\"Token\",\"relationName\":\"TokenHoldings\"},{\"name\":\"mintAddress\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenName\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenSymbol\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenImageUrl\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"tokenDecimals\",\"kind\":\"scalar\",\"type\":\"Int\"}],\"dbName\":\"Holding\"},\"Transaction\":{\"fields\":[{\"name\":\"id\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"walletPublicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"wallet\",\"kind\":\"object\",\"type\":\"Wallet\",\"relationName\":\"WalletTransactions\"},{\"name\":\"tokenPublicKey\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"token\",\"kind\":\"object\",\"type\":\"Token\",\"relationName\":\"TokenTransactions\"},{\"name\":\"transactionType\",\"kind\":\"enum\",\"type\":\"TransactionType\"},{\"name\":\"status\",\"kind\":\"enum\",\"type\":\"TransactionStatus\"},{\"name\":\"transactionSignature\",\"kind\":\"scalar\",\"type\":\"String\"},{\"name\":\"solAmount\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"tokenAmount\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"pricePerToken\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"slippageBps\",\"kind\":\"scalar\",\"type\":\"Int\"},{\"name\":\"feeAmount\",\"kind\":\"scalar\",\"type\":\"Decimal\"},{\"name\":\"blockTime\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"createdAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"},{\"name\":\"updatedAt\",\"kind\":\"scalar\",\"type\":\"DateTime\"}],\"dbName\":\"Transaction\"}},\"enums\":{},\"types\":{}}")
 
 async function decodeBase64AsWasm(wasmBase64: string): Promise<WebAssembly.Module> {
   const { Buffer } = await import('node:buffer')
@@ -183,6 +183,56 @@ export interface PrismaClient<
     * ```
     */
   get testTable(): Prisma.TestTableDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.user`: Exposes CRUD operations for the **User** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Users
+    * const users = await prisma.user.findMany()
+    * ```
+    */
+  get user(): Prisma.UserDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.wallet`: Exposes CRUD operations for the **Wallet** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Wallets
+    * const wallets = await prisma.wallet.findMany()
+    * ```
+    */
+  get wallet(): Prisma.WalletDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.token`: Exposes CRUD operations for the **Token** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Tokens
+    * const tokens = await prisma.token.findMany()
+    * ```
+    */
+  get token(): Prisma.TokenDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.holding`: Exposes CRUD operations for the **Holding** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Holdings
+    * const holdings = await prisma.holding.findMany()
+    * ```
+    */
+  get holding(): Prisma.HoldingDelegate<ExtArgs, { omit: OmitOpts }>;
+
+  /**
+   * `prisma.transaction`: Exposes CRUD operations for the **Transaction** model.
+    * Example usage:
+    * ```ts
+    * // Fetch zero or more Transactions
+    * const transactions = await prisma.transaction.findMany()
+    * ```
+    */
+  get transaction(): Prisma.TransactionDelegate<ExtArgs, { omit: OmitOpts }>;
 }
 
 export function getPrismaClientClass(): PrismaClientConstructor {
