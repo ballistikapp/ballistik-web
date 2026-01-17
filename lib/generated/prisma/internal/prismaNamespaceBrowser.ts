@@ -55,6 +55,9 @@ export const ModelName = {
   User: 'User',
   Wallet: 'Wallet',
   Token: 'Token',
+  Launch: 'Launch',
+  LaunchLog: 'LaunchLog',
+  VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction'
 } as const
@@ -128,6 +131,54 @@ export const TokenScalarFieldEnum = {
 export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
 
 
+export const LaunchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  status: 'status',
+  progress: 'progress',
+  currentStep: 'currentStep',
+  input: 'input',
+  result: 'result',
+  tokenPublicKey: 'tokenPublicKey',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  cancelRequestedAt: 'cancelRequestedAt',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
+
+
+export const LaunchLogScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  level: 'level',
+  message: 'message',
+  step: 'step',
+  data: 'data',
+  createdAt: 'createdAt'
+} as const
+
+export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
+
+
+export const VanityMintScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  reservedAt: 'reservedAt',
+  usedAt: 'usedAt',
+  tokenPublicKey: 'tokenPublicKey',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VanityMintScalarFieldEnum = (typeof VanityMintScalarFieldEnum)[keyof typeof VanityMintScalarFieldEnum]
+
+
 export const HoldingScalarFieldEnum = {
   id: 'id',
   walletPublicKey: 'walletPublicKey',
@@ -177,6 +228,21 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: 'JsonNull'
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: 'DbNull',
+  JsonNull: 'JsonNull'
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -191,4 +257,13 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: 'DbNull',
+  JsonNull: 'JsonNull',
+  AnyNull: 'AnyNull'
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 

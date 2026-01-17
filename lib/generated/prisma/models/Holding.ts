@@ -691,14 +691,6 @@ export type HoldingUncheckedUpdateManyWithoutTokenNestedInput = {
   deleteMany?: Prisma.HoldingScalarWhereInput | Prisma.HoldingScalarWhereInput[]
 }
 
-export type IntFieldUpdateOperationsInput = {
-  set?: number
-  increment?: number
-  decrement?: number
-  multiply?: number
-  divide?: number
-}
-
 export type HoldingCreateWithoutWalletInput = {
   id?: string
   tokenBalance: runtime.Decimal | runtime.DecimalJsLike | number | string

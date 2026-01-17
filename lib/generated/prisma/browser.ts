@@ -38,6 +38,21 @@ export type Wallet = Prisma.WalletModel
  */
 export type Token = Prisma.TokenModel
 /**
+ * Model Launch
+ * 
+ */
+export type Launch = Prisma.LaunchModel
+/**
+ * Model LaunchLog
+ * 
+ */
+export type LaunchLog = Prisma.LaunchLogModel
+/**
+ * Model VanityMint
+ * 
+ */
+export type VanityMint = Prisma.VanityMintModel
+/**
  * Model Holding
  * 
  */

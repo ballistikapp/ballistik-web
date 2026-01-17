@@ -37,8 +37,8 @@ import {
 import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog";
+import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
 import { trpc } from "@/lib/trpc/client";
-import { useRouter } from "next/navigation";
 
 const formSchema = z.object({
   tokenName: z
@@ -95,24 +95,99 @@ const steps = [
 export function LaunchForm() {
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = React.useState(false);
+  const [activeLaunchId, setActiveLaunchId] = React.useState<string | null>(null);
+  const [isProgressOpen, setIsProgressOpen] = React.useState(false);
+  const [launchNotified, setLaunchNotified] = React.useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
-  const router = useRouter();
+  const launchStorageKey = "sollabs.launch.active";
 
-  const createTokenMutation = trpc.token.create.useMutation({
+  const startLaunchMutation = trpc.launch.start.useMutation({
     onSuccess: (data) => {
-      toast.success("Token created successfully!", {
-        description: `Token ${data.name} has been created.`,
+      toast.success("Launch started", {
+        description: "Your token launch is now in progress.",
       });
       setShowLaunchDialog(false);
-      router.push(`/dashboard?token=${data.publicKey}`);
+      setActiveLaunchId(data.launchId);
+      setIsProgressOpen(true);
+      setLaunchNotified(false);
+      window.localStorage.setItem(launchStorageKey, data.launchId);
     },
     onError: (error) => {
-      toast.error("Failed to create token", {
-        description:
-          error.message || "An error occurred while creating the token.",
+      toast.error("Failed to start launch", {
+        description: error.message || "Unable to start the launch.",
       });
     },
   });
+
+  const cancelLaunchMutation = trpc.launch.cancel.useMutation({
+    onSuccess: () => {
+      toast.message("Cancel requested", {
+        description: "The launch will stop as soon as it is safe.",
+      });
+    },
+    onError: (error) => {
+      toast.error("Failed to cancel launch", {
+        description: error.message || "Unable to cancel the launch.",
+      });
+    },
+  });
+
+  const activeLaunchQuery = trpc.launch.getActive.useQuery();
+  const launchStatusQuery = trpc.launch.status.useQuery(
+    { launchId: activeLaunchId ?? "" },
+    {
+      enabled: Boolean(activeLaunchId),
+      refetchInterval: activeLaunchId ? 2000 : false,
+    }
+  );
+
+  React.useEffect(() => {
+    const stored = window.localStorage.getItem(launchStorageKey);
+    if (stored) {
+      setActiveLaunchId(stored);
+      setIsProgressOpen(true);
+    }
+  }, []);
+
+  React.useEffect(() => {
+    if (!activeLaunchId && activeLaunchQuery.data) {
+      setActiveLaunchId(activeLaunchQuery.data.id);
+      setIsProgressOpen(true);
+      window.localStorage.setItem(launchStorageKey, activeLaunchQuery.data.id);
+    }
+  }, [activeLaunchId, activeLaunchQuery.data]);
+
+  React.useEffect(() => {
+    const launch = launchStatusQuery.data;
+    if (!launch) {
+      return;
+    }
+
+    if (launch.status === "SUCCEEDED" && !launchNotified) {
+      toast.success("Launch complete", {
+        description: `Token ${launch.tokenPublicKey} is live.`,
+      });
+      setLaunchNotified(true);
+    }
+
+    if (launch.status === "FAILED" && !launchNotified) {
+      toast.error("Launch failed", {
+        description: launch.errorMessage || "Something went wrong during launch.",
+      });
+      setLaunchNotified(true);
+    }
+
+    if (launch.status === "CANCELED" && !launchNotified) {
+      toast.message("Launch canceled", {
+        description: "The launch has been stopped.",
+      });
+      setLaunchNotified(true);
+    }
+
+    if (launch.status !== "PENDING" && launch.status !== "RUNNING") {
+      window.localStorage.removeItem(launchStorageKey);
+    }
+  }, [launchNotified, launchStatusQuery.data]);
 
   const scrollToStep = (stepId: string) => {
     const element = document.getElementById(stepId);
@@ -187,15 +262,24 @@ export function LaunchForm() {
       });
       return;
     }
-
-    createTokenMutation.mutate({
+    startLaunchMutation.mutate({
       tokenName: values.tokenName,
       tokenSymbol: values.tokenSymbol,
       description: values.description,
-      tokenImage: values.tokenImage || undefined,
+      tokenImage: values.tokenImage,
       twitter: values.twitter || undefined,
       telegram: values.telegram || undefined,
       website: values.website || undefined,
+      devWalletOption: values.devWalletOption,
+      importedDevWalletKey: values.importedDevWalletKey || undefined,
+      devBuyAmount: values.devBuyAmount,
+      jitoTipAmount: values.jitoTipAmount,
+      bundleBuyEnabled: values.bundleBuyEnabled,
+      vanityMint: values.vanityMint,
+      numberOfWallets: values.numberOfWallets,
+      buyAmountPerWallet: values.buyAmountPerWallet,
+      buyAmountVariance: values.buyAmountVariance,
+      distributionMultiplier: values.distributionMultiplier,
     });
   };
 
@@ -1046,7 +1130,24 @@ export function LaunchForm() {
           onConfirm={handleConfirmLaunch}
           formValues={form.state.values}
           imagePreview={imagePreview}
-          isLoading={createTokenMutation.isPending}
+          isLoading={startLaunchMutation.isPending}
+        />
+        <LaunchProgressDialog
+          open={isProgressOpen}
+          onOpenChange={setIsProgressOpen}
+          launch={launchStatusQuery.data ?? activeLaunchQuery.data ?? null}
+          onCancel={() => {
+            if (activeLaunchId) {
+              cancelLaunchMutation.mutate({ launchId: activeLaunchId });
+            }
+          }}
+          onClose={() => {
+            setIsProgressOpen(false);
+            const status = launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
+            if (status && status !== "PENDING" && status !== "RUNNING") {
+              setActiveLaunchId(null);
+            }
+          }}
         />
       </div>
       <div className="w-80 shrink-0">

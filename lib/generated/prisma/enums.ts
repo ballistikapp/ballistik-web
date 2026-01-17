@@ -20,6 +20,27 @@ export const WalletType = {
 export type WalletType = (typeof WalletType)[keyof typeof WalletType]
 
 
+export const LaunchStatus = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  CANCELED: 'CANCELED',
+  FAILED: 'FAILED',
+  SUCCEEDED: 'SUCCEEDED'
+} as const
+
+export type LaunchStatus = (typeof LaunchStatus)[keyof typeof LaunchStatus]
+
+
+export const LaunchLogLevel = {
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+  STEP: 'STEP'
+} as const
+
+export type LaunchLogLevel = (typeof LaunchLogLevel)[keyof typeof LaunchLogLevel]
+
+
 export const TransactionType = {
   BUY: 'BUY',
   SELL: 'SELL',

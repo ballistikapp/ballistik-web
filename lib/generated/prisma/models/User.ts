@@ -185,6 +185,8 @@ export type UserWhereInput = {
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
   wallets?: Prisma.WalletListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
+  launches?: Prisma.LaunchListRelationFilter
+  vanityMints?: Prisma.VanityMintListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -196,6 +198,8 @@ export type UserOrderByWithRelationInput = {
   mainWallet?: Prisma.WalletOrderByWithRelationInput
   wallets?: Prisma.WalletOrderByRelationAggregateInput
   tokens?: Prisma.TokenOrderByRelationAggregateInput
+  launches?: Prisma.LaunchOrderByRelationAggregateInput
+  vanityMints?: Prisma.VanityMintOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -210,6 +214,8 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
   wallets?: Prisma.WalletListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
+  launches?: Prisma.LaunchListRelationFilter
+  vanityMints?: Prisma.VanityMintListRelationFilter
 }, "id" | "mainWalletPublicKey">
 
 export type UserOrderByWithAggregationInput = {
@@ -242,6 +248,8 @@ export type UserCreateInput = {
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -252,6 +260,8 @@ export type UserUncheckedCreateInput = {
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -262,6 +272,8 @@ export type UserUpdateInput = {
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -272,6 +284,8 @@ export type UserUncheckedUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -393,6 +407,36 @@ export type UserUpdateOneRequiredWithoutTokensNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutTokensInput, Prisma.UserUpdateWithoutTokensInput>, Prisma.UserUncheckedUpdateWithoutTokensInput>
 }
 
+export type UserCreateNestedOneWithoutLaunchesInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutLaunchesInput, Prisma.UserUncheckedCreateWithoutLaunchesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutLaunchesInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutLaunchesNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutLaunchesInput, Prisma.UserUncheckedCreateWithoutLaunchesInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutLaunchesInput
+  upsert?: Prisma.UserUpsertWithoutLaunchesInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutLaunchesInput, Prisma.UserUpdateWithoutLaunchesInput>, Prisma.UserUncheckedUpdateWithoutLaunchesInput>
+}
+
+export type UserCreateNestedOneWithoutVanityMintsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutVanityMintsInput, Prisma.UserUncheckedCreateWithoutVanityMintsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutVanityMintsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneWithoutVanityMintsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutVanityMintsInput, Prisma.UserUncheckedCreateWithoutVanityMintsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutVanityMintsInput
+  upsert?: Prisma.UserUpsertWithoutVanityMintsInput
+  disconnect?: Prisma.UserWhereInput | boolean
+  delete?: Prisma.UserWhereInput | boolean
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutVanityMintsInput, Prisma.UserUpdateWithoutVanityMintsInput>, Prisma.UserUncheckedUpdateWithoutVanityMintsInput>
+}
+
 export type UserCreateWithoutWalletsInput = {
   id?: string
   name: string
@@ -400,6 +444,8 @@ export type UserCreateWithoutWalletsInput = {
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWalletsInput = {
@@ -409,6 +455,8 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWalletsInput = {
@@ -423,6 +471,8 @@ export type UserCreateWithoutMainWalletInput = {
   updatedAt?: Date | string
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMainWalletInput = {
@@ -432,6 +482,8 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMainWalletInput = {
@@ -457,6 +509,8 @@ export type UserUpdateWithoutWalletsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWalletsInput = {
@@ -466,6 +520,8 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutMainWalletInput = {
@@ -486,6 +542,8 @@ export type UserUpdateWithoutMainWalletInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMainWalletInput = {
@@ -495,6 +553,8 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTokensInput = {
@@ -504,6 +564,8 @@ export type UserCreateWithoutTokensInput = {
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTokensInput = {
@@ -513,6 +575,8 @@ export type UserUncheckedCreateWithoutTokensInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTokensInput = {
@@ -538,6 +602,8 @@ export type UserUpdateWithoutTokensInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTokensInput = {
@@ -547,6 +613,128 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutLaunchesInput = {
+  id?: string
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutLaunchesInput = {
+  id?: string
+  name: string
+  mainWalletPublicKey: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutLaunchesInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutLaunchesInput, Prisma.UserUncheckedCreateWithoutLaunchesInput>
+}
+
+export type UserUpsertWithoutLaunchesInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutLaunchesInput, Prisma.UserUncheckedUpdateWithoutLaunchesInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutLaunchesInput, Prisma.UserUncheckedCreateWithoutLaunchesInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutLaunchesInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutLaunchesInput, Prisma.UserUncheckedUpdateWithoutLaunchesInput>
+}
+
+export type UserUpdateWithoutLaunchesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutLaunchesInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutVanityMintsInput = {
+  id?: string
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutVanityMintsInput = {
+  id?: string
+  name: string
+  mainWalletPublicKey: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutVanityMintsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutVanityMintsInput, Prisma.UserUncheckedCreateWithoutVanityMintsInput>
+}
+
+export type UserUpsertWithoutVanityMintsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutVanityMintsInput, Prisma.UserUncheckedUpdateWithoutVanityMintsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutVanityMintsInput, Prisma.UserUncheckedCreateWithoutVanityMintsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutVanityMintsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutVanityMintsInput, Prisma.UserUncheckedUpdateWithoutVanityMintsInput>
+}
+
+export type UserUpdateWithoutVanityMintsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutVanityMintsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -557,11 +745,15 @@ export type UserUncheckedUpdateWithoutTokensInput = {
 export type UserCountOutputType = {
   wallets: number
   tokens: number
+  launches: number
+  vanityMints: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   wallets?: boolean | UserCountOutputTypeCountWalletsArgs
   tokens?: boolean | UserCountOutputTypeCountTokensArgs
+  launches?: boolean | UserCountOutputTypeCountLaunchesArgs
+  vanityMints?: boolean | UserCountOutputTypeCountVanityMintsArgs
 }
 
 /**
@@ -588,6 +780,20 @@ export type UserCountOutputTypeCountTokensArgs<ExtArgs extends runtime.Types.Ext
   where?: Prisma.TokenWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountLaunchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LaunchWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountVanityMintsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.VanityMintWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -598,6 +804,8 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
+  launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
+  vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -632,6 +840,8 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
+  launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
+  vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -647,6 +857,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     mainWallet: Prisma.$WalletPayload<ExtArgs>
     wallets: Prisma.$WalletPayload<ExtArgs>[]
     tokens: Prisma.$TokenPayload<ExtArgs>[]
+    launches: Prisma.$LaunchPayload<ExtArgs>[]
+    vanityMints: Prisma.$VanityMintPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1051,6 +1263,8 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   mainWallet<T extends Prisma.WalletDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WalletDefaultArgs<ExtArgs>>): Prisma.Prisma__WalletClient<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   wallets<T extends Prisma.User$walletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$walletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tokens<T extends Prisma.User$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  launches<T extends Prisma.User$launchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$launchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  vanityMints<T extends Prisma.User$vanityMintsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$vanityMintsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VanityMintPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1526,6 +1740,54 @@ export type User$tokensArgs<ExtArgs extends runtime.Types.Extensions.InternalArg
   take?: number
   skip?: number
   distinct?: Prisma.TokenScalarFieldEnum | Prisma.TokenScalarFieldEnum[]
+}
+
+/**
+ * User.launches
+ */
+export type User$launchesArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Launch
+   */
+  select?: Prisma.LaunchSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Launch
+   */
+  omit?: Prisma.LaunchOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LaunchInclude<ExtArgs> | null
+  where?: Prisma.LaunchWhereInput
+  orderBy?: Prisma.LaunchOrderByWithRelationInput | Prisma.LaunchOrderByWithRelationInput[]
+  cursor?: Prisma.LaunchWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LaunchScalarFieldEnum | Prisma.LaunchScalarFieldEnum[]
+}
+
+/**
+ * User.vanityMints
+ */
+export type User$vanityMintsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the VanityMint
+   */
+  select?: Prisma.VanityMintSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the VanityMint
+   */
+  omit?: Prisma.VanityMintOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.VanityMintInclude<ExtArgs> | null
+  where?: Prisma.VanityMintWhereInput
+  orderBy?: Prisma.VanityMintOrderByWithRelationInput | Prisma.VanityMintOrderByWithRelationInput[]
+  cursor?: Prisma.VanityMintWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.VanityMintScalarFieldEnum | Prisma.VanityMintScalarFieldEnum[]
 }
 
 /**

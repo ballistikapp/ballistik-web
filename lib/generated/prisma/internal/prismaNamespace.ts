@@ -388,6 +388,9 @@ export const ModelName = {
   User: 'User',
   Wallet: 'Wallet',
   Token: 'Token',
+  Launch: 'Launch',
+  LaunchLog: 'LaunchLog',
+  VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction'
 } as const
@@ -405,7 +408,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "holding" | "transaction"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "launch" | "launchLog" | "vanityMint" | "holding" | "transaction"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -705,6 +708,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    Launch: {
+      payload: Prisma.$LaunchPayload<ExtArgs>
+      fields: Prisma.LaunchFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LaunchFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LaunchFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        findFirst: {
+          args: Prisma.LaunchFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LaunchFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        findMany: {
+          args: Prisma.LaunchFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>[]
+        }
+        create: {
+          args: Prisma.LaunchCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        createMany: {
+          args: Prisma.LaunchCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LaunchCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>[]
+        }
+        delete: {
+          args: Prisma.LaunchDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        update: {
+          args: Prisma.LaunchUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        deleteMany: {
+          args: Prisma.LaunchDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LaunchUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LaunchUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>[]
+        }
+        upsert: {
+          args: Prisma.LaunchUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPayload>
+        }
+        aggregate: {
+          args: Prisma.LaunchAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLaunch>
+        }
+        groupBy: {
+          args: Prisma.LaunchGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LaunchCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchCountAggregateOutputType> | number
+        }
+      }
+    }
+    LaunchLog: {
+      payload: Prisma.$LaunchLogPayload<ExtArgs>
+      fields: Prisma.LaunchLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LaunchLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LaunchLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        findFirst: {
+          args: Prisma.LaunchLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LaunchLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        findMany: {
+          args: Prisma.LaunchLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>[]
+        }
+        create: {
+          args: Prisma.LaunchLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        createMany: {
+          args: Prisma.LaunchLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LaunchLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>[]
+        }
+        delete: {
+          args: Prisma.LaunchLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        update: {
+          args: Prisma.LaunchLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.LaunchLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LaunchLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LaunchLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.LaunchLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchLogPayload>
+        }
+        aggregate: {
+          args: Prisma.LaunchLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLaunchLog>
+        }
+        groupBy: {
+          args: Prisma.LaunchLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LaunchLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchLogCountAggregateOutputType> | number
+        }
+      }
+    }
+    VanityMint: {
+      payload: Prisma.$VanityMintPayload<ExtArgs>
+      fields: Prisma.VanityMintFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VanityMintFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VanityMintFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        findFirst: {
+          args: Prisma.VanityMintFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VanityMintFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        findMany: {
+          args: Prisma.VanityMintFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>[]
+        }
+        create: {
+          args: Prisma.VanityMintCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        createMany: {
+          args: Prisma.VanityMintCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VanityMintCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>[]
+        }
+        delete: {
+          args: Prisma.VanityMintDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        update: {
+          args: Prisma.VanityMintUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        deleteMany: {
+          args: Prisma.VanityMintDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VanityMintUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VanityMintUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>[]
+        }
+        upsert: {
+          args: Prisma.VanityMintUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VanityMintPayload>
+        }
+        aggregate: {
+          args: Prisma.VanityMintAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVanityMint>
+        }
+        groupBy: {
+          args: Prisma.VanityMintGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VanityMintGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VanityMintCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VanityMintCountAggregateOutputType> | number
+        }
+      }
+    }
     Holding: {
       payload: Prisma.$HoldingPayload<ExtArgs>
       fields: Prisma.HoldingFieldRefs
@@ -945,6 +1170,54 @@ export const TokenScalarFieldEnum = {
 export type TokenScalarFieldEnum = (typeof TokenScalarFieldEnum)[keyof typeof TokenScalarFieldEnum]
 
 
+export const LaunchScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  status: 'status',
+  progress: 'progress',
+  currentStep: 'currentStep',
+  input: 'input',
+  result: 'result',
+  tokenPublicKey: 'tokenPublicKey',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  cancelRequestedAt: 'cancelRequestedAt',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
+
+
+export const LaunchLogScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  level: 'level',
+  message: 'message',
+  step: 'step',
+  data: 'data',
+  createdAt: 'createdAt'
+} as const
+
+export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
+
+
+export const VanityMintScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  reservedAt: 'reservedAt',
+  usedAt: 'usedAt',
+  tokenPublicKey: 'tokenPublicKey',
+  userId: 'userId',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VanityMintScalarFieldEnum = (typeof VanityMintScalarFieldEnum)[keyof typeof VanityMintScalarFieldEnum]
+
+
 export const HoldingScalarFieldEnum = {
   id: 'id',
   walletPublicKey: 'walletPublicKey',
@@ -994,6 +1267,21 @@ export const SortOrder = {
 export type SortOrder = (typeof SortOrder)[keyof typeof SortOrder]
 
 
+export const JsonNullValueInput = {
+  JsonNull: JsonNull
+} as const
+
+export type JsonNullValueInput = (typeof JsonNullValueInput)[keyof typeof JsonNullValueInput]
+
+
+export const NullableJsonNullValueInput = {
+  DbNull: DbNull,
+  JsonNull: JsonNull
+} as const
+
+export type NullableJsonNullValueInput = (typeof NullableJsonNullValueInput)[keyof typeof NullableJsonNullValueInput]
+
+
 export const QueryMode = {
   default: 'default',
   insensitive: 'insensitive'
@@ -1008,6 +1296,15 @@ export const NullsOrder = {
 } as const
 
 export type NullsOrder = (typeof NullsOrder)[keyof typeof NullsOrder]
+
+
+export const JsonNullValueFilter = {
+  DbNull: DbNull,
+  JsonNull: JsonNull,
+  AnyNull: AnyNull
+} as const
+
+export type JsonNullValueFilter = (typeof JsonNullValueFilter)[keyof typeof JsonNullValueFilter]
 
 
 
@@ -1080,6 +1377,20 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
+ * Reference to a field of type 'LaunchStatus'
+ */
+export type EnumLaunchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchStatus[]'
+ */
+export type ListEnumLaunchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Int'
  */
 export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int'>
@@ -1090,6 +1401,34 @@ export type IntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'In
  * Reference to a field of type 'Int[]'
  */
 export type ListIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Int[]'>
+    
+
+
+/**
+ * Reference to a field of type 'Json'
+ */
+export type JsonFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Json'>
+    
+
+
+/**
+ * Reference to a field of type 'QueryMode'
+ */
+export type EnumQueryModeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'QueryMode'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchLogLevel'
+ */
+export type EnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchLogLevel'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchLogLevel[]'
+ */
+export type ListEnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchLogLevel[]'>
     
 
 
@@ -1233,6 +1572,9 @@ export type GlobalOmitConfig = {
   user?: Prisma.UserOmit
   wallet?: Prisma.WalletOmit
   token?: Prisma.TokenOmit
+  launch?: Prisma.LaunchOmit
+  launchLog?: Prisma.LaunchLogOmit
+  vanityMint?: Prisma.VanityMintOmit
   holding?: Prisma.HoldingOmit
   transaction?: Prisma.TransactionOmit
 }
