@@ -1,7 +1,8 @@
-import { cookies } from 'next/headers';
-import { verifyToken } from '@/lib/auth/jwt';
-import { prisma } from '@/lib/prisma';
-import type { User } from '@/lib/generated/prisma/client';
+import { cookies } from "next/headers";
+import { verifyToken } from "@/lib/auth/jwt";
+import { prisma } from "@/lib/prisma";
+import type { User } from "@/lib/generated/prisma/client";
+import { logger } from "@/lib/logger";
 
 export async function getServerUser(): Promise<User | null> {
   try {
@@ -26,12 +27,14 @@ export async function getServerUser(): Promise<User | null> {
 
     return user;
   } catch (error) {
-    console.error('Error getting server user:', error);
+    logger.error("Error getting server user", error);
     return null;
   }
 }
 
-export async function getServerUserFromCookies(cookieStore: Awaited<ReturnType<typeof cookies>>): Promise<User | null> {
+export async function getServerUserFromCookies(
+  cookieStore: Awaited<ReturnType<typeof cookies>>
+): Promise<User | null> {
   try {
     const token = cookieStore.get('auth-token')?.value;
 
@@ -53,7 +56,7 @@ export async function getServerUserFromCookies(cookieStore: Awaited<ReturnType<t
 
     return user;
   } catch (error) {
-    console.error('Error getting server user from cookies:', error);
+    logger.error("Error getting server user from cookies", error);
     return null;
   }
 }

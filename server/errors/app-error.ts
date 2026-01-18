@@ -21,6 +21,7 @@ export class AppError extends Error {
 
     // Log the error automatically
     logger.error(message, {
+      errorName: "AppError",
       statusCode,
       ...context,
     });
@@ -36,5 +37,20 @@ export class AppError extends Error {
  * Check if an error is an AppError
  */
 export function isAppError(error: unknown): error is AppError {
-  return error instanceof AppError;
+  if (error instanceof AppError) {
+    return true;
+  }
+  if (!error || typeof error !== "object") {
+    return false;
+  }
+  const candidate = error as {
+    name?: string;
+    statusCode?: number;
+    message?: string;
+  };
+  return (
+    candidate.name === "AppError" &&
+    typeof candidate.statusCode === "number" &&
+    typeof candidate.message === "string"
+  );
 }

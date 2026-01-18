@@ -30,8 +30,14 @@ export const refreshWalletBalancesSchema = z.object({
   walletPublicKeys: z.array(z.string().min(1)).optional(),
 });
 
+export const refreshMainWalletBalanceSchema = z.object({});
+
 export type RefreshWalletBalancesInput = z.infer<
   typeof refreshWalletBalancesSchema
+>;
+
+export type RefreshMainWalletBalanceInput = z.infer<
+  typeof refreshMainWalletBalanceSchema
 >;
 
 export const sendSolSchema = z.object({
@@ -42,10 +48,21 @@ export const sendSolSchema = z.object({
 
 export type SendSolInput = z.infer<typeof sendSolSchema>;
 
-export const returnSolSchema = z.object({
-  tokenPublicKey: z.string().min(1, "Token public key is required"),
-  walletPublicKeys: z.array(z.string().min(1)).min(1),
-  amountSol: z.number().positive(),
-});
+export const returnSolSchema = z
+  .object({
+    tokenPublicKey: z.string().min(1, "Token public key is required"),
+    walletPublicKeys: z.array(z.string().min(1)).min(1),
+    amountSol: z.number().positive().optional(),
+    useMax: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.useMax && !data.amountSol) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Amount in SOL is required",
+        path: ["amountSol"],
+      });
+    }
+  });
 
 export type ReturnSolInput = z.infer<typeof returnSolSchema>;

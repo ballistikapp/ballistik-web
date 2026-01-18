@@ -1,8 +1,9 @@
 "use client";
 
-import { useCallback, useMemo, useState } from "react";
-import { useQueryState } from "nuqs";
 import { formatDistanceToNowStrict } from "date-fns";
+import { useQueryState } from "nuqs";
+import { useCallback, useMemo, useState } from "react";
+import { toast } from "sonner";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
@@ -18,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
+import { Spinner } from "@/components/ui/spinner";
 
 function formatRelativeTime(dateValue?: Date | string | null) {
   if (!dateValue) return "Never";
@@ -81,12 +83,24 @@ export default function Page() {
   const handleRefreshBalances = useCallback(
     async (walletPublicKeys?: string[]) => {
       if (!tokenPublicKey) return;
-      await refreshBalances({ tokenPublicKey, walletPublicKeys });
-      await Promise.all([
-        refetchOperationalWallets(),
-        refetchDevWallet(),
-        refetchMainWallet(),
-      ]);
+      const toastId = toast.loading("Refreshing wallet balances...", {
+        icon: <Spinner className="size-4" />,
+      });
+
+      try {
+        await refreshBalances({ tokenPublicKey, walletPublicKeys });
+        await Promise.all([
+          refetchOperationalWallets(),
+          refetchDevWallet(),
+          refetchMainWallet(),
+        ]);
+        toast.success("Wallet balances refreshed", { id: toastId, icon: null });
+      } catch (error) {
+        toast.error("Failed to refresh wallet balances", {
+          id: toastId,
+          icon: null,
+        });
+      }
     },
     [
       refetchOperationalWallets,
@@ -143,6 +157,16 @@ export default function Page() {
     ...(devWallet ? [devWallet] : []),
     ...wallets,
   ];
+  const transferWallets = useMemo(
+    () =>
+      allWallets.map((wallet) => ({
+        publicKey: wallet.publicKey,
+        type: wallet.type,
+        balanceSol:
+          wallet.balanceSol == null ? null : Number(wallet.balanceSol),
+      })),
+    [allWallets]
+  );
   const canRefreshAny = allWallets.some((wallet) =>
     canRefresh(wallet.balanceRefreshedAt)
   );
@@ -190,6 +214,7 @@ export default function Page() {
                   !canRefresh(mainWallet.balanceRefreshedAt)
                 }
               >
+                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
               </Button>
             </div>
@@ -227,6 +252,7 @@ export default function Page() {
                   !canRefresh(devWallet.balanceRefreshedAt)
                 }
               >
+                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
               </Button>
               {devWallet && (
@@ -270,6 +296,7 @@ export default function Page() {
                 onClick={() => handleRefreshBalances()}
                 disabled={isRefreshingBalances || !canRefreshAny}
               >
+                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh all
               </Button>
               <Button
@@ -303,6 +330,7 @@ export default function Page() {
             mode="send"
             tokenPublicKey={tokenPublicKey}
             walletPublicKeys={sendTargets}
+            wallets={transferWallets}
             onSuccess={() => handleRefreshBalances(sendTargets)}
           />
           <WalletTransferDialog
@@ -311,6 +339,7 @@ export default function Page() {
             mode="return"
             tokenPublicKey={tokenPublicKey}
             walletPublicKeys={returnTargets}
+            wallets={transferWallets}
             onSuccess={() => handleRefreshBalances(returnTargets)}
           />
         </>

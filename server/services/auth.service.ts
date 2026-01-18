@@ -8,6 +8,7 @@ import type {
   AuthUserOutput,
 } from "@/server/schemas";
 import { WalletType } from "@/lib/generated/prisma/client";
+import { logger } from "@/lib/logger";
 
 export const authService = {
   async register(input: RegisterInput): Promise<AuthUserOutput> {
@@ -69,6 +70,7 @@ export const authService = {
         id: user.id,
         name: user.name,
         mainWalletPublicKey: user.mainWalletPublicKey,
+        mainWalletBalanceSol: 0,
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
@@ -85,7 +87,7 @@ export const authService = {
       if (error instanceof AppError) {
         throw error;
       }
-      console.error("Registration error:", error);
+      logger.error("Registration error", error);
       throw new AppError("Failed to register user", 500, { error });
     }
   },
@@ -128,6 +130,7 @@ export const authService = {
         id: user.id,
         name: user.name,
         mainWalletPublicKey: user.mainWalletPublicKey,
+        mainWalletBalanceSol: Number(wallet.balanceSol ?? 0),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
@@ -135,7 +138,7 @@ export const authService = {
       if (error instanceof AppError) {
         throw error;
       }
-      console.error("Login error:", error);
+      logger.error("Login error", error);
       throw new AppError("Failed to login", 500, { error });
     }
   },
@@ -144,6 +147,18 @@ export const authService = {
     try {
       const user = await prisma.user.findUnique({
         where: { id },
+        select: {
+          id: true,
+          name: true,
+          mainWalletPublicKey: true,
+          createdAt: true,
+          updatedAt: true,
+          mainWallet: {
+            select: {
+              balanceSol: true,
+            },
+          },
+        },
       });
 
       if (!user) {
@@ -154,11 +169,12 @@ export const authService = {
         id: user.id,
         name: user.name,
         mainWalletPublicKey: user.mainWalletPublicKey,
+        mainWalletBalanceSol: Number(user.mainWallet?.balanceSol ?? 0),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
       };
     } catch (error) {
-      console.error("Get user error:", error);
+      logger.error("Get user error", error);
       return null;
     }
   },

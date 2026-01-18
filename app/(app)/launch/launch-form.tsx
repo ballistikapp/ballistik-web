@@ -59,14 +59,27 @@ const formSchema = z.object({
   website: z.string(),
   devWalletOption: z.enum(["import", "generate", "use_main"]),
   importedDevWalletKey: z.string(),
-  devBuyAmount: z.string(),
-  jitoTipAmount: z.string(),
+  devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
+  jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
-  numberOfWallets: z.string(),
-  buyAmountPerWallet: z.string(),
-  buyAmountVariance: z.string(),
-  distributionMultiplier: z.string(),
+  bundlerWalletCount: z
+    .number()
+    .int()
+    .min(0, "Bundler wallet count must be 0 or more")
+    .max(11, "Bundler wallet count must be 11 or less"),
+  bundlerBuyAmountSol: z
+    .number()
+    .min(0, "Bundler buy amount must be 0 or more"),
+  bundlerBuyVariancePercent: z
+    .number()
+    .min(0, "Bundler buy variance must be 0 or more")
+    .max(50, "Bundler buy variance must be 50 or less"),
+  distributionWalletMultiplier: z
+    .number()
+    .int()
+    .min(1, "Distribution multiplier must be at least 1")
+    .max(5, "Distribution multiplier must be 5 or less"),
 });
 
 const steps = [
@@ -91,6 +104,25 @@ const steps = [
     description: "Review all details and launch your token on pump.fun",
   },
 ];
+
+function calculateLaunchTotals(values: {
+  devBuyAmountSol: number;
+  jitoTipAmountSol: number;
+  bundleBuyEnabled: boolean;
+  bundlerWalletCount: number;
+  bundlerBuyAmountSol: number;
+  distributionWalletMultiplier: number;
+}) {
+  const bundleBuyTotal = values.bundleBuyEnabled
+    ? values.bundlerWalletCount * values.bundlerBuyAmountSol
+    : 0;
+  const totalCostSol =
+    values.devBuyAmountSol + bundleBuyTotal + values.jitoTipAmountSol;
+  const distributionWallets =
+    values.bundlerWalletCount * values.distributionWalletMultiplier;
+
+  return { bundleBuyTotal, totalCostSol, distributionWallets };
+}
 
 export function LaunchForm() {
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
@@ -137,7 +169,13 @@ export function LaunchForm() {
     { launchId: activeLaunchId ?? "" },
     {
       enabled: Boolean(activeLaunchId),
-      refetchInterval: activeLaunchId ? 2000 : false,
+      refetchInterval: (query) => {
+        const launch = query.state.data;
+        if (!launch) return 2000;
+        return launch.status === "PENDING" || launch.status === "RUNNING"
+          ? 2000
+          : false;
+      },
     }
   );
 
@@ -185,9 +223,23 @@ export function LaunchForm() {
     }
 
     if (launch.status !== "PENDING" && launch.status !== "RUNNING") {
-      window.localStorage.removeItem(launchStorageKey);
+      if (launch.status === "SUCCEEDED") {
+        window.localStorage.removeItem(launchStorageKey);
+      }
     }
   }, [launchNotified, launchStatusQuery.data]);
+
+  const clearActiveLaunch = React.useCallback(() => {
+    window.localStorage.removeItem(launchStorageKey);
+    setActiveLaunchId(null);
+  }, []);
+
+  const launchStatus =
+    launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
+  const showRecoveryBanner =
+    Boolean(activeLaunchId) &&
+    !isProgressOpen &&
+    (launchStatus === "FAILED" || launchStatus === "CANCELED");
 
   const scrollToStep = (stepId: string) => {
     const element = document.getElementById(stepId);
@@ -228,14 +280,14 @@ export function LaunchForm() {
       website: "",
       devWalletOption: "generate" as "import" | "generate" | "use_main",
       importedDevWalletKey: "",
-      devBuyAmount: "0",
-      jitoTipAmount: "0.001",
+      devBuyAmountSol: 0.003,
+      jitoTipAmountSol: 0.001,
       bundleBuyEnabled: true,
       vanityMint: false,
-      numberOfWallets: "5",
-      buyAmountPerWallet: "0.01",
-      buyAmountVariance: "20",
-      distributionMultiplier: "1",
+      bundlerWalletCount: 5,
+      bundlerBuyAmountSol: 0.01,
+      bundlerBuyVariancePercent: 20,
+      distributionWalletMultiplier: 1,
     },
     validators: {
       onSubmit: formSchema,
@@ -272,14 +324,14 @@ export function LaunchForm() {
       website: values.website || undefined,
       devWalletOption: values.devWalletOption,
       importedDevWalletKey: values.importedDevWalletKey || undefined,
-      devBuyAmount: values.devBuyAmount,
-      jitoTipAmount: values.jitoTipAmount,
+      devBuyAmountSol: values.devBuyAmountSol,
+      jitoTipAmountSol: values.jitoTipAmountSol,
       bundleBuyEnabled: values.bundleBuyEnabled,
       vanityMint: values.vanityMint,
-      numberOfWallets: values.numberOfWallets,
-      buyAmountPerWallet: values.buyAmountPerWallet,
-      buyAmountVariance: values.buyAmountVariance,
-      distributionMultiplier: values.distributionMultiplier,
+      bundlerWalletCount: values.bundlerWalletCount,
+      bundlerBuyAmountSol: values.bundlerBuyAmountSol,
+      bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
+      distributionWalletMultiplier: values.distributionWalletMultiplier,
     });
   };
 
@@ -289,6 +341,23 @@ export function LaunchForm() {
 
       {/* Form Content */}
       <div className="flex-1 space-y-6 pb-12">
+        {showRecoveryBanner && (
+          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm">
+                <Info className="size-4 text-destructive" />
+                <span>Previous launch failed. Recover SOL from launch wallets.</span>
+              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsProgressOpen(true)}
+              >
+                Open recovery
+              </Button>
+            </div>
+          </div>
+        )}
         <form
           id="launch-form"
           onSubmit={(e) => {
@@ -652,7 +721,7 @@ export function LaunchForm() {
               </Field>
 
               <div className="grid grid-cols-2 gap-6">
-                <form.Field name="devBuyAmount">
+                <form.Field name="devBuyAmountSol">
                   {(field) => (
                     <Field>
                       <div className="flex items-center gap-2 mb-1">
@@ -672,16 +741,18 @@ export function LaunchForm() {
                         id={field.name}
                         type="number"
                         step="0.0001"
-                        min="0"
+                        min="0.003"
                         max="100"
                         value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
+                        onChange={(e) =>
+                          field.handleChange(e.target.valueAsNumber || 0)
+                        }
                         placeholder="0"
                       />
                     </Field>
                   )}
                 </form.Field>
-                <form.Field name="jitoTipAmount">
+                <form.Field name="jitoTipAmountSol">
                   {(field) => (
                     <Field>
                       <div className="flex items-center gap-2 mb-1">
@@ -704,7 +775,9 @@ export function LaunchForm() {
                         min="0"
                         max="1"
                         value={field.state.value}
-                        onChange={(e) => field.handleChange(e.target.value)}
+                        onChange={(e) =>
+                          field.handleChange(e.target.valueAsNumber || 0)
+                        }
                         placeholder="0.001"
                       />
                     </Field>
@@ -768,7 +841,7 @@ export function LaunchForm() {
                   bundleBuyEnabled && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 gap-6">
-                        <form.Field name="numberOfWallets">
+                        <form.Field name="bundlerWalletCount">
                           {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
@@ -781,7 +854,7 @@ export function LaunchForm() {
                                 max="11"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.value)
+                                  field.handleChange(e.target.valueAsNumber || 0)
                                 }
                                 placeholder="5"
                               />
@@ -791,7 +864,7 @@ export function LaunchForm() {
                             </Field>
                           )}
                         </form.Field>
-                        <form.Field name="buyAmountPerWallet">
+                        <form.Field name="bundlerBuyAmountSol">
                           {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
@@ -804,7 +877,7 @@ export function LaunchForm() {
                                 min="0.001"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.value)
+                                  field.handleChange(e.target.valueAsNumber || 0)
                                 }
                                 placeholder="0.01"
                               />
@@ -817,7 +890,7 @@ export function LaunchForm() {
                       </div>
 
                       <div className="grid grid-cols-2 gap-6">
-                        <form.Field name="buyAmountVariance">
+                        <form.Field name="bundlerBuyVariancePercent">
                           {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
@@ -830,7 +903,7 @@ export function LaunchForm() {
                                 max="50"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.value)
+                                  field.handleChange(e.target.valueAsNumber || 0)
                                 }
                                 placeholder="20"
                               />
@@ -840,7 +913,7 @@ export function LaunchForm() {
                             </Field>
                           )}
                         </form.Field>
-                        <form.Field name="distributionMultiplier">
+                        <form.Field name="distributionWalletMultiplier">
                           {(field) => (
                             <Field>
                               <FieldLabel htmlFor={field.name}>
@@ -853,7 +926,7 @@ export function LaunchForm() {
                                 max="5"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.value)
+                                  field.handleChange(e.target.valueAsNumber || 1)
                                 }
                                 placeholder="1"
                               />
@@ -868,23 +941,21 @@ export function LaunchForm() {
 
                       <form.Subscribe
                         selector={(state) => ({
-                          numberOfWallets: state.values.numberOfWallets,
-                          buyAmountPerWallet: state.values.buyAmountPerWallet,
-                          distributionMultiplier:
-                            state.values.distributionMultiplier,
+                          bundlerWalletCount: state.values.bundlerWalletCount,
+                          bundlerBuyAmountSol: state.values.bundlerBuyAmountSol,
+                          distributionWalletMultiplier:
+                            state.values.distributionWalletMultiplier,
                         })}
                       >
                         {({
-                          numberOfWallets,
-                          buyAmountPerWallet,
-                          distributionMultiplier,
+                          bundlerWalletCount,
+                          bundlerBuyAmountSol,
+                          distributionWalletMultiplier,
                         }) => {
-                          const wallets = parseInt(numberOfWallets) || 0;
-                          const amount = parseFloat(buyAmountPerWallet) || 0;
-                          const multiplier =
-                            parseInt(distributionMultiplier) || 1;
-                          const totalBuy = wallets * amount;
-                          const totalWallets = wallets * multiplier;
+                          const totalBuy =
+                            bundlerWalletCount * bundlerBuyAmountSol;
+                          const totalWallets =
+                            bundlerWalletCount * distributionWalletMultiplier;
 
                           return (
                             <div className="rounded-lg border bg-muted/50 p-4">
@@ -928,7 +999,10 @@ export function LaunchForm() {
             <Separator />
             <CardContent>
               <form.Subscribe selector={(state) => state.values}>
-                {(values) => (
+              {(values) => {
+                const { totalCostSol, distributionWallets } =
+                  calculateLaunchTotals(values);
+                return (
                   <div className="space-y-6">
                     <div className="flex items-start gap-4">
                       {imagePreview ? (
@@ -1008,13 +1082,13 @@ export function LaunchForm() {
                         </div>
                         <div className="grid grid-cols-[140px_1fr] gap-2">
                           <span className="text-muted-foreground">Dev Buy</span>
-                          <span>{values.devBuyAmount || "0"} SOL</span>
+                          <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
                         </div>
                         <div className="grid grid-cols-[140px_1fr] gap-2">
                           <span className="text-muted-foreground">
                             Jito Tip
                           </span>
-                          <span>{values.jitoTipAmount || "0"} SOL</span>
+                          <span>{values.jitoTipAmountSol.toFixed(4)} SOL</span>
                         </div>
                         {values.bundleBuyEnabled && (
                           <>
@@ -1023,23 +1097,19 @@ export function LaunchForm() {
                                 Bundle Buy
                               </span>
                               <span>
-                                {values.numberOfWallets} wallets ×{" "}
-                                {values.buyAmountPerWallet} SOL (±
-                                {values.buyAmountVariance}%)
+                                {values.bundlerWalletCount} wallets ×{" "}
+                                {values.bundlerBuyAmountSol} SOL (±
+                                {values.bundlerBuyVariancePercent}%)
                               </span>
                             </div>
-                            {parseInt(values.distributionMultiplier) > 1 && (
+                            {values.distributionWalletMultiplier > 1 && (
                               <div className="grid grid-cols-[140px_1fr] gap-2">
                                 <span className="text-muted-foreground">
                                   Distribution
                                 </span>
                                 <span>
-                                  {parseInt(values.numberOfWallets || "0") *
-                                    parseInt(
-                                      values.distributionMultiplier || "1"
-                                    )}{" "}
-                                  wallets after ×{values.distributionMultiplier}{" "}
-                                  distribution
+                                  {distributionWallets} wallets after ×
+                                  {values.distributionWalletMultiplier} distribution
                                 </span>
                               </div>
                             )}
@@ -1068,20 +1138,13 @@ export function LaunchForm() {
                       <div className="flex justify-between items-center text-sm">
                         <span className="font-medium">Total Cost</span>
                         <span className="text-lg font-bold">
-                          {(
-                            parseFloat(values.devBuyAmount || "0") +
-                            (values.bundleBuyEnabled
-                              ? parseInt(values.numberOfWallets || "0") *
-                                parseFloat(values.buyAmountPerWallet || "0")
-                              : 0) +
-                            parseFloat(values.jitoTipAmount || "0")
-                          ).toFixed(4)}{" "}
-                          SOL
+                          {totalCostSol.toFixed(4)} SOL
                         </span>
                       </div>
                     </div>
                   </div>
-                )}
+                );
+              }}
               </form.Subscribe>
             </CardContent>
           </Card>
@@ -1110,7 +1173,7 @@ export function LaunchForm() {
           open={showLaunchDialog}
           onOpenChange={setShowLaunchDialog}
           onConfirm={handleConfirmLaunch}
-          formValues={form.state.values}
+          launchInput={form.state.values}
           imagePreview={imagePreview}
           isLoading={startLaunchMutation.isPending}
         />
@@ -1126,8 +1189,8 @@ export function LaunchForm() {
           onClose={() => {
             setIsProgressOpen(false);
             const status = launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
-            if (status && status !== "PENDING" && status !== "RUNNING") {
-              setActiveLaunchId(null);
+            if (status === "SUCCEEDED") {
+              clearActiveLaunch();
             }
           }}
         />

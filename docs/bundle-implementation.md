@@ -4,31 +4,48 @@ This document describes the current Jito bundle launch flow used by `sollabs-web
 
 ### Current Behavior (ALT Disabled)
 
-- Launch uses Jito bundles for create + dev buy + bundle buys when `bundleBuyEnabled` is true.
-- The create transaction and the first buy are packed into the same transaction.
-- Additional buys are packed 3 per transaction.
-- The last transaction includes one buy plus the Jito tip transfer.
-- Maximum buyer wallets per launch: 11 (matching v0 working behavior).
-- Tipper is the main wallet, and the tip is sent to a Jito tip account.
+### Trigger Conditions
+- Bundle launch is used when `bundleBuyEnabled` is true.
+- Buyers include the dev wallet if `devBuyAmountSol > 0`, plus all bundler wallets.
+- Maximum buyer wallets per launch: 11.
 
-Transaction packing layout:
+### Core Flow (High Level)
+1. Build the token create transaction.
+2. Build buy transactions for each buyer wallet.
+3. Pack transactions into a Jito bundle.
+4. Add a Jito tip transfer to the last transaction (if `jitoTipAmountSol > 0`).
+5. Send the bundle via the Jito block engine.
+
+### Transaction Packing Rules
+- The bundle can contain up to 5 transactions.
+- Transaction 1 includes:
+  - Compute budget instruction (800k units)
+  - Token create instructions
+  - Up to 1 buy
+- Subsequent transactions include up to 3 buys each.
+- The last transaction may also include the Jito tip transfer.
+ - Each bundle transaction adds a compute budget instruction for consistency.
+
+Transaction packing layout (max buyers):
 
 1. Create + 1 buy
 2. 3 buys
 3. 3 buys
 4. 3 buys
-5. 1 buy + tip
+5. 1 buy (+ tip if enabled)
 
-### How ALT Would Extend Capacity
+### Buy Amounts
+- Each bundler buy uses random variance:
+  - `amount = bundlerBuyAmountSol ± (bundlerBuyAmountSol * bundlerBuyVariancePercent / 100)`
+- Buys with non-positive amounts are skipped.
 
-ALT reduces transaction size by moving account addresses into a lookup table and referencing them by index. This does not reduce the number of instructions, but it allows more accounts and instructions to fit within the transaction size limit.
+### Jito Tip
+- If `jitoTipAmountSol > 0`, a SOL transfer is appended to the last transaction.
+- Tipper is the main wallet; the tip is sent to a Jito tip account.
 
-If ALT is enabled later:
+### Key Files
+- `server/solana/bundle-create-and-buy.ts`
+- `server/solana/bundle-transaction-builder.ts`
+- `server/solana/pump-transaction-builders.ts`
+- `server/solana/jito-bundle.ts`
 
-- Build all transactions first to collect the full account set.
-- Create a lookup table containing all required addresses.
-- Wait for ALT propagation on the network.
-- Compile each bundle transaction to v0 messages using the ALT.
-- Increase the per-transaction buy packing once size tests confirm it fits.
-
-The existing packing strategy can stay as a baseline, and ALT can be introduced to safely increase the number of buyers per bundle without changing the Jito bundle size limit of 5 transactions.

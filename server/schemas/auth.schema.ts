@@ -39,6 +39,7 @@ export type AuthUserOutput = {
   id: string;
   name: string;
   mainWalletPublicKey: string;
+  mainWalletBalanceSol: number;
   createdAt: Date;
   updatedAt: Date;
   generatedWallet?: {

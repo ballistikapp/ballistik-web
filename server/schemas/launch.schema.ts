@@ -1,9 +1,5 @@
 import { z } from "zod";
 
-const numericString = z
-  .string()
-  .refine((value) => !Number.isNaN(Number(value)), "Must be a number");
-
 export const launchTokenSchema = z.object({
   tokenName: z
     .string()
@@ -23,19 +19,43 @@ export const launchTokenSchema = z.object({
   website: z.string().optional(),
   devWalletOption: z.enum(["import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
-  devBuyAmount: numericString,
-  jitoTipAmount: numericString,
+  devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
+  jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
-  numberOfWallets: numericString,
-  buyAmountPerWallet: numericString,
-  buyAmountVariance: numericString,
-  distributionMultiplier: numericString,
+  bundlerWalletCount: z
+    .number()
+    .int()
+    .min(0, "Bundler wallet count must be 0 or more")
+    .max(11, "Bundler wallet count must be 11 or less"),
+  bundlerBuyAmountSol: z
+    .number()
+    .min(0, "Bundler buy amount must be 0 or more"),
+  bundlerBuyVariancePercent: z
+    .number()
+    .min(0, "Bundler buy variance must be 0 or more")
+    .max(50, "Bundler buy variance must be 50 or less"),
+  distributionWalletMultiplier: z
+    .number()
+    .int()
+    .min(1, "Distribution multiplier must be at least 1")
+    .max(5, "Distribution multiplier must be 5 or less"),
 });
 
 export const launchStatusSchema = z.object({
   launchId: z.string().min(1),
 });
 
+export const launchRecoverySchema = z.object({
+  launchId: z.string().min(1),
+});
+
+export const launchRecoverSolSchema = z.object({
+  launchId: z.string().min(1),
+  walletPublicKeys: z.array(z.string().min(1)).min(1).optional(),
+});
+
 export type LaunchTokenInput = z.infer<typeof launchTokenSchema>;
 export type LaunchStatusInput = z.infer<typeof launchStatusSchema>;
+export type LaunchRecoveryInput = z.infer<typeof launchRecoverySchema>;
+export type LaunchRecoverSolInput = z.infer<typeof launchRecoverSolSchema>;

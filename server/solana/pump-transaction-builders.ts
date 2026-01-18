@@ -11,7 +11,7 @@ import {
 
 const ACCOUNT_CREATION_BUFFER = 4_000_000;
 
-export async function buildCreateTransaction(
+export async function buildCreateTokenTransaction(
   pumpSdk: PumpFunSDK,
   creator: Keypair,
   mint: Keypair,
@@ -38,13 +38,13 @@ export async function buildCreateTransaction(
   return { createTx, metadataUri };
 }
 
-export async function constructBuyTokenTransactionLocal(
+export async function buildBuyTokenTransaction(
   buyer: Keypair,
   mint: PublicKey,
   buyAmountLamport: bigint,
   creator?: PublicKey
 ): Promise<Transaction> {
-  const spendableSolIn = new BN(buyAmountLamport.toString()).add(
+  const spendableLamports = new BN(buyAmountLamport.toString()).add(
     new BN(ACCOUNT_CREATION_BUFFER)
   );
   const minTokensOut = new BN(1);
@@ -58,7 +58,7 @@ export async function constructBuyTokenTransactionLocal(
     program,
     buyer,
     mint,
-    spendableSolIn,
+    spendableLamports,
     minTokensOut,
     creator
   );

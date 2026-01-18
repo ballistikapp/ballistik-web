@@ -10,6 +10,7 @@ sollabs-web is the modern successor to sollabv0. It reimplements core launch, wa
 - Token-scoped wallets and operational wallet management
 - Solana RPC integrations for balance refresh and transactions
 - Transaction tracking and token holdings
+- Holdings and transactions refresh flows mirror wallet balance refresh behavior
 
 ## Architecture
 

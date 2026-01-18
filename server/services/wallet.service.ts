@@ -1,6 +1,3 @@
-import { prisma } from "@/lib/prisma";
-import { AppError } from "@/server/errors";
-import { getSolanaConnection } from "@/lib/solana/connection";
 import {
   Keypair,
   PublicKey,
@@ -8,7 +5,11 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
+import { getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
+import { prisma } from "@/lib/prisma";
+import { getSolanaConnection } from "@/lib/solana/connection";
+import { AppError } from "@/server/errors";
 
 export const walletService = {
   async getOperationalWalletsByToken(tokenPublicKey: string, userId: string) {
@@ -102,6 +103,44 @@ export const walletService = {
     });
 
     return user?.mainWallet ?? null;
+  },
+
+  async refreshMainWalletBalance(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        mainWallet: {
+          select: {
+            publicKey: true,
+          },
+        },
+      },
+    });
+
+    const mainWallet = user?.mainWallet;
+    if (!mainWallet) {
+      throw new AppError("Main wallet not found", 404);
+    }
+
+    const connection = getSolanaConnection();
+    const walletPublicKey = new PublicKey(mainWallet.publicKey);
+    const solBalance = await connection.getBalance(walletPublicKey);
+    const balanceSol = solBalance / 1_000_000_000;
+    const now = new Date();
+
+    await prisma.wallet.update({
+      where: { publicKey: mainWallet.publicKey },
+      data: {
+        balanceSol,
+        balanceRefreshedAt: now,
+      },
+    });
+
+    return {
+      publicKey: mainWallet.publicKey,
+      balanceSol,
+      balanceRefreshedAt: now,
+    };
   },
 
   async getWalletByToken(
@@ -284,18 +323,23 @@ export const walletService = {
     const balances = await Promise.all(
       targetWallets.map(async (wallet) => {
         const walletPublicKey = new PublicKey(wallet.publicKey);
-        const [solBalance, tokenAccounts] = await Promise.all([
+        const [solBalance, tokenBalance] = await Promise.all([
           connection.getBalance(walletPublicKey),
-          connection.getParsedTokenAccountsByOwner(walletPublicKey, {
-            mint: mintPublicKey,
-          }),
+          (async () => {
+            const tokenAccount = await getAssociatedTokenAddress(
+              mintPublicKey,
+              walletPublicKey
+            );
+            const tokenAccountInfo =
+              await connection.getAccountInfo(tokenAccount);
+            if (!tokenAccountInfo) {
+              return 0;
+            }
+            const tokenBalanceResponse =
+              await connection.getTokenAccountBalance(tokenAccount);
+            return tokenBalanceResponse.value.uiAmount ?? 0;
+          })(),
         ]);
-
-        const tokenBalance = tokenAccounts.value.reduce((total, account) => {
-          const amount =
-            account.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0;
-          return total + amount;
-        }, 0);
 
         return {
           publicKey: wallet.publicKey,
@@ -407,7 +451,8 @@ export const walletService = {
     tokenPublicKey: string,
     userId: string,
     walletPublicKeys: string[],
-    amountSol: number
+    amountSol?: number,
+    useMax?: boolean
   ) {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
@@ -458,11 +503,40 @@ export const walletService = {
     }
 
     const connection = getSolanaConnection();
-    const lamports = Math.floor(amountSol * 1_000_000_000);
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
 
     const results = await Promise.all(
       targets.map(async (wallet) => {
         const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+        let lamports: number;
+
+        if (useMax) {
+          const balanceLamports = await connection.getBalance(sender.publicKey);
+          const feeTransaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: sender.publicKey,
+              toPubkey: mainPublicKey,
+              lamports: 1,
+            })
+          );
+          feeTransaction.recentBlockhash = latestBlockhash.blockhash;
+          feeTransaction.feePayer = sender.publicKey;
+          const fee = await connection.getFeeForMessage(
+            feeTransaction.compileMessage(),
+            "confirmed"
+          );
+          const feeLamports = fee.value ?? 5000;
+          lamports = balanceLamports - feeLamports;
+          if (lamports <= 0) {
+            return { publicKey: wallet.publicKey, signature: null };
+          }
+        } else {
+          if (!amountSol) {
+            throw new AppError("Amount in SOL is required", 400);
+          }
+          lamports = Math.floor(amountSol * 1_000_000_000);
+        }
+
         const transaction = new Transaction().add(
           SystemProgram.transfer({
             fromPubkey: sender.publicKey,
@@ -470,6 +544,8 @@ export const walletService = {
             lamports,
           })
         );
+        transaction.recentBlockhash = latestBlockhash.blockhash;
+        transaction.feePayer = sender.publicKey;
         const signature = await sendAndConfirmTransaction(
           connection,
           transaction,

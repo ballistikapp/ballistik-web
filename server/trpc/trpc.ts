@@ -3,6 +3,7 @@ import { type Context } from "./context";
 import superjson from "superjson";
 import { ZodError } from "zod";
 import { isAppError } from "@/server/errors";
+import { logger } from "@/lib/logger";
 
 /**
  * Initialize tRPC with context
@@ -53,7 +54,7 @@ const t = initTRPC.context<Context>().create({
 export const router = t.router;
 export const publicProcedure = t.procedure;
 
-const errorMapperMiddleware = t.middleware(async ({ next }) => {
+const errorMapperMiddleware = t.middleware(async ({ next, ctx, path }) => {
   try {
     return await next();
   } catch (error) {
@@ -72,6 +73,18 @@ const errorMapperMiddleware = t.middleware(async ({ next }) => {
         cause: error,
       });
     }
+    if (error instanceof TRPCError) {
+      throw error;
+    }
+    const errorContext =
+      error instanceof Error
+        ? { errorName: error.name, errorMessage: error.message }
+        : { errorName: "UnknownError", errorMessage: String(error) };
+    const requestLogger = ctx?.logger ?? logger;
+    requestLogger.error("Unhandled tRPC error", {
+      path,
+      ...errorContext,
+    });
     throw error;
   }
 });
@@ -92,14 +105,15 @@ export const protectedProcedure = t.procedure
 /**
  * Middleware example - logging
  */
-export const loggedProcedure = t.procedure.use(async ({ path, next }) => {
+export const loggedProcedure = t.procedure.use(async ({ path, next, ctx }) => {
   const start = Date.now();
   const result = await next();
   const duration = Date.now() - start;
-
-  if (process.env.NODE_ENV === "development") {
-    console.log(`[tRPC] ${path} took ${duration}ms`);
-  }
+  const requestLogger = ctx?.logger ?? logger;
+  requestLogger.debug("tRPC request", {
+    path,
+    durationMs: duration,
+  });
 
   return result;
 });

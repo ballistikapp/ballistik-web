@@ -13,9 +13,12 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAccount,
 } from "@solana/spl-token";
-import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
 import { CreateTokenMetadata } from "pumpdotfun-sdk";
+
 import { getSolanaConnection } from "@/lib/solana/connection";
+import { logger } from "@/lib/logger";
+import { AppError } from "@/server/errors";
+import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
 
 const GLOBAL_SEED = Buffer.from("global");
 const BONDING_CURVE_SEED = Buffer.from("bonding-curve");
@@ -120,36 +123,25 @@ export async function createTokenWithNewIdl(
     const mintAccountInfo = await connection.getAccountInfo(mint.publicKey);
     if (mintAccountInfo) {
       const error = new Error(
-        `❌ CRITICAL: Mint account ${mint.publicKey.toBase58()} already exists on-chain! ` +
-          `This mint was likely used in a previous transaction. ` +
-          `Please generate a new mint keypair before creating a token.`
+        `Mint account ${mint.publicKey.toBase58()} already exists on-chain. ` +
+          `Generate a new mint keypair before creating a token.`
       );
-      console.error(`\n${"=".repeat(80)}`);
-      console.error(`🚨🚨🚨 CRITICAL: MINT ACCOUNT ALREADY EXISTS! 🚨🚨🚨`);
-      console.error(`🚨 Mint: ${mint.publicKey.toBase58()}`);
-      console.error(
-        `🚨 This mint was already used - CREATE transaction will FAIL!`
-      );
-      console.error(
-        `🚨 The account exists with ${mintAccountInfo.lamports} lamports`
-      );
-      console.error(`🚨 Generate a new mint keypair before proceeding!`);
-      console.error(`${"=".repeat(80)}\n`);
+      logger.error("Mint account already exists", {
+        mint: mint.publicKey.toBase58(),
+        lamports: mintAccountInfo.lamports,
+      });
       throw error;
     }
-    console.log(
-      `✅ Mint account ${mint.publicKey.toBase58()} does not exist - safe to create`
-    );
+    logger.info("Mint account does not exist", {
+      mint: mint.publicKey.toBase58(),
+    });
   } catch (checkError) {
     const err =
       checkError instanceof Error ? checkError : new Error(String(checkError));
     if (err.message.includes("already exists")) {
       throw err;
     }
-    console.warn(
-      `⚠️ Could not check mint account existence (continuing anyway):`,
-      err.message
-    );
+    logger.warn("Mint account existence check failed", err.message);
   }
 
   if (!(creator.publicKey instanceof PublicKey)) {
@@ -204,37 +196,31 @@ export async function createTokenWithNewIdl(
     const MIN_REQUIRED_SOL = 0.02; // Reduced from 0.03 to 0.02 SOL - actual cost is ~0.0195 SOL
     const MIN_REQUIRED_LAMPORTS = MIN_REQUIRED_SOL * 1e9;
 
-    console.log(`🔹 Checking creator wallet balance...`);
-    console.log(`   Creator: ${creator.publicKey.toBase58()}`);
-    console.log(
-      `   Balance: ${creatorBalance / 1e9} SOL (${creatorBalance} lamports)`
-    );
-    console.log(
-      `   Minimum required: ${MIN_REQUIRED_SOL} SOL (${MIN_REQUIRED_LAMPORTS} lamports)`
-    );
+    logger.info("Creator balance check", {
+      creator: creator.publicKey.toBase58(),
+      balanceSol: creatorBalance / 1e9,
+      balanceLamports: creatorBalance,
+      minRequiredSol: MIN_REQUIRED_SOL,
+      minRequiredLamports: MIN_REQUIRED_LAMPORTS,
+    });
 
     if (creatorBalance < MIN_REQUIRED_LAMPORTS) {
       const shortfall = MIN_REQUIRED_LAMPORTS - creatorBalance;
-      const isVeryClose = shortfall < 5000000; // 0.005 SOL
+      const isVeryClose = shortfall < 5000000;
 
       if (isVeryClose) {
-        console.warn(`\n${"=".repeat(80)}`);
-        console.warn(
-          `⚠️ WARNING: CREATOR WALLET LOW ON FUNDS (BUT CLOSE TO LIMIT) ⚠️`
-        );
-        console.warn(`   Balance: ${(creatorBalance / 1e9).toFixed(9)} SOL`);
-        console.warn(
-          `   Ideally needs: ${MIN_REQUIRED_SOL} SOL (Shortfall: ${(shortfall / 1e9).toFixed(9)} SOL)`
-        );
-        console.warn(`   Proceeding anyway, but transaction MIGHT fail.`);
-        console.warn(`${"=".repeat(80)}\n`);
+        logger.warn("Creator balance below minimum (close)", {
+          balanceSol: Number((creatorBalance / 1e9).toFixed(9)),
+          minRequiredSol: MIN_REQUIRED_SOL,
+          shortfallSol: Number((shortfall / 1e9).toFixed(9)),
+        });
       } else {
-        const error = new Error(
-          `❌ INSUFFICIENT FUNDS: Creator wallet has ${(creatorBalance / 1e9).toFixed(9)} SOL, ` +
+        throw new AppError(
+          `Insufficient funds: creator wallet has ${(creatorBalance / 1e9).toFixed(9)} SOL, ` +
             `needs at least ${MIN_REQUIRED_SOL} SOL. Shortfall: ${(shortfall / 1e9).toFixed(9)} SOL. ` +
-            `Please fund the creator wallet before creating token.`
+            `Please fund the creator wallet before creating token.`,
+          400
         );
-        throw error;
       }
     }
 
@@ -244,48 +230,34 @@ export async function createTokenWithNewIdl(
 
     if (availableForTransaction < ESTIMATED_TOTAL_COST) {
       const actualShortfall = ESTIMATED_TOTAL_COST - availableForTransaction;
-      console.warn(
-        `⚠️ WARNING: After accounting for rent-exempt minimum, wallet may have insufficient funds`
-      );
-      console.warn(`   Balance: ${(creatorBalance / 1e9).toFixed(9)} SOL`);
-      console.warn(
-        `   After rent-exempt reserve: ${(availableForTransaction / 1e9).toFixed(9)} SOL`
-      );
-      console.warn(
-        `   Estimated cost: ${(ESTIMATED_TOTAL_COST / 1e9).toFixed(9)} SOL`
-      );
-      console.warn(
-        `   Potential shortfall: ${(actualShortfall / 1e9).toFixed(9)} SOL`
-      );
-      console.warn(
-        `   ⚠️ Transaction may still fail during execution - consider adding more funds`
-      );
+      logger.warn("Creator balance may be insufficient after rent reserve", {
+        balanceSol: Number((creatorBalance / 1e9).toFixed(9)),
+        availableSol: Number((availableForTransaction / 1e9).toFixed(9)),
+        estimatedCostSol: Number((ESTIMATED_TOTAL_COST / 1e9).toFixed(9)),
+        potentialShortfallSol: Number((actualShortfall / 1e9).toFixed(9)),
+      });
     }
 
-    console.log(
-      `✅ Creator wallet has sufficient balance (${(creatorBalance / 1e9).toFixed(9)} SOL >= ${MIN_REQUIRED_SOL} SOL)`
-    );
+    logger.info("Creator balance sufficient", {
+      balanceSol: Number((creatorBalance / 1e9).toFixed(9)),
+      minRequiredSol: MIN_REQUIRED_SOL,
+    });
   } catch (balanceError) {
     const err =
       balanceError instanceof Error
         ? balanceError
         : new Error(String(balanceError));
-    if (err.message.includes("INSUFFICIENT FUNDS")) {
-      throw err;
-    }
-    console.warn(
-      `⚠️ Could not check creator balance (continuing anyway):`,
-      err.message
-    );
+    logger.warn("Creator balance check failed", err.message);
+    throw err;
   }
 
   try {
-    console.log(
-      "🔹 Building create instruction manually (bypassing Anchor IDL parsing)..."
-    );
-    console.log("🔹 Mint:", mint.publicKey.toBase58());
-    console.log("🔹 Creator:", creator.publicKey.toBase58());
-    console.log("🔹 Metadata URI:", metadataUri);
+    logger.info("Building create instruction");
+    logger.info("Create inputs", {
+      mint: mint.publicKey.toBase58(),
+      creator: creator.publicKey.toBase58(),
+      metadataUri,
+    });
 
     const name = String(metadata.name || "").trim();
     const symbol = String(metadata.symbol || "").trim();
@@ -302,7 +274,7 @@ export async function createTokenWithNewIdl(
       throw new Error(`Invalid creator publicKey: ${creatorPubkey}`);
     }
 
-    console.log("🔹 Validated arguments:", {
+    logger.info("Create args validated", {
       name,
       symbol,
       uri: uri.substring(0, 50) + "...",
@@ -312,13 +284,7 @@ export async function createTokenWithNewIdl(
 
     const discriminator = Buffer.from([24, 30, 200, 40, 5, 28, 7, 119]);
 
-    console.log(
-      "🔹 Instruction discriminator (from IDL):",
-      discriminator.toString("hex")
-    );
-    console.log(
-      "🔹 Using EXACT discriminator from pump.json IDL to ensure correctness"
-    );
+    logger.info("Create discriminator", discriminator.toString("hex"));
 
     const encodeString = (str: string): Buffer => {
       const utf8 = Buffer.from(str, "utf8");
@@ -344,7 +310,7 @@ export async function createTokenWithNewIdl(
       creatorBuf,
     ]);
 
-    console.log("🔹 Instruction data length:", instructionData.length, "bytes");
+    logger.info("Create instruction data length", instructionData.length);
 
     const accounts = [
       { pubkey: mint.publicKey, isSigner: true, isWritable: true }, // mint
@@ -367,12 +333,7 @@ export async function createTokenWithNewIdl(
       { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false }, // program
     ];
 
-    console.log("🔹 Instruction accounts:", accounts.length);
-    accounts.forEach((acc, i) => {
-      console.log(
-        `   Account ${i}: ${acc.pubkey.toBase58()} (signer: ${acc.isSigner}, writable: ${acc.isWritable})`
-      );
-    });
+    logger.info("Create instruction accounts", accounts.length);
 
     const instruction = new TransactionInstruction({
       programId: PUMP_PROGRAM_ID,
@@ -388,9 +349,7 @@ export async function createTokenWithNewIdl(
     tx.add(instruction);
     tx.feePayer = creator.publicKey;
 
-    console.log(
-      "✅ Create transaction built manually (bypassed Anchor IDL parsing)"
-    );
+    logger.info("Create transaction built");
     return tx;
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
@@ -398,8 +357,8 @@ export async function createTokenWithNewIdl(
       typeof err === "object" && err !== null
         ? (err as { name?: string; code?: string })
         : {};
-    console.error("❌ Error building create transaction manually:", err);
-    console.error("Error details:", {
+    logger.error("Create transaction build failed", err);
+    logger.error("Create error details", {
       message: err.message,
       stack: err.stack,
       name: errorDetails.name,
@@ -440,51 +399,38 @@ export async function buyTokensWithNewIdl(
     const connection = getSolanaConnection();
     await getAccount(connection, associatedUser, "confirmed");
     ataExists = true;
-    console.log(
-      "✅ ATA already exists AND is initialized:",
-      associatedUser.toBase58()
-    );
+    logger.info("ATA exists and initialized", associatedUser.toBase58());
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));
     if (
       err.message.includes("could not find account") ||
       (err as { name?: string }).name === "TokenAccountNotFoundError"
     ) {
-      console.log(
-        "🔹 ATA does not exist, will create it:",
-        associatedUser.toBase58()
-      );
+      logger.info("ATA missing, will create", associatedUser.toBase58());
     } else if (err.message.includes("Invalid account owner")) {
-      console.log(
-        "⚠️  ATA exists but NOT initialized as token account, will create it:",
+      logger.info(
+        "ATA exists but not initialized, will create",
         associatedUser.toBase58()
       );
     } else {
-      console.log(
-        "🔹 ATA check failed (assuming doesn't exist), will create it:",
+      logger.info(
+        "ATA check failed, will create",
         associatedUser.toBase58()
       );
-      console.log("   Error:", err.message);
+      logger.info("ATA check error", err.message);
     }
   }
 
-  console.log(
-    "🔹 Bundle mode status: Creator provided =",
-    !!creator,
-    "| ATA initialized =",
-    ataExists
-  );
+  logger.info("Bundle mode status", {
+    creatorProvided: !!creator,
+    ataInitialized: ataExists,
+  });
 
   const feeRecipient = new PublicKey(
     "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
   );
 
-  console.log(
-    `🔹 Using fee_recipient: ${feeRecipient.toBase58()} (authorized pump.fun protocol fee recipient)`
-  );
-  console.log(
-    `🔹 NOTE: Always using known authorized fee recipient to avoid NotAuthorized errors`
-  );
+  logger.info("Fee recipient", feeRecipient.toBase58());
 
   const [eventAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("__event_authority")],
@@ -512,36 +458,30 @@ export async function buyTokensWithNewIdl(
     if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
       if (creator) {
         creatorPubkey = creator;
-        console.log(
-          "🔹 BUNDLE MODE: Bonding curve not found, using provided creator:",
+        logger.info(
+          "Bonding curve missing; using provided creator",
           creatorPubkey.toBase58()
         );
       } else {
         throw new Error(
-          "❌ CRITICAL: Bonding curve not found and no creator provided. Cannot determine creator_vault!"
+          "Bonding curve not found and no creator provided. Cannot determine creator_vault."
         );
       }
     } else {
       const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
       creatorPubkey = new PublicKey(creatorBytes);
-      console.log(
-        "✅ Creator fetched from bonding curve:",
-        creatorPubkey.toBase58()
-      );
+      logger.info("Creator fetched from bonding curve", creatorPubkey.toBase58());
     }
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error("❌ Failed to get creator from bonding curve:", err.message);
+    logger.error("Failed to get creator from bonding curve", err.message);
 
     if (creator) {
       creatorPubkey = creator;
-      console.log(
-        "🔹 Using provided creator as fallback:",
-        creatorPubkey.toBase58()
-      );
+      logger.info("Using provided creator fallback", creatorPubkey.toBase58());
     } else {
       throw new Error(
-        `❌ CRITICAL: Cannot determine token creator! Error: ${err.message}`
+        `Cannot determine token creator. Error: ${err.message}`
       );
     }
   }
@@ -551,8 +491,8 @@ export async function buyTokensWithNewIdl(
     PUMP_PROGRAM_ID
   );
 
-  console.log("🔹 Creator (for creator_vault):", creatorPubkey.toBase58());
-  console.log("🔹 Creator vault:", creatorVault.toBase58());
+  logger.info("Creator for creator_vault", creatorPubkey.toBase58());
+  logger.info("Creator vault", creatorVault.toBase58());
 
   const feeProgram = FEE_PROGRAM_ID;
   const [feeConfig] = PublicKey.findProgramAddressSync(
@@ -567,30 +507,15 @@ export async function buyTokensWithNewIdl(
     feeProgram
   );
 
-  console.log(
-    "🔹 Building BuyExactSolIn instruction manually (Anchor doesn't handle OptionBool properly)..."
-  );
-  console.log("🔹 Mint:", mint.toBase58());
-  console.log("🔹 Buyer:", buyer.publicKey.toBase58());
-  console.log(
-    "🔹 Spendable SOL in:",
-    spendableSolIn.toString(),
-    "lamports (",
-    Number(spendableSolIn) / 1e9,
-    "SOL)"
-  );
-  console.log(
-    "🔹 Min tokens out:",
-    minTokensOut.toString(),
-    "tokens (slippage protection)"
-  );
-  console.log("🔹 Bonding curve:", addresses.bondingCurve.toBase58());
-  console.log(
-    "🔹 NOTE: Not checking bonding curve existence - assuming it will be created in bundle"
-  );
-  console.log(
-    "🔹 Using manual instruction construction (bypassing Anchor for OptionBool compatibility)"
-  );
+  logger.info("Building buy_exact_sol_in instruction");
+  logger.info("Buy inputs", {
+    mint: mint.toBase58(),
+    buyer: buyer.publicKey.toBase58(),
+    spendableLamports: spendableSolIn.toString(),
+    spendableSol: Number(spendableSolIn) / 1e9,
+    minTokensOut: minTokensOut.toString(),
+    bondingCurve: addresses.bondingCurve.toBase58(),
+  });
 
   const buyDiscriminator = Buffer.from([56, 252, 116, 8, 158, 223, 205, 95]);
 
@@ -609,11 +534,8 @@ export async function buyTokensWithNewIdl(
     trackVolumeEncoded,
   ]);
 
-  console.log("🔹 Instruction: BuyExactSolIn");
-  console.log("🔹 Instruction data length:", instructionData.length, "bytes");
-  console.log("🔹 Discriminator:", buyDiscriminator.toString("hex"));
-  console.log("🔹 Spendable SOL in:", spendableSolIn.toString(), "lamports");
-  console.log("🔹 Min tokens out:", minTokensOut.toString(), "tokens");
+  logger.info("Buy instruction data length", instructionData.length);
+  logger.info("Buy discriminator", buyDiscriminator.toString("hex"));
 
   const buyIx = new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
@@ -638,33 +560,18 @@ export async function buyTokensWithNewIdl(
     data: instructionData,
   });
 
-  console.log(
-    "✅ Buy instruction created manually with",
-    buyIx.keys.length,
-    "accounts"
-  );
-  console.log("🔹 Account keys in buy instruction:");
-  buyIx.keys.forEach((key, idx) => {
-    console.log(
-      `   ${idx}: ${key.pubkey.toBase58()} (signer: ${key.isSigner}, writable: ${key.isWritable})`
-    );
-  });
+  logger.info("Buy instruction accounts", buyIx.keys.length);
 
   const tx = new Transaction();
 
   if (!ataExists) {
-    console.log("🔹 Adding ATA creation instruction (ATA does not exist yet)");
+    logger.info("Adding ATA creation instruction");
     if (creator) {
-      console.log(
-        "🔹 Bundle mode: ATA will be created AFTER CREATE instructions run (same TX)"
-      );
-      console.log(
-        "🔹 Order: CREATE → ATA creation → BUY (all in one transaction)"
+      logger.info(
+        "Bundle mode: ATA will be created after CREATE instructions"
       );
     } else {
-      console.log(
-        "🔹 Standalone buy mode: Mint exists, ATA creation will work immediately"
-      );
+      logger.info("Standalone buy mode: mint exists for ATA creation");
     }
 
     const { createAssociatedTokenAccountInstruction } = await import(
@@ -681,23 +588,18 @@ export async function buyTokensWithNewIdl(
         ASSOCIATED_TOKEN_PROGRAM_ID // associatedTokenProgramId
       )
     );
-    console.log(
-      "✅ ATA creation instruction added (tx will now have CREATE_ATA + BUY instructions)"
-    );
+    logger.info("ATA creation instruction added");
   } else {
-    console.log(
-      "✅ Skipping ATA creation (already exists) - tx will have 1 instruction: BUY only"
-    );
+    logger.info("Skipping ATA creation (already exists)");
   }
 
   tx.add(buyIx);
   tx.feePayer = buyer.publicKey;
 
-  console.log(
-    "✅ Buy transaction built manually (OptionBool properly encoded)"
-  );
-  console.log("🔹 Transaction has", tx.instructions.length, "instruction(s)");
-  console.log("🔹 Fee payer:", tx.feePayer?.toBase58());
+  logger.info("Buy transaction built", {
+    instructionCount: tx.instructions.length,
+    feePayer: tx.feePayer?.toBase58(),
+  });
 
   return tx;
 }
@@ -734,23 +636,19 @@ export async function sellTokensWithNewIdl(
     const connection = getSolanaConnection();
     const globalAccountInfo = await connection.getAccountInfo(addresses.global);
     if (!globalAccountInfo || !globalAccountInfo.data) {
-      console.warn(
-        "⚠️ Global account not found, using default pump.fun fee recipient"
-      );
+      logger.warn("Global account not found, using default fee recipient");
       feeRecipient = new PublicKey(
         "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
       ); // Known pump.fun fee recipient
     } else {
       const feeRecipientBytes = globalAccountInfo.data.slice(41, 73);
       feeRecipient = new PublicKey(feeRecipientBytes);
-      console.log(
-        `✅ Fee recipient fetched from global: ${feeRecipient.toBase58()}`
-      );
+      logger.info("Fee recipient from global", feeRecipient.toBase58());
     }
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.warn(
-      "⚠️ Failed to fetch global account, using default fee recipient:",
+    logger.warn(
+      "Failed to fetch global account, using default fee recipient",
       err.message
     );
     feeRecipient = new PublicKey(
@@ -771,16 +669,14 @@ export async function sellTokensWithNewIdl(
       addresses.bondingCurve
     );
     if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
-      console.warn(
-        "⚠️ Bonding curve account not found yet (will be created in bundle), using seller as creator"
+      logger.warn(
+        "Bonding curve not found, using seller as creator for creator_vault"
       );
       creator = seller.publicKey;
     } else {
       const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
       creator = new PublicKey(creatorBytes);
-      console.log(
-        `✅ Creator fetched from bonding curve: ${creator.toBase58()}`
-      );
+      logger.info("Creator fetched from bonding curve", creator.toBase58());
     }
 
     const [creatorVaultPDA] = PublicKey.findProgramAddressSync(
@@ -788,19 +684,17 @@ export async function sellTokensWithNewIdl(
       PUMP_PROGRAM_ID
     );
     creatorVault = creatorVaultPDA;
-    console.log(`✅ Creator vault PDA: ${creatorVault.toBase58()}`);
+    logger.info("Creator vault PDA", creatorVault.toBase58());
   } catch (error) {
     const err = error instanceof Error ? error : new Error(String(error));
-    console.error("❌ Failed to get creator vault:", err.message);
+    logger.error("Failed to get creator vault", err.message);
     creator = seller.publicKey;
     const [creatorVaultPDA] = PublicKey.findProgramAddressSync(
       [Buffer.from("creator-vault"), creator.toBuffer()],
       PUMP_PROGRAM_ID
     );
     creatorVault = creatorVaultPDA;
-    console.warn(
-      "⚠️ Using seller as creator for creator_vault (bonding curve not available yet)"
-    );
+    logger.warn("Using seller as creator for creator_vault");
   }
 
   const feeProgram = new PublicKey(
@@ -886,7 +780,7 @@ export async function buyTokensExactSolInWithNewIdl(
   const feeRecipient = new PublicKey(
     "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
   );
-  console.log(
+  logger.info(
     `🔹 Using fee_recipient: ${feeRecipient.toBase58()} (authorized pump.fun protocol fee recipient)`
   );
 
@@ -908,7 +802,7 @@ export async function buyTokensExactSolInWithNewIdl(
   let creatorPubkey: PublicKey;
   if (creator) {
     creatorPubkey = creator;
-    console.log(
+    logger.info(
       "🔹 Using provided creator for creator_vault:",
       creatorPubkey.toBase58()
     );
@@ -919,26 +813,26 @@ export async function buyTokensExactSolInWithNewIdl(
         addresses.bondingCurve
       );
       if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
-        console.warn(
+        logger.warn(
           "⚠️ Bonding curve account not found yet (will be created in bundle), using buyer as creator fallback"
         );
         creatorPubkey = buyer.publicKey;
       } else {
         const creatorBytes = bondingCurveAccountInfo.data.slice(8, 40);
         creatorPubkey = new PublicKey(creatorBytes);
-        console.log(
+        logger.info(
           "✅ Creator fetched from bonding curve:",
           creatorPubkey.toBase58()
         );
       }
     } catch (error) {
       const err = error instanceof Error ? error : new Error(String(error));
-      console.error(
+      logger.error(
         "❌ Failed to get creator from bonding curve:",
         err.message
       );
       creatorPubkey = buyer.publicKey;
-      console.warn(
+      logger.warn(
         "⚠️ Using buyer as creator for creator_vault (bonding curve not available yet)"
       );
     }
@@ -962,11 +856,13 @@ export async function buyTokensExactSolInWithNewIdl(
     feeProgram
   );
 
-  console.log("🔹 Building buy_exact_sol_in instruction manually...");
-  console.log("🔹 Mint:", mint.toBase58());
-  console.log("🔹 Buyer:", buyer.publicKey.toBase58());
-  console.log("🔹 Spendable SOL in:", spendableSolIn.toString(), "lamports");
-  console.log("🔹 Min tokens out:", minTokensOut.toString());
+  logger.info("Building buy_exact_sol_in instruction");
+  logger.info("Buy exact inputs", {
+    mint: mint.toBase58(),
+    buyer: buyer.publicKey.toBase58(),
+    spendableLamports: spendableSolIn.toString(),
+    minTokensOut: minTokensOut.toString(),
+  });
 
   const buyExactSolInDiscriminator = Buffer.from([
     56, 252, 116, 8, 158, 223, 205, 95,
@@ -987,8 +883,11 @@ export async function buyTokensExactSolInWithNewIdl(
     trackVolumeEncoded,
   ]);
 
-  console.log("🔹 Instruction data length:", instructionData.length, "bytes");
-  console.log("🔹 Discriminator:", buyExactSolInDiscriminator.toString("hex"));
+  logger.info("Buy exact instruction data length", instructionData.length);
+  logger.info(
+    "Buy exact discriminator",
+    buyExactSolInDiscriminator.toString("hex")
+  );
 
   const buyExactSolInIx = new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
@@ -1013,18 +912,12 @@ export async function buyTokensExactSolInWithNewIdl(
     data: instructionData,
   });
 
-  console.log(
-    "✅ buy_exact_sol_in instruction created manually with",
-    buyExactSolInIx.keys.length,
-    "accounts"
-  );
+  logger.info("Buy exact instruction accounts", buyExactSolInIx.keys.length);
 
   const tx = new Transaction();
 
   if (creator) {
-    console.log(
-      "🔹 Bundle mode: Adding ATA creation instruction for associated_user"
-    );
+    logger.info("Bundle mode: adding ATA creation for associated_user");
     const { createAssociatedTokenAccountInstruction } = await import(
       "@solana/spl-token"
     );
@@ -1038,15 +931,16 @@ export async function buyTokensExactSolInWithNewIdl(
         ASSOCIATED_TOKEN_PROGRAM_ID // associatedTokenProgramId
       )
     );
-    console.log("✅ ATA creation instruction added for bundle mode");
+    logger.info("ATA creation instruction added for bundle mode");
   }
 
   tx.add(buyExactSolInIx);
   tx.feePayer = buyer.publicKey;
 
-  console.log("✅ buy_exact_sol_in transaction built successfully");
-  console.log("🔹 Transaction has", tx.instructions.length, "instruction(s)");
-  console.log("🔹 Fee payer:", tx.feePayer?.toBase58());
+  logger.info("Buy exact transaction built", {
+    instructionCount: tx.instructions.length,
+    feePayer: tx.feePayer?.toBase58(),
+  });
 
   return tx;
 }

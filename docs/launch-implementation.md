@@ -58,7 +58,7 @@ Based on `devWalletOption`:
 If bundle buys are enabled, server generates `BUNDLER` wallets and uses them for buy transactions.
 
 ### Distribution Wallets
-When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and links them to the token. Token distribution logic is intentionally separate for later extension.
+When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets and links them to the token. Token distribution logic is intentionally separate for later extension.
 
 ### Wallet Associations
 
@@ -66,16 +66,15 @@ When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and l
 - Dev wallets are linked through `TokenDevWallet` to allow sharing across multiple tokens
 - Main wallet remains user-scoped via `User.mainWallet`
 
-## Launch Job Steps
-- Validate inputs and thresholds
-- Load main wallet and prepare dev wallet
-- Generate bundler wallets when enabled
-- Resolve metadata image (base64 or URL)
-- Reserve vanity mint if requested
-- Create token using PumpFun SDK
-- Execute bundle buys (sequential SDK buy instructions)
-- Persist token + wallet associations
-- Mark launch complete and store result metadata
+## Launch Job Steps (Short)
+1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
+2. **Validate**: enforce min buy thresholds and bundle wallet limit.
+3. **Wallets**: load main wallet, resolve dev wallet, generate bundler wallets if enabled.
+4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work.
+5. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+6. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
+7. **Persist**: create Token, link wallets, mark vanity mint used, generate distribution wallets if needed.
+8. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
 `app/(app)/launch/launch-form.tsx` now:
@@ -84,12 +83,17 @@ When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and l
 - Resumes from local storage or `launch.getActive`
 - Allows user cancellation
 - Uses shadcn/ui components for dialogs, badges, buttons, and progress
+- Uses numeric form values end-to-end (no string parsing)
+ - Emits concise step logs with structured metrics
 
 ## Key Files
 - `prisma/schema.prisma` (Launch, LaunchLog, VanityMint)
 - `server/services/launch.service.ts`
 - `server/trpc/routers/launch.router.ts`
 - `server/schemas/launch.schema.ts`
+- `server/solana/bundle-create-and-buy.ts`
+- `server/solana/bundle-transaction-builder.ts`
+- `server/solana/pump-transaction-builders.ts`
 - `app/(app)/launch/launch-progress-dialog.tsx`
 - `app/(app)/launch/launch-form.tsx`
 
@@ -98,16 +102,42 @@ When `distributionMultiplier > 1`, server generates `DISTRIBUTION` wallets and l
 - `JITO_BLOCK_ENGINE_URL` must be set for bundle launches.
 
 ## Bundle Launch
-- When bundle buy is enabled, create + dev buy + bundle buys are sent as a Jito bundle.
-- The bundle is packed into 5 transactions with a maximum of 11 buyer wallets.
-- See `docs/bundle-implementation.md` for packing details and ALT extension notes.
+### Overview
+When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito bundle. The path is:
+1. Build the token create transaction.
+2. Build buy transactions for each buyer.
+3. Pack transactions into a bundle and submit through Jito.
+
+### Transaction Packing Rules
+- The bundle can contain up to 5 transactions.
+- The first transaction includes:
+  - A compute budget instruction (800k units),
+  - The token create instructions,
+  - Up to 1 buy.
+- Subsequent transactions include up to 3 buys each.
+- With 10 bundler wallets + dev buy (11 total buys), the packing is:
+  - TX1: create + dev buy
+  - TX2: 3 buys
+  - TX3: 3 buys
+  - TX4: 3 buys
+  - TX5: 1 buy
+
+### Buyer Amounts
+- Each bundler buy amount uses a random variance:
+  - `amount = bundlerBuyAmountSol ± (bundlerBuyAmountSol * bundlerBuyVariancePercent / 100)`
+- Buys with non-positive amounts are skipped.
+
+### Jito Tip
+- If `jitoTipAmountSol > 0`, a SOL transfer is added to the last bundle transaction.
+- The tip is paid by the main wallet and sent to a Jito tip account.
+
+### Signatures and Blockhash
+- All bundle transactions share a single recent blockhash.
+- Transactions are compiled to v0 and signed by the relevant wallets.
+- Signers are deduplicated for the final tipped transaction.
 
 ## Balance Refresh Strategy
 
 - Balances are refreshed on demand only
 - Server enforces a 15-second debounce per wallet
 
-## Extension Points
-- Add distribution transfer logic to move tokens into distribution wallets.
-- Add fee collection and Jito tip handling if needed.
-- Reuse `Launch` and `LaunchLog` for volume-bot workflows.

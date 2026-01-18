@@ -5,6 +5,7 @@ import { TRPCProvider } from "@/lib/trpc/provider";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
+import NextTopLoader from 'nextjs-toploader';
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -36,8 +37,17 @@ export default function RootLayout({
         <NuqsAdapter>
           <TooltipProvider delayDuration={0}>
             <TRPCProvider>
+              <NextTopLoader color="#333" height={5} showSpinner={false} />
               {children}
-              <Toaster />
+              <Toaster
+                richColors
+                closeButton
+                position="bottom-center"
+                theme="dark"
+                toastOptions={{
+                  className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
+                }}
+              />
             </TRPCProvider>
           </TooltipProvider>
         </NuqsAdapter>

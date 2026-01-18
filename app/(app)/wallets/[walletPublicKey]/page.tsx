@@ -1,9 +1,11 @@
 "use client";
 
+import { formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQueryState } from "nuqs";
-import { formatDistanceToNowStrict } from "date-fns";
+import { useState } from "react";
+import { toast } from "sonner";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { copyToClipboard } from "@/lib/utils";
@@ -13,7 +15,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
-import { useState } from "react";
+import { Spinner } from "@/components/ui/spinner";
 
 function formatRelativeTime(dateValue?: Date | string | null) {
   if (!dateValue) return "Never";
@@ -54,11 +56,20 @@ export default function WalletPage() {
 
   const handleRefresh = async () => {
     if (!tokenPublicKey || !walletPublicKey) return;
-    await refreshBalances({
-      tokenPublicKey,
-      walletPublicKeys: [walletPublicKey],
+    const toastId = toast.loading("Refreshing wallet balance...", {
+      icon: <Spinner className="size-4" />,
     });
-    await refetchWallet();
+
+    try {
+      await refreshBalances({
+        tokenPublicKey,
+        walletPublicKeys: [walletPublicKey],
+      });
+      await refetchWallet();
+      toast.success("Wallet balance refreshed", { id: toastId, icon: null });
+    } catch (error) {
+      toast.error("Failed to refresh wallet balance", { id: toastId, icon: null });
+    }
   };
 
   if (isLoading) {
@@ -99,6 +110,7 @@ export default function WalletPage() {
           onClick={handleRefresh}
           disabled={isRefreshingBalances || !canRefresh(wallet.balanceRefreshedAt)}
         >
+          {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
           Refresh balance
         </Button>
       </div>

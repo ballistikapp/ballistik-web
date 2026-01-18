@@ -17,7 +17,7 @@ interface LaunchOverviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
-  formValues: {
+  launchInput: {
     tokenName: string;
     tokenSymbol: string;
     description: string;
@@ -26,14 +26,14 @@ interface LaunchOverviewDialogProps {
     telegram: string;
     website: string;
     devWalletOption: "import" | "generate" | "use_main";
-    devBuyAmount: string;
-    jitoTipAmount: string;
+    devBuyAmountSol: number;
+    jitoTipAmountSol: number;
     bundleBuyEnabled: boolean;
     vanityMint: boolean;
-    numberOfWallets: string;
-    buyAmountPerWallet: string;
-    buyAmountVariance: string;
-    distributionMultiplier: string;
+    bundlerWalletCount: number;
+    bundlerBuyAmountSol: number;
+    bundlerBuyVariancePercent: number;
+    distributionWalletMultiplier: number;
   };
   imagePreview: string | null;
   isLoading?: boolean;
@@ -43,17 +43,16 @@ export function LaunchOverviewDialog({
   open,
   onOpenChange,
   onConfirm,
-  formValues,
+  launchInput,
   imagePreview,
   isLoading = false,
 }: LaunchOverviewDialogProps) {
   const totalCost =
-    parseFloat(formValues.devBuyAmount || "0") +
-    (formValues.bundleBuyEnabled
-      ? parseInt(formValues.numberOfWallets || "0") *
-        parseFloat(formValues.buyAmountPerWallet || "0")
+    launchInput.devBuyAmountSol +
+    (launchInput.bundleBuyEnabled
+      ? launchInput.bundlerWalletCount * launchInput.bundlerBuyAmountSol
       : 0) +
-    parseFloat(formValues.jitoTipAmount || "0");
+    launchInput.jitoTipAmountSol;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -80,10 +79,10 @@ export function LaunchOverviewDialog({
             )}
             <div>
               <p className="text-lg font-semibold">
-                {formValues.tokenName || "Token Name"}
+                {launchInput.tokenName || "Token Name"}
               </p>
               <p className="text-sm text-muted-foreground">
-                ${formValues.tokenSymbol || "SYMBOL"}
+                ${launchInput.tokenSymbol || "SYMBOL"}
               </p>
             </div>
           </div>
@@ -92,26 +91,26 @@ export function LaunchOverviewDialog({
             <div className="grid grid-cols-[140px_1fr] gap-2">
               <span className="text-muted-foreground">Description</span>
               <span className="text-foreground line-clamp-2">
-                {formValues.description || "-"}
+                {launchInput.description || "-"}
               </span>
             </div>
-            {(formValues.twitter ||
-              formValues.telegram ||
-              formValues.website) && (
+            {(launchInput.twitter ||
+              launchInput.telegram ||
+              launchInput.website) && (
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Social Links</span>
                 <div className="flex gap-2">
-                  {formValues.twitter && (
+                  {launchInput.twitter && (
                     <span className="text-xs bg-muted px-2 py-0.5 rounded">
                       Twitter
                     </span>
                   )}
-                  {formValues.telegram && (
+                  {launchInput.telegram && (
                     <span className="text-xs bg-muted px-2 py-0.5 rounded">
                       Telegram
                     </span>
                   )}
-                  {formValues.website && (
+                  {launchInput.website && (
                     <span className="text-xs bg-muted px-2 py-0.5 rounded">
                       Website
                     </span>
@@ -127,55 +126,54 @@ export function LaunchOverviewDialog({
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Dev Wallet</span>
                 <span>
-                  {formValues.devWalletOption === "import"
+                  {launchInput.devWalletOption === "import"
                     ? "Imported wallet"
-                    : formValues.devWalletOption === "generate"
+                    : launchInput.devWalletOption === "generate"
                     ? "Will be generated"
                     : "Main wallet"}
                 </span>
               </div>
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Dev Buy</span>
-                <span>{formValues.devBuyAmount || "0"} SOL</span>
+                <span>{launchInput.devBuyAmountSol.toFixed(4)} SOL</span>
               </div>
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Jito Tip</span>
-                <span>{formValues.jitoTipAmount || "0"} SOL</span>
+                <span>{launchInput.jitoTipAmountSol.toFixed(4)} SOL</span>
               </div>
-              {formValues.bundleBuyEnabled && (
+              {launchInput.bundleBuyEnabled && (
                 <>
                   <div className="grid grid-cols-[140px_1fr] gap-2">
                     <span className="text-muted-foreground">Bundle Buy</span>
                     <span>
-                      {formValues.numberOfWallets} wallets ×{" "}
-                      {formValues.buyAmountPerWallet} SOL (±
-                      {formValues.buyAmountVariance}%)
+                      {launchInput.bundlerWalletCount} wallets ×{" "}
+                      {launchInput.bundlerBuyAmountSol} SOL (±
+                      {launchInput.bundlerBuyVariancePercent}%)
                     </span>
                   </div>
-                  {parseInt(formValues.distributionMultiplier) > 1 && (
+                  {launchInput.distributionWalletMultiplier > 1 && (
                     <div className="grid grid-cols-[140px_1fr] gap-2">
                       <span className="text-muted-foreground">
                         Distribution
                       </span>
                       <span>
-                        {parseInt(formValues.numberOfWallets || "0") *
-                          parseInt(
-                            formValues.distributionMultiplier || "1"
-                          )}{" "}
-                        wallets after ×{formValues.distributionMultiplier}{" "}
+                        {launchInput.bundlerWalletCount *
+                          launchInput.distributionWalletMultiplier}{" "}
+                        wallets after ×
+                        {launchInput.distributionWalletMultiplier}{" "}
                         distribution
                       </span>
                     </div>
                   )}
                 </>
               )}
-              {!formValues.bundleBuyEnabled && (
+              {!launchInput.bundleBuyEnabled && (
                 <div className="grid grid-cols-[140px_1fr] gap-2">
                   <span className="text-muted-foreground">Bundle Buy</span>
                   <span>Disabled</span>
                 </div>
               )}
-              {formValues.vanityMint && (
+              {launchInput.vanityMint && (
                 <div className="grid grid-cols-[140px_1fr] gap-2">
                   <span className="text-muted-foreground">Vanity Address</span>
                   <span className="text-green-600">Enabled</span>

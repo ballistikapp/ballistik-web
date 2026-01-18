@@ -1,4 +1,4 @@
-import { PrismaClient } from "./generated/prisma/client";
+import { Prisma, PrismaClient } from "./generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
@@ -19,14 +19,13 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 
 // Create Prisma Client with adapter
+const prismaLogLevels: Prisma.LogLevel[] = ["error"];
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     adapter,
-    log:
-      process.env.NODE_ENV === "development"
-        ? ["query", "error", "warn"]
-        : ["error"],
+    log: prismaLogLevels,
   });
 
 if (process.env.NODE_ENV !== "production") globalForPrisma.prisma = prisma;

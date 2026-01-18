@@ -6,6 +6,7 @@ import {
   getMainWalletSchema,
   getOperationalWalletsByTokenSchema,
   refreshWalletBalancesSchema,
+  refreshMainWalletBalanceSchema,
   returnSolSchema,
   sendSolSchema,
 } from "@/server/schemas/wallet.schema";
@@ -50,6 +51,11 @@ export const walletRouter = router({
         input.walletPublicKeys
       );
     }),
+  refreshMainBalance: protectedProcedure
+    .input(refreshMainWalletBalanceSchema)
+    .mutation(async ({ ctx }) => {
+      return await walletService.refreshMainWalletBalance(ctx.user.id);
+    }),
   sendSol: protectedProcedure
     .input(sendSolSchema)
     .mutation(async ({ input, ctx }) => {
@@ -67,7 +73,8 @@ export const walletRouter = router({
         input.tokenPublicKey,
         ctx.user.id,
         input.walletPublicKeys,
-        input.amountSol
+        input.amountSol,
+        input.useMax
       );
     }),
 });

@@ -7,3 +7,5 @@ export * from "./test.service";
 export * from "./auth.service";
 export * from "./wallet.service";
 export * from "./launch.service";
+export * from "./holding.service";
+export * from "./transaction.service";

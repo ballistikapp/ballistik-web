@@ -29,7 +29,7 @@ const adapter = new PrismaPg(pool);
 
 const prisma = new PrismaClient({
   adapter,
-  log: ["error", "warn"],
+  log: ["error"],
 });
 
 const WALLET_TYPES: WalletType[] = [
