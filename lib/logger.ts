@@ -27,16 +27,12 @@ function parseLogLevel(value?: string): LogLevel {
 }
 
 const defaultTransport: LogTransport = (entry) => {
-  const line = JSON.stringify(entry);
+  const payload = JSON.stringify(entry);
   if (entry.level === "error") {
-    console.error(line);
+    console.error(payload);
     return;
   }
-  if (entry.level === "warn") {
-    console.warn(line);
-    return;
-  }
-  console.log(line);
+  console.log(payload);
 };
 
 class Logger {

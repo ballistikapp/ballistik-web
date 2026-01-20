@@ -5,7 +5,8 @@
 - Persist launches and allow UI resume after refresh.
 - Use main wallet as funding wallet; generate dev and bundler wallets server-side.
 - Support vanity mint pool selection with safe reservation and release.
-- Keep launch logic modular for reuse in tokens, wallets, and volume-bot features.
+- Keep launch logic modular for reuse in tokens and wallets.
+- Volume bot uses dedicated `VolumeBotSession` and `VolumeBotLog` models.
 
 ## Core Flow
 1. UI submits launch input via `trpc.launch.start`.
@@ -70,7 +71,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
 2. **Validate**: enforce min buy thresholds and bundle wallet limit.
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler wallets if enabled.
-4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work.
+4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, and fee buffers.
 5. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
 6. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
 7. **Persist**: create Token, link wallets, mark vanity mint used, generate distribution wallets if needed.
@@ -99,7 +100,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 ## Environment Requirements
 - `SOLANA_RPC_URL` must be set for on-chain operations.
-- `JITO_BLOCK_ENGINE_URL` must be set for bundle launches.
+- Jito block engine URLs are defined in `src/lib/config/jito.config.ts`.
+- `SHYFT_API_KEY` is required for gRPC confirmation.
 
 ## Bundle Launch
 ### Overview
@@ -126,15 +128,28 @@ When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito b
 - Each bundler buy amount uses a random variance:
   - `amount = bundlerBuyAmountSol ± (bundlerBuyAmountSol * bundlerBuyVariancePercent / 100)`
 - Buys with non-positive amounts are skipped.
+- Buy amounts represent the actual spend; ATA rent is funded separately.
+- User volume accumulator rent is funded separately for each buy wallet.
 
 ### Jito Tip
 - If `jitoTipAmountSol > 0`, a SOL transfer is added to the last bundle transaction.
 - The tip is paid by the main wallet and sent to a Jito tip account.
 
+### Jito Block Engine
+- Bundle submission rotates through available Jito block engine endpoints based on RPC network.
+- Tip accounts are cached per endpoint to reduce rate limiting.
+
 ### Signatures and Blockhash
 - All bundle transactions share a single recent blockhash.
 - Transactions are compiled to v0 and signed by the relevant wallets.
 - Signers are deduplicated for the final tipped transaction.
+
+### Diagnostics Logging
+- Create preparation logs include fee payer, instruction count, and metadata URI prefix.
+- Create simulation logs include blockhash and units consumed.
+- Bundle transaction logs include instruction counts and fulfilled buy counts per tx.
+- Jito bundle send logs include RPC endpoint, tipper, tip account, blockhash, and signature preview.
+- Confirmation logs include summary counts, resend triggers, and gRPC confirmation.
 
 ## Balance Refresh Strategy
 

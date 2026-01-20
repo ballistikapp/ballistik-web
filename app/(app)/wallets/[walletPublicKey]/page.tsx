@@ -1,6 +1,5 @@
 "use client";
 
-import { formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useQueryState } from "nuqs";
@@ -8,6 +7,8 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
+import { cacheConfig } from "@/lib/config/cache.config";
+import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { copyToClipboard } from "@/lib/utils";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../../dashboard/dashboard-loading";
@@ -16,20 +17,6 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
 import { Spinner } from "@/components/ui/spinner";
-
-function formatRelativeTime(dateValue?: Date | string | null) {
-  if (!dateValue) return "Never";
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return "Never";
-  return `${formatDistanceToNowStrict(date)} ago`;
-}
-
-function canRefresh(dateValue?: Date | string | null) {
-  if (!dateValue) return true;
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return true;
-  return Date.now() - date.getTime() >= 15_000;
-}
 
 export default function WalletPage() {
   const params = useParams();
@@ -54,6 +41,21 @@ export default function WalletPage() {
   const { mutateAsync: refreshBalances, isPending: isRefreshingBalances } =
     trpc.wallet.refreshBalances.useMutation();
 
+  const getCooldownMessage = () => {
+    const lastRefreshedAt = data?.wallet.balanceRefreshedAt;
+    if (!lastRefreshedAt) {
+      return "Wallet balance was refreshed recently.";
+    }
+    const last = new Date(lastRefreshedAt).getTime();
+    const remainingMs =
+      cacheConfig.cooldownMs.walletBalances - (Date.now() - last);
+    if (Number.isNaN(remainingMs) || remainingMs <= 0) {
+      return "Wallet balance was refreshed recently.";
+    }
+    const waitSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
+    return `Wallet balance was refreshed recently. Try again in ${waitSeconds}s.`;
+  };
+
   const handleRefresh = async () => {
     if (!tokenPublicKey || !walletPublicKey) return;
     const toastId = toast.loading("Refreshing wallet balance...", {
@@ -61,12 +63,16 @@ export default function WalletPage() {
     });
 
     try {
-      await refreshBalances({
+      const result = await refreshBalances({
         tokenPublicKey,
         walletPublicKeys: [walletPublicKey],
       });
-      await refetchWallet();
-      toast.success("Wallet balance refreshed", { id: toastId, icon: null });
+      if (result.length > 0) {
+        await refetchWallet();
+        toast.success("Wallet balance refreshed", { id: toastId, icon: null });
+      } else {
+        toast.info(getCooldownMessage(), { id: toastId, icon: null });
+      }
     } catch (error) {
       toast.error("Failed to refresh wallet balance", { id: toastId, icon: null });
     }
@@ -108,7 +114,7 @@ export default function WalletPage() {
         <Button
           variant="outline"
           onClick={handleRefresh}
-          disabled={isRefreshingBalances || !canRefresh(wallet.balanceRefreshedAt)}
+          disabled={isRefreshingBalances}
         >
           {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
           Refresh balance
@@ -165,11 +171,8 @@ export default function WalletPage() {
             <div className="text-2xl font-mono">
               {Number(wallet.balanceSol).toFixed(4)} SOL
             </div>
-            <div className="text-sm text-muted-foreground">
-              {Number(wallet.tokenBalance).toFixed(4)} {token.symbol}
-            </div>
             <div className="text-xs text-muted-foreground">
-              Last refreshed {formatRelativeTime(wallet.balanceRefreshedAt)}
+              Last refreshed {formatRefreshTime(wallet.balanceRefreshedAt)}
             </div>
             {!isMainWallet && (
               <div className="flex gap-2">

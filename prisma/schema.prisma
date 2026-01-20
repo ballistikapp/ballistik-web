@@ -23,7 +23,9 @@ model User {
   wallets Wallet[] @relation("WalletUser")
   tokens Token[] @relation("TokenUser")
   launches Launch[] @relation("LaunchUser")
+  volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionUser")
   vanityMints VanityMint[] @relation("VanityMintUser")
+  refreshCaches RefreshCache[]
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
@@ -41,12 +43,12 @@ model Wallet {
   tokenPublicKey String?
   token Token? @relation("TokenOperationalWallets", fields: [tokenPublicKey], references: [publicKey])
   balanceSol Decimal @default(0)
-  tokenBalance Decimal @default(0)
   balanceRefreshedAt DateTime?
   isImported Boolean @default(false)
   holdings Holding[] @relation("WalletHoldings")
   transactions Transaction[] @relation("WalletTransactions")
   devWalletTokens TokenDevWallet[] @relation("DevWalletTokens")
+  volumeBotWallets VolumeBotWallet[] @relation("VolumeBotWallets")
   @@map("Wallet")
 }
 
@@ -76,7 +78,9 @@ model Token {
   devWallets TokenDevWallet[] @relation("TokenDevWallets")
   holdings Holding[] @relation("TokenHoldings")
   transactions Transaction[] @relation("TokenTransactions")
+  refreshCaches RefreshCache[]
   launches Launch[] @relation("LaunchToken")
+  volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionToken")
   vanityMints VanityMint[]
   @@map("Token")
 }
@@ -103,6 +107,33 @@ enum LaunchLogLevel {
   WARN
   ERROR
   STEP
+}
+
+enum VolumeBotSessionStatus {
+  DRAFT
+  RUNNING
+  STOP_REQUESTED
+  STOPPING
+  STOPPED
+  FAILED
+}
+
+enum VolumeBotLogLevel {
+  INFO
+  WARN
+  ERROR
+  TRADE
+}
+
+enum VolumeBotWalletRole {
+  TRADER
+}
+
+enum VolumeBotWalletStatus {
+  ACTIVE
+  PAUSED
+  RECLAIMED
+  FAILED
 }
 
 model Launch {
@@ -136,6 +167,72 @@ model LaunchLog {
   data Json?
   createdAt DateTime @default(now())
   @@map("LaunchLog")
+}
+
+model VolumeBotSession {
+  id String @id @default(cuid())
+  userId String
+  user User @relation("VolumeBotSessionUser", fields: [userId], references: [id])
+  tokenPublicKey String
+  token Token @relation("VolumeBotSessionToken", fields: [tokenPublicKey], references: [publicKey])
+  status VolumeBotSessionStatus @default(DRAFT)
+  config Json
+  startedAt DateTime?
+  stopRequestedAt DateTime?
+  scheduledStopAt DateTime?
+  stoppedAt DateTime?
+  lastTickAt DateTime?
+  totalVolumeUsd Decimal @default(0)
+  totalTrades Int @default(0)
+  totalPnlSol Decimal @default(0)
+  runtimeSeconds Int @default(0)
+  wallets VolumeBotWallet[] @relation("VolumeBotSessionWallets")
+  logs VolumeBotLog[] @relation("VolumeBotSessionLogs")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, status])
+  @@index([tokenPublicKey, status])
+  @@map("VolumeBotSession")
+}
+
+model VolumeBotWallet {
+  id String @id @default(cuid())
+  sessionId String
+  session VolumeBotSession @relation("VolumeBotSessionWallets", fields: [sessionId], references: [id])
+  walletPublicKey String
+  wallet Wallet @relation("VolumeBotWallets", fields: [walletPublicKey], references: [publicKey])
+  role VolumeBotWalletRole @default(TRADER)
+  status VolumeBotWalletStatus @default(ACTIVE)
+  solBalance Decimal @default(0)
+  tokenBalance Decimal @default(0)
+  tradesExecuted Int @default(0)
+  pnlSol Decimal @default(0)
+  lastTradeAt DateTime?
+  pausedAt DateTime?
+  pauseReason String?
+  reclaimedAt DateTime?
+  reclaimTxSignature String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([sessionId, walletPublicKey])
+  @@index([sessionId, status])
+  @@index([walletPublicKey])
+  @@map("VolumeBotWallet")
+}
+
+model VolumeBotLog {
+  id String @id @default(cuid())
+  sessionId String
+  session VolumeBotSession @relation("VolumeBotSessionLogs", fields: [sessionId], references: [id])
+  level VolumeBotLogLevel
+  type String
+  message String
+  data Json?
+  walletPublicKey String?
+  signature String?
+  createdAt DateTime @default(now())
+  @@index([sessionId, createdAt])
+  @@map("VolumeBotLog")
 }
 
 model VanityMint {
@@ -185,6 +282,13 @@ enum TransactionStatus {
   CONFIRMED
   FAILED
 }
+
+enum RefreshScope {
+  TRANSACTIONS
+  HOLDINGS
+  WALLETS
+}
+
 model Transaction {
   id String @id @default(cuid())
   walletPublicKey String
@@ -203,4 +307,18 @@ model Transaction {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("Transaction")
+}
+
+model RefreshCache {
+  id String @id @default(cuid())
+  userId String
+  user User @relation(fields: [userId], references: [id])
+  tokenPublicKey String?
+  token Token? @relation(fields: [tokenPublicKey], references: [publicKey])
+  scope RefreshScope
+  lastRefreshedAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, tokenPublicKey, scope])
+  @@map("RefreshCache")
 }

@@ -15,6 +15,12 @@ Prisma changes:
 - `Token.operationalWallets` (relation to `Wallet`)
 - `TokenDevWallet` join model for dev wallet sharing
 
+## Volume Bot Wallets
+
+- Volume bot wallets are still `Wallet` rows with `type = VOLUME`.
+- Per-session state and recovery metadata live in `VolumeBotWallet`.
+- Reclaim and close-accounts actions update both the wallet balance and the session wallet status.
+
 ## Queries and Services
 
 tRPC procedures:
@@ -55,8 +61,13 @@ Service rules:
 Wallets list page:
 - Main and dev wallets are shown as cards at the top.
 - Operational wallets are listed in the table.
-- Refresh buttons are disabled if `balanceRefreshedAt` is within 15 seconds.
+- Transfer dialogs receive a combined wallet list (main, dev, operational).
+- Manual refresh is always available (disabled only while a request is in flight).
+- If refresh is within cooldown, the UI shows a toast indicating it was refreshed recently.
 - Bulk actions: refresh all, send, return.
+- Header shows a cached last refresh timestamp from `RefreshCache`.
+- Auto refresh waits for `RefreshCache` to load and runs only when stale.
+- Header timestamp mapping: 0-15s just refreshed, 15-90s minute ago, <5m couple minutes, <1h N minutes, <3h hour/couple hours, 3-12h N hours, 12h+ full datetime.
 
 Wallet detail page:
 - Main wallet shows a user-style page.
@@ -64,9 +75,10 @@ Wallet detail page:
 
 ## Balance Strategy
 
-- DB stores `balanceSol`, `tokenBalance`, `balanceRefreshedAt`.
+- DB stores `balanceSol`, `balanceRefreshedAt`.
 - Refresh is on-demand only; no background auto-refresh.
 - Server enforces a 15-second debounce per wallet.
+- `RefreshCache` stores the last full refresh time per token to drive staleness checks.
 
 ## Migrations
 

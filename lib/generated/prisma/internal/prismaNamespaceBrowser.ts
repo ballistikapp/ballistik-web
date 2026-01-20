@@ -58,9 +58,13 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  VolumeBotSession: 'VolumeBotSession',
+  VolumeBotWallet: 'VolumeBotWallet',
+  VolumeBotLog: 'VolumeBotLog',
   VanityMint: 'VanityMint',
   Holding: 'Holding',
-  Transaction: 'Transaction'
+  Transaction: 'Transaction',
+  RefreshCache: 'RefreshCache'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -108,7 +112,6 @@ export const WalletScalarFieldEnum = {
   userId: 'userId',
   tokenPublicKey: 'tokenPublicKey',
   balanceSol: 'balanceSol',
-  tokenBalance: 'tokenBalance',
   balanceRefreshedAt: 'balanceRefreshedAt',
   isImported: 'isImported'
 } as const
@@ -175,6 +178,65 @@ export const LaunchLogScalarFieldEnum = {
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
 
 
+export const VolumeBotSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  status: 'status',
+  config: 'config',
+  startedAt: 'startedAt',
+  stopRequestedAt: 'stopRequestedAt',
+  scheduledStopAt: 'scheduledStopAt',
+  stoppedAt: 'stoppedAt',
+  lastTickAt: 'lastTickAt',
+  totalVolumeUsd: 'totalVolumeUsd',
+  totalTrades: 'totalTrades',
+  totalPnlSol: 'totalPnlSol',
+  runtimeSeconds: 'runtimeSeconds',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotSessionScalarFieldEnum = (typeof VolumeBotSessionScalarFieldEnum)[keyof typeof VolumeBotSessionScalarFieldEnum]
+
+
+export const VolumeBotWalletScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  walletPublicKey: 'walletPublicKey',
+  role: 'role',
+  status: 'status',
+  solBalance: 'solBalance',
+  tokenBalance: 'tokenBalance',
+  tradesExecuted: 'tradesExecuted',
+  pnlSol: 'pnlSol',
+  lastTradeAt: 'lastTradeAt',
+  pausedAt: 'pausedAt',
+  pauseReason: 'pauseReason',
+  reclaimedAt: 'reclaimedAt',
+  reclaimTxSignature: 'reclaimTxSignature',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotWalletScalarFieldEnum = (typeof VolumeBotWalletScalarFieldEnum)[keyof typeof VolumeBotWalletScalarFieldEnum]
+
+
+export const VolumeBotLogScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  level: 'level',
+  type: 'type',
+  message: 'message',
+  data: 'data',
+  walletPublicKey: 'walletPublicKey',
+  signature: 'signature',
+  createdAt: 'createdAt'
+} as const
+
+export type VolumeBotLogScalarFieldEnum = (typeof VolumeBotLogScalarFieldEnum)[keyof typeof VolumeBotLogScalarFieldEnum]
+
+
 export const VanityMintScalarFieldEnum = {
   id: 'id',
   publicKey: 'publicKey',
@@ -229,6 +291,19 @@ export const TransactionScalarFieldEnum = {
 } as const
 
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const RefreshCacheScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  scope: 'scope',
+  lastRefreshedAt: 'lastRefreshedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RefreshCacheScalarFieldEnum = (typeof RefreshCacheScalarFieldEnum)[keyof typeof RefreshCacheScalarFieldEnum]
 
 
 export const SortOrder = {

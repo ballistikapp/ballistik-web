@@ -5,11 +5,13 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { getAssociatedTokenAddress } from "@solana/spl-token";
 import bs58 from "bs58";
 import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
+import { rpcConfig } from "@/lib/config/rpc.config";
+import { cacheConfig } from "@/lib/config/cache.config";
+import { refreshCacheService } from "@/server/services/refresh-cache.service";
 
 export const walletService = {
   async getOperationalWalletsByToken(tokenPublicKey: string, userId: string) {
@@ -36,7 +38,6 @@ export const walletService = {
         publicKey: true,
         type: true,
         balanceSol: true,
-        tokenBalance: true,
         balanceRefreshedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -72,7 +73,6 @@ export const walletService = {
             publicKey: true,
             type: true,
             balanceSol: true,
-            tokenBalance: true,
             balanceRefreshedAt: true,
             createdAt: true,
             updatedAt: true,
@@ -93,7 +93,6 @@ export const walletService = {
             publicKey: true,
             type: true,
             balanceSol: true,
-            tokenBalance: true,
             balanceRefreshedAt: true,
             createdAt: true,
             updatedAt: true,
@@ -170,7 +169,6 @@ export const walletService = {
             publicKey: true,
             type: true,
             balanceSol: true,
-            tokenBalance: true,
             balanceRefreshedAt: true,
             createdAt: true,
             updatedAt: true,
@@ -199,7 +197,6 @@ export const walletService = {
         publicKey: true,
         type: true,
         balanceSol: true,
-        tokenBalance: true,
         balanceRefreshedAt: true,
         createdAt: true,
         updatedAt: true,
@@ -239,7 +236,6 @@ export const walletService = {
         publicKey: wallet.publicKey,
         type: wallet.type,
         balanceSol: wallet.balanceSol,
-        tokenBalance: wallet.tokenBalance,
         balanceRefreshedAt: wallet.balanceRefreshedAt,
         createdAt: wallet.createdAt,
         updatedAt: wallet.updatedAt,
@@ -307,7 +303,7 @@ export const walletService = {
       : availableWallets;
 
     const now = new Date();
-    const cooldownMs = 15_000;
+    const cooldownMs = cacheConfig.cooldownMs.walletBalances;
     const targetWallets = requestedWallets.filter((wallet) => {
       if (!wallet.balanceRefreshedAt) return true;
       return now.getTime() - wallet.balanceRefreshedAt.getTime() >= cooldownMs;
@@ -318,36 +314,38 @@ export const walletService = {
     }
 
     const connection = getSolanaConnection();
-    const mintPublicKey = new PublicKey(token.publicKey);
+    const solBalanceMap = new Map<string, number>();
+    const validWallets: { wallet: typeof targetWallets[number]; key: PublicKey }[] =
+      [];
+    for (const wallet of targetWallets) {
+      try {
+        validWallets.push({
+          wallet,
+          key: new PublicKey(wallet.publicKey),
+        });
+      } catch {
+        solBalanceMap.set(wallet.publicKey, 0);
+      }
+    }
 
-    const balances = await Promise.all(
-      targetWallets.map(async (wallet) => {
-        const walletPublicKey = new PublicKey(wallet.publicKey);
-        const [solBalance, tokenBalance] = await Promise.all([
-          connection.getBalance(walletPublicKey),
-          (async () => {
-            const tokenAccount = await getAssociatedTokenAddress(
-              mintPublicKey,
-              walletPublicKey
-            );
-            const tokenAccountInfo =
-              await connection.getAccountInfo(tokenAccount);
-            if (!tokenAccountInfo) {
-              return 0;
-            }
-            const tokenBalanceResponse =
-              await connection.getTokenAccountBalance(tokenAccount);
-            return tokenBalanceResponse.value.uiAmount ?? 0;
-          })(),
-        ]);
+    const batchSize = Math.max(1, rpcConfig.tuning.solBalanceBatchSize);
+    for (let i = 0; i < validWallets.length; i += batchSize) {
+      const batch = validWallets.slice(i, i + batchSize);
+      const infos = await connection.getMultipleAccountsInfo(
+        batch.map((item) => item.key),
+        "confirmed"
+      );
+      infos.forEach((info, index) => {
+        const walletKey = batch[index]?.wallet.publicKey;
+        if (!walletKey) return;
+        solBalanceMap.set(walletKey, info ? info.lamports : 0);
+      });
+    }
 
-        return {
-          publicKey: wallet.publicKey,
-          balanceSol: solBalance / 1_000_000_000,
-          tokenBalance,
-        };
-      })
-    );
+    const balances = targetWallets.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      balanceSol: (solBalanceMap.get(wallet.publicKey) ?? 0) / 1_000_000_000,
+    }));
 
     await prisma.$transaction(
       balances.map((balance) =>
@@ -355,17 +353,22 @@ export const walletService = {
           where: { publicKey: balance.publicKey },
           data: {
             balanceSol: balance.balanceSol,
-            tokenBalance: balance.tokenBalance,
             balanceRefreshedAt: now,
           },
         })
       )
     );
 
+    await refreshCacheService.touch({
+      userId,
+      tokenPublicKey: token.publicKey,
+      scope: "WALLETS",
+      refreshedAt: now,
+    });
+
     return balances.map((balance) => ({
       publicKey: balance.publicKey,
       balanceSol: balance.balanceSol,
-      tokenBalance: balance.tokenBalance,
       balanceRefreshedAt: now,
     }));
   },

@@ -28,12 +28,10 @@ export type AggregateWallet = {
 
 export type WalletAvgAggregateOutputType = {
   balanceSol: runtime.Decimal | null
-  tokenBalance: runtime.Decimal | null
 }
 
 export type WalletSumAggregateOutputType = {
   balanceSol: runtime.Decimal | null
-  tokenBalance: runtime.Decimal | null
 }
 
 export type WalletMinAggregateOutputType = {
@@ -45,7 +43,6 @@ export type WalletMinAggregateOutputType = {
   userId: string | null
   tokenPublicKey: string | null
   balanceSol: runtime.Decimal | null
-  tokenBalance: runtime.Decimal | null
   balanceRefreshedAt: Date | null
   isImported: boolean | null
 }
@@ -59,7 +56,6 @@ export type WalletMaxAggregateOutputType = {
   userId: string | null
   tokenPublicKey: string | null
   balanceSol: runtime.Decimal | null
-  tokenBalance: runtime.Decimal | null
   balanceRefreshedAt: Date | null
   isImported: boolean | null
 }
@@ -73,7 +69,6 @@ export type WalletCountAggregateOutputType = {
   userId: number
   tokenPublicKey: number
   balanceSol: number
-  tokenBalance: number
   balanceRefreshedAt: number
   isImported: number
   _all: number
@@ -82,12 +77,10 @@ export type WalletCountAggregateOutputType = {
 
 export type WalletAvgAggregateInputType = {
   balanceSol?: true
-  tokenBalance?: true
 }
 
 export type WalletSumAggregateInputType = {
   balanceSol?: true
-  tokenBalance?: true
 }
 
 export type WalletMinAggregateInputType = {
@@ -99,7 +92,6 @@ export type WalletMinAggregateInputType = {
   userId?: true
   tokenPublicKey?: true
   balanceSol?: true
-  tokenBalance?: true
   balanceRefreshedAt?: true
   isImported?: true
 }
@@ -113,7 +105,6 @@ export type WalletMaxAggregateInputType = {
   userId?: true
   tokenPublicKey?: true
   balanceSol?: true
-  tokenBalance?: true
   balanceRefreshedAt?: true
   isImported?: true
 }
@@ -127,7 +118,6 @@ export type WalletCountAggregateInputType = {
   userId?: true
   tokenPublicKey?: true
   balanceSol?: true
-  tokenBalance?: true
   balanceRefreshedAt?: true
   isImported?: true
   _all?: true
@@ -228,7 +218,6 @@ export type WalletGroupByOutputType = {
   userId: string | null
   tokenPublicKey: string | null
   balanceSol: runtime.Decimal
-  tokenBalance: runtime.Decimal
   balanceRefreshedAt: Date | null
   isImported: boolean
   _count: WalletCountAggregateOutputType | null
@@ -265,7 +254,6 @@ export type WalletWhereInput = {
   userId?: Prisma.StringNullableFilter<"Wallet"> | string | null
   tokenPublicKey?: Prisma.StringNullableFilter<"Wallet"> | string | null
   balanceSol?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.DateTimeNullableFilter<"Wallet"> | Date | string | null
   isImported?: Prisma.BoolFilter<"Wallet"> | boolean
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
@@ -274,6 +262,7 @@ export type WalletWhereInput = {
   holdings?: Prisma.HoldingListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
   devWalletTokens?: Prisma.TokenDevWalletListRelationFilter
+  volumeBotWallets?: Prisma.VolumeBotWalletListRelationFilter
 }
 
 export type WalletOrderByWithRelationInput = {
@@ -285,7 +274,6 @@ export type WalletOrderByWithRelationInput = {
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
   balanceRefreshedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   isImported?: Prisma.SortOrder
   user?: Prisma.UserOrderByWithRelationInput
@@ -294,6 +282,7 @@ export type WalletOrderByWithRelationInput = {
   holdings?: Prisma.HoldingOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
   devWalletTokens?: Prisma.TokenDevWalletOrderByRelationAggregateInput
+  volumeBotWallets?: Prisma.VolumeBotWalletOrderByRelationAggregateInput
 }
 
 export type WalletWhereUniqueInput = Prisma.AtLeast<{
@@ -308,7 +297,6 @@ export type WalletWhereUniqueInput = Prisma.AtLeast<{
   userId?: Prisma.StringNullableFilter<"Wallet"> | string | null
   tokenPublicKey?: Prisma.StringNullableFilter<"Wallet"> | string | null
   balanceSol?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.DateTimeNullableFilter<"Wallet"> | Date | string | null
   isImported?: Prisma.BoolFilter<"Wallet"> | boolean
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
@@ -317,6 +305,7 @@ export type WalletWhereUniqueInput = Prisma.AtLeast<{
   holdings?: Prisma.HoldingListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
   devWalletTokens?: Prisma.TokenDevWalletListRelationFilter
+  volumeBotWallets?: Prisma.VolumeBotWalletListRelationFilter
 }, "publicKey" | "publicKey" | "privateKey">
 
 export type WalletOrderByWithAggregationInput = {
@@ -328,7 +317,6 @@ export type WalletOrderByWithAggregationInput = {
   userId?: Prisma.SortOrderInput | Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
   balanceRefreshedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   isImported?: Prisma.SortOrder
   _count?: Prisma.WalletCountOrderByAggregateInput
@@ -350,7 +338,6 @@ export type WalletScalarWhereWithAggregatesInput = {
   userId?: Prisma.StringNullableWithAggregatesFilter<"Wallet"> | string | null
   tokenPublicKey?: Prisma.StringNullableWithAggregatesFilter<"Wallet"> | string | null
   balanceSol?: Prisma.DecimalWithAggregatesFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalWithAggregatesFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"Wallet"> | Date | string | null
   isImported?: Prisma.BoolWithAggregatesFilter<"Wallet"> | boolean
 }
@@ -362,7 +349,6 @@ export type WalletCreateInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -371,6 +357,7 @@ export type WalletCreateInput = {
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateInput = {
@@ -382,13 +369,13 @@ export type WalletUncheckedCreateInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUpdateInput = {
@@ -398,7 +385,6 @@ export type WalletUpdateInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -407,6 +393,7 @@ export type WalletUpdateInput = {
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateInput = {
@@ -418,13 +405,13 @@ export type WalletUncheckedUpdateInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateManyInput = {
@@ -436,7 +423,6 @@ export type WalletCreateManyInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
 }
@@ -448,7 +434,6 @@ export type WalletUpdateManyMutationInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
@@ -462,7 +447,6 @@ export type WalletUncheckedUpdateManyInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
@@ -491,14 +475,12 @@ export type WalletCountOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrder
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
   balanceRefreshedAt?: Prisma.SortOrder
   isImported?: Prisma.SortOrder
 }
 
 export type WalletAvgOrderByAggregateInput = {
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
 }
 
 export type WalletMaxOrderByAggregateInput = {
@@ -510,7 +492,6 @@ export type WalletMaxOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrder
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
   balanceRefreshedAt?: Prisma.SortOrder
   isImported?: Prisma.SortOrder
 }
@@ -524,14 +505,12 @@ export type WalletMinOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrder
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
   balanceRefreshedAt?: Prisma.SortOrder
   isImported?: Prisma.SortOrder
 }
 
 export type WalletSumOrderByAggregateInput = {
   balanceSol?: Prisma.SortOrder
-  tokenBalance?: Prisma.SortOrder
 }
 
 export type WalletCreateNestedOneWithoutMainWalletUserInput = {
@@ -670,6 +649,20 @@ export type WalletUpdateOneRequiredWithoutDevWalletTokensNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WalletUpdateToOneWithWhereWithoutDevWalletTokensInput, Prisma.WalletUpdateWithoutDevWalletTokensInput>, Prisma.WalletUncheckedUpdateWithoutDevWalletTokensInput>
 }
 
+export type WalletCreateNestedOneWithoutVolumeBotWalletsInput = {
+  create?: Prisma.XOR<Prisma.WalletCreateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedCreateWithoutVolumeBotWalletsInput>
+  connectOrCreate?: Prisma.WalletCreateOrConnectWithoutVolumeBotWalletsInput
+  connect?: Prisma.WalletWhereUniqueInput
+}
+
+export type WalletUpdateOneRequiredWithoutVolumeBotWalletsNestedInput = {
+  create?: Prisma.XOR<Prisma.WalletCreateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedCreateWithoutVolumeBotWalletsInput>
+  connectOrCreate?: Prisma.WalletCreateOrConnectWithoutVolumeBotWalletsInput
+  upsert?: Prisma.WalletUpsertWithoutVolumeBotWalletsInput
+  connect?: Prisma.WalletWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WalletUpdateToOneWithWhereWithoutVolumeBotWalletsInput, Prisma.WalletUpdateWithoutVolumeBotWalletsInput>, Prisma.WalletUncheckedUpdateWithoutVolumeBotWalletsInput>
+}
+
 export type WalletCreateNestedOneWithoutHoldingsInput = {
   create?: Prisma.XOR<Prisma.WalletCreateWithoutHoldingsInput, Prisma.WalletUncheckedCreateWithoutHoldingsInput>
   connectOrCreate?: Prisma.WalletCreateOrConnectWithoutHoldingsInput
@@ -705,7 +698,6 @@ export type WalletCreateWithoutMainWalletUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -713,6 +705,7 @@ export type WalletCreateWithoutMainWalletUserInput = {
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutMainWalletUserInput = {
@@ -724,12 +717,12 @@ export type WalletUncheckedCreateWithoutMainWalletUserInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutMainWalletUserInput = {
@@ -744,7 +737,6 @@ export type WalletCreateWithoutUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserCreateNestedOneWithoutMainWalletInput
@@ -752,6 +744,7 @@ export type WalletCreateWithoutUserInput = {
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutUserInput = {
@@ -762,13 +755,13 @@ export type WalletUncheckedCreateWithoutUserInput = {
   updatedAt?: Date | string
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutUserInput = {
@@ -799,7 +792,6 @@ export type WalletUpdateWithoutMainWalletUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -807,6 +799,7 @@ export type WalletUpdateWithoutMainWalletUserInput = {
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutMainWalletUserInput = {
@@ -818,12 +811,12 @@ export type WalletUncheckedUpdateWithoutMainWalletUserInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUpsertWithWhereUniqueWithoutUserInput = {
@@ -854,7 +847,6 @@ export type WalletScalarWhereInput = {
   userId?: Prisma.StringNullableFilter<"Wallet"> | string | null
   tokenPublicKey?: Prisma.StringNullableFilter<"Wallet"> | string | null
   balanceSol?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFilter<"Wallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.DateTimeNullableFilter<"Wallet"> | Date | string | null
   isImported?: Prisma.BoolFilter<"Wallet"> | boolean
 }
@@ -866,7 +858,6 @@ export type WalletCreateWithoutTokenInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -874,6 +865,7 @@ export type WalletCreateWithoutTokenInput = {
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutTokenInput = {
@@ -884,13 +876,13 @@ export type WalletUncheckedCreateWithoutTokenInput = {
   updatedAt?: Date | string
   userId?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutTokenInput = {
@@ -926,7 +918,6 @@ export type WalletCreateWithoutDevWalletTokensInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -934,6 +925,7 @@ export type WalletCreateWithoutDevWalletTokensInput = {
   token?: Prisma.TokenCreateNestedOneWithoutOperationalWalletsInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutDevWalletTokensInput = {
@@ -945,12 +937,12 @@ export type WalletUncheckedCreateWithoutDevWalletTokensInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutDevWalletTokensInput = {
@@ -976,7 +968,6 @@ export type WalletUpdateWithoutDevWalletTokensInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -984,6 +975,7 @@ export type WalletUpdateWithoutDevWalletTokensInput = {
   token?: Prisma.TokenUpdateOneWithoutOperationalWalletsNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutDevWalletTokensInput = {
@@ -995,12 +987,96 @@ export type WalletUncheckedUpdateWithoutDevWalletTokensInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+}
+
+export type WalletCreateWithoutVolumeBotWalletsInput = {
+  publicKey: string
+  privateKey: string
+  type: $Enums.WalletType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Date | string | null
+  isImported?: boolean
+  user?: Prisma.UserCreateNestedOneWithoutWalletsInput
+  mainWalletUser?: Prisma.UserCreateNestedOneWithoutMainWalletInput
+  token?: Prisma.TokenCreateNestedOneWithoutOperationalWalletsInput
+  holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
+  devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+}
+
+export type WalletUncheckedCreateWithoutVolumeBotWalletsInput = {
+  publicKey: string
+  privateKey: string
+  type: $Enums.WalletType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  userId?: string | null
+  tokenPublicKey?: string | null
+  balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Date | string | null
+  isImported?: boolean
+  mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
+  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
+  devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+}
+
+export type WalletCreateOrConnectWithoutVolumeBotWalletsInput = {
+  where: Prisma.WalletWhereUniqueInput
+  create: Prisma.XOR<Prisma.WalletCreateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedCreateWithoutVolumeBotWalletsInput>
+}
+
+export type WalletUpsertWithoutVolumeBotWalletsInput = {
+  update: Prisma.XOR<Prisma.WalletUpdateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedUpdateWithoutVolumeBotWalletsInput>
+  create: Prisma.XOR<Prisma.WalletCreateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedCreateWithoutVolumeBotWalletsInput>
+  where?: Prisma.WalletWhereInput
+}
+
+export type WalletUpdateToOneWithWhereWithoutVolumeBotWalletsInput = {
+  where?: Prisma.WalletWhereInput
+  data: Prisma.XOR<Prisma.WalletUpdateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedUpdateWithoutVolumeBotWalletsInput>
+}
+
+export type WalletUpdateWithoutVolumeBotWalletsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
+  mainWalletUser?: Prisma.UserUpdateOneWithoutMainWalletNestedInput
+  token?: Prisma.TokenUpdateOneWithoutOperationalWalletsNestedInput
+  holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
+  devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+}
+
+export type WalletUncheckedUpdateWithoutVolumeBotWalletsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
+  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
+  devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateWithoutHoldingsInput = {
@@ -1010,7 +1086,6 @@ export type WalletCreateWithoutHoldingsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -1018,6 +1093,7 @@ export type WalletCreateWithoutHoldingsInput = {
   token?: Prisma.TokenCreateNestedOneWithoutOperationalWalletsInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutHoldingsInput = {
@@ -1029,12 +1105,12 @@ export type WalletUncheckedCreateWithoutHoldingsInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutHoldingsInput = {
@@ -1060,7 +1136,6 @@ export type WalletUpdateWithoutHoldingsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -1068,6 +1143,7 @@ export type WalletUpdateWithoutHoldingsInput = {
   token?: Prisma.TokenUpdateOneWithoutOperationalWalletsNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutHoldingsInput = {
@@ -1079,12 +1155,12 @@ export type WalletUncheckedUpdateWithoutHoldingsInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateWithoutTransactionsInput = {
@@ -1094,7 +1170,6 @@ export type WalletCreateWithoutTransactionsInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   user?: Prisma.UserCreateNestedOneWithoutWalletsInput
@@ -1102,6 +1177,7 @@ export type WalletCreateWithoutTransactionsInput = {
   token?: Prisma.TokenCreateNestedOneWithoutOperationalWalletsInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutTransactionsInput = {
@@ -1113,12 +1189,12 @@ export type WalletUncheckedCreateWithoutTransactionsInput = {
   userId?: string | null
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
   mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutTransactionsInput = {
@@ -1144,7 +1220,6 @@ export type WalletUpdateWithoutTransactionsInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -1152,6 +1227,7 @@ export type WalletUpdateWithoutTransactionsInput = {
   token?: Prisma.TokenUpdateOneWithoutOperationalWalletsNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutTransactionsInput = {
@@ -1163,12 +1239,12 @@ export type WalletUncheckedUpdateWithoutTransactionsInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateManyUserInput = {
@@ -1179,7 +1255,6 @@ export type WalletCreateManyUserInput = {
   updatedAt?: Date | string
   tokenPublicKey?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
 }
@@ -1191,7 +1266,6 @@ export type WalletUpdateWithoutUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUpdateOneWithoutMainWalletNestedInput
@@ -1199,6 +1273,7 @@ export type WalletUpdateWithoutUserInput = {
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutUserInput = {
@@ -1209,13 +1284,13 @@ export type WalletUncheckedUpdateWithoutUserInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateManyWithoutUserInput = {
@@ -1226,7 +1301,6 @@ export type WalletUncheckedUpdateManyWithoutUserInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
@@ -1239,7 +1313,6 @@ export type WalletCreateManyTokenInput = {
   updatedAt?: Date | string
   userId?: string | null
   balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Date | string | null
   isImported?: boolean
 }
@@ -1251,7 +1324,6 @@ export type WalletUpdateWithoutTokenInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
@@ -1259,6 +1331,7 @@ export type WalletUpdateWithoutTokenInput = {
   holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutTokenInput = {
@@ -1269,13 +1342,13 @@ export type WalletUncheckedUpdateWithoutTokenInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateManyWithoutTokenInput = {
@@ -1286,7 +1359,6 @@ export type WalletUncheckedUpdateManyWithoutTokenInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
-  tokenBalance?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
 }
@@ -1300,12 +1372,14 @@ export type WalletCountOutputType = {
   holdings: number
   transactions: number
   devWalletTokens: number
+  volumeBotWallets: number
 }
 
 export type WalletCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   holdings?: boolean | WalletCountOutputTypeCountHoldingsArgs
   transactions?: boolean | WalletCountOutputTypeCountTransactionsArgs
   devWalletTokens?: boolean | WalletCountOutputTypeCountDevWalletTokensArgs
+  volumeBotWallets?: boolean | WalletCountOutputTypeCountVolumeBotWalletsArgs
 }
 
 /**
@@ -1339,6 +1413,13 @@ export type WalletCountOutputTypeCountDevWalletTokensArgs<ExtArgs extends runtim
   where?: Prisma.TokenDevWalletWhereInput
 }
 
+/**
+ * WalletCountOutputType without action
+ */
+export type WalletCountOutputTypeCountVolumeBotWalletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.VolumeBotWalletWhereInput
+}
+
 
 export type WalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   publicKey?: boolean
@@ -1349,7 +1430,6 @@ export type WalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   userId?: boolean
   tokenPublicKey?: boolean
   balanceSol?: boolean
-  tokenBalance?: boolean
   balanceRefreshedAt?: boolean
   isImported?: boolean
   user?: boolean | Prisma.Wallet$userArgs<ExtArgs>
@@ -1358,6 +1438,7 @@ export type WalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   holdings?: boolean | Prisma.Wallet$holdingsArgs<ExtArgs>
   transactions?: boolean | Prisma.Wallet$transactionsArgs<ExtArgs>
   devWalletTokens?: boolean | Prisma.Wallet$devWalletTokensArgs<ExtArgs>
+  volumeBotWallets?: boolean | Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>
   _count?: boolean | Prisma.WalletCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["wallet"]>
 
@@ -1370,7 +1451,6 @@ export type WalletSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extens
   userId?: boolean
   tokenPublicKey?: boolean
   balanceSol?: boolean
-  tokenBalance?: boolean
   balanceRefreshedAt?: boolean
   isImported?: boolean
   user?: boolean | Prisma.Wallet$userArgs<ExtArgs>
@@ -1386,7 +1466,6 @@ export type WalletSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extens
   userId?: boolean
   tokenPublicKey?: boolean
   balanceSol?: boolean
-  tokenBalance?: boolean
   balanceRefreshedAt?: boolean
   isImported?: boolean
   user?: boolean | Prisma.Wallet$userArgs<ExtArgs>
@@ -1402,12 +1481,11 @@ export type WalletSelectScalar = {
   userId?: boolean
   tokenPublicKey?: boolean
   balanceSol?: boolean
-  tokenBalance?: boolean
   balanceRefreshedAt?: boolean
   isImported?: boolean
 }
 
-export type WalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"publicKey" | "privateKey" | "type" | "createdAt" | "updatedAt" | "userId" | "tokenPublicKey" | "balanceSol" | "tokenBalance" | "balanceRefreshedAt" | "isImported", ExtArgs["result"]["wallet"]>
+export type WalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"publicKey" | "privateKey" | "type" | "createdAt" | "updatedAt" | "userId" | "tokenPublicKey" | "balanceSol" | "balanceRefreshedAt" | "isImported", ExtArgs["result"]["wallet"]>
 export type WalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.Wallet$userArgs<ExtArgs>
   mainWalletUser?: boolean | Prisma.Wallet$mainWalletUserArgs<ExtArgs>
@@ -1415,6 +1493,7 @@ export type WalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   holdings?: boolean | Prisma.Wallet$holdingsArgs<ExtArgs>
   transactions?: boolean | Prisma.Wallet$transactionsArgs<ExtArgs>
   devWalletTokens?: boolean | Prisma.Wallet$devWalletTokensArgs<ExtArgs>
+  volumeBotWallets?: boolean | Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>
   _count?: boolean | Prisma.WalletCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WalletIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1435,6 +1514,7 @@ export type $WalletPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     holdings: Prisma.$HoldingPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
     devWalletTokens: Prisma.$TokenDevWalletPayload<ExtArgs>[]
+    volumeBotWallets: Prisma.$VolumeBotWalletPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     publicKey: string
@@ -1445,7 +1525,6 @@ export type $WalletPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     userId: string | null
     tokenPublicKey: string | null
     balanceSol: runtime.Decimal
-    tokenBalance: runtime.Decimal
     balanceRefreshedAt: Date | null
     isImported: boolean
   }, ExtArgs["result"]["wallet"]>
@@ -1848,6 +1927,7 @@ export interface Prisma__WalletClient<T, Null = never, ExtArgs extends runtime.T
   holdings<T extends Prisma.Wallet$holdingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$holdingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Wallet$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   devWalletTokens<T extends Prisma.Wallet$devWalletTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$devWalletTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenDevWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  volumeBotWallets<T extends Prisma.Wallet$volumeBotWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VolumeBotWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1885,7 +1965,6 @@ export interface WalletFieldRefs {
   readonly userId: Prisma.FieldRef<"Wallet", 'String'>
   readonly tokenPublicKey: Prisma.FieldRef<"Wallet", 'String'>
   readonly balanceSol: Prisma.FieldRef<"Wallet", 'Decimal'>
-  readonly tokenBalance: Prisma.FieldRef<"Wallet", 'Decimal'>
   readonly balanceRefreshedAt: Prisma.FieldRef<"Wallet", 'DateTime'>
   readonly isImported: Prisma.FieldRef<"Wallet", 'Boolean'>
 }
@@ -2410,6 +2489,30 @@ export type Wallet$devWalletTokensArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.TokenDevWalletScalarFieldEnum | Prisma.TokenDevWalletScalarFieldEnum[]
+}
+
+/**
+ * Wallet.volumeBotWallets
+ */
+export type Wallet$volumeBotWalletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the VolumeBotWallet
+   */
+  select?: Prisma.VolumeBotWalletSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the VolumeBotWallet
+   */
+  omit?: Prisma.VolumeBotWalletOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.VolumeBotWalletInclude<ExtArgs> | null
+  where?: Prisma.VolumeBotWalletWhereInput
+  orderBy?: Prisma.VolumeBotWalletOrderByWithRelationInput | Prisma.VolumeBotWalletOrderByWithRelationInput[]
+  cursor?: Prisma.VolumeBotWalletWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.VolumeBotWalletScalarFieldEnum | Prisma.VolumeBotWalletScalarFieldEnum[]
 }
 
 /**

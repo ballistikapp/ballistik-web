@@ -1,0 +1,12 @@
+---
+description: "Documentation discipline for non-trivial changes"
+alwaysApply: true
+---
+
+# Docs Discipline
+
+- Always refer to relevant files in the `docs/` directory before making changes, except for small insignificant development
+- Always add or update a `docs/` file when making a change or adding a feature so future agents can stay consistent and bug-free
+- Use a docs-first checklist for non-trivial changes: read existing docs, update docs with behavior changes, then implement
+- When modifying Prisma schema, update `docs/` to reflect data model and relationship changes
+- When adding or modifying tRPC procedures, update the relevant `docs/` entries with new endpoints and behavior

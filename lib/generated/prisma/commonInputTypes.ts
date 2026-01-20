@@ -355,6 +355,74 @@ export type EnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
 }
 
+export type EnumVolumeBotSessionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotSessionStatus | Prisma.EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel> | $Enums.VolumeBotSessionStatus
+}
+
+export type EnumVolumeBotSessionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotSessionStatus | Prisma.EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotSessionStatusWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotSessionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel>
+}
+
+export type EnumVolumeBotWalletRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletRole | Prisma.EnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel> | $Enums.VolumeBotWalletRole
+}
+
+export type EnumVolumeBotWalletStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletStatus | Prisma.EnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel> | $Enums.VolumeBotWalletStatus
+}
+
+export type EnumVolumeBotWalletRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletRole | Prisma.EnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletRoleWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotWalletRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel>
+}
+
+export type EnumVolumeBotWalletStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletStatus | Prisma.EnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletStatusWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotWalletStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel>
+}
+
+export type EnumVolumeBotLogLevelFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotLogLevel | Prisma.EnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel> | $Enums.VolumeBotLogLevel
+}
+
+export type EnumVolumeBotLogLevelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotLogLevel | Prisma.EnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotLogLevelWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotLogLevel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel>
+}
+
 export type EnumTransactionTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.TransactionType | Prisma.EnumTransactionTypeFieldRefInput<$PrismaModel>
   in?: $Enums.TransactionType[] | Prisma.ListEnumTransactionTypeFieldRefInput<$PrismaModel>
@@ -387,6 +455,23 @@ export type EnumTransactionStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTransactionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTransactionStatusFilter<$PrismaModel>
+}
+
+export type EnumRefreshScopeFilter<$PrismaModel = never> = {
+  equals?: $Enums.RefreshScope | Prisma.EnumRefreshScopeFieldRefInput<$PrismaModel>
+  in?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel> | $Enums.RefreshScope
+}
+
+export type EnumRefreshScopeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RefreshScope | Prisma.EnumRefreshScopeFieldRefInput<$PrismaModel>
+  in?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRefreshScopeWithAggregatesFilter<$PrismaModel> | $Enums.RefreshScope
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel>
 }
 
 export type NestedStringFilter<$PrismaModel = never> = {
@@ -689,6 +774,74 @@ export type NestedEnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> =
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
 }
 
+export type NestedEnumVolumeBotSessionStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotSessionStatus | Prisma.EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel> | $Enums.VolumeBotSessionStatus
+}
+
+export type NestedEnumVolumeBotSessionStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotSessionStatus | Prisma.EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotSessionStatusWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotSessionStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotSessionStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumVolumeBotWalletRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletRole | Prisma.EnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel> | $Enums.VolumeBotWalletRole
+}
+
+export type NestedEnumVolumeBotWalletStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletStatus | Prisma.EnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel> | $Enums.VolumeBotWalletStatus
+}
+
+export type NestedEnumVolumeBotWalletRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletRole | Prisma.EnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletRole[] | Prisma.ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletRoleWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotWalletRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotWalletRoleFilter<$PrismaModel>
+}
+
+export type NestedEnumVolumeBotWalletStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotWalletStatus | Prisma.EnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotWalletStatus[] | Prisma.ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotWalletStatusWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotWalletStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotWalletStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumVolumeBotLogLevelFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotLogLevel | Prisma.EnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel> | $Enums.VolumeBotLogLevel
+}
+
+export type NestedEnumVolumeBotLogLevelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.VolumeBotLogLevel | Prisma.EnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.VolumeBotLogLevel[] | Prisma.ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumVolumeBotLogLevelWithAggregatesFilter<$PrismaModel> | $Enums.VolumeBotLogLevel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumVolumeBotLogLevelFilter<$PrismaModel>
+}
+
 export type NestedEnumTransactionTypeFilter<$PrismaModel = never> = {
   equals?: $Enums.TransactionType | Prisma.EnumTransactionTypeFieldRefInput<$PrismaModel>
   in?: $Enums.TransactionType[] | Prisma.ListEnumTransactionTypeFieldRefInput<$PrismaModel>
@@ -721,6 +874,23 @@ export type NestedEnumTransactionStatusWithAggregatesFilter<$PrismaModel = never
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTransactionStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTransactionStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumRefreshScopeFilter<$PrismaModel = never> = {
+  equals?: $Enums.RefreshScope | Prisma.EnumRefreshScopeFieldRefInput<$PrismaModel>
+  in?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel> | $Enums.RefreshScope
+}
+
+export type NestedEnumRefreshScopeWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.RefreshScope | Prisma.EnumRefreshScopeFieldRefInput<$PrismaModel>
+  in?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  notIn?: $Enums.RefreshScope[] | Prisma.ListEnumRefreshScopeFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumRefreshScopeWithAggregatesFilter<$PrismaModel> | $Enums.RefreshScope
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumRefreshScopeFilter<$PrismaModel>
 }
 
 

@@ -1,12 +1,16 @@
 "use client";
 
-import { useMemo } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useQueryState } from "nuqs";
-import { formatDistanceToNowStrict } from "date-fns";
+import { toast } from "sonner";
+import { IconRefresh } from "@tabler/icons-react";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
+import { cacheConfig } from "@/lib/config/cache.config";
+import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
+import { HoldingSellDialog } from "@/components/holdings/holding-sell-dialog";
 import {
   DataTable,
   DataTablePagination,
@@ -14,24 +18,13 @@ import {
   DataTableViewOptions,
 } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
-
-function formatRelativeTime(dateValue?: Date | string | null) {
-  if (!dateValue) return "Never";
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return "Never";
-  return `${formatDistanceToNowStrict(date)} ago`;
-}
-
-function canRefresh(dateValue?: Date | string | null) {
-  if (!dateValue) return true;
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return true;
-  return Date.now() - date.getTime() >= 15_000;
-}
 
 export default function Page() {
   const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
+  const [sellDialogOpen, setSellDialogOpen] = useState(false);
 
   const {
     data: tokenData,
@@ -52,8 +45,22 @@ export default function Page() {
     { enabled: !!tokenPublicKey && !!tokenData }
   );
 
+  const {
+    data: refreshCache,
+    refetch: refetchRefreshCache,
+    isLoading: refreshCacheLoading,
+  } = trpc.refreshCache.getByScope.useQuery(
+    {
+      tokenPublicKey: tokenPublicKey || "",
+      scope: "HOLDINGS",
+    },
+    { enabled: !!tokenPublicKey }
+  );
+
   const { mutateAsync: refreshHoldings, isPending: isRefreshing } =
     trpc.holding.refreshByToken.useMutation();
+  const { mutateAsync: sellHoldings, isPending: isSelling } =
+    trpc.holding.sellByToken.useMutation();
 
   const columns = useMemo(() => {
     if (!tokenPublicKey || !tokenData) return [];
@@ -63,6 +70,72 @@ export default function Page() {
     });
   }, [tokenData, tokenPublicKey]);
 
+  const holdings = holdingsData ?? [];
+  const selectedHoldings = useMemo(
+    () => holdings.filter((holding) => rowSelection[holding.walletPublicKey]),
+    [holdings, rowSelection]
+  );
+  const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
+  const isStale =
+    !refreshTimestamp ||
+    Date.now() - new Date(refreshTimestamp).getTime() >=
+      cacheConfig.staleMs.holdings;
+  const autoRefreshTriggered = useRef(false);
+
+  const handleRefresh = async (options?: { showToast?: boolean }) => {
+    if (!tokenPublicKey) return;
+    const showToast = options?.showToast !== false;
+    const toastId = showToast
+      ? toast.loading("Refreshing holdings...", {
+          icon: <Spinner className="size-4" />,
+        })
+      : null;
+    try {
+      await refreshHoldings({ tokenPublicKey });
+      await Promise.all([refetchHoldings(), refetchRefreshCache()]);
+      if (toastId) {
+        toast.success("Holdings refreshed", { id: toastId, icon: null });
+      }
+    } catch (error) {
+      if (toastId) {
+        toast.error("Failed to refresh holdings", { id: toastId, icon: null });
+      }
+    }
+  };
+
+  const handleSell = async (sellPercentage: number) => {
+    if (!tokenPublicKey || selectedHoldings.length === 0) return;
+    const walletPublicKeys = selectedHoldings.map(
+      (holding) => holding.wallet.publicKey
+    );
+    const toastId = toast.loading("Submitting sell transactions...");
+    try {
+      const result = await sellHoldings({
+        tokenPublicKey,
+        walletPublicKeys,
+        sellPercentage,
+      });
+      const summary = `${result.submitted} submitted, ${result.failed} failed`;
+      toast.success(`Sell submitted: ${summary}`, { id: toastId });
+      await refreshHoldings({ tokenPublicKey, walletPublicKeys });
+      await refetchHoldings();
+      setSellDialogOpen(false);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to submit sells";
+      toast.error(message, { id: toastId });
+    }
+  };
+
+  useEffect(() => {
+    if (!tokenPublicKey || !tokenData) return;
+    if (refreshCacheLoading) return;
+    if (!isStale || isRefreshing) return;
+    if (autoRefreshTriggered.current) return;
+    autoRefreshTriggered.current = true;
+    void handleRefresh({ showToast: false });
+  }, [isRefreshing, isStale, refreshCacheLoading, tokenData, tokenPublicKey]);
+
   if (isLoading) {
     return <DashboardLoading />;
   }
@@ -71,25 +144,29 @@ export default function Page() {
     return <TokenNotFound error={error} onRetry={() => refetch()} />;
   }
 
-  const holdings = holdingsData ?? [];
-  const canRefreshAny = holdings.length
-    ? holdings.some((holding) => canRefresh(holding.lastUpdated))
-    : true;
-
-  const handleRefresh = async () => {
-    if (!tokenPublicKey) return;
-    await refreshHoldings({ tokenPublicKey });
-    await refetchHoldings();
-  };
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
         <div>
           <h1 className="text-4xl">Holdings</h1>
-          <p className="text-sm text-muted-foreground">
-            Last refresh {formatRelativeTime(holdings[0]?.lastUpdated)}
-          </p>
+          <div className="mt-3 flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleRefresh()}
+              disabled={isRefreshing || !tokenPublicKey}
+            >
+              {isRefreshing ? (
+                <Spinner className="mr-2 size-4" />
+              ) : (
+                <IconRefresh className="mr-2 size-4" />
+              )}
+              Refresh
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Last refresh {formatRefreshTime(refreshTimestamp)}
+            </p>
+          </div>
         </div>
         <p className="leading-tight font-light text-right text-muted-foreground">
           View token holdings across wallets.
@@ -104,6 +181,9 @@ export default function Page() {
         columns={columns}
         data={holdings}
         isLoading={holdingsLoading}
+        getRowId={(row) => row.walletPublicKey}
+        enableRowSelection
+        onRowSelectionChange={setRowSelection}
         enableUrlState
         urlStatePrefix="holdings"
         searchableColumns={["walletPublicKey", "walletType"]}
@@ -116,18 +196,30 @@ export default function Page() {
             />
             <div className="flex items-center gap-2">
               <Button
-                variant="outline"
+                variant="destructive"
                 size="sm"
-                onClick={handleRefresh}
-                disabled={isRefreshing || !canRefreshAny}
+                onClick={() => setSellDialogOpen(true)}
+                disabled={selectedHoldings.length === 0 || isSelling}
               >
-                Refresh
+                Sell
               </Button>
               <DataTableViewOptions table={table} />
             </div>
           </div>
         )}
         pagination={(table) => <DataTablePagination table={table} />}
+      />
+
+      <HoldingSellDialog
+        open={sellDialogOpen}
+        onOpenChange={setSellDialogOpen}
+        holdings={selectedHoldings.map((holding) => ({
+          walletPublicKey: holding.wallet.publicKey,
+          tokenBalance: Number(holding.tokenBalance),
+        }))}
+        tokenSymbol={tokenData.symbol}
+        isSubmitting={isSelling}
+        onConfirm={handleSell}
       />
     </div>
   );

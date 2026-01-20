@@ -1,11 +1,13 @@
 "use client";
 
-import { formatDistanceToNowStrict } from "date-fns";
 import { useQueryState } from "nuqs";
-import { useCallback, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
+import { IconRefresh } from "@tabler/icons-react";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
+import { cacheConfig } from "@/lib/config/cache.config";
+import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
 import {
@@ -20,20 +22,6 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
 import { Spinner } from "@/components/ui/spinner";
-
-function formatRelativeTime(dateValue?: Date | string | null) {
-  if (!dateValue) return "Never";
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return "Never";
-  return `${formatDistanceToNowStrict(date)} ago`;
-}
-
-function canRefresh(dateValue?: Date | string | null) {
-  if (!dateValue) return true;
-  const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
-  if (Number.isNaN(date.getTime())) return true;
-  return Date.now() - date.getTime() >= 15_000;
-}
 
 export default function Page() {
   const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
@@ -77,35 +65,109 @@ export default function Page() {
     refetch: refetchMainWallet,
   } = trpc.wallet.getMain.useQuery({}, { enabled: !!tokenData });
 
+  const {
+    data: refreshCache,
+    refetch: refetchRefreshCache,
+    isLoading: refreshCacheLoading,
+  } = trpc.refreshCache.getByScope.useQuery(
+    {
+      tokenPublicKey: tokenPublicKey || "",
+      scope: "WALLETS",
+    },
+    { enabled: !!tokenPublicKey }
+  );
+
   const { mutateAsync: refreshBalances, isPending: isRefreshingBalances } =
     trpc.wallet.refreshBalances.useMutation();
 
+  const wallets = operationalWalletsData?.wallets ?? [];
+  const allWallets = useMemo(
+    () => [
+      ...(mainWallet ? [mainWallet] : []),
+      ...(devWallet ? [devWallet] : []),
+      ...wallets,
+    ],
+    [devWallet, mainWallet, wallets]
+  );
+
+  const getCooldownMessage = useCallback(
+    (walletPublicKeys?: string[]) => {
+      const now = Date.now();
+      const targetWallets = walletPublicKeys?.length
+        ? allWallets.filter((wallet) =>
+            walletPublicKeys.includes(wallet.publicKey)
+          )
+        : allWallets;
+      const remaining = targetWallets
+        .map((wallet) => {
+          if (!wallet.balanceRefreshedAt) return 0;
+          const last = new Date(wallet.balanceRefreshedAt).getTime();
+          return Math.max(
+            0,
+            cacheConfig.cooldownMs.walletBalances - (now - last)
+          );
+        })
+        .filter((value) => value > 0);
+
+      if (remaining.length === 0) {
+        return "Wallet balances were refreshed recently.";
+      }
+
+      const waitSeconds = Math.max(1, Math.ceil(Math.min(...remaining) / 1000));
+      return `Wallet balances were refreshed recently. Try again in ${waitSeconds}s.`;
+    },
+    [allWallets]
+  );
+
   const handleRefreshBalances = useCallback(
-    async (walletPublicKeys?: string[]) => {
+    async (
+      walletPublicKeys?: string[],
+      options?: { showToast?: boolean }
+    ) => {
       if (!tokenPublicKey) return;
-      const toastId = toast.loading("Refreshing wallet balances...", {
-        icon: <Spinner className="size-4" />,
-      });
+      const showToast = options?.showToast !== false;
+      const toastId = showToast
+        ? toast.loading("Refreshing wallet balances...", {
+            icon: <Spinner className="size-4" />,
+          })
+        : null;
 
       try {
-        await refreshBalances({ tokenPublicKey, walletPublicKeys });
+        const result = await refreshBalances({ tokenPublicKey, walletPublicKeys });
         await Promise.all([
           refetchOperationalWallets(),
           refetchDevWallet(),
           refetchMainWallet(),
+          refetchRefreshCache(),
         ]);
-        toast.success("Wallet balances refreshed", { id: toastId, icon: null });
+        if (toastId) {
+          if (result.length === 0) {
+            toast.info(getCooldownMessage(walletPublicKeys), {
+              id: toastId,
+              icon: null,
+            });
+          } else {
+            toast.success("Wallet balances refreshed", {
+              id: toastId,
+              icon: null,
+            });
+          }
+        }
       } catch (error) {
-        toast.error("Failed to refresh wallet balances", {
-          id: toastId,
-          icon: null,
-        });
+        if (toastId) {
+          toast.error("Failed to refresh wallet balances", {
+            id: toastId,
+            icon: null,
+          });
+        }
       }
     },
     [
       refetchOperationalWallets,
       refetchDevWallet,
       refetchMainWallet,
+      refetchRefreshCache,
+      getCooldownMessage,
       refreshBalances,
       tokenPublicKey,
     ]
@@ -128,6 +190,17 @@ export default function Page() {
       .map((wallet: { publicKey: string }) => wallet.publicKey);
   }, [rowSelection, operationalWalletsData?.wallets]);
 
+  const transferWallets = useMemo(
+    () =>
+      allWallets.map((wallet) => ({
+        publicKey: wallet.publicKey,
+        type: wallet.type,
+        balanceSol:
+          wallet.balanceSol == null ? null : Number(wallet.balanceSol),
+      })),
+    [allWallets]
+  );
+
   const columns = useMemo(() => {
     if (!tokenPublicKey) return [];
     return getColumns({
@@ -137,6 +210,29 @@ export default function Page() {
       onReturn: (walletPublicKey) => handleOpenReturn([walletPublicKey]),
     });
   }, [handleOpenReturn, handleOpenSend, handleRefreshBalances, tokenPublicKey]);
+
+  const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
+  const isStale =
+    !refreshTimestamp ||
+    Date.now() - new Date(refreshTimestamp).getTime() >=
+      cacheConfig.staleMs.wallets;
+  const autoRefreshTriggered = useRef(false);
+
+  useEffect(() => {
+    if (!tokenPublicKey || !tokenData) return;
+    if (refreshCacheLoading) return;
+    if (!isStale || isRefreshingBalances) return;
+    if (autoRefreshTriggered.current) return;
+    autoRefreshTriggered.current = true;
+    void handleRefreshBalances(undefined, { showToast: false });
+  }, [
+    handleRefreshBalances,
+    isRefreshingBalances,
+    isStale,
+    refreshCacheLoading,
+    tokenData,
+    tokenPublicKey,
+  ]);
 
   if (tokenLoading) {
     return <DashboardLoading />;
@@ -151,30 +247,30 @@ export default function Page() {
     );
   }
 
-  const wallets = operationalWalletsData?.wallets ?? [];
-  const allWallets = [
-    ...(mainWallet ? [mainWallet] : []),
-    ...(devWallet ? [devWallet] : []),
-    ...wallets,
-  ];
-  const transferWallets = useMemo(
-    () =>
-      allWallets.map((wallet) => ({
-        publicKey: wallet.publicKey,
-        type: wallet.type,
-        balanceSol:
-          wallet.balanceSol == null ? null : Number(wallet.balanceSol),
-      })),
-    [allWallets]
-  );
-  const canRefreshAny = allWallets.some((wallet) =>
-    canRefresh(wallet.balanceRefreshedAt)
-  );
-
   return (
     <div className="flex flex-col gap-6">
       <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <h1 className="text-4xl">Wallets</h1>
+        <div>
+          <h1 className="text-4xl">Wallets</h1>
+          <div className="mt-3 flex items-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => handleRefreshBalances()}
+              disabled={isRefreshingBalances || !tokenPublicKey}
+            >
+              {isRefreshingBalances ? (
+                <Spinner className="mr-2 size-4" />
+              ) : (
+                <IconRefresh className="mr-2 size-4" />
+              )}
+              Refresh
+            </Button>
+            <p className="text-sm text-muted-foreground">
+              Last refresh: {formatRefreshTime(refreshTimestamp)}
+            </p>
+          </div>
+        </div>
         <p className="leading-tight font-light text-right text-muted-foreground">
           Main and dev wallets appear above for quick access.
           <br />
@@ -198,7 +294,7 @@ export default function Page() {
               </div>
               <div className="text-xs text-muted-foreground">
                 Last refreshed{" "}
-                {formatRelativeTime(mainWallet?.balanceRefreshedAt)}
+                {formatRefreshTime(mainWallet?.balanceRefreshedAt)}
               </div>
             </div>
             <div className="flex gap-2">
@@ -208,11 +304,7 @@ export default function Page() {
                 onClick={() =>
                   mainWallet && handleRefreshBalances([mainWallet.publicKey])
                 }
-                disabled={
-                  isRefreshingBalances ||
-                  !mainWallet ||
-                  !canRefresh(mainWallet.balanceRefreshedAt)
-                }
+                disabled={isRefreshingBalances || !mainWallet}
               >
                 {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
@@ -236,7 +328,7 @@ export default function Page() {
               </div>
               <div className="text-xs text-muted-foreground">
                 Last refreshed{" "}
-                {formatRelativeTime(devWallet?.balanceRefreshedAt)}
+                {formatRefreshTime(devWallet?.balanceRefreshedAt)}
               </div>
             </div>
             <div className="flex gap-2">
@@ -246,11 +338,7 @@ export default function Page() {
                 onClick={() =>
                   devWallet && handleRefreshBalances([devWallet.publicKey])
                 }
-                disabled={
-                  isRefreshingBalances ||
-                  !devWallet ||
-                  !canRefresh(devWallet.balanceRefreshedAt)
-                }
+                disabled={isRefreshingBalances || !devWallet}
               >
                 {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
@@ -294,7 +382,7 @@ export default function Page() {
                 variant="outline"
                 size="sm"
                 onClick={() => handleRefreshBalances()}
-                disabled={isRefreshingBalances || !canRefreshAny}
+                disabled={isRefreshingBalances || !tokenPublicKey}
               >
                 {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh all

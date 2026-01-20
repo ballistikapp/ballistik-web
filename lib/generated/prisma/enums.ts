@@ -41,6 +41,45 @@ export const LaunchLogLevel = {
 export type LaunchLogLevel = (typeof LaunchLogLevel)[keyof typeof LaunchLogLevel]
 
 
+export const VolumeBotSessionStatus = {
+  DRAFT: 'DRAFT',
+  RUNNING: 'RUNNING',
+  STOP_REQUESTED: 'STOP_REQUESTED',
+  STOPPING: 'STOPPING',
+  STOPPED: 'STOPPED',
+  FAILED: 'FAILED'
+} as const
+
+export type VolumeBotSessionStatus = (typeof VolumeBotSessionStatus)[keyof typeof VolumeBotSessionStatus]
+
+
+export const VolumeBotLogLevel = {
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+  TRADE: 'TRADE'
+} as const
+
+export type VolumeBotLogLevel = (typeof VolumeBotLogLevel)[keyof typeof VolumeBotLogLevel]
+
+
+export const VolumeBotWalletRole = {
+  TRADER: 'TRADER'
+} as const
+
+export type VolumeBotWalletRole = (typeof VolumeBotWalletRole)[keyof typeof VolumeBotWalletRole]
+
+
+export const VolumeBotWalletStatus = {
+  ACTIVE: 'ACTIVE',
+  PAUSED: 'PAUSED',
+  RECLAIMED: 'RECLAIMED',
+  FAILED: 'FAILED'
+} as const
+
+export type VolumeBotWalletStatus = (typeof VolumeBotWalletStatus)[keyof typeof VolumeBotWalletStatus]
+
+
 export const TransactionType = {
   BUY: 'BUY',
   SELL: 'SELL',
@@ -57,3 +96,12 @@ export const TransactionStatus = {
 } as const
 
 export type TransactionStatus = (typeof TransactionStatus)[keyof typeof TransactionStatus]
+
+
+export const RefreshScope = {
+  TRANSACTIONS: 'TRANSACTIONS',
+  HOLDINGS: 'HOLDINGS',
+  WALLETS: 'WALLETS'
+} as const
+
+export type RefreshScope = (typeof RefreshScope)[keyof typeof RefreshScope]

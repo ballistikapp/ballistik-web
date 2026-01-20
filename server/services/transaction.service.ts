@@ -1,6 +1,7 @@
 import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
+import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import {
   LAMPORTS_PER_SOL,
   type ParsedTransactionWithMeta,
@@ -29,6 +30,43 @@ type ParsedTransactionResult = {
   feeAmount: number;
   blockTime: Date | null;
 };
+
+const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
+
+type TokenBalanceEntry = NonNullable<
+  NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
+>[number];
+
+function sumTokenBalances(
+  balances: TokenBalanceEntry[] | null | undefined,
+  owner: string,
+  mint: string
+) {
+  if (!balances?.length) return 0;
+  return balances.reduce((total, balance) => {
+    if (balance.owner !== owner || balance.mint !== mint) return total;
+    const amount = balance.uiTokenAmount?.uiAmount ?? 0;
+    return total + amount;
+  }, 0);
+}
+
+function getWrappedSolDiff(
+  tx: ParsedTransactionWithMeta,
+  walletPublicKey: string
+) {
+  if (!tx.meta) return 0;
+  const preBalance = sumTokenBalances(
+    tx.meta.preTokenBalances,
+    walletPublicKey,
+    WRAPPED_SOL_MINT
+  );
+  const postBalance = sumTokenBalances(
+    tx.meta.postTokenBalances,
+    walletPublicKey,
+    WRAPPED_SOL_MINT
+  );
+  return postBalance - preBalance;
+}
 
 async function getAllowedWallets(
   tokenPublicKey: string,
@@ -110,13 +148,20 @@ function parseTransactionForToken(
     (key) => key.pubkey.toBase58() === walletPublicKey
   );
 
-  if (accountIndex === -1) {
-    return null;
+  let systemSolDiff = 0;
+  if (accountIndex !== -1) {
+    const preSolBalance = tx.meta.preBalances[accountIndex];
+    const postSolBalance = tx.meta.postBalances[accountIndex];
+    if (preSolBalance !== undefined && postSolBalance !== undefined) {
+      systemSolDiff = (postSolBalance - preSolBalance) / LAMPORTS_PER_SOL;
+    }
   }
 
-  const preSolBalance = tx.meta.preBalances[accountIndex];
-  const postSolBalance = tx.meta.postBalances[accountIndex];
-  const solDiff = (postSolBalance - preSolBalance) / LAMPORTS_PER_SOL;
+  const wrappedSolDiff = getWrappedSolDiff(tx, walletPublicKey);
+  const solDiff =
+    Math.abs(wrappedSolDiff) > Math.abs(systemSolDiff)
+      ? wrappedSolDiff
+      : systemSolDiff;
 
   const isCreate = tx.meta.logMessages?.some(
     (log) =>
@@ -192,47 +237,119 @@ export const transactionService = {
     );
 
     const connection = getSolanaConnection();
-    const parsedTransactions: ParsedTransactionResult[] = [];
+    const signatureWallets = new Map<string, Set<string>>();
+    const walletPublicKeys = wallets.map((wallet) => wallet.publicKey);
+    const signatureLimit = 100;
 
     for (const wallet of wallets) {
       const walletPublicKey = new PublicKey(wallet.publicKey);
       const signatures = await connection.getSignaturesForAddress(
         walletPublicKey,
-        { limit: 100 }
+        { limit: signatureLimit }
       );
-
-      const parsedResults = await Promise.all(
-        signatures.map(async (sig) => {
-          const parsed = await connection.getParsedTransaction(sig.signature, {
-            maxSupportedTransactionVersion: 0,
-          });
-          return parseTransactionForToken(
-            sig.signature,
-            parsed,
-            wallet.publicKey,
-            token.publicKey
+      signatures.forEach((signatureInfo) => {
+        const existing = signatureWallets.get(signatureInfo.signature);
+        if (existing) {
+          existing.add(wallet.publicKey);
+        } else {
+          signatureWallets.set(
+            signatureInfo.signature,
+            new Set([wallet.publicKey])
           );
-        })
-      );
-
-      parsedResults.forEach((result) => {
-        if (result) {
-          parsedTransactions.push(result);
         }
       });
     }
 
-    if (parsedTransactions.length === 0) {
+    const staleTransactions = await prisma.transaction.findMany({
+      where: {
+        tokenPublicKey: token.publicKey,
+        walletPublicKey: { in: walletPublicKeys },
+        OR: [{ pricePerToken: 0 }, { solAmount: 0 }],
+      },
+      select: { transactionSignature: true, walletPublicKey: true },
+      orderBy: { updatedAt: "desc" },
+      take: 200,
+    });
+
+    staleTransactions.forEach((transaction) => {
+      const existing = signatureWallets.get(transaction.transactionSignature);
+      if (existing) {
+        existing.add(transaction.walletPublicKey);
+      } else {
+        signatureWallets.set(
+          transaction.transactionSignature,
+          new Set([transaction.walletPublicKey])
+        );
+      }
+    });
+
+    const signatures = Array.from(signatureWallets.keys());
+    if (signatures.length === 0) {
+      await refreshCacheService.touch({
+        userId,
+        tokenPublicKey: token.publicKey,
+        scope: "TRANSACTIONS",
+      });
       return [];
     }
 
-    const uniquePairs = new Set(
-      parsedTransactions.map(
-        (tx) => `${tx.walletPublicKey}:${tx.transactionSignature}`
-      )
-    );
+    const parsedBySignature = new Map<
+      string,
+      ParsedTransactionWithMeta | null
+    >();
+    const batchSize = 20;
+    for (let i = 0; i < signatures.length; i += batchSize) {
+      const batch = signatures.slice(i, i + batchSize);
+      const parsedBatch = await connection.getParsedTransactions(batch, {
+        maxSupportedTransactionVersion: 0,
+      });
+      parsedBatch.forEach((parsed, index) => {
+        const signature = batch[index];
+        if (signature) {
+          parsedBySignature.set(signature, parsed);
+        }
+      });
+    }
+
+    const parsedTransactions: ParsedTransactionResult[] = [];
+    signatureWallets.forEach((walletSet, signature) => {
+      const parsed = parsedBySignature.get(signature) ?? null;
+      if (!parsed) return;
+      walletSet.forEach((walletPublicKey) => {
+        const result = parseTransactionForToken(
+          signature,
+          parsed,
+          walletPublicKey,
+          token.publicKey
+        );
+        if (result) {
+          parsedTransactions.push(result);
+        }
+      });
+    });
+
+    if (parsedTransactions.length === 0) {
+      await refreshCacheService.touch({
+        userId,
+        tokenPublicKey: token.publicKey,
+        scope: "TRANSACTIONS",
+      });
+      return [];
+    }
+
+    const parsedByKey = new Map<string, ParsedTransactionResult>();
+    parsedTransactions.forEach((transaction) => {
+      const key = `${transaction.walletPublicKey}:${transaction.transactionSignature}`;
+      if (!parsedByKey.has(key)) {
+        parsedByKey.set(key, transaction);
+      }
+    });
     const uniqueSignatures = Array.from(
-      new Set(parsedTransactions.map((tx) => tx.transactionSignature))
+      new Set(
+        Array.from(parsedByKey.values()).map(
+          (tx) => tx.transactionSignature
+        )
+      )
     );
 
     const existing = await prisma.transaction.findMany({
@@ -241,42 +358,96 @@ export const transactionService = {
         transactionSignature: { in: uniqueSignatures },
         walletPublicKey: { in: wallets.map((wallet) => wallet.publicKey) },
       },
-      select: { transactionSignature: true, walletPublicKey: true },
+      select: {
+        id: true,
+        transactionSignature: true,
+        walletPublicKey: true,
+        solAmount: true,
+        tokenAmount: true,
+        pricePerToken: true,
+      },
     });
 
-    const existingSet = new Set(
-      existing.map(
-        (transaction) =>
-          `${transaction.walletPublicKey}:${transaction.transactionSignature}`
-      )
+    const existingByKey = new Map(
+      existing.map((transaction) => [
+        `${transaction.walletPublicKey}:${transaction.transactionSignature}`,
+        transaction,
+      ])
     );
 
-    const newTransactions = parsedTransactions.filter((transaction) => {
-      const key = `${transaction.walletPublicKey}:${transaction.transactionSignature}`;
-      if (!uniquePairs.has(key)) return false;
-      if (existingSet.has(key)) return false;
-      uniquePairs.delete(key);
-      return true;
-    });
+    const newTransactions = Array.from(parsedByKey.entries())
+      .filter(([key]) => !existingByKey.has(key))
+      .map(([, transaction]) => transaction);
 
-    if (newTransactions.length === 0) {
-      return [];
+    const updates = Array.from(parsedByKey.entries())
+      .map(([key, transaction]) => {
+        const existingTx = existingByKey.get(key);
+        if (!existingTx) return null;
+        const existingPrice = Number(existingTx.pricePerToken ?? 0);
+        const existingSol = Number(existingTx.solAmount ?? 0);
+        const existingToken = Number(existingTx.tokenAmount ?? 0);
+        const shouldUpdate =
+          (existingPrice === 0 && transaction.pricePerToken > 0) ||
+          (existingSol === 0 && transaction.solAmount > 0) ||
+          (existingToken === 0 && transaction.tokenAmount > 0);
+        if (!shouldUpdate) return null;
+        return {
+          id: existingTx.id,
+          data: {
+            solAmount: transaction.solAmount,
+            tokenAmount: transaction.tokenAmount,
+            pricePerToken: transaction.pricePerToken,
+            feeAmount: transaction.feeAmount,
+            blockTime: transaction.blockTime,
+          },
+        };
+      })
+      .filter(
+        (update): update is {
+          id: string;
+          data: {
+            solAmount: number;
+            tokenAmount: number;
+            pricePerToken: number;
+            feeAmount: number;
+            blockTime: Date | null;
+          };
+        } => Boolean(update)
+      );
+
+    if (newTransactions.length > 0) {
+      await prisma.transaction.createMany({
+        data: newTransactions.map((transaction) => ({
+          walletPublicKey: transaction.walletPublicKey,
+          tokenPublicKey: token.publicKey,
+          transactionType: transaction.transactionType,
+          status: transaction.status,
+          transactionSignature: transaction.transactionSignature,
+          solAmount: transaction.solAmount,
+          tokenAmount: transaction.tokenAmount,
+          pricePerToken: transaction.pricePerToken,
+          slippageBps: transaction.slippageBps,
+          feeAmount: transaction.feeAmount,
+          blockTime: transaction.blockTime,
+        })),
+      });
     }
 
-    await prisma.transaction.createMany({
-      data: newTransactions.map((transaction) => ({
-        walletPublicKey: transaction.walletPublicKey,
-        tokenPublicKey: token.publicKey,
-        transactionType: transaction.transactionType,
-        status: transaction.status,
-        transactionSignature: transaction.transactionSignature,
-        solAmount: transaction.solAmount,
-        tokenAmount: transaction.tokenAmount,
-        pricePerToken: transaction.pricePerToken,
-        slippageBps: transaction.slippageBps,
-        feeAmount: transaction.feeAmount,
-        blockTime: transaction.blockTime,
-      })),
+    if (updates.length > 0) {
+      await prisma.$transaction(
+        updates.map((update) =>
+          prisma.transaction.update({
+            where: { id: update.id },
+            data: update.data,
+          })
+        )
+      );
+    }
+
+    await refreshCacheService.touch({
+      userId,
+      tokenPublicKey: token.publicKey,
+      scope: "TRANSACTIONS",
     });
 
     return newTransactions;

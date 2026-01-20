@@ -8,3 +8,5 @@ export * from "./auth.schema";
 export * from "./wallet.schema";
 export * from "./holding.schema";
 export * from "./transaction.schema";
+export * from "./refresh-cache.schema";
+export * from "./volume-bot.schema";

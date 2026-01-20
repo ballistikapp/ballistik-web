@@ -4,6 +4,7 @@ import { AppError, isAppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
 import type { LaunchTokenInput } from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
+import { getLaunchConfig } from "@/lib/config/launch.config";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
@@ -17,19 +18,6 @@ import {
 import bs58 from "bs58";
 import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
-
-const SLIPPAGE_BASIS_POINTS = BigInt(10000);
-const MIN_BUY_AMOUNT_SOL = 0.003;
-const FUNDING_BUFFER_LAMPORTS = 4_000_000;
-const CREATE_FEE_BUFFER_LAMPORTS = 2_000_000;
-const TRANSFER_FEE_BUFFER_LAMPORTS = 10_000;
-const FUNDING_BATCH_SIZE = 6;
-const LAUNCH_STALE_MS = 15 * 60 * 1000;
-const LAUNCH_STALE_ERROR =
-  "Launch stalled. Please recover funds and try again.";
-const MINT_CONFIRM_TIMEOUT_MS = 120_000;
-const MINT_CONFIRM_INTERVAL_MS = 2_000;
-const MIN_CREATOR_BALANCE_LAMPORTS = BigInt(20_000_000);
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<{}>;
@@ -118,8 +106,22 @@ function isRateLimitError(error: unknown, message: string) {
   );
 }
 
+function isJitoRateLimitMessage(message: string) {
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("jito") ||
+    normalized.includes("block engine") ||
+    normalized.includes("searcherclienterror") ||
+    normalized.includes("globally rate limited") ||
+    normalized.includes("network congested")
+  );
+}
+
 function resolveLaunchClientMessage(error: unknown, message: string) {
   if (isRateLimitError(error, message)) {
+    if (isJitoRateLimitMessage(message)) {
+      return "Jito block engine rate limit reached. Please try again shortly.";
+    }
     return "RPC rate limit reached. Please try again shortly.";
   }
   if (process.env.NODE_ENV !== "production" && message) {
@@ -304,6 +306,10 @@ async function updateProgress(
 }
 
 async function markLaunchStaleIfNeeded<T extends LaunchRecord>(launch: T) {
+  const {
+    launchStaleMs: LAUNCH_STALE_MS,
+    launchStaleError: LAUNCH_STALE_ERROR,
+  } = getLaunchConfig();
   if (launch.status !== "PENDING" && launch.status !== "RUNNING") {
     return launch;
   }
@@ -394,6 +400,10 @@ async function setStep(
 }
 
 async function waitForMintAccount(mintPublicKey: string) {
+  const {
+    mintConfirmTimeoutMs: MINT_CONFIRM_TIMEOUT_MS,
+    mintConfirmIntervalMs: MINT_CONFIRM_INTERVAL_MS,
+  } = getLaunchConfig();
   const connection = getSolanaConnection();
   const mintKey = new PublicKey(mintPublicKey);
   const startedAt = Date.now();
@@ -424,14 +434,23 @@ function keypairFromPrivateKey(privateKey: string) {
   return Keypair.fromSecretKey(bs58.decode(privateKey));
 }
 
-function requiredBuyLamports(amountSol: number, extraBufferLamports = 0) {
+function requiredBuyLamports(
+  amountSol: number,
+  extraBufferLamports = 0,
+  rentLamports = BigInt(0)
+) {
+  const {
+    fundingBufferLamports: FUNDING_BUFFER_LAMPORTS,
+    transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS,
+  } = getLaunchConfig();
   if (amountSol <= 0) {
     return BigInt(0);
   }
   return (
     toLamports(amountSol) +
     BigInt(FUNDING_BUFFER_LAMPORTS + TRANSFER_FEE_BUFFER_LAMPORTS) +
-    BigInt(extraBufferLamports)
+    BigInt(extraBufferLamports) +
+    rentLamports
   );
 }
 
@@ -441,6 +460,7 @@ async function fundWalletsFromMain(
   targets: { publicKey: PublicKey; requiredLamports: bigint }[],
   mainReserveLamports: bigint
 ) {
+  const { fundingBatchSize: FUNDING_BATCH_SIZE } = getLaunchConfig();
   const connection = getSolanaConnection();
   const startedAt = Date.now();
   const uniqueTargets = targets.filter(
@@ -537,6 +557,7 @@ async function fundWalletsFromMain(
 }
 
 function validateLaunchInput(input: LaunchTokenInput) {
+  const { minBuyAmountSol: MIN_BUY_AMOUNT_SOL } = getLaunchConfig();
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
   const bundlerWalletCount = Math.max(
@@ -1063,6 +1084,8 @@ export const launchService = {
     userId: string,
     walletPublicKeys?: string[]
   ) {
+    const { transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS } =
+      getLaunchConfig();
     const { launch, mainWalletPublicKey, walletPublicKeys: recoveryWallets } =
       await loadLaunchRecoveryInfo(launchId, userId);
 
@@ -1208,6 +1231,11 @@ export const launchService = {
 
     const launchStartedAt = Date.now();
     const input = launch.input as LaunchTokenInput;
+    const {
+      createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+      minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+      slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
+    } = getLaunchConfig();
     let reservedVanityId: string | null = null;
     let recoveryData: LaunchRecoveryData | null = null;
 
@@ -1293,12 +1321,22 @@ export const launchService = {
       }
 
       await setStep(launchId, 12, "funding", "Funding wallets");
+      const connection = getSolanaConnection();
+      const ataRentLamports = BigInt(
+        await connection.getMinimumBalanceForRentExemption(165)
+      );
+      const userVolumeAccumulatorRentLamports = BigInt(
+        await connection.getMinimumBalanceForRentExemption(74)
+      );
+      const buyRentLamports =
+        ataRentLamports + userVolumeAccumulatorRentLamports;
       const maxBundlerBuySol =
         bundlerBuyAmountSol *
         (1 + Math.max(0, bundlerBuyVariancePercent) / 100);
       const requiredCreatorLamports = requiredBuyLamports(
         devBuyAmountSol,
-        CREATE_FEE_BUFFER_LAMPORTS
+        CREATE_FEE_BUFFER_LAMPORTS,
+        buyRentLamports
       );
       const creatorTargetLamports =
         requiredCreatorLamports > MIN_CREATOR_BALANCE_LAMPORTS
@@ -1308,7 +1346,11 @@ export const launchService = {
         devWalletPublicKey === user.mainWallet.publicKey
           ? BigInt(0)
           : creatorTargetLamports;
-      const bundlerFundingLamports = requiredBuyLamports(maxBundlerBuySol);
+      const bundlerFundingLamports = requiredBuyLamports(
+        maxBundlerBuySol,
+        0,
+        buyRentLamports
+      );
       const tipLamports = input.bundleBuyEnabled
         ? BigInt(Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL))
         : BigInt(0);
@@ -1337,6 +1379,10 @@ export const launchService = {
         creatorMinLamports: MIN_CREATOR_BALANCE_LAMPORTS.toString(),
         creatorTargetLamports: creatorTargetLamports.toString(),
         bundlerFundingLamports: bundlerFundingLamports.toString(),
+        ataRentLamports: ataRentLamports.toString(),
+        userVolumeAccumulatorRentLamports:
+          userVolumeAccumulatorRentLamports.toString(),
+        buyRentLamports: buyRentLamports.toString(),
         mainReserveLamports: mainReserveLamports.toString(),
         tipLamports: tipLamports.toString(),
         maxBundlerBuySol,
@@ -1601,6 +1647,23 @@ export const launchService = {
         ...(errorMessage ? { errorMessage } : {}),
       };
       await appendLog(launchId, "ERROR", clientMessage, "error", logData);
+      try {
+        const recoveryResult = await this.recoverSol(launchId, launch.userId);
+        await appendLog(
+          launchId,
+          "INFO",
+          "Recovery complete",
+          "recovery",
+          recoveryResult as Prisma.InputJsonValue
+        );
+      } catch (recoveryError) {
+        const recoveryMessage = getErrorMessage(recoveryError) || "Recovery failed";
+        await appendLog(launchId, "WARN", recoveryMessage, "recovery", {
+          errorName:
+            recoveryError instanceof Error ? recoveryError.name : "UnknownError",
+          ...(recoveryMessage ? { errorMessage: recoveryMessage } : {}),
+        });
+      }
     }
   },
 };

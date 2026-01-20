@@ -12,8 +12,19 @@ ALTER TABLE "_TokenWallets" DROP CONSTRAINT "_TokenWallets_A_fkey";
 ALTER TABLE "_TokenWallets" DROP CONSTRAINT "_TokenWallets_B_fkey";
 
 -- AlterTable
-ALTER TABLE "Wallet" ADD COLUMN     "tokenPublicKey" TEXT,
-ALTER COLUMN "tokenBalance" SET DATA TYPE DECIMAL(65,30);
+ALTER TABLE "Wallet" ADD COLUMN "tokenPublicKey" TEXT;
+
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1
+    FROM information_schema.columns
+    WHERE table_name = 'Wallet'
+      AND column_name = 'tokenBalance'
+  ) THEN
+    ALTER TABLE "Wallet" ALTER COLUMN "tokenBalance" TYPE DECIMAL(65,30);
+  END IF;
+END $$;
 
 -- DropTable
 DROP TABLE "_TokenWallets";

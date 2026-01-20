@@ -1,0 +1,254 @@
+{"timestamp":"2026-01-19T13:08:38.174Z","level":"info","message":"Launch queued","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"queue","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:38.937Z","level":"info","message":"Launch started","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"start","launchLevel":"INFO","tokenName":"GEORGE FLOYDSTEIN","tokenSymbol":"JEWGEORGE","bundleBuyEnabled":true,"devWalletOption":"generate","vanityMint":false,"devBuyAmountSol":0.3,"bundlerWalletCount":10,"bundlerBuyAmountSol":0.04,"bundlerBuyVariancePercent":0,"distributionWalletMultiplier":1,"jitoTipAmountSol":0.005,"tokenImageSource":"inline","hasTwitter":false,"hasTelegram":false,"hasWebsite":false}
+{"timestamp":"2026-01-19T13:08:38.979Z","level":"info","message":"Validating input","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"validate","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:39.024Z","level":"info","message":"Input validated","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"validate","launchLevel":"INFO","bundleBuyEnabled":true,"bundlerWalletCount":10,"devBuyAmountSol":0.3,"bundlerBuyAmountSol":0.04,"bundlerBuyVariancePercent":0,"distributionWalletMultiplier":1,"durationMs":0}
+{"timestamp":"2026-01-19T13:08:39.161Z","level":"info","message":"Loading wallets","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"wallets","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:39.770Z","level":"info","message":"Wallets prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"wallets","launchLevel":"INFO","mainWalletPublicKey":"4qUZY6DdTRv8jLNh2iLMhhAFmDCtsvqWGd9p1tA2bTxi","devWalletPublicKey":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","usesMainWalletAsDev":false,"devWalletOption":"generate","bundlerWallets":10,"bundleBuyEnabled":true,"durationMs":567}
+{"timestamp":"2026-01-19T13:08:40.061Z","level":"info","message":"Funding wallets","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"funding","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:40.346Z","level":"info","message":"Funding plan prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"funding","launchLevel":"INFO","targetsCount":11,"devFundingLamports":"327455200","creatorMinLamports":"20000000","creatorTargetLamports":"327455200","bundlerFundingLamports":"47455200","ataRentLamports":"2039280","userVolumeAccumulatorRentLamports":"1405920","buyRentLamports":"3445200","mainReserveLamports":"5000000","tipLamports":"5000000","maxBundlerBuySol":0.04}
+{"timestamp":"2026-01-19T13:08:44.733Z","level":"info","message":"Wallets funded","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"funding","launchLevel":"INFO","fundedCount":11,"totalLamports":"802007200","totalSol":"0.8020","transactions":2,"signatures":["4nm9xnGWzVK8G11jQ5skBuy9kGE6dgygooEhKr8Lg6Cze3JaDBBPo7jAdsxLAUyMJ1zpbCYhsRNWbDhgNUXKTN9M","3kQ2HDjCo2AJ3ZTv4yx4UveZBFJEKenppYcRGEWJwZorHByzGcDgy7T4bXagrAY94Ecm5DZXFKV9gxPMWDXp7N9i"],"reserveSol":"0.0050","durationMs":4338}
+{"timestamp":"2026-01-19T13:08:44.961Z","level":"info","message":"Preparing metadata","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"metadata","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:45.009Z","level":"info","message":"Metadata prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"metadata","launchLevel":"INFO","durationMs":3,"tokenImageSource":"inline","imageType":"image/png","imageSize":399917}
+{"timestamp":"2026-01-19T13:08:45.148Z","level":"info","message":"Preparing mint","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"mint","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:45.193Z","level":"info","message":"Mint prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"mint","launchLevel":"INFO","durationMs":1,"mintPublicKey":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","vanityMint":false,"reservedVanityId":null}
+{"timestamp":"2026-01-19T13:08:45.378Z","level":"info","message":"Creating token","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"create","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:45.430Z","level":"info","message":"Bundle buy prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"create","launchLevel":"INFO","buyers":10,"totalBuySol":"0.4000","totalBuyLamports":"400000000"}
+{"timestamp":"2026-01-19T13:08:45.431Z","level":"info","message":"Bundle create/buy start","launchId":"cmkl6laj500059oi2sfdp4q3e","buyerCount":10,"buyAmountCount":10,"creatorBuyLamports":"300000000","tipLamports":5000000}
+{"timestamp":"2026-01-19T13:08:51.071Z","level":"info","message":"Mint account does not exist","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY"}
+{"timestamp":"2026-01-19T13:08:51.123Z","level":"info","message":"Creator balance check","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","balanceSol":0.3274552,"balanceLamports":327455200,"minRequiredSol":0.02,"minRequiredLamports":20000000}
+{"timestamp":"2026-01-19T13:08:51.124Z","level":"info","message":"Creator balance sufficient","balanceSol":0.3274552,"minRequiredSol":0.02}
+{"timestamp":"2026-01-19T13:08:51.124Z","level":"info","message":"Building create instruction"}
+{"timestamp":"2026-01-19T13:08:51.124Z","level":"info","message":"Create inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","metadataUri":"https://ipfs.io/ipfs/QmZvdrggtaNHijfXLTMR6rAZwdJtGSMrGBEaf6NS8yAtM1"}
+{"timestamp":"2026-01-19T13:08:51.124Z","level":"info","message":"Create args validated","name":"GEORGE FLOYDSTEIN","symbol":"JEWGEORGE","uri":"https://ipfs.io/ipfs/QmZvdrggtaNHijfXLTMR6rAZwdJtG...","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.124Z","level":"info","message":"Create discriminator","value":"181ec828051c0777"}
+{"timestamp":"2026-01-19T13:08:51.125Z","level":"info","message":"Create instruction data length","value":145}
+{"timestamp":"2026-01-19T13:08:51.125Z","level":"info","message":"Create instruction accounts","value":14}
+{"timestamp":"2026-01-19T13:08:51.125Z","level":"info","message":"Create transaction built"}
+{"timestamp":"2026-01-19T13:08:51.125Z","level":"info","message":"Create transaction prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","feePayer":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","instructionCount":1,"metadataUriLength":67,"metadataUriPrefix":"https://ipfs.io/ipfs/QmZvdrggtaN"}
+{"timestamp":"2026-01-19T13:08:51.174Z","level":"info","message":"Create simulation start","launchId":"cmkl6laj500059oi2sfdp4q3e","blockhash":"9jF4vbQrHobho1vGsWRvQ4haWMxFMWaPRNuJa7DmJaX4"}
+{"timestamp":"2026-01-19T13:08:51.239Z","level":"info","message":"Create simulation succeeded","launchId":"cmkl6laj500059oi2sfdp4q3e","unitsConsumed":124732}
+{"timestamp":"2026-01-19T13:08:51.239Z","level":"info","message":"Bundle buyers prepared","launchId":"cmkl6laj500059oi2sfdp4q3e","buyerCount":11,"totalBuyLamports":"700000000"}
+{"timestamp":"2026-01-19T13:08:51.302Z","level":"info","message":"ATA missing, will create","value":"8V6P57pyybuTE5z3gReRvprUvTvSktgsfawGd3nEFy4v"}
+{"timestamp":"2026-01-19T13:08:51.303Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.303Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.355Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.358Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.358Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.359Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.360Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","spendableLamports":"300000000","spendableSol":0.3,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.361Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.361Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.361Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.361Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.361Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.399Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.400Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.400Z","level":"info","message":"Bundle first transaction built","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","buyCount":1,"fulfilledBuys":1,"instructionCount":4,"feePayer":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.479Z","level":"info","message":"ATA missing, will create","value":"4MEsmjoBuh98kdwrLEryTWNE3w6fEpsyCXVSJWo8Pzhd"}
+{"timestamp":"2026-01-19T13:08:51.479Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.479Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.528Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.530Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.530Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.531Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.531Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"6p5dQARnqu8AwTLeGcnoVrUaFfUPcPmqpywoAyoZQZJG","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.531Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.532Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"6p5dQARnqu8AwTLeGcnoVrUaFfUPcPmqpywoAyoZQZJG"}
+{"timestamp":"2026-01-19T13:08:51.567Z","level":"info","message":"ATA missing, will create","value":"HsFBzcKKAYXHiRb6pqgS4gbmAudWYoTdTnNqTMuRmnoY"}
+{"timestamp":"2026-01-19T13:08:51.567Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.568Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.571Z","level":"info","message":"ATA missing, will create","value":"4Bk7cF5ZubAzEUW7dnw3gQbwKgsJceVorXQb3yWU97uq"}
+{"timestamp":"2026-01-19T13:08:51.571Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.571Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.617Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.621Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.621Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.623Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.623Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"JqwMWAwHibG19R3oYwTkGibpVKBuBDZzBQk93h8cXdW","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.623Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.623Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.624Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.624Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.624Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.624Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.624Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"JqwMWAwHibG19R3oYwTkGibpVKBuBDZzBQk93h8cXdW"}
+{"timestamp":"2026-01-19T13:08:51.628Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.630Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.630Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.631Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.631Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"DQ3moAkx1PkbnRzWVm7poEWrch43nxkAUhW9JVs4QX6N","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.632Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.632Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.632Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.632Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.632Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.633Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.633Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"DQ3moAkx1PkbnRzWVm7poEWrch43nxkAUhW9JVs4QX6N"}
+{"timestamp":"2026-01-19T13:08:51.633Z","level":"info","message":"Bundle buy transaction built","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","walletCount":3,"fulfilledBuys":3,"instructionCount":7,"feePayer":"6p5dQARnqu8AwTLeGcnoVrUaFfUPcPmqpywoAyoZQZJG"}
+{"timestamp":"2026-01-19T13:08:51.703Z","level":"info","message":"ATA missing, will create","value":"GeMraSjkmppxrG7QZzh4F8ZwA84NRL2Dmr9v4sw1M1FP"}
+{"timestamp":"2026-01-19T13:08:51.704Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.704Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.708Z","level":"info","message":"ATA missing, will create","value":"HHTWiBx5j4H59e7Kw4Gh1dvsKwBstQVfbjfKwJfzCvHu"}
+{"timestamp":"2026-01-19T13:08:51.708Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.708Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.709Z","level":"info","message":"ATA missing, will create","value":"CmbkBVnErkcUGibKqCAxD6WDufTi1st6gKRignBycwjq"}
+{"timestamp":"2026-01-19T13:08:51.710Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.710Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.754Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.755Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.755Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"AmBqB9K3LgwFky15iEr2xdwbEEPeP6aqU5Ww7WmwbJrq","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.756Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.757Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.757Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.757Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"AmBqB9K3LgwFky15iEr2xdwbEEPeP6aqU5Ww7WmwbJrq"}
+{"timestamp":"2026-01-19T13:08:51.757Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.759Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.759Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.760Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.760Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"RPPPafTjcTCJUTsbtFYzU96jqw2fT2BSVPJ5QdwM8B1","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.760Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.761Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"RPPPafTjcTCJUTsbtFYzU96jqw2fT2BSVPJ5QdwM8B1"}
+{"timestamp":"2026-01-19T13:08:51.763Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.765Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.765Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"Cz3vo8CdeNFgjfdJDT5bxssjaEYy7dPaWPEYteyvsqFQ","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.766Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.767Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.767Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"Cz3vo8CdeNFgjfdJDT5bxssjaEYy7dPaWPEYteyvsqFQ"}
+{"timestamp":"2026-01-19T13:08:51.767Z","level":"info","message":"Bundle buy transaction built","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","walletCount":3,"fulfilledBuys":3,"instructionCount":7,"feePayer":"AmBqB9K3LgwFky15iEr2xdwbEEPeP6aqU5Ww7WmwbJrq"}
+{"timestamp":"2026-01-19T13:08:51.859Z","level":"info","message":"ATA missing, will create","value":"9xwGK4S7QthQfW4EaEwA9CPY9bcVXcZ2zCKNpnQb94fx"}
+{"timestamp":"2026-01-19T13:08:51.859Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.859Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.861Z","level":"info","message":"ATA missing, will create","value":"7jqNKNZSP6sPF4r8zGb4jHorU3YXXGtx6FDvjX8F6iFi"}
+{"timestamp":"2026-01-19T13:08:51.861Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.861Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.863Z","level":"info","message":"ATA missing, will create","value":"CmqbRJiV2JdwwgxuBF1DvMYuZHgxzXXbvovscLLCtLc7"}
+{"timestamp":"2026-01-19T13:08:51.863Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.863Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:51.906Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.907Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.907Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"3eQK8hhUnmcAsJgZCiKap5pyoNS1D39UV1dTttCfNi4g","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.908Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.909Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.909Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"3eQK8hhUnmcAsJgZCiKap5pyoNS1D39UV1dTttCfNi4g"}
+{"timestamp":"2026-01-19T13:08:51.910Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.910Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.910Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"EuzSGhbySKWSiSELEqg5HzTshkgoWzpWjVT8bVrjqzuJ","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.911Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.912Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"EuzSGhbySKWSiSELEqg5HzTshkgoWzpWjVT8bVrjqzuJ"}
+{"timestamp":"2026-01-19T13:08:51.917Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.919Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:51.919Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:51.921Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:51.922Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"8hv5be5fV6hYuhAeVcP5xyiE3k8YHGmHni52tv6jwybK","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:51.922Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:51.922Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:51.923Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:51.923Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:51.923Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:51.923Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:51.924Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"8hv5be5fV6hYuhAeVcP5xyiE3k8YHGmHni52tv6jwybK"}
+{"timestamp":"2026-01-19T13:08:51.925Z","level":"info","message":"Bundle buy transaction built","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","walletCount":3,"fulfilledBuys":3,"instructionCount":7,"feePayer":"3eQK8hhUnmcAsJgZCiKap5pyoNS1D39UV1dTttCfNi4g"}
+{"timestamp":"2026-01-19T13:08:51.988Z","level":"info","message":"ATA missing, will create","value":"AACVbgyGd7TQCLj2yymc6idMeeeKLeqtzt36ShtNkvad"}
+{"timestamp":"2026-01-19T13:08:51.988Z","level":"info","message":"Bundle mode status","creatorProvided":true,"ataInitialized":false}
+{"timestamp":"2026-01-19T13:08:51.988Z","level":"info","message":"Fee recipient","value":"CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"}
+{"timestamp":"2026-01-19T13:08:52.036Z","level":"info","message":"Bonding curve missing; using provided creator","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:52.037Z","level":"info","message":"Creator for creator_vault","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:08:52.037Z","level":"info","message":"Creator vault","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:08:52.038Z","level":"info","message":"Building buy_exact_sol_in instruction"}
+{"timestamp":"2026-01-19T13:08:52.038Z","level":"info","message":"Buy inputs","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","buyer":"8Vq6J2J8d83tVZK3FJtPMAMHbMN1nxUwqspzLjmeMtPu","spendableLamports":"40000000","spendableSol":0.04,"minTokensOut":"1","bondingCurve":"Akb52pmybkR3WeXyHdGY15hPbySusER87poHHHNPdCDA"}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Buy instruction data length","value":25}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Buy discriminator","value":"38fc74089edfcd5f"}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Buy instruction accounts","value":16}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Adding ATA creation instruction"}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Bundle mode: ATA will be created after CREATE instructions"}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"ATA creation instruction added"}
+{"timestamp":"2026-01-19T13:08:52.039Z","level":"info","message":"Buy transaction built","instructionCount":2,"feePayer":"8Vq6J2J8d83tVZK3FJtPMAMHbMN1nxUwqspzLjmeMtPu"}
+{"timestamp":"2026-01-19T13:08:52.040Z","level":"info","message":"Bundle buy transaction built","mint":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","creator":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","walletCount":1,"fulfilledBuys":1,"instructionCount":3,"feePayer":"8Vq6J2J8d83tVZK3FJtPMAMHbMN1nxUwqspzLjmeMtPu"}
+{"timestamp":"2026-01-19T13:08:52.040Z","level":"info","message":"Bundle transactions built","launchId":"cmkl6laj500059oi2sfdp4q3e","transactionCount":5,"signerGroups":5,"instructionCounts":[4,7,7,7,3]}
+{"timestamp":"2026-01-19T13:08:52.041Z","level":"info","message":"Jito bundle send start","txCount":5,"signerGroupCount":5,"tipLamports":5000000,"tipper":"4qUZY6DdTRv8jLNh2iLMhhAFmDCtsvqWGd9p1tA2bTxi","rpcEndpoint":"https://rpc.shyft.to?api_key=xXeO9WrLX9kMBUhN"}
+{"timestamp":"2026-01-19T13:08:52.326Z","level":"warn","message":"Jito tip account fetch failed","endpoint":"mainnet.block-engine.jito.wtf","error":{"code":8,"details":"Network congested. Endpoint is globally rate limited.","name":"SearcherClientError"}}
+{"timestamp":"2026-01-19T13:08:52.606Z","level":"info","message":"Jito tip account resolved","tipAccount":"DfXygSm4jCyNCybVYYK6DwvWqjKee8pbDmJGcLWNDXjh"}
+{"timestamp":"2026-01-19T13:08:52.661Z","level":"info","message":"Bundle blockhash fetched","blockhash":"C928xV9nyoSSPp4JHzsCzxj1qZmF8SvuYdDLJ71Fbn9p"}
+{"timestamp":"2026-01-19T13:08:52.699Z","level":"info","message":"Bundle versioned transactions built","signatureCount":5,"signaturesPreview":["3bSjSKz4cBJVgjE9nfAUCsjp5Gfjms1G4qbjfDkyoSH1W1NWyyxE6LwEDFCkUpUuG4cgH24EfXK5YyuwudJG2gXC","3SyUvAwvnxbZZBjgfoRzZWAXg7Rr3yUGPq6FZiECQ7o4Sa35935N9xDHkn88WgNmm66PQx3N5Yj375RW6XkCELbF","22Ukjpi3nVdwf5XN8CMUqvbtWEVpJesF7eE4q1eYgXbTvoqsukYFdiDXcg5ybsSDKp6cYk3HF2RGjk9SMoDqT5Bb"],"feePayers":["BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6","6p5dQARnqu8AwTLeGcnoVrUaFfUPcPmqpywoAyoZQZJG","AmBqB9K3LgwFky15iEr2xdwbEEPeP6aqU5Ww7WmwbJrq","3eQK8hhUnmcAsJgZCiKap5pyoNS1D39UV1dTttCfNi4g","8Vq6J2J8d83tVZK3FJtPMAMHbMN1nxUwqspzLjmeMtPu"],"blockhash":"C928xV9nyoSSPp4JHzsCzxj1qZmF8SvuYdDLJ71Fbn9p"}
+{"timestamp":"2026-01-19T13:08:52.752Z","level":"info","message":"Bundle first transaction simulation succeeded","unitsConsumed":220938}
+{"timestamp":"2026-01-19T13:08:52.805Z","level":"info","message":"Jito bundle sent","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","signatureCount":5,"endpoint":"amsterdam.mainnet.block-engine.jito.wtf"}
+{"timestamp":"2026-01-19T13:08:52.806Z","level":"info","message":"Bundle confirmation start","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","signatureCount":5,"createSignature":"3bSjSKz4cBJVgjE9nfAUCsjp5Gfjms1G4qbjfDkyoSH1W1NWyyxE6LwEDFCkUpUuG4cgH24EfXK5YyuwudJG2gXC","rpcEndpoint":"https://rpc.shyft.to?api_key=xXeO9WrLX9kMBUhN","fallbackRpcEndpoint":null,"accountKeyCount":5}
+{"timestamp":"2026-01-19T13:08:52.871Z","level":"info","message":"Bundle confirmation summary","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","elapsedMs":66,"blockhashAgeMs":264,"foundCount":0,"confirmedCount":0,"failedCount":0,"notFoundCount":5,"createConfirmed":false,"createError":null,"createStatus":"not_found"}
+{"timestamp":"2026-01-19T13:08:52.872Z","level":"warn","message":"Bundle resend triggered","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","elapsedMs":67,"blockhashAgeMs":265}
+{"timestamp":"2026-01-19T13:08:52.923Z","level":"warn","message":"Jito bundle rejected","endpoint":"amsterdam.mainnet.block-engine.jito.wtf","error":"Resource has been exhausted: Rate limit exceeded. Limit: 1 per second for txn requests. Back-off triggered: Retry after 1000ms"}
+{"timestamp":"2026-01-19T13:08:53.257Z","level":"info","message":"Bundle resent","previousBundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600"}
+{"timestamp":"2026-01-19T13:08:53.723Z","level":"info","message":"Bundle confirmation summary","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","elapsedMs":918,"blockhashAgeMs":1116,"foundCount":5,"confirmedCount":5,"failedCount":0,"notFoundCount":0,"createConfirmed":true,"createError":null,"createStatus":"confirmed"}
+{"timestamp":"2026-01-19T13:08:53.724Z","level":"info","message":"Bundle confirmed","launchId":"cmkl6laj500059oi2sfdp4q3e","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","signatureCount":5}
+{"timestamp":"2026-01-19T13:08:53.773Z","level":"info","message":"Create submitted","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"create","launchLevel":"INFO","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","signatures":["3bSjSKz4cBJVgjE9nfAUCsjp5Gfjms1G4qbjfDkyoSH1W1NWyyxE6LwEDFCkUpUuG4cgH24EfXK5YyuwudJG2gXC","3SyUvAwvnxbZZBjgfoRzZWAXg7Rr3yUGPq6FZiECQ7o4Sa35935N9xDHkn88WgNmm66PQx3N5Yj375RW6XkCELbF","22Ukjpi3nVdwf5XN8CMUqvbtWEVpJesF7eE4q1eYgXbTvoqsukYFdiDXcg5ybsSDKp6cYk3HF2RGjk9SMoDqT5Bb","4E21Lt7VsuUgpkQMEeA9FkxvwLZ7MHgTmBqssXLaxLtzseq2Q6FFhWtcm3GytCJXkkTvviUJMsRdkvWhteMrxPcM","4Ji47Ki8KCm9qyytrVSjgiN7vtuKJ3NBnsqRdJ58uyShEMMCvdaoTEyW5Yuviv742uijW7hnDMrbCrajXtvCVsmU"],"signatureCount":5,"durationMs":8346}
+{"timestamp":"2026-01-19T13:08:53.908Z","level":"info","message":"Confirming token on-chain","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"confirm","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:54.005Z","level":"info","message":"Token confirmed","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"confirm","launchLevel":"INFO","createSignature":"3bSjSKz4cBJVgjE9nfAUCsjp5Gfjms1G4qbjfDkyoSH1W1NWyyxE6LwEDFCkUpUuG4cgH24EfXK5YyuwudJG2gXC","bundleId":"16e0fe323d3aa48e1d38f306e9ce740f1e2c26e39ad87cf6d9a2d889a6490600","attempts":1,"durationMs":53,"owner":"TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA","lamports":1461600,"dataLength":82}
+{"timestamp":"2026-01-19T13:08:54.142Z","level":"info","message":"Saving token","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"persist","launchLevel":"STEP"}
+{"timestamp":"2026-01-19T13:08:54.637Z","level":"info","message":"Token saved","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"persist","launchLevel":"INFO","tokenPublicKey":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","distributionWalletCount":0,"durationMs":450}
+{"timestamp":"2026-01-19T13:08:54.869Z","level":"info","message":"Launch complete","launchId":"cmkl6laj500059oi2sfdp4q3e","step":"complete","launchLevel":"INFO","status":"SUCCEEDED","tokenPublicKey":"J6UityhHNjRTbYHUczLa8N1zDZp4e9PukjhgPW8JfNWY","durationMs":15744}
+{"timestamp":"2026-01-19T13:14:10.108Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.110Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.110Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.111Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.112Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.115Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.122Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.128Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.134Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.138Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.142Z","level":"info","message":"Fee recipient from global","value":"62qc2CNXwrYqQScmEdiZFFAnJR262PxWEuNQtxfafNgV"}
+{"timestamp":"2026-01-19T13:14:10.154Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.155Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.158Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.159Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.160Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.161Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.162Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.163Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.163Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.164Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.165Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.166Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.168Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.169Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.181Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.182Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.183Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.184Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.187Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.188Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}
+{"timestamp":"2026-01-19T13:14:10.189Z","level":"info","message":"Creator fetched from bonding curve","value":"BmV1b497fwjpdzHCdamLma3cgomQtKuWr9NtgkkbGYA6"}
+{"timestamp":"2026-01-19T13:14:10.190Z","level":"info","message":"Creator vault PDA","value":"4bhWVXymuzMggGuUYEBJ7bP64ntSmcev19UrevvgKDEY"}

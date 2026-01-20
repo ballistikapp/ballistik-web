@@ -1,6 +1,10 @@
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
-import { Keypair } from "@solana/web3.js";
+import {
+  Keypair,
+  TransactionMessage,
+  VersionedTransaction,
+} from "@solana/web3.js";
 import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
@@ -55,12 +59,53 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     { commitment: "finalized" }
   );
   const pumpSdk = new PumpFunSDK(provider);
-  const { createTx } = await buildCreateTokenTransaction(
+  const { createTx, metadataUri } = await buildCreateTokenTransaction(
     pumpSdk,
     input.creator,
     input.mint,
     input.metadata
   );
+  logger.info("Create transaction prepared", {
+    ...logContext,
+    feePayer: createTx.feePayer?.toBase58(),
+    instructionCount: createTx.instructions.length,
+    metadataUriLength: metadataUri?.length ?? 0,
+    metadataUriPrefix: metadataUri ? metadataUri.slice(0, 32) : null,
+  });
+  const connection = getSolanaConnection();
+  if (!createTx.feePayer) {
+    createTx.feePayer = input.creator.publicKey;
+  }
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  logger.info("Create simulation start", {
+    ...logContext,
+    blockhash,
+  });
+  const createMessage = new TransactionMessage({
+    payerKey: createTx.feePayer,
+    recentBlockhash: blockhash,
+    instructions: createTx.instructions,
+  }).compileToV0Message();
+  const createSimulationTx = new VersionedTransaction(createMessage);
+  createSimulationTx.sign([input.creator, input.mint]);
+  const simulationResult = await connection.simulateTransaction(
+    createSimulationTx,
+    { sigVerify: false, commitment: "processed" }
+  );
+  if (simulationResult.value.err) {
+    logger.error("Create simulation failed", {
+      ...logContext,
+      error: simulationResult.value.err,
+      logs: simulationResult.value.logs?.slice(0, 6),
+    });
+    throw new Error(
+      `Create simulation failed: ${JSON.stringify(simulationResult.value.err)}`
+    );
+  }
+  logger.info("Create simulation succeeded", {
+    ...logContext,
+    unitsConsumed: simulationResult.value.unitsConsumed ?? null,
+  });
 
   const { buyerWallets, buyAmountsLamport } = buildBundleBuyers(
     input.creator,
@@ -90,6 +135,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     ...logContext,
     transactionCount: txs.length,
     signerGroups: signers.length,
+    instructionCounts: txs.map((tx) => tx.instructions.length),
   });
 
   try {

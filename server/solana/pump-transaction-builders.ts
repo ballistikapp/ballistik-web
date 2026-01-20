@@ -9,8 +9,6 @@ import {
   createTokenWithNewIdl,
 } from "@/server/solana/pump-new-idl";
 
-const ACCOUNT_CREATION_BUFFER = 4_000_000;
-
 export async function buildCreateTokenTransaction(
   pumpSdk: PumpFunSDK,
   creator: Keypair,
@@ -44,9 +42,7 @@ export async function buildBuyTokenTransaction(
   buyAmountLamport: bigint,
   creator?: PublicKey
 ): Promise<Transaction> {
-  const spendableLamports = new BN(buyAmountLamport.toString()).add(
-    new BN(ACCOUNT_CREATION_BUFFER)
-  );
+  const spendableLamports = new BN(buyAmountLamport.toString());
   const minTokensOut = new BN(1);
   const provider = new AnchorProvider(
     getSolanaConnection(),

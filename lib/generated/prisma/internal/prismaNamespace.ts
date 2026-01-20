@@ -391,9 +391,13 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  VolumeBotSession: 'VolumeBotSession',
+  VolumeBotWallet: 'VolumeBotWallet',
+  VolumeBotLog: 'VolumeBotLog',
   VanityMint: 'VanityMint',
   Holding: 'Holding',
-  Transaction: 'Transaction'
+  Transaction: 'Transaction',
+  RefreshCache: 'RefreshCache'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -409,7 +413,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "vanityMint" | "holding" | "transaction"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "volumeBotSession" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -931,6 +935,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    VolumeBotSession: {
+      payload: Prisma.$VolumeBotSessionPayload<ExtArgs>
+      fields: Prisma.VolumeBotSessionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VolumeBotSessionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VolumeBotSessionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        findFirst: {
+          args: Prisma.VolumeBotSessionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VolumeBotSessionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        findMany: {
+          args: Prisma.VolumeBotSessionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>[]
+        }
+        create: {
+          args: Prisma.VolumeBotSessionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        createMany: {
+          args: Prisma.VolumeBotSessionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VolumeBotSessionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>[]
+        }
+        delete: {
+          args: Prisma.VolumeBotSessionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        update: {
+          args: Prisma.VolumeBotSessionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        deleteMany: {
+          args: Prisma.VolumeBotSessionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VolumeBotSessionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VolumeBotSessionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>[]
+        }
+        upsert: {
+          args: Prisma.VolumeBotSessionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotSessionPayload>
+        }
+        aggregate: {
+          args: Prisma.VolumeBotSessionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVolumeBotSession>
+        }
+        groupBy: {
+          args: Prisma.VolumeBotSessionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotSessionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VolumeBotSessionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotSessionCountAggregateOutputType> | number
+        }
+      }
+    }
+    VolumeBotWallet: {
+      payload: Prisma.$VolumeBotWalletPayload<ExtArgs>
+      fields: Prisma.VolumeBotWalletFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VolumeBotWalletFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VolumeBotWalletFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        findFirst: {
+          args: Prisma.VolumeBotWalletFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VolumeBotWalletFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        findMany: {
+          args: Prisma.VolumeBotWalletFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>[]
+        }
+        create: {
+          args: Prisma.VolumeBotWalletCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        createMany: {
+          args: Prisma.VolumeBotWalletCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VolumeBotWalletCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>[]
+        }
+        delete: {
+          args: Prisma.VolumeBotWalletDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        update: {
+          args: Prisma.VolumeBotWalletUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        deleteMany: {
+          args: Prisma.VolumeBotWalletDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VolumeBotWalletUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VolumeBotWalletUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>[]
+        }
+        upsert: {
+          args: Prisma.VolumeBotWalletUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotWalletPayload>
+        }
+        aggregate: {
+          args: Prisma.VolumeBotWalletAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVolumeBotWallet>
+        }
+        groupBy: {
+          args: Prisma.VolumeBotWalletGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotWalletGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VolumeBotWalletCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotWalletCountAggregateOutputType> | number
+        }
+      }
+    }
+    VolumeBotLog: {
+      payload: Prisma.$VolumeBotLogPayload<ExtArgs>
+      fields: Prisma.VolumeBotLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VolumeBotLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VolumeBotLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        findFirst: {
+          args: Prisma.VolumeBotLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VolumeBotLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        findMany: {
+          args: Prisma.VolumeBotLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>[]
+        }
+        create: {
+          args: Prisma.VolumeBotLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        createMany: {
+          args: Prisma.VolumeBotLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VolumeBotLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>[]
+        }
+        delete: {
+          args: Prisma.VolumeBotLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        update: {
+          args: Prisma.VolumeBotLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.VolumeBotLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VolumeBotLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VolumeBotLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.VolumeBotLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotLogPayload>
+        }
+        aggregate: {
+          args: Prisma.VolumeBotLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVolumeBotLog>
+        }
+        groupBy: {
+          args: Prisma.VolumeBotLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VolumeBotLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotLogCountAggregateOutputType> | number
+        }
+      }
+    }
     VanityMint: {
       payload: Prisma.$VanityMintPayload<ExtArgs>
       fields: Prisma.VanityMintFieldRefs
@@ -1153,6 +1379,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    RefreshCache: {
+      payload: Prisma.$RefreshCachePayload<ExtArgs>
+      fields: Prisma.RefreshCacheFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.RefreshCacheFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.RefreshCacheFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        findFirst: {
+          args: Prisma.RefreshCacheFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.RefreshCacheFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        findMany: {
+          args: Prisma.RefreshCacheFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>[]
+        }
+        create: {
+          args: Prisma.RefreshCacheCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        createMany: {
+          args: Prisma.RefreshCacheCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.RefreshCacheCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>[]
+        }
+        delete: {
+          args: Prisma.RefreshCacheDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        update: {
+          args: Prisma.RefreshCacheUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        deleteMany: {
+          args: Prisma.RefreshCacheDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.RefreshCacheUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.RefreshCacheUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>[]
+        }
+        upsert: {
+          args: Prisma.RefreshCacheUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$RefreshCachePayload>
+        }
+        aggregate: {
+          args: Prisma.RefreshCacheAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateRefreshCache>
+        }
+        groupBy: {
+          args: Prisma.RefreshCacheGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshCacheGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.RefreshCacheCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.RefreshCacheCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1221,7 +1521,6 @@ export const WalletScalarFieldEnum = {
   userId: 'userId',
   tokenPublicKey: 'tokenPublicKey',
   balanceSol: 'balanceSol',
-  tokenBalance: 'tokenBalance',
   balanceRefreshedAt: 'balanceRefreshedAt',
   isImported: 'isImported'
 } as const
@@ -1288,6 +1587,65 @@ export const LaunchLogScalarFieldEnum = {
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
 
 
+export const VolumeBotSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  status: 'status',
+  config: 'config',
+  startedAt: 'startedAt',
+  stopRequestedAt: 'stopRequestedAt',
+  scheduledStopAt: 'scheduledStopAt',
+  stoppedAt: 'stoppedAt',
+  lastTickAt: 'lastTickAt',
+  totalVolumeUsd: 'totalVolumeUsd',
+  totalTrades: 'totalTrades',
+  totalPnlSol: 'totalPnlSol',
+  runtimeSeconds: 'runtimeSeconds',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotSessionScalarFieldEnum = (typeof VolumeBotSessionScalarFieldEnum)[keyof typeof VolumeBotSessionScalarFieldEnum]
+
+
+export const VolumeBotWalletScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  walletPublicKey: 'walletPublicKey',
+  role: 'role',
+  status: 'status',
+  solBalance: 'solBalance',
+  tokenBalance: 'tokenBalance',
+  tradesExecuted: 'tradesExecuted',
+  pnlSol: 'pnlSol',
+  lastTradeAt: 'lastTradeAt',
+  pausedAt: 'pausedAt',
+  pauseReason: 'pauseReason',
+  reclaimedAt: 'reclaimedAt',
+  reclaimTxSignature: 'reclaimTxSignature',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotWalletScalarFieldEnum = (typeof VolumeBotWalletScalarFieldEnum)[keyof typeof VolumeBotWalletScalarFieldEnum]
+
+
+export const VolumeBotLogScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  level: 'level',
+  type: 'type',
+  message: 'message',
+  data: 'data',
+  walletPublicKey: 'walletPublicKey',
+  signature: 'signature',
+  createdAt: 'createdAt'
+} as const
+
+export type VolumeBotLogScalarFieldEnum = (typeof VolumeBotLogScalarFieldEnum)[keyof typeof VolumeBotLogScalarFieldEnum]
+
+
 export const VanityMintScalarFieldEnum = {
   id: 'id',
   publicKey: 'publicKey',
@@ -1342,6 +1700,19 @@ export const TransactionScalarFieldEnum = {
 } as const
 
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const RefreshCacheScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  scope: 'scope',
+  lastRefreshedAt: 'lastRefreshedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type RefreshCacheScalarFieldEnum = (typeof RefreshCacheScalarFieldEnum)[keyof typeof RefreshCacheScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -1518,6 +1889,62 @@ export type ListEnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputTyp
 
 
 /**
+ * Reference to a field of type 'VolumeBotSessionStatus'
+ */
+export type EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotSessionStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotSessionStatus[]'
+ */
+export type ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotSessionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotWalletRole'
+ */
+export type EnumVolumeBotWalletRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotWalletRole'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotWalletRole[]'
+ */
+export type ListEnumVolumeBotWalletRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotWalletRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotWalletStatus'
+ */
+export type EnumVolumeBotWalletStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotWalletStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotWalletStatus[]'
+ */
+export type ListEnumVolumeBotWalletStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotWalletStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotLogLevel'
+ */
+export type EnumVolumeBotLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotLogLevel'>
+    
+
+
+/**
+ * Reference to a field of type 'VolumeBotLogLevel[]'
+ */
+export type ListEnumVolumeBotLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotLogLevel[]'>
+    
+
+
+/**
  * Reference to a field of type 'TransactionType'
  */
 export type EnumTransactionTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TransactionType'>
@@ -1542,6 +1969,20 @@ export type EnumTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInputType
  * Reference to a field of type 'TransactionStatus[]'
  */
 export type ListEnumTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TransactionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'RefreshScope'
+ */
+export type EnumRefreshScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RefreshScope'>
+    
+
+
+/**
+ * Reference to a field of type 'RefreshScope[]'
+ */
+export type ListEnumRefreshScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RefreshScope[]'>
     
 
 
@@ -1660,9 +2101,13 @@ export type GlobalOmitConfig = {
   tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
   launchLog?: Prisma.LaunchLogOmit
+  volumeBotSession?: Prisma.VolumeBotSessionOmit
+  volumeBotWallet?: Prisma.VolumeBotWalletOmit
+  volumeBotLog?: Prisma.VolumeBotLogOmit
   vanityMint?: Prisma.VanityMintOmit
   holding?: Prisma.HoldingOmit
   transaction?: Prisma.TransactionOmit
+  refreshCache?: Prisma.RefreshCacheOmit
 }
 
 /* Types for Logging */

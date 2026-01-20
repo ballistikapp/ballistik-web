@@ -46,6 +46,11 @@ export async function buildBundleTransactionsForCreateAndBuys(
     if (!createOnlyTx.feePayer) {
       createOnlyTx.feePayer = createSigners[0]?.publicKey;
     }
+    logger.info("Bundle create-only transaction built", {
+      ...logContext,
+      instructionCount: createOnlyTx.instructions.length,
+      feePayer: createOnlyTx.feePayer?.toBase58(),
+    });
     return [[createOnlyTx], [createSigners]];
   }
 
@@ -91,6 +96,16 @@ export async function buildBundleTransactionsForCreateAndBuys(
   }
 
   firstTx.feePayer = firstWallets[0].publicKey;
+  const firstFulfilledCount = firstBuyTxResults.filter(
+    (result) => result.status === "fulfilled"
+  ).length;
+  logger.info("Bundle first transaction built", {
+    ...logContext,
+    buyCount: firstTransactionBuyCount,
+    fulfilledBuys: firstFulfilledCount,
+    instructionCount: firstTx.instructions.length,
+    feePayer: firstTx.feePayer?.toBase58(),
+  });
   bundleTransactions.push(firstTx);
   bundleSigners.push([...createSigners, ...firstWallets]);
 
@@ -162,5 +177,15 @@ async function buildBuyBundleTransaction(
   }
 
   outputTx.feePayer = wallets[0].publicKey;
+  const fulfilledCount = buyTxResults.filter(
+    (result) => result.status === "fulfilled"
+  ).length;
+  logger.info("Bundle buy transaction built", {
+    ...logContext,
+    walletCount: wallets.length,
+    fulfilledBuys: fulfilledCount,
+    instructionCount: outputTx.instructions.length,
+    feePayer: outputTx.feePayer?.toBase58(),
+  });
   return outputTx;
 }

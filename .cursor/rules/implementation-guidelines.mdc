@@ -1,0 +1,49 @@
+---
+description: "Code style, database, tRPC, components, Solana, and testing"
+alwaysApply: true
+---
+
+# Code Style
+
+- **File naming**: kebab-case for files, PascalCase for components/classes
+- **Imports**: Group external libraries first, then internal modules
+- **Comments**: Only for complex business logic, prefer self-documenting code
+- **Formatting**: 2 spaces indentation, use ESLint/Prettier
+- **No comments**: Don't add comment lines unless explicitly requested
+
+# Database (Prisma)
+
+- **Schema**: Define models in `prisma/schema.prisma`
+- **Migrations**: Use `prisma migrate dev` for schema changes
+- **Client**: Import from `@/lib/generated/prisma` (generated path)
+- **Relations**: Use Prisma relations, avoid manual joins when possible
+
+# tRPC Best Practices
+
+- Use `publicProcedure` for unauthenticated endpoints
+- Use `protectedProcedure` (when implemented) for authenticated endpoints
+- Always validate input with Zod schemas
+- Return typed outputs from services
+- Handle errors with `AppError` for user-facing messages
+- Use `superjson` transformer (already configured) for Date/Map/Set serialization
+
+# Component Guidelines
+
+- Use shadcn/ui components from `components/ui/`
+- Fetch data using tRPC hooks: `trpc.[router].[procedure].useQuery()` or `.useMutation()`
+- Keep components focused and composable
+- Use TanStack Query for caching and state management
+
+# Solana Integration
+
+- Use `@solana/web3.js` for blockchain interactions
+- Keep Solana-specific logic in services, not in components
+- Handle transaction errors gracefully
+- Consider rate limiting and connection pooling for RPC calls
+
+# Testing Considerations
+
+- Services should be easily testable (pure functions)
+- Use dependency injection patterns where helpful
+- Mock Prisma client in tests
+- Test tRPC routers with test clients

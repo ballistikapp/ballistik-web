@@ -75,6 +75,21 @@ export type Launch = Prisma.LaunchModel
  */
 export type LaunchLog = Prisma.LaunchLogModel
 /**
+ * Model VolumeBotSession
+ * 
+ */
+export type VolumeBotSession = Prisma.VolumeBotSessionModel
+/**
+ * Model VolumeBotWallet
+ * 
+ */
+export type VolumeBotWallet = Prisma.VolumeBotWalletModel
+/**
+ * Model VolumeBotLog
+ * 
+ */
+export type VolumeBotLog = Prisma.VolumeBotLogModel
+/**
  * Model VanityMint
  * 
  */
@@ -89,3 +104,8 @@ export type Holding = Prisma.HoldingModel
  * 
  */
 export type Transaction = Prisma.TransactionModel
+/**
+ * Model RefreshCache
+ * 
+ */
+export type RefreshCache = Prisma.RefreshCacheModel
