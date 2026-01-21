@@ -2,14 +2,14 @@
 
 ## Goals
 - Provide a production-ready volume bot with durable scheduling.
-- Run trading loops outside Vercel using a queue worker.
+- Run trading loops outside the web process using a polling worker.
 - Persist sessions, wallets, and trade logs for recovery and UI status.
 - Support scheduled stop, sell-on-stop, reclaim, and close-accounts actions.
 
 ## Architecture Summary
-- UI and tRPC run on Vercel.
-- Worker process runs BullMQ queues and executes trades.
-- Redis backs BullMQ; Postgres stores state and logs.
+- UI and tRPC run in the web service.
+- Worker process polls Postgres for due wallets and executes trades.
+- Postgres stores state and logs.
 
 ## Data Model
 ### VolumeBotSession
@@ -24,6 +24,7 @@ Tracks per-wallet state for a session.
 - Links to `Wallet` (type VOLUME)
 - `status`: ACTIVE | PAUSED | RECLAIMED | FAILED
 - `solBalance`, `tokenBalance`, `tradesExecuted`, `pnlSol`
+- `nextTickAt`: next scheduled tick time
 - Reclaim metadata (`reclaimedAt`, `reclaimTxSignature`)
 
 ### VolumeBotLog
@@ -32,32 +33,30 @@ Structured log entries for trades and errors.
 - `type`: string tag (start, tick, buy, sell, stop, reclaim)
 - `data`: JSON payload (signature, amounts, error details)
 
-## Queue Workflow (BullMQ)
-- `start`: validate input, create session, enqueue tick jobs
-- `tick`: execute one buy/sell/wait and schedule next tick
-- `stop`: cancel ticks, sell tokens, return SOL
+## Worker Workflow (Polling)
+- `start`: validate input, create session, initialize next tick times
+- `tick`: execute one buy/sell/wait and schedule next tick in DB
+- `stop`: stop session, sell tokens, return SOL
 - `reclaim`: consolidate SOL back to main wallet
 - `close-accounts`: close SPL token accounts for rent reclaim
 
 ## tRPC Endpoints
-- `volumeBot.start` create session, enqueue start job
+- `volumeBot.start` create session and initialize polling
 - `volumeBot.status` return session + wallet stats
-- `volumeBot.stop` request stop and enqueue stop job
-- `volumeBot.reclaim` enqueue reclaim job
-- `volumeBot.closeAccounts` enqueue close-accounts job
+- `volumeBot.stop` request stop
+- `volumeBot.reclaim` run reclaim for the session
+- `volumeBot.closeAccounts` run close-accounts for the session
 - `volumeBot.listSessions` list recent sessions by token/user
 
 ## UI Behavior
-- Token selection required
-- Presets + custom config inputs
-- Live polling for status and stats
-- Actions: stop, reclaim, close accounts
+- Token-scoped page (token selected via sidebar switcher).
+- Session status is polled for live stats.
+- Actions: start, stop, reclaim, close accounts.
 
 ## Runtime Requirements
-- Redis for BullMQ
-- Separate worker process to run queues
+- Separate worker process to run polling loop
 - Solana RPC provider
 
 ## Environment Variables
-- `REDIS_URL`
 - `SOLANA_RPC_URL`
+- `VOLUME_BOT_POLL_INTERVAL_MS`

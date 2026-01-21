@@ -208,6 +208,7 @@ model VolumeBotWallet {
   tradesExecuted Int @default(0)
   pnlSol Decimal @default(0)
   lastTradeAt DateTime?
+  nextTickAt DateTime?
   pausedAt DateTime?
   pauseReason String?
   reclaimedAt DateTime?
@@ -216,6 +217,7 @@ model VolumeBotWallet {
   updatedAt DateTime @updatedAt
   @@unique([sessionId, walletPublicKey])
   @@index([sessionId, status])
+  @@index([status, nextTickAt])
   @@index([walletPublicKey])
   @@map("VolumeBotWallet")
 }

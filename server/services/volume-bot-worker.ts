@@ -6,27 +6,20 @@ import {
   Transaction,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
-import { type Job } from "bullmq";
 import bs58 from "bs58";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { mapWithConcurrency } from "@/lib/utils/async";
-import {
-  getVolumeBotControlQueue,
-  getVolumeBotControlQueueEvents,
-  getVolumeBotQueue,
-  getVolumeBotQueueEvents,
-} from "@/lib/queue/volume-bot-queues";
 import { getPumpProgram } from "@/server/solana/pump-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { walletService } from "@/server/services/wallet.service";
 
-type VolumeBotJobPayload = {
-  sessionId: string;
-  walletPublicKey?: string;
-};
+type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
+  include: { session: true; wallet: true };
+}>;
 
 const getTokenBalance = async (
   walletPublicKey: PublicKey,
@@ -48,24 +41,11 @@ const getTokenBalance = async (
 const randomBetween = (min: number, max: number) =>
   Math.random() * (max - min) + min;
 
-const scheduleNextTick = async (
-  sessionId: string,
-  walletPublicKey: string,
-  config: VolumeBotConfigInput
-) => {
+const computeNextTickAt = (config: VolumeBotConfigInput) => {
   const delaySeconds = Math.floor(
     randomBetween(config.minIntervalSeconds, config.maxIntervalSeconds)
   );
-  const scheduleAt = Date.now() + delaySeconds * 1000;
-  const queue = getVolumeBotQueue();
-  await queue.add(
-    "tick",
-    { sessionId, walletPublicKey },
-    {
-      delay: delaySeconds * 1000,
-      jobId: `tick:${sessionId}:${walletPublicKey}:${scheduleAt}`,
-    }
-  );
+  return new Date(Date.now() + delaySeconds * 1000);
 };
 
 const selectAction = (
@@ -93,39 +73,48 @@ const selectAction = (
   return "WAIT";
 };
 
-const runTick = async (job: Job<VolumeBotJobPayload>) => {
-  const session = await prisma.volumeBotSession.findUnique({
-    where: { id: job.data.sessionId },
+const requestStopIfNeeded = async (sessionId: string) => {
+  await prisma.volumeBotSession.updateMany({
+    where: { id: sessionId, status: "RUNNING" },
+    data: { status: "STOP_REQUESTED", stopRequestedAt: new Date() },
   });
-  if (!session || session.status !== "RUNNING") {
-    return;
-  }
+};
 
-  const walletPublicKey = job.data.walletPublicKey;
-  if (!walletPublicKey) {
+export const processVolumeBotWallet = async (
+  volumeWallet: VolumeBotWalletWithRelations
+) => {
+  const walletId = volumeWallet.id;
+  const walletPk = volumeWallet.walletPublicKey.slice(0, 8);
+  console.log(`[Worker] Processing wallet ${walletPk} (${walletId})`);
+
+  const session = volumeWallet.session;
+  if (session.status !== "RUNNING") {
+    console.log(`[Worker] Skipping ${walletPk}: session not RUNNING (${session.status})`);
     return;
   }
 
   if (session.scheduledStopAt && session.scheduledStopAt <= new Date()) {
-    const controlQueue = getVolumeBotControlQueue();
-    await controlQueue.add(
-      "stop",
-      { sessionId: session.id },
-      { jobId: `stop:${session.id}` }
-    );
+    console.log(`[Worker] Session ${session.id} scheduled stop reached`);
+    await requestStopIfNeeded(session.id);
     return;
   }
 
-  const volumeWallet = await prisma.volumeBotWallet.findFirst({
-    where: { sessionId: session.id, walletPublicKey },
-    include: { wallet: true },
-  });
-
-  if (!volumeWallet || volumeWallet.status !== "ACTIVE") {
+  if (volumeWallet.status !== "ACTIVE") {
+    console.log(`[Worker] Skipping ${walletPk}: wallet not ACTIVE (${volumeWallet.status})`);
     return;
   }
 
   const config = session.config as VolumeBotConfigInput;
+  if (!volumeWallet.nextTickAt) {
+    const nextTick = computeNextTickAt(config);
+    console.log(`[Worker] ${walletPk}: No nextTickAt, scheduling for ${nextTick.toISOString()}`);
+    await prisma.volumeBotWallet.update({
+      where: { id: volumeWallet.id },
+      data: { nextTickAt: nextTick },
+    });
+    return;
+  }
+  console.log(`[Worker] ${walletPk}: Fetching balances...`);
   const connection = getSolanaConnection();
   const mintPublicKey = new PublicKey(session.tokenPublicKey);
   const walletKeypair = Keypair.fromSecretKey(
@@ -141,10 +130,18 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
   );
   const hasTokens = tokenBalance > BigInt(0);
 
+  console.log(`[Worker] ${walletPk}: SOL=${solBalanceLamports / 1e9}, tokens=${tokenBalance}, hasTokens=${hasTokens}`);
+
   const action = selectAction(config.strategy, hasTokens);
+  console.log(`[Worker] ${walletPk}: Selected action=${action} (strategy=${config.strategy})`);
 
   if (action === "WAIT") {
-    await scheduleNextTick(session.id, walletPublicKey, config);
+    const nextTick = computeNextTickAt(config);
+    console.log(`[Worker] ${walletPk}: WAIT, next tick at ${nextTick.toISOString()}`);
+    await prisma.volumeBotWallet.update({
+      where: { id: volumeWallet.id },
+      data: { nextTickAt: nextTick },
+    });
     return;
   }
 
@@ -159,12 +156,20 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
         config.maxTradeAmountSol
       );
       const feeBufferLamports = 2_000_000;
-      if (solBalanceLamports < tradeAmountSol * 1_000_000_000 + feeBufferLamports) {
-        await scheduleNextTick(session.id, walletPublicKey, config);
+      const requiredLamports = tradeAmountSol * 1_000_000_000 + feeBufferLamports;
+      console.log(`[Worker] ${walletPk}: BUY ${tradeAmountSol} SOL, required=${requiredLamports / 1e9}, have=${solBalanceLamports / 1e9}`);
+
+      if (solBalanceLamports < requiredLamports) {
+        console.log(`[Worker] ${walletPk}: Insufficient balance, skipping`);
+        await prisma.volumeBotWallet.update({
+          where: { id: volumeWallet.id },
+          data: { nextTickAt: computeNextTickAt(config) },
+        });
         return;
       }
 
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
+      console.log(`[Worker] ${walletPk}: Building buy tx for ${buyLamports} lamports`);
       const buyTx = await buildBuyTokenTransaction(
         walletKeypair,
         mintPublicKey,
@@ -175,14 +180,22 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
       buyTx.recentBlockhash = blockhash;
       buyTx.lastValidBlockHeight = lastValidBlockHeight;
       buyTx.feePayer = walletKeypair.publicKey;
+      console.log(`[Worker] ${walletPk}: Sending buy tx...`);
       signature = await sendAndConfirmTransaction(connection, buyTx, [
         walletKeypair,
       ]);
+      console.log(`[Worker] ${walletPk}: Buy tx confirmed: ${signature}`);
     } else {
-      tokenAmount = (tokenBalance * BigInt(Math.floor(config.sellRatio * 100))) /
-        BigInt(100);
+      tokenAmount =
+        (tokenBalance * BigInt(Math.floor(config.sellRatio * 100))) / BigInt(100);
+      console.log(`[Worker] ${walletPk}: SELL ${tokenAmount} tokens (${config.sellRatio * 100}% of ${tokenBalance})`);
+
       if (tokenAmount <= BigInt(0)) {
-        await scheduleNextTick(session.id, walletPublicKey, config);
+        console.log(`[Worker] ${walletPk}: No tokens to sell, skipping`);
+        await prisma.volumeBotWallet.update({
+          where: { id: volumeWallet.id },
+          data: { nextTickAt: computeNextTickAt(config) },
+        });
         return;
       }
       const provider = new AnchorProvider(
@@ -191,6 +204,7 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
         { commitment: "finalized" }
       );
       const program = getPumpProgram(provider);
+      console.log(`[Worker] ${walletPk}: Building sell tx...`);
       const sellTx = await sellTokensWithNewIdl(
         program,
         walletKeypair,
@@ -203,11 +217,14 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
       sellTx.recentBlockhash = blockhash;
       sellTx.lastValidBlockHeight = lastValidBlockHeight;
       sellTx.feePayer = walletKeypair.publicKey;
+      console.log(`[Worker] ${walletPk}: Sending sell tx...`);
       signature = await sendAndConfirmTransaction(connection, sellTx, [
         walletKeypair,
       ]);
+      console.log(`[Worker] ${walletPk}: Sell tx confirmed: ${signature}`);
     }
 
+    console.log(`[Worker] ${walletPk}: Updating balances after trade...`);
     const updatedSolLamports = await connection.getBalance(
       walletKeypair.publicKey
     );
@@ -218,6 +235,10 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
     const solDelta =
       (updatedSolLamports - solBalanceLamports) / 1_000_000_000;
     const now = new Date();
+    const nextTick = computeNextTickAt(config);
+
+    console.log(`[Worker] ${walletPk}: SOL delta=${solDelta}, new SOL=${updatedSolLamports / 1e9}, new tokens=${updatedTokenBalance}`);
+    console.log(`[Worker] ${walletPk}: Next tick at ${nextTick.toISOString()}`);
 
     await prisma.volumeBotWallet.update({
       where: { id: volumeWallet.id },
@@ -226,6 +247,7 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
         tokenBalance: Number(updatedTokenBalance) / 1_000_000,
         tradesExecuted: { increment: 1 },
         lastTradeAt: now,
+        nextTickAt: nextTick,
       },
     });
 
@@ -249,7 +271,7 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
         level: "TRADE",
         type: action.toLowerCase(),
         message: "Trade executed",
-        walletPublicKey,
+        walletPublicKey: volumeWallet.walletPublicKey,
         signature,
         data: {
           tradeAmountSol,
@@ -257,54 +279,39 @@ const runTick = async (job: Job<VolumeBotJobPayload>) => {
         },
       },
     });
+    console.log(`[Worker] ${walletPk}: Trade complete!`);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.error(`[Worker] ${walletPk}: ERROR - ${message}`);
+    if (error instanceof Error && error.stack) {
+      console.error(`[Worker] ${walletPk}: Stack:`, error.stack);
+    }
     await prisma.volumeBotLog.create({
       data: {
         sessionId: session.id,
         level: "ERROR",
         type: "tick",
         message,
-        walletPublicKey,
+        walletPublicKey: volumeWallet.walletPublicKey,
       },
     });
-    if (job.attemptsMade >= 2) {
-      await prisma.volumeBotWallet.update({
-        where: { id: volumeWallet.id },
-        data: { status: "PAUSED", pauseReason: "tick_failed", pausedAt: new Date() },
-      });
-    }
+    await prisma.volumeBotWallet.update({
+      where: { id: volumeWallet.id },
+      data: { nextTickAt: computeNextTickAt(config) },
+    });
   }
-
-  await scheduleNextTick(session.id, walletPublicKey, config);
 };
 
-const runStart = async (job: Job<VolumeBotJobPayload>) => {
+export const stopVolumeBotSession = async (sessionId: string) => {
+  console.log(`[Worker] stopVolumeBotSession called for ${sessionId}`);
   const session = await prisma.volumeBotSession.findUnique({
-    where: { id: job.data.sessionId },
-  });
-  if (!session || session.status !== "RUNNING") {
-    return;
-  }
-  const wallets = await prisma.volumeBotWallet.findMany({
-    where: { sessionId: session.id },
-    select: { walletPublicKey: true },
-  });
-  const config = session.config as VolumeBotConfigInput;
-  await Promise.all(
-    wallets.map((wallet) =>
-      scheduleNextTick(session.id, wallet.walletPublicKey, config)
-    )
-  );
-};
-
-const runStop = async (job: Job<VolumeBotJobPayload>) => {
-  const session = await prisma.volumeBotSession.findUnique({
-    where: { id: job.data.sessionId },
+    where: { id: sessionId },
   });
   if (!session || ["STOPPED", "FAILED"].includes(session.status)) {
+    console.log(`[Worker] Session ${sessionId} not found or already stopped/failed`);
     return;
   }
+  console.log(`[Worker] Stopping session ${sessionId}, status=${session.status}`);
 
   const config = session.config as VolumeBotConfigInput;
   await prisma.volumeBotSession.update({
@@ -383,9 +390,9 @@ const runStop = async (job: Job<VolumeBotJobPayload>) => {
   });
 };
 
-const runReclaim = async (job: Job<VolumeBotJobPayload>) => {
+export const reclaimVolumeBotSession = async (sessionId: string) => {
   const session = await prisma.volumeBotSession.findUnique({
-    where: { id: job.data.sessionId },
+    where: { id: sessionId },
   });
   if (!session) {
     return;
@@ -425,9 +432,9 @@ const runReclaim = async (job: Job<VolumeBotJobPayload>) => {
   });
 };
 
-const runCloseAccounts = async (job: Job<VolumeBotJobPayload>) => {
+export const closeVolumeBotAccounts = async (sessionId: string) => {
   const session = await prisma.volumeBotSession.findUnique({
-    where: { id: job.data.sessionId },
+    where: { id: sessionId },
   });
   if (!session) {
     return;
@@ -465,73 +472,6 @@ const runCloseAccounts = async (job: Job<VolumeBotJobPayload>) => {
       tx.lastValidBlockHeight = lastValidBlockHeight;
       tx.feePayer = walletKeypair.publicKey;
       await sendAndConfirmTransaction(connection, tx, [walletKeypair]);
-    });
-  });
-};
-
-export const handleVolumeBotJob = async (job: Job<VolumeBotJobPayload>) => {
-  if (job.name === "start") {
-    await runStart(job);
-    return;
-  }
-  if (job.name === "tick") {
-    await runTick(job);
-    return;
-  }
-  throw new Error("Unknown volume bot job");
-};
-
-export const handleVolumeBotControlJob = async (job: Job<VolumeBotJobPayload>) => {
-  if (job.name === "stop") {
-    await runStop(job);
-    return;
-  }
-  if (job.name === "reclaim") {
-    await runReclaim(job);
-    return;
-  }
-  if (job.name === "close-accounts") {
-    await runCloseAccounts(job);
-    return;
-  }
-  throw new Error("Unknown volume bot control job");
-};
-
-export const registerVolumeBotQueueEvents = async () => {
-  const events = getVolumeBotQueueEvents();
-  const controlEvents = getVolumeBotControlQueueEvents();
-
-  events.on("failed", async ({ jobId, failedReason }) => {
-    const queue = getVolumeBotQueue();
-    const job = await queue.getJob(jobId);
-    const sessionId = job?.data?.sessionId;
-    if (!sessionId) {
-      return;
-    }
-    await prisma.volumeBotLog.create({
-      data: {
-        sessionId,
-        level: "ERROR",
-        type: "queue_failed",
-        message: failedReason,
-      },
-    });
-  });
-
-  controlEvents.on("failed", async ({ jobId, failedReason }) => {
-    const queue = getVolumeBotControlQueue();
-    const job = await queue.getJob(jobId);
-    const sessionId = job?.data?.sessionId;
-    if (!sessionId) {
-      return;
-    }
-    await prisma.volumeBotLog.create({
-      data: {
-        sessionId,
-        level: "ERROR",
-        type: "queue_failed",
-        message: failedReason,
-      },
     });
   });
 };

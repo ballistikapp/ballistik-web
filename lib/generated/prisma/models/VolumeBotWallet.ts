@@ -51,6 +51,7 @@ export type VolumeBotWalletMinAggregateOutputType = {
   tradesExecuted: number | null
   pnlSol: runtime.Decimal | null
   lastTradeAt: Date | null
+  nextTickAt: Date | null
   pausedAt: Date | null
   pauseReason: string | null
   reclaimedAt: Date | null
@@ -70,6 +71,7 @@ export type VolumeBotWalletMaxAggregateOutputType = {
   tradesExecuted: number | null
   pnlSol: runtime.Decimal | null
   lastTradeAt: Date | null
+  nextTickAt: Date | null
   pausedAt: Date | null
   pauseReason: string | null
   reclaimedAt: Date | null
@@ -89,6 +91,7 @@ export type VolumeBotWalletCountAggregateOutputType = {
   tradesExecuted: number
   pnlSol: number
   lastTradeAt: number
+  nextTickAt: number
   pausedAt: number
   pauseReason: number
   reclaimedAt: number
@@ -124,6 +127,7 @@ export type VolumeBotWalletMinAggregateInputType = {
   tradesExecuted?: true
   pnlSol?: true
   lastTradeAt?: true
+  nextTickAt?: true
   pausedAt?: true
   pauseReason?: true
   reclaimedAt?: true
@@ -143,6 +147,7 @@ export type VolumeBotWalletMaxAggregateInputType = {
   tradesExecuted?: true
   pnlSol?: true
   lastTradeAt?: true
+  nextTickAt?: true
   pausedAt?: true
   pauseReason?: true
   reclaimedAt?: true
@@ -162,6 +167,7 @@ export type VolumeBotWalletCountAggregateInputType = {
   tradesExecuted?: true
   pnlSol?: true
   lastTradeAt?: true
+  nextTickAt?: true
   pausedAt?: true
   pauseReason?: true
   reclaimedAt?: true
@@ -268,6 +274,7 @@ export type VolumeBotWalletGroupByOutputType = {
   tradesExecuted: number
   pnlSol: runtime.Decimal
   lastTradeAt: Date | null
+  nextTickAt: Date | null
   pausedAt: Date | null
   pauseReason: string | null
   reclaimedAt: Date | null
@@ -310,6 +317,7 @@ export type VolumeBotWalletWhereInput = {
   tradesExecuted?: Prisma.IntFilter<"VolumeBotWallet"> | number
   pnlSol?: Prisma.DecimalFilter<"VolumeBotWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
+  nextTickAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pausedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pauseReason?: Prisma.StringNullableFilter<"VolumeBotWallet"> | string | null
   reclaimedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
@@ -331,6 +339,7 @@ export type VolumeBotWalletOrderByWithRelationInput = {
   tradesExecuted?: Prisma.SortOrder
   pnlSol?: Prisma.SortOrder
   lastTradeAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  nextTickAt?: Prisma.SortOrderInput | Prisma.SortOrder
   pausedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   pauseReason?: Prisma.SortOrderInput | Prisma.SortOrder
   reclaimedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -356,6 +365,7 @@ export type VolumeBotWalletWhereUniqueInput = Prisma.AtLeast<{
   tradesExecuted?: Prisma.IntFilter<"VolumeBotWallet"> | number
   pnlSol?: Prisma.DecimalFilter<"VolumeBotWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
+  nextTickAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pausedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pauseReason?: Prisma.StringNullableFilter<"VolumeBotWallet"> | string | null
   reclaimedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
@@ -377,6 +387,7 @@ export type VolumeBotWalletOrderByWithAggregationInput = {
   tradesExecuted?: Prisma.SortOrder
   pnlSol?: Prisma.SortOrder
   lastTradeAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  nextTickAt?: Prisma.SortOrderInput | Prisma.SortOrder
   pausedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   pauseReason?: Prisma.SortOrderInput | Prisma.SortOrder
   reclaimedAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -404,6 +415,7 @@ export type VolumeBotWalletScalarWhereWithAggregatesInput = {
   tradesExecuted?: Prisma.IntWithAggregatesFilter<"VolumeBotWallet"> | number
   pnlSol?: Prisma.DecimalWithAggregatesFilter<"VolumeBotWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotWallet"> | Date | string | null
+  nextTickAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotWallet"> | Date | string | null
   pausedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotWallet"> | Date | string | null
   pauseReason?: Prisma.StringNullableWithAggregatesFilter<"VolumeBotWallet"> | string | null
   reclaimedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotWallet"> | Date | string | null
@@ -421,6 +433,7 @@ export type VolumeBotWalletCreateInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -442,6 +455,7 @@ export type VolumeBotWalletUncheckedCreateInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -459,6 +473,7 @@ export type VolumeBotWalletUpdateInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -480,6 +495,7 @@ export type VolumeBotWalletUncheckedUpdateInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -499,6 +515,7 @@ export type VolumeBotWalletCreateManyInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -516,6 +533,7 @@ export type VolumeBotWalletUpdateManyMutationInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -535,6 +553,7 @@ export type VolumeBotWalletUncheckedUpdateManyInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -569,6 +588,7 @@ export type VolumeBotWalletCountOrderByAggregateInput = {
   tradesExecuted?: Prisma.SortOrder
   pnlSol?: Prisma.SortOrder
   lastTradeAt?: Prisma.SortOrder
+  nextTickAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   reclaimedAt?: Prisma.SortOrder
@@ -595,6 +615,7 @@ export type VolumeBotWalletMaxOrderByAggregateInput = {
   tradesExecuted?: Prisma.SortOrder
   pnlSol?: Prisma.SortOrder
   lastTradeAt?: Prisma.SortOrder
+  nextTickAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   reclaimedAt?: Prisma.SortOrder
@@ -614,6 +635,7 @@ export type VolumeBotWalletMinOrderByAggregateInput = {
   tradesExecuted?: Prisma.SortOrder
   pnlSol?: Prisma.SortOrder
   lastTradeAt?: Prisma.SortOrder
+  nextTickAt?: Prisma.SortOrder
   pausedAt?: Prisma.SortOrder
   pauseReason?: Prisma.SortOrder
   reclaimedAt?: Prisma.SortOrder
@@ -730,6 +752,7 @@ export type VolumeBotWalletCreateWithoutWalletInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -749,6 +772,7 @@ export type VolumeBotWalletUncheckedCreateWithoutWalletInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -797,6 +821,7 @@ export type VolumeBotWalletScalarWhereInput = {
   tradesExecuted?: Prisma.IntFilter<"VolumeBotWallet"> | number
   pnlSol?: Prisma.DecimalFilter<"VolumeBotWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
+  nextTickAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pausedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
   pauseReason?: Prisma.StringNullableFilter<"VolumeBotWallet"> | string | null
   reclaimedAt?: Prisma.DateTimeNullableFilter<"VolumeBotWallet"> | Date | string | null
@@ -814,6 +839,7 @@ export type VolumeBotWalletCreateWithoutSessionInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -833,6 +859,7 @@ export type VolumeBotWalletUncheckedCreateWithoutSessionInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -877,6 +904,7 @@ export type VolumeBotWalletCreateManyWalletInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -894,6 +922,7 @@ export type VolumeBotWalletUpdateWithoutWalletInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -913,6 +942,7 @@ export type VolumeBotWalletUncheckedUpdateWithoutWalletInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -931,6 +961,7 @@ export type VolumeBotWalletUncheckedUpdateManyWithoutWalletInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -949,6 +980,7 @@ export type VolumeBotWalletCreateManySessionInput = {
   tradesExecuted?: number
   pnlSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Date | string | null
+  nextTickAt?: Date | string | null
   pausedAt?: Date | string | null
   pauseReason?: string | null
   reclaimedAt?: Date | string | null
@@ -966,6 +998,7 @@ export type VolumeBotWalletUpdateWithoutSessionInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -985,6 +1018,7 @@ export type VolumeBotWalletUncheckedUpdateWithoutSessionInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1003,6 +1037,7 @@ export type VolumeBotWalletUncheckedUpdateManyWithoutSessionInput = {
   tradesExecuted?: Prisma.IntFieldUpdateOperationsInput | number
   pnlSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   lastTradeAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  nextTickAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pausedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   pauseReason?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   reclaimedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1024,6 +1059,7 @@ export type VolumeBotWalletSelect<ExtArgs extends runtime.Types.Extensions.Inter
   tradesExecuted?: boolean
   pnlSol?: boolean
   lastTradeAt?: boolean
+  nextTickAt?: boolean
   pausedAt?: boolean
   pauseReason?: boolean
   reclaimedAt?: boolean
@@ -1045,6 +1081,7 @@ export type VolumeBotWalletSelectCreateManyAndReturn<ExtArgs extends runtime.Typ
   tradesExecuted?: boolean
   pnlSol?: boolean
   lastTradeAt?: boolean
+  nextTickAt?: boolean
   pausedAt?: boolean
   pauseReason?: boolean
   reclaimedAt?: boolean
@@ -1066,6 +1103,7 @@ export type VolumeBotWalletSelectUpdateManyAndReturn<ExtArgs extends runtime.Typ
   tradesExecuted?: boolean
   pnlSol?: boolean
   lastTradeAt?: boolean
+  nextTickAt?: boolean
   pausedAt?: boolean
   pauseReason?: boolean
   reclaimedAt?: boolean
@@ -1087,6 +1125,7 @@ export type VolumeBotWalletSelectScalar = {
   tradesExecuted?: boolean
   pnlSol?: boolean
   lastTradeAt?: boolean
+  nextTickAt?: boolean
   pausedAt?: boolean
   pauseReason?: boolean
   reclaimedAt?: boolean
@@ -1095,7 +1134,7 @@ export type VolumeBotWalletSelectScalar = {
   updatedAt?: boolean
 }
 
-export type VolumeBotWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "sessionId" | "walletPublicKey" | "role" | "status" | "solBalance" | "tokenBalance" | "tradesExecuted" | "pnlSol" | "lastTradeAt" | "pausedAt" | "pauseReason" | "reclaimedAt" | "reclaimTxSignature" | "createdAt" | "updatedAt", ExtArgs["result"]["volumeBotWallet"]>
+export type VolumeBotWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "sessionId" | "walletPublicKey" | "role" | "status" | "solBalance" | "tokenBalance" | "tradesExecuted" | "pnlSol" | "lastTradeAt" | "nextTickAt" | "pausedAt" | "pauseReason" | "reclaimedAt" | "reclaimTxSignature" | "createdAt" | "updatedAt", ExtArgs["result"]["volumeBotWallet"]>
 export type VolumeBotWalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   session?: boolean | Prisma.VolumeBotSessionDefaultArgs<ExtArgs>
   wallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
@@ -1126,6 +1165,7 @@ export type $VolumeBotWalletPayload<ExtArgs extends runtime.Types.Extensions.Int
     tradesExecuted: number
     pnlSol: runtime.Decimal
     lastTradeAt: Date | null
+    nextTickAt: Date | null
     pausedAt: Date | null
     pauseReason: string | null
     reclaimedAt: Date | null
@@ -1567,6 +1607,7 @@ export interface VolumeBotWalletFieldRefs {
   readonly tradesExecuted: Prisma.FieldRef<"VolumeBotWallet", 'Int'>
   readonly pnlSol: Prisma.FieldRef<"VolumeBotWallet", 'Decimal'>
   readonly lastTradeAt: Prisma.FieldRef<"VolumeBotWallet", 'DateTime'>
+  readonly nextTickAt: Prisma.FieldRef<"VolumeBotWallet", 'DateTime'>
   readonly pausedAt: Prisma.FieldRef<"VolumeBotWallet", 'DateTime'>
   readonly pauseReason: Prisma.FieldRef<"VolumeBotWallet", 'String'>
   readonly reclaimedAt: Prisma.FieldRef<"VolumeBotWallet", 'DateTime'>

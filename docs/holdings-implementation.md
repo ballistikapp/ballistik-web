@@ -25,10 +25,5 @@ Holdings show per-wallet token balances, aggregated buy/sell totals, and last ac
 
 ## UI Behavior
 
-- Sell action is a bulk action on selected holdings rows.
-- Default sell percentage is 100%.
-- Transactions are sent via standard RPC (no bundle).
-- Holdings refresh updates `RefreshCache` and the header shows the cached timestamp.
-- Auto refresh waits for `RefreshCache` to load and runs only when stale.
-- Manual refresh is always available (disabled only while a request is in flight) and shows toast feedback.
-- Header timestamp mapping: 0-15s just refreshed, 15-90s minute ago, <5m couple minutes, <1h N minutes, <3h hour/couple hours, 3-12h N hours, 12h+ full datetime.
+- Bulk sell action operates on selected holdings rows.
+- Manual refresh is available; auto refresh uses `RefreshCache` staleness.

@@ -22,10 +22,7 @@ Transactions track per-wallet buy, sell, and create activity for a token. Each r
 - Existing rows with zero SOL or price are queued for backfill by signature.
 - Parsed transactions are batched to reduce RPC calls.
 - New transactions are inserted and stale rows are updated when recalculated values are available.
-- `RefreshCache` is updated on each refresh to drive UI staleness checks and the header timestamp.
-- Auto refresh waits for `RefreshCache` to load and runs only when stale.
-- Manual refresh is always available (disabled only while a request is in flight) and shows toast feedback.
-- Header timestamp mapping: 0-15s just refreshed, 15-90s minute ago, <5m couple minutes, <1h N minutes, <3h hour/couple hours, 3-12h N hours, 12h+ full datetime.
+- `RefreshCache` is updated on each refresh to support client staleness checks.
 
 ## Access Rules
 

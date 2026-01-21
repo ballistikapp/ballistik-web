@@ -78,14 +78,10 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 8. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
-`app/(app)/launch/launch-form.tsx` now:
-- Starts launch via `launch.start`
-- Opens `LaunchProgressDialog` and polls status
-- Resumes from local storage or `launch.getActive`
-- Allows user cancellation
-- Uses shadcn/ui components for dialogs, badges, buttons, and progress
-- Uses numeric form values end-to-end (no string parsing)
- - Emits concise step logs with structured metrics
+- Launch form starts via `launch.start` and polls `launch.status`.
+- Progress dialog renders launch status and logs.
+- Resume uses local storage or `launch.getActive`.
+- User can request cancellation.
 
 ## Key Files
 - `prisma/schema.prisma` (Launch, LaunchLog, VanityMint)

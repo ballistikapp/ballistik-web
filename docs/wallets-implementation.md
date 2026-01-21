@@ -59,19 +59,11 @@ Service rules:
 ## UI Behavior
 
 Wallets list page:
-- Main and dev wallets are shown as cards at the top.
-- Operational wallets are listed in the table.
-- Transfer dialogs receive a combined wallet list (main, dev, operational).
-- Manual refresh is always available (disabled only while a request is in flight).
-- If refresh is within cooldown, the UI shows a toast indicating it was refreshed recently.
-- Bulk actions: refresh all, send, return.
-- Header shows a cached last refresh timestamp from `RefreshCache`.
-- Auto refresh waits for `RefreshCache` to load and runs only when stale.
-- Header timestamp mapping: 0-15s just refreshed, 15-90s minute ago, <5m couple minutes, <1h N minutes, <3h hour/couple hours, 3-12h N hours, 12h+ full datetime.
+- Separates main/dev wallets from operational wallets.
+- Provides bulk actions for refresh, send, and return.
 
 Wallet detail page:
-- Main wallet shows a user-style page.
-- Non-main wallets allow send/return actions.
+- Non-main wallets allow send and return actions.
 
 ## Balance Strategy
 

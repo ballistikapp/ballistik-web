@@ -3,10 +3,18 @@
 import { useMemo, useState } from "react";
 import { useQueryState } from "nuqs";
 import { toast } from "sonner";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  SlidersHorizontal,
+  ShieldCheck,
+  Minus,
+  TrendingUp,
+} from "lucide-react";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
@@ -17,9 +25,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { TokenNotFound } from "@/components/placeholders/token-not-found";
+import { DashboardLoading } from "../dashboard/dashboard-loading";
+import { Separator } from "@/components/ui/separator";
 
 const presets = {
   conservative: {
+    walletCount: 10,
+    fundingPerWalletSol: 0.5,
+    minTradeAmountSol: 0.01,
+    maxTradeAmountSol: 0.03,
+    minIntervalSeconds: 180,
+    maxIntervalSeconds: 600,
+    sellRatio: 0.9,
+    strategy: "neutral" as const,
+    maxLossPerWalletSol: 0.1,
+    maxTotalLossSol: 1,
+    slippageBps: 500,
+    targetDurationHours: 24,
+    sellOnStop: true,
+  },
+  custom: {
     walletCount: 10,
     fundingPerWalletSol: 0.5,
     minTradeAmountSol: 0.01,
@@ -52,10 +78,7 @@ const presets = {
 };
 
 export default function VolumeBotPage() {
-  const [tokenPublicKey, setTokenPublicKey] = useQueryState(
-    "token",
-    tokenQueryParser
-  );
+  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
   const [selectedPreset, setSelectedPreset] =
     useState<keyof typeof presets>("conservative");
 
@@ -95,7 +118,15 @@ export default function VolumeBotPage() {
   );
   const [sellOnStop, setSellOnStop] = useState(presets.conservative.sellOnStop);
 
-  const { data: tokens } = trpc.token.getUserTokens.useQuery();
+  const {
+    data: tokenData,
+    isLoading,
+    error,
+    refetch,
+  } = trpc.token.getByPublicKey.useQuery(
+    { publicKey: tokenPublicKey || "" },
+    { enabled: !!tokenPublicKey }
+  );
 
   const {
     data: statusData,
@@ -103,7 +134,11 @@ export default function VolumeBotPage() {
     refetch: refetchStatus,
   } = trpc.volumeBot.status.useQuery(
     { tokenPublicKey: tokenPublicKey || undefined },
-    { enabled: Boolean(tokenPublicKey), refetchInterval: 5000, retry: false }
+    {
+      enabled: Boolean(tokenPublicKey && tokenData),
+      refetchInterval: 5000,
+      retry: false,
+    }
   );
 
   const startMutation = trpc.volumeBot.start.useMutation({
@@ -156,7 +191,15 @@ export default function VolumeBotPage() {
     [walletCount, fundingPerWalletSol]
   );
 
+  const markCustom = () => {
+    setSelectedPreset("custom");
+  };
+
   const handlePresetChange = (preset: keyof typeof presets) => {
+    if (preset === "custom") {
+      setSelectedPreset("custom");
+      return;
+    }
     const nextPreset = presets[preset];
     setSelectedPreset(preset);
     setWalletCount(nextPreset.walletCount);
@@ -220,73 +263,139 @@ export default function VolumeBotPage() {
     await closeAccountsMutation.mutateAsync({ sessionId: session.id });
   };
 
+  if (isLoading) {
+    return <DashboardLoading />;
+  }
+
+  if (!tokenData) {
+    return <TokenNotFound error={error} onRetry={() => refetch()} />;
+  }
+
   return (
-    <div className="grid gap-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-3xl font-bold">Volume Bot</h1>
-          <p className="text-sm text-muted-foreground">
-            Schedule and monitor automated volume trades.
+    <div className="flex flex-col gap-6">
+      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
+        <div className="flex flex-col gap-3">
+          <h1 className="text-4xl">Volume Bot</h1>
+        </div>
+        <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
+          <p className="leading-tight font-light">
+            Configure, start, and manage volume sessions.
+            <br />
+            Status updates refresh every few seconds.
           </p>
         </div>
-        <Badge variant={isRunning ? "default" : "secondary"}>
-          {isRunning ? "Running" : "Stopped"}
-        </Badge>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Token</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          <Select
-            value={tokenPublicKey ?? ""}
-            onValueChange={setTokenPublicKey}
-          >
-            <SelectTrigger className="w-full">
-              <SelectValue placeholder="Select a token" />
-            </SelectTrigger>
-            <SelectContent>
-              {tokens?.map((token) => (
-                <SelectItem key={token.publicKey} value={token.publicKey}>
-                  {token.name} ({token.symbol})
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {statusError && statusError.data?.httpStatus !== 404 && (
-            <p className="text-sm text-destructive">
-              {statusError.message || "Failed to load status"}
-            </p>
-          )}
-        </CardContent>
-      </Card>
+      <div className="" />
 
       {!isRunning && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Configuration</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label>Preset</Label>
-              <Select
-                value={selectedPreset}
-                onValueChange={(value) =>
-                  handlePresetChange(value as keyof typeof presets)
-                }
-              >
-                <SelectTrigger className="w-full">
-                  <SelectValue placeholder="Select preset" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="conservative">Conservative</SelectItem>
-                  <SelectItem value="aggressive">Aggressive</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+        <section className="space-y-6 pb-8">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-primary text-xl">
+                Presets & Strategy
+              </CardTitle>
+            </CardHeader>
+            <Separator />
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-base">Preset</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Choose a starting profile and fine-tune below.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {(["conservative", "aggressive", "custom"] as const).map(
+                    (preset) => (
+                    <button
+                      key={preset}
+                      type="button"
+                      onClick={() => handlePresetChange(preset)}
+                      className={`flex flex-col gap-2 rounded-lg bg-background border px-5 py-4 text-left transition ${
+                        selectedPreset === preset
+                          ? "border-primary"
+                          : "border-muted bg-background/50 hover:border-primary/50"
+                      }`}
+                    >
+                    <span className="flex items-center gap-2 text-base font-semibold capitalize">
+                      {preset === "conservative" ? (
+                        <ShieldCheck className="h-5 w-5" />
+                      ) : preset === "aggressive" ? (
+                        <TrendingUp className="h-5 w-5" />
+                      ) : (
+                        <SlidersHorizontal className="h-5 w-5" />
+                      )}
+                      {preset}
+                    </span>
+                      <span className="text-sm text-muted-foreground">
+                        {preset === "conservative"
+                          ? "Balanced trades with slower pacing."
+                        : preset === "aggressive"
+                        ? "Higher volume with tighter intervals."
+                        : "Manual tuning for advanced setups."}
+                      </span>
+                    </button>
+                  )
+                  )}
+                </div>
+              </div>
 
-            <div className="grid gap-4 md:grid-cols-2">
+              <div className="space-y-3">
+                <div>
+                  <Label className="text-base">Strategy</Label>
+                  <p className="text-sm text-muted-foreground">
+                    Tune how the bot impacts price action.
+                  </p>
+                </div>
+                <div className="grid gap-4 md:grid-cols-3">
+                  {(["neutral", "pump", "dump"] as const).map((option) => (
+                    <button
+                      key={option}
+                      type="button"
+                      onClick={() => {
+                        setStrategy(option);
+                        markCustom();
+                      }}
+                      className={`flex flex-col gap-2 rounded-lg bg-background border px-5 py-4 text-left transition ${
+                        strategy === option
+                          ? "border-primary"
+                          : "border-muted bg-background/50 hover:border-primary/50"
+                      }`}
+                    >
+                      <span className="flex items-center gap-2 text-base font-semibold capitalize">
+                        {option === "neutral" ? (
+                          <Minus className="h-5 w-5" />
+                        ) : option === "pump" ? (
+                          <ArrowUpRight className="h-5 w-5" />
+                        ) : (
+                          <ArrowDownRight className="h-5 w-5" />
+                        )}
+                        {option}
+                      </span>
+                      <span className="text-sm text-muted-foreground">
+                        {option === "neutral"
+                          ? "Balanced buy/sell activity."
+                          : option === "pump"
+                          ? "Bias toward buy pressure."
+                          : "Bias toward sell pressure."}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-primary text-xl">
+                Configuration
+              </CardTitle>
+            </CardHeader>
+            <Separator />
+            <CardContent className="space-y-6">
+              <div className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label>Wallet count</Label>
                 <Input
@@ -294,8 +403,10 @@ export default function VolumeBotPage() {
                   min={1}
                   value={walletCount}
                   onChange={(event) =>
-                    setWalletCount(Number(event.target.value))
-                  }
+                    {
+                      setWalletCount(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -306,8 +417,10 @@ export default function VolumeBotPage() {
                   step={0.01}
                   value={fundingPerWalletSol}
                   onChange={(event) =>
-                    setFundingPerWalletSol(Number(event.target.value))
-                  }
+                    {
+                      setFundingPerWalletSol(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -318,8 +431,10 @@ export default function VolumeBotPage() {
                   step={0.001}
                   value={minTradeAmountSol}
                   onChange={(event) =>
-                    setMinTradeAmountSol(Number(event.target.value))
-                  }
+                    {
+                      setMinTradeAmountSol(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -330,8 +445,10 @@ export default function VolumeBotPage() {
                   step={0.001}
                   value={maxTradeAmountSol}
                   onChange={(event) =>
-                    setMaxTradeAmountSol(Number(event.target.value))
-                  }
+                    {
+                      setMaxTradeAmountSol(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -341,8 +458,10 @@ export default function VolumeBotPage() {
                   min={1}
                   value={minIntervalSeconds}
                   onChange={(event) =>
-                    setMinIntervalSeconds(Number(event.target.value))
-                  }
+                    {
+                      setMinIntervalSeconds(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -352,8 +471,10 @@ export default function VolumeBotPage() {
                   min={1}
                   value={maxIntervalSeconds}
                   onChange={(event) =>
-                    setMaxIntervalSeconds(Number(event.target.value))
-                  }
+                    {
+                      setMaxIntervalSeconds(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -365,27 +486,11 @@ export default function VolumeBotPage() {
                   step={0.1}
                   value={sellRatio}
                   onChange={(event) =>
-                    setSellRatio(Number(event.target.value))
-                  }
+                    {
+                      setSellRatio(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
-              </div>
-              <div className="space-y-2">
-                <Label>Strategy</Label>
-                <Select
-                  value={strategy}
-                  onValueChange={(value) =>
-                    setStrategy(value as "neutral" | "pump" | "dump")
-                  }
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select strategy" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="neutral">Neutral</SelectItem>
-                    <SelectItem value="pump">Pump</SelectItem>
-                    <SelectItem value="dump">Dump</SelectItem>
-                  </SelectContent>
-                </Select>
               </div>
               <div className="space-y-2">
                 <Label>Max loss per wallet (SOL)</Label>
@@ -395,8 +500,10 @@ export default function VolumeBotPage() {
                   step={0.01}
                   value={maxLossPerWalletSol}
                   onChange={(event) =>
-                    setMaxLossPerWalletSol(Number(event.target.value))
-                  }
+                    {
+                      setMaxLossPerWalletSol(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -407,8 +514,10 @@ export default function VolumeBotPage() {
                   step={0.01}
                   value={maxTotalLossSol}
                   onChange={(event) =>
-                    setMaxTotalLossSol(Number(event.target.value))
-                  }
+                    {
+                      setMaxTotalLossSol(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -418,8 +527,10 @@ export default function VolumeBotPage() {
                   min={0}
                   value={slippageBps}
                   onChange={(event) =>
-                    setSlippageBps(Number(event.target.value))
-                  }
+                    {
+                      setSlippageBps(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
@@ -429,15 +540,20 @@ export default function VolumeBotPage() {
                   min={0}
                   value={targetDurationHours}
                   onChange={(event) =>
-                    setTargetDurationHours(Number(event.target.value))
-                  }
+                    {
+                      setTargetDurationHours(Number(event.target.value));
+                      markCustom();
+                    }}
                 />
               </div>
               <div className="space-y-2">
                 <Label>Sell on stop</Label>
                 <Select
                   value={sellOnStop ? "yes" : "no"}
-                  onValueChange={(value) => setSellOnStop(value === "yes")}
+                  onValueChange={(value) => {
+                    setSellOnStop(value === "yes");
+                    markCustom();
+                  }}
                 >
                   <SelectTrigger className="w-full">
                     <SelectValue placeholder="Select" />
@@ -448,28 +564,75 @@ export default function VolumeBotPage() {
                   </SelectContent>
                 </Select>
               </div>
-            </div>
-
-            <div className="flex items-center justify-between">
-              <div className="text-sm text-muted-foreground">
-                Total funding: {totalFunding.toFixed(2)} SOL
               </div>
-              <Button
-                onClick={handleStart}
-                disabled={startMutation.isPending || !tokenPublicKey}
-              >
-                {startMutation.isPending ? "Starting..." : "Start bot"}
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-primary text-xl">Preview</CardTitle>
+            </CardHeader>
+            <Separator />
+            <CardContent className="space-y-6">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      Total funding
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {totalFunding.toFixed(2)} SOL
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      Trade range
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {minTradeAmountSol.toFixed(3)} -{" "}
+                      {maxTradeAmountSol.toFixed(3)} SOL
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">
+                      Interval range
+                    </div>
+                    <div className="text-lg font-semibold">
+                      {minIntervalSeconds} - {maxIntervalSeconds} sec
+                    </div>
+                  </div>
+                  <div>
+                    <div className="text-xs text-muted-foreground">Strategy</div>
+                    <div className="text-lg font-semibold capitalize">
+                      {strategy}
+                    </div>
+                  </div>
+                </div>
+
+            </CardContent>
+          </Card>
+              <div className="flex items-center justify-end">
+                <Button
+                  size="lg"
+                  onClick={handleStart}
+                  disabled={startMutation.isPending || !tokenPublicKey}
+                  className="h-14 px-6 text-4xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black w-full md:w-auto"
+                >
+                  {startMutation.isPending ? "STARTING..." : "START VOLUME BOT"}
+                </Button>
+              </div>
+        </section>
       )}
 
       {session && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>Status</CardTitle>
-            <div className="flex gap-2">
+        <section className="space-y-6">
+          <div className="flex flex-col gap-4 border-b pb-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <h2 className="text-2xl font-semibold">Status</h2>
+              <p className="text-sm text-muted-foreground">
+                Live session activity and wallet health.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
               <Button
                 variant="outline"
                 size="sm"
@@ -495,8 +658,9 @@ export default function VolumeBotPage() {
                 Stop
               </Button>
             </div>
-          </CardHeader>
-          <CardContent className="space-y-4">
+          </div>
+
+          <div className="space-y-4">
             <div className="grid gap-3 md:grid-cols-4">
               <div>
                 <div className="text-xs text-muted-foreground">Status</div>
@@ -549,8 +713,8 @@ export default function VolumeBotPage() {
                 )}
               </div>
             </div>
-          </CardContent>
-        </Card>
+          </div>
+        </section>
       )}
     </div>
   );

@@ -211,6 +211,7 @@ export const VolumeBotWalletScalarFieldEnum = {
   tradesExecuted: 'tradesExecuted',
   pnlSol: 'pnlSol',
   lastTradeAt: 'lastTradeAt',
+  nextTickAt: 'nextTickAt',
   pausedAt: 'pausedAt',
   pauseReason: 'pauseReason',
   reclaimedAt: 'reclaimedAt',

@@ -2,10 +2,6 @@ import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
 import { prisma } from "@/lib/prisma";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
-import {
-  getVolumeBotControlQueue,
-  getVolumeBotQueue,
-} from "@/lib/queue/volume-bot-queues";
 import { AppError } from "@/server/errors";
 import type {
   CloseVolumeBotAccountsInput,
@@ -15,6 +11,10 @@ import type {
   VolumeBotConfigInput,
   VolumeBotStatusInput,
 } from "@/server/schemas/volume-bot.schema";
+import {
+  closeVolumeBotAccounts,
+  reclaimVolumeBotSession,
+} from "@/server/services/volume-bot-worker";
 import { walletService } from "@/server/services/wallet.service";
 
 const validateConfig = (config: VolumeBotConfigInput) => {
@@ -44,6 +44,16 @@ const resolveScheduledStopAt = (
     return new Date(Date.now() + config.targetDurationHours * 60 * 60 * 1000);
   }
   return null;
+};
+
+const randomBetween = (min: number, max: number) =>
+  Math.random() * (max - min) + min;
+
+const computeNextTickAt = (config: VolumeBotConfigInput) => {
+  const delaySeconds = Math.floor(
+    randomBetween(config.minIntervalSeconds, config.maxIntervalSeconds)
+  );
+  return new Date(Date.now() + delaySeconds * 1000);
 };
 
 export const volumeBotService = {
@@ -107,6 +117,7 @@ export const volumeBotService = {
         data: keypairs.map((keypair) => ({
           sessionId: createdSession.id,
           walletPublicKey: keypair.publicKey.toBase58(),
+          nextTickAt: computeNextTickAt(input.config),
         })),
       });
 
@@ -132,13 +143,6 @@ export const volumeBotService = {
       const message = error instanceof Error ? error.message : String(error);
       throw new AppError(message, 500);
     }
-
-    const queue = getVolumeBotQueue();
-    await queue.add(
-      "start",
-      { sessionId: session.id },
-      { jobId: `start:${session.id}` }
-    );
 
     return { sessionId: session.id };
   },
@@ -191,13 +195,6 @@ export const volumeBotService = {
       data: { status: "STOP_REQUESTED", stopRequestedAt: new Date() },
     });
 
-    const controlQueue = getVolumeBotControlQueue();
-    await controlQueue.add(
-      "stop",
-      { sessionId: session.id },
-      { jobId: `stop:${session.id}` }
-    );
-
     return { sessionId: session.id };
   },
 
@@ -209,12 +206,7 @@ export const volumeBotService = {
     if (!session) {
       throw new AppError("Volume bot session not found", 404);
     }
-    const controlQueue = getVolumeBotControlQueue();
-    await controlQueue.add(
-      "reclaim",
-      { sessionId: session.id },
-      { jobId: `reclaim:${session.id}` }
-    );
+    await reclaimVolumeBotSession(session.id);
     return { sessionId: session.id };
   },
 
@@ -226,12 +218,7 @@ export const volumeBotService = {
     if (!session) {
       throw new AppError("Volume bot session not found", 404);
     }
-    const controlQueue = getVolumeBotControlQueue();
-    await controlQueue.add(
-      "close-accounts",
-      { sessionId: session.id },
-      { jobId: `close-accounts:${session.id}` }
-    );
+    await closeVolumeBotAccounts(session.id);
     return { sessionId: session.id };
   },
 

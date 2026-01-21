@@ -4,6 +4,7 @@ import * as React from "react";
 import { useQueryState } from "nuqs";
 import {
   IconListDetails,
+  IconBolt,
   IconRocket,
   IconWallet,
   IconLayoutDashboard,
@@ -36,6 +37,11 @@ const data = {
       title: "Transactions",
       url: "/transactions",
       icon: IconListDetails,
+    },
+    {
+      title: "Volume Bot",
+      url: "/volume-bot",
+      icon: IconBolt,
     },
     {
       title: "Wallets",
