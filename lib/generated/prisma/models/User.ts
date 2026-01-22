@@ -186,6 +186,7 @@ export type UserWhereInput = {
   wallets?: Prisma.WalletListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
+  holdingExits?: Prisma.HoldingExitListRelationFilter
   volumeBotSessions?: Prisma.VolumeBotSessionListRelationFilter
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
@@ -201,6 +202,7 @@ export type UserOrderByWithRelationInput = {
   wallets?: Prisma.WalletOrderByRelationAggregateInput
   tokens?: Prisma.TokenOrderByRelationAggregateInput
   launches?: Prisma.LaunchOrderByRelationAggregateInput
+  holdingExits?: Prisma.HoldingExitOrderByRelationAggregateInput
   volumeBotSessions?: Prisma.VolumeBotSessionOrderByRelationAggregateInput
   vanityMints?: Prisma.VanityMintOrderByRelationAggregateInput
   refreshCaches?: Prisma.RefreshCacheOrderByRelationAggregateInput
@@ -219,6 +221,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   wallets?: Prisma.WalletListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
+  holdingExits?: Prisma.HoldingExitListRelationFilter
   volumeBotSessions?: Prisma.VolumeBotSessionListRelationFilter
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
@@ -255,6 +258,7 @@ export type UserCreateInput = {
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
@@ -269,6 +273,7 @@ export type UserUncheckedCreateInput = {
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
@@ -283,6 +288,7 @@ export type UserUpdateInput = {
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
@@ -297,6 +303,7 @@ export type UserUncheckedUpdateInput = {
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
@@ -435,6 +442,20 @@ export type UserUpdateOneRequiredWithoutLaunchesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutLaunchesInput, Prisma.UserUpdateWithoutLaunchesInput>, Prisma.UserUncheckedUpdateWithoutLaunchesInput>
 }
 
+export type UserCreateNestedOneWithoutHoldingExitsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutHoldingExitsInput, Prisma.UserUncheckedCreateWithoutHoldingExitsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutHoldingExitsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutHoldingExitsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutHoldingExitsInput, Prisma.UserUncheckedCreateWithoutHoldingExitsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutHoldingExitsInput
+  upsert?: Prisma.UserUpsertWithoutHoldingExitsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutHoldingExitsInput, Prisma.UserUpdateWithoutHoldingExitsInput>, Prisma.UserUncheckedUpdateWithoutHoldingExitsInput>
+}
+
 export type UserCreateNestedOneWithoutVolumeBotSessionsInput = {
   create?: Prisma.XOR<Prisma.UserCreateWithoutVolumeBotSessionsInput, Prisma.UserUncheckedCreateWithoutVolumeBotSessionsInput>
   connectOrCreate?: Prisma.UserCreateOrConnectWithoutVolumeBotSessionsInput
@@ -487,6 +508,7 @@ export type UserCreateWithoutWalletsInput = {
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
@@ -500,6 +522,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   updatedAt?: Date | string
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
@@ -518,6 +541,7 @@ export type UserCreateWithoutMainWalletInput = {
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
@@ -531,6 +555,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
@@ -560,6 +585,7 @@ export type UserUpdateWithoutWalletsInput = {
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
@@ -573,6 +599,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
@@ -597,6 +624,7 @@ export type UserUpdateWithoutMainWalletInput = {
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
@@ -610,6 +638,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
@@ -623,6 +652,7 @@ export type UserCreateWithoutTokensInput = {
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
@@ -636,6 +666,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
@@ -665,6 +696,7 @@ export type UserUpdateWithoutTokensInput = {
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
@@ -678,6 +710,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
@@ -691,6 +724,7 @@ export type UserCreateWithoutLaunchesInput = {
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
@@ -704,6 +738,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
@@ -733,6 +768,7 @@ export type UserUpdateWithoutLaunchesInput = {
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
@@ -746,6 +782,79 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutHoldingExitsInput = {
+  id?: string
+  name: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutHoldingExitsInput = {
+  id?: string
+  name: string
+  mainWalletPublicKey: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutHoldingExitsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutHoldingExitsInput, Prisma.UserUncheckedCreateWithoutHoldingExitsInput>
+}
+
+export type UserUpsertWithoutHoldingExitsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutHoldingExitsInput, Prisma.UserUncheckedUpdateWithoutHoldingExitsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutHoldingExitsInput, Prisma.UserUncheckedCreateWithoutHoldingExitsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutHoldingExitsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutHoldingExitsInput, Prisma.UserUncheckedUpdateWithoutHoldingExitsInput>
+}
+
+export type UserUpdateWithoutHoldingExitsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutHoldingExitsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
@@ -760,6 +869,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
 }
@@ -773,6 +883,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
 }
@@ -802,6 +913,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
 }
@@ -815,6 +927,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -828,6 +941,7 @@ export type UserCreateWithoutVanityMintsInput = {
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
 }
@@ -841,6 +955,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
 }
@@ -870,6 +985,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
 }
@@ -883,6 +999,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -896,6 +1013,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
 }
@@ -909,6 +1027,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
 }
@@ -938,6 +1057,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
 }
@@ -951,6 +1071,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
 }
@@ -964,6 +1085,7 @@ export type UserCountOutputType = {
   wallets: number
   tokens: number
   launches: number
+  holdingExits: number
   volumeBotSessions: number
   vanityMints: number
   refreshCaches: number
@@ -973,6 +1095,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   wallets?: boolean | UserCountOutputTypeCountWalletsArgs
   tokens?: boolean | UserCountOutputTypeCountTokensArgs
   launches?: boolean | UserCountOutputTypeCountLaunchesArgs
+  holdingExits?: boolean | UserCountOutputTypeCountHoldingExitsArgs
   volumeBotSessions?: boolean | UserCountOutputTypeCountVolumeBotSessionsArgs
   vanityMints?: boolean | UserCountOutputTypeCountVanityMintsArgs
   refreshCaches?: boolean | UserCountOutputTypeCountRefreshCachesArgs
@@ -1012,6 +1135,13 @@ export type UserCountOutputTypeCountLaunchesArgs<ExtArgs extends runtime.Types.E
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountHoldingExitsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.HoldingExitWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountVolumeBotSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.VolumeBotSessionWhereInput
 }
@@ -1041,6 +1171,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
+  holdingExits?: boolean | Prisma.User$holdingExitsArgs<ExtArgs>
   volumeBotSessions?: boolean | Prisma.User$volumeBotSessionsArgs<ExtArgs>
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
@@ -1079,6 +1210,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
+  holdingExits?: boolean | Prisma.User$holdingExitsArgs<ExtArgs>
   volumeBotSessions?: boolean | Prisma.User$volumeBotSessionsArgs<ExtArgs>
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
@@ -1098,6 +1230,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     wallets: Prisma.$WalletPayload<ExtArgs>[]
     tokens: Prisma.$TokenPayload<ExtArgs>[]
     launches: Prisma.$LaunchPayload<ExtArgs>[]
+    holdingExits: Prisma.$HoldingExitPayload<ExtArgs>[]
     volumeBotSessions: Prisma.$VolumeBotSessionPayload<ExtArgs>[]
     vanityMints: Prisma.$VanityMintPayload<ExtArgs>[]
     refreshCaches: Prisma.$RefreshCachePayload<ExtArgs>[]
@@ -1506,6 +1639,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   wallets<T extends Prisma.User$walletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$walletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tokens<T extends Prisma.User$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   launches<T extends Prisma.User$launchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$launchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  holdingExits<T extends Prisma.User$holdingExitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$holdingExitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingExitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   volumeBotSessions<T extends Prisma.User$volumeBotSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$volumeBotSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VolumeBotSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   vanityMints<T extends Prisma.User$vanityMintsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$vanityMintsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VanityMintPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshCaches<T extends Prisma.User$refreshCachesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshCachesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshCachePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2008,6 +2142,30 @@ export type User$launchesArgs<ExtArgs extends runtime.Types.Extensions.InternalA
   take?: number
   skip?: number
   distinct?: Prisma.LaunchScalarFieldEnum | Prisma.LaunchScalarFieldEnum[]
+}
+
+/**
+ * User.holdingExits
+ */
+export type User$holdingExitsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the HoldingExit
+   */
+  select?: Prisma.HoldingExitSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the HoldingExit
+   */
+  omit?: Prisma.HoldingExitOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.HoldingExitInclude<ExtArgs> | null
+  where?: Prisma.HoldingExitWhereInput
+  orderBy?: Prisma.HoldingExitOrderByWithRelationInput | Prisma.HoldingExitOrderByWithRelationInput[]
+  cursor?: Prisma.HoldingExitWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.HoldingExitScalarFieldEnum | Prisma.HoldingExitScalarFieldEnum[]
 }
 
 /**

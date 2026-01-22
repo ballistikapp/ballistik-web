@@ -21,7 +21,8 @@ const pool = new Pool({
 const adapter = new PrismaPg(pool);
 
 // Create Prisma Client with adapter
-const prismaLogLevels: Prisma.LogLevel[] = ["error", "warn", "query"];
+const prismaLogLevels: Prisma.LogLevel[] = ["error", "warn", "query", "info"];
+// const prismaLogLevels: Prisma.LogLevel[] = ["error"];
 
 export const prisma =
   globalForPrisma.prisma ??

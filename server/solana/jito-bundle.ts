@@ -19,7 +19,10 @@ const MAX_BUNDLE_SEND_ATTEMPTS = 3;
 const BUNDLE_RETRY_BASE_DELAY_MS = 500;
 const BUNDLE_RETRY_MAX_DELAY_MS = 2_000;
 const BUNDLE_CONFIRM_TIMEOUT_MS = 120_000;
-const BUNDLE_CONFIRM_INTERVAL_MS = 400;
+const BUNDLE_CONFIRM_INTERVAL_MS = 500;
+const BUNDLE_CONFIRM_INTERVAL_BACKOFF_MS = 2000;
+const BUNDLE_CONFIRM_GRPC_POLL_MS = 100;
+const BUNDLE_CONFIRM_RPC_SLOW_POLL_MS = 3000;
 const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
 
@@ -105,6 +108,18 @@ export async function sendJitoBundle(
         error: simulation.value.err,
         logs: simulation.value.logs?.slice(0, 8),
       });
+
+      const errStr = JSON.stringify(simulation.value.err);
+      const isCriticalError =
+        errStr.includes("InsufficientFundsForRent") ||
+        errStr.includes("InsufficientFunds") ||
+        errStr.includes("AccountNotFound") ||
+        errStr.includes("InvalidAccountData") ||
+        errStr.includes("ProgramFailedToComplete");
+
+      if (isCriticalError) {
+        throw new Error(`Transaction simulation failed: ${errStr}`);
+      }
     } else {
       logger.info("Bundle first transaction simulation succeeded", {
         unitsConsumed: simulation.value.unitsConsumed ?? null,
@@ -268,107 +283,166 @@ async function confirmBundleOnChain({
     fallbackRpcEndpoint: fallbackConnection?.rpcEndpoint ?? null,
     accountKeyCount: accountKeys.length,
   });
-  const grpcState: { done: boolean; result: Set<string> | null } = {
+  const grpcState: { done: boolean; result: Set<string> | null; active: boolean } = {
     done: false,
     result: null,
+    active: false,
   };
-  waitForSignaturesViaGrpc({
+
+  const grpcPromise = waitForSignaturesViaGrpc({
     signatures,
     accountKeys,
     timeoutMs: BUNDLE_CONFIRM_TIMEOUT_MS,
-  })
+  });
+
+  grpcPromise
     .then((result) => {
       grpcState.done = true;
       grpcState.result = result;
+      if (result !== null) {
+        grpcState.active = true;
+      }
     })
     .catch(() => {
       grpcState.done = true;
       grpcState.result = null;
     });
 
+  await sleep(50);
+  grpcState.active = !grpcState.done || grpcState.result !== null;
+
+  logger.info("Bundle confirmation mode", {
+    grpcActive: grpcState.active,
+    bundleId,
+  });
+
+  let currentInterval = grpcState.active
+    ? BUNDLE_CONFIRM_RPC_SLOW_POLL_MS
+    : BUNDLE_CONFIRM_INTERVAL_MS;
+  let rateLimitCount = 0;
+  let lastRpcCheckAt = 0;
+
   while (Date.now() - startedAt < BUNDLE_CONFIRM_TIMEOUT_MS) {
-    try {
-      if (grpcState.result?.has(signatures[0])) {
-        logger.info("Bundle confirmed via gRPC", {
-          bundleId: currentBundleId,
-          signature: signatures[0],
-          elapsedMs: Date.now() - startedAt,
-        });
-        return currentBundleId;
-      }
-      const primaryStatuses = await fetchSignatureStatuses(
-        connection,
-        signatures
-      );
-      const fallbackStatuses = fallbackConnection
-        ? await fetchSignatureStatuses(fallbackConnection, signatures)
-        : null;
-      const statuses = fallbackStatuses
-        ? mergeSignatureStatuses(primaryStatuses, fallbackStatuses)
-        : primaryStatuses;
-      const summary = summarizeBundleStatuses(statuses);
-      lastSummary = summary;
-      lastStatusError = null;
-      const summaryKey = `${summary.foundCount}:${summary.confirmedCount}:${summary.failedCount}:${summary.notFoundCount}:${summary.createStatus}`;
-      if (summaryKey !== lastLoggedSummary) {
-        logger.info("Bundle confirmation summary", {
-          bundleId: currentBundleId,
-          elapsedMs: Date.now() - startedAt,
-          blockhashAgeMs: Date.now() - blockhashFetchedAt,
-          ...summary,
-        });
-        lastLoggedSummary = summaryKey;
-      }
-      if (summary.createError) {
-        logger.warn("Bundle create failed", {
-          bundleId: currentBundleId,
-          createError: summary.createError,
-          elapsedMs: Date.now() - startedAt,
-        });
-        throw new Error(
-          `Create transaction failed: ${JSON.stringify(summary.createError)}`
+    if (grpcState.result?.has(signatures[0])) {
+      logger.info("Bundle confirmed via gRPC", {
+        bundleId: currentBundleId,
+        signature: signatures[0],
+        elapsedMs: Date.now() - startedAt,
+      });
+      return currentBundleId;
+    }
+
+    if (grpcState.done && grpcState.result === null && !grpcState.active) {
+      currentInterval = BUNDLE_CONFIRM_INTERVAL_MS;
+    }
+
+    const shouldCheckRpc =
+      !grpcState.active ||
+      grpcState.done ||
+      Date.now() - lastRpcCheckAt >= BUNDLE_CONFIRM_RPC_SLOW_POLL_MS;
+
+    if (shouldCheckRpc) {
+      lastRpcCheckAt = Date.now();
+      try {
+        const primaryStatuses = await fetchSignatureStatuses(
+          connection,
+          signatures
         );
-      }
-      if (summary.createConfirmed) {
-        return currentBundleId;
-      }
-      const blockhashAge = Date.now() - blockhashFetchedAt;
-      if (
-        summary.foundCount === 0 &&
-        blockhashAge < BUNDLE_BLOCKHASH_MAX_AGE_MS &&
-        Date.now() - lastResendAt > BUNDLE_RESEND_INTERVAL_MS
-      ) {
-        logger.warn("Bundle resend triggered", {
-          bundleId: currentBundleId,
-          elapsedMs: Date.now() - startedAt,
-          blockhashAgeMs: blockhashAge,
-        });
-        const previousBundleId = currentBundleId;
-        currentBundleId = await sendBundleWithRetries();
-        logger.info("Bundle resent", {
-          previousBundleId,
-          bundleId: currentBundleId,
-        });
-        lastResendAt = Date.now();
-      }
-    } catch (error) {
-      const primaryError =
-        error instanceof Error ? error.message : String(error);
-      let fallbackErrorText = "";
-      if (fallbackConnection && lastStatusError) {
-        fallbackErrorText = ` fallback=${lastStatusError}`;
-      }
-      lastStatusError = `${primaryError}${fallbackErrorText}`;
-      if (lastStatusError !== lastLoggedStatusError) {
-        logger.warn("Bundle status check error", {
-          bundleId: currentBundleId,
-          error: lastStatusError,
-          elapsedMs: Date.now() - startedAt,
-        });
-        lastLoggedStatusError = lastStatusError;
+        const fallbackStatuses = fallbackConnection
+          ? await fetchSignatureStatuses(fallbackConnection, signatures)
+          : null;
+        const statuses = fallbackStatuses
+          ? mergeSignatureStatuses(primaryStatuses, fallbackStatuses)
+          : primaryStatuses;
+        const summary = summarizeBundleStatuses(statuses);
+        lastSummary = summary;
+        lastStatusError = null;
+
+        if (rateLimitCount > 0) {
+          rateLimitCount = 0;
+          currentInterval = grpcState.active
+            ? BUNDLE_CONFIRM_RPC_SLOW_POLL_MS
+            : BUNDLE_CONFIRM_INTERVAL_MS;
+        }
+
+        const summaryKey = `${summary.foundCount}:${summary.confirmedCount}:${summary.failedCount}:${summary.notFoundCount}:${summary.createStatus}`;
+        if (summaryKey !== lastLoggedSummary) {
+          logger.info("Bundle confirmation summary", {
+            bundleId: currentBundleId,
+            elapsedMs: Date.now() - startedAt,
+            blockhashAgeMs: Date.now() - blockhashFetchedAt,
+            grpcActive: grpcState.active,
+            ...summary,
+          });
+          lastLoggedSummary = summaryKey;
+        }
+        if (summary.createError) {
+          logger.warn("Bundle create failed", {
+            bundleId: currentBundleId,
+            createError: summary.createError,
+            elapsedMs: Date.now() - startedAt,
+          });
+          throw new Error(
+            `Create transaction failed: ${JSON.stringify(summary.createError)}`
+          );
+        }
+        if (summary.createConfirmed) {
+          return currentBundleId;
+        }
+        const blockhashAge = Date.now() - blockhashFetchedAt;
+        if (
+          summary.foundCount === 0 &&
+          blockhashAge < BUNDLE_BLOCKHASH_MAX_AGE_MS &&
+          Date.now() - lastResendAt > BUNDLE_RESEND_INTERVAL_MS
+        ) {
+          logger.warn("Bundle resend triggered", {
+            bundleId: currentBundleId,
+            elapsedMs: Date.now() - startedAt,
+            blockhashAgeMs: blockhashAge,
+          });
+          const previousBundleId = currentBundleId;
+          currentBundleId = await sendBundleWithRetries();
+          logger.info("Bundle resent", {
+            previousBundleId,
+            bundleId: currentBundleId,
+          });
+          lastResendAt = Date.now();
+        }
+      } catch (error) {
+        const primaryError =
+          error instanceof Error ? error.message : String(error);
+        let fallbackErrorText = "";
+        if (fallbackConnection && lastStatusError) {
+          fallbackErrorText = ` fallback=${lastStatusError}`;
+        }
+        lastStatusError = `${primaryError}${fallbackErrorText}`;
+        if (lastStatusError !== lastLoggedStatusError) {
+          logger.warn("Bundle status check error", {
+            bundleId: currentBundleId,
+            error: lastStatusError,
+            elapsedMs: Date.now() - startedAt,
+          });
+          lastLoggedStatusError = lastStatusError;
+        }
+
+        if (isRateLimitMessage(primaryError)) {
+          rateLimitCount += 1;
+          currentInterval = Math.min(
+            BUNDLE_CONFIRM_INTERVAL_BACKOFF_MS * rateLimitCount,
+            BUNDLE_CONFIRM_TIMEOUT_MS / 10
+          );
+          logger.info("Rate limit detected, backing off", {
+            rateLimitCount,
+            nextIntervalMs: currentInterval,
+          });
+        }
       }
     }
-    await sleep(BUNDLE_CONFIRM_INTERVAL_MS);
+
+    const pollInterval = grpcState.active
+      ? BUNDLE_CONFIRM_GRPC_POLL_MS
+      : currentInterval;
+    await sleep(pollInterval);
   }
 
   const summaryText = lastSummary

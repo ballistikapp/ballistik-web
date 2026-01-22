@@ -41,6 +41,26 @@ export const LaunchLogLevel = {
 export type LaunchLogLevel = (typeof LaunchLogLevel)[keyof typeof LaunchLogLevel]
 
 
+export const HoldingExitStatus = {
+  PENDING: 'PENDING',
+  RUNNING: 'RUNNING',
+  FAILED: 'FAILED',
+  SUCCEEDED: 'SUCCEEDED'
+} as const
+
+export type HoldingExitStatus = (typeof HoldingExitStatus)[keyof typeof HoldingExitStatus]
+
+
+export const HoldingExitLogLevel = {
+  INFO: 'INFO',
+  WARN: 'WARN',
+  ERROR: 'ERROR',
+  STEP: 'STEP'
+} as const
+
+export type HoldingExitLogLevel = (typeof HoldingExitLogLevel)[keyof typeof HoldingExitLogLevel]
+
+
 export const VolumeBotSessionStatus = {
   DRAFT: 'DRAFT',
   RUNNING: 'RUNNING',

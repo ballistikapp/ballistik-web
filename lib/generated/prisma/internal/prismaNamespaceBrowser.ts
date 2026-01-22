@@ -58,6 +58,8 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  HoldingExit: 'HoldingExit',
+  HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
   VolumeBotWallet: 'VolumeBotWallet',
   VolumeBotLog: 'VolumeBotLog',
@@ -176,6 +178,38 @@ export const LaunchLogScalarFieldEnum = {
 } as const
 
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
+
+
+export const HoldingExitScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  status: 'status',
+  progress: 'progress',
+  currentStep: 'currentStep',
+  input: 'input',
+  result: 'result',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type HoldingExitScalarFieldEnum = (typeof HoldingExitScalarFieldEnum)[keyof typeof HoldingExitScalarFieldEnum]
+
+
+export const HoldingExitLogScalarFieldEnum = {
+  id: 'id',
+  exitId: 'exitId',
+  level: 'level',
+  message: 'message',
+  step: 'step',
+  data: 'data',
+  createdAt: 'createdAt'
+} as const
+
+export type HoldingExitLogScalarFieldEnum = (typeof HoldingExitLogScalarFieldEnum)[keyof typeof HoldingExitLogScalarFieldEnum]
 
 
 export const VolumeBotSessionScalarFieldEnum = {

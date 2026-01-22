@@ -355,6 +355,40 @@ export type EnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
 }
 
+export type EnumHoldingExitStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitStatus | Prisma.EnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel> | $Enums.HoldingExitStatus
+}
+
+export type EnumHoldingExitStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitStatus | Prisma.EnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitStatusWithAggregatesFilter<$PrismaModel> | $Enums.HoldingExitStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel>
+}
+
+export type EnumHoldingExitLogLevelFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitLogLevel | Prisma.EnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel> | $Enums.HoldingExitLogLevel
+}
+
+export type EnumHoldingExitLogLevelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitLogLevel | Prisma.EnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitLogLevelWithAggregatesFilter<$PrismaModel> | $Enums.HoldingExitLogLevel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel>
+}
+
 export type EnumVolumeBotSessionStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.VolumeBotSessionStatus | Prisma.EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
   in?: $Enums.VolumeBotSessionStatus[] | Prisma.ListEnumVolumeBotSessionStatusFieldRefInput<$PrismaModel>
@@ -772,6 +806,40 @@ export type NestedEnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> =
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
+}
+
+export type NestedEnumHoldingExitStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitStatus | Prisma.EnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel> | $Enums.HoldingExitStatus
+}
+
+export type NestedEnumHoldingExitStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitStatus | Prisma.EnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitStatus[] | Prisma.ListEnumHoldingExitStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitStatusWithAggregatesFilter<$PrismaModel> | $Enums.HoldingExitStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumHoldingExitStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumHoldingExitLogLevelFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitLogLevel | Prisma.EnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel> | $Enums.HoldingExitLogLevel
+}
+
+export type NestedEnumHoldingExitLogLevelWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.HoldingExitLogLevel | Prisma.EnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  in?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  notIn?: $Enums.HoldingExitLogLevel[] | Prisma.ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumHoldingExitLogLevelWithAggregatesFilter<$PrismaModel> | $Enums.HoldingExitLogLevel
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumHoldingExitLogLevelFilter<$PrismaModel>
 }
 
 export type NestedEnumVolumeBotSessionStatusFilter<$PrismaModel = never> = {

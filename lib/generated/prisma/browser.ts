@@ -53,6 +53,16 @@ export type Launch = Prisma.LaunchModel
  */
 export type LaunchLog = Prisma.LaunchLogModel
 /**
+ * Model HoldingExit
+ * 
+ */
+export type HoldingExit = Prisma.HoldingExitModel
+/**
+ * Model HoldingExitLog
+ * 
+ */
+export type HoldingExitLog = Prisma.HoldingExitLogModel
+/**
  * Model VolumeBotSession
  * 
  */

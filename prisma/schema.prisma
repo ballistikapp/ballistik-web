@@ -23,6 +23,7 @@ model User {
   wallets Wallet[] @relation("WalletUser")
   tokens Token[] @relation("TokenUser")
   launches Launch[] @relation("LaunchUser")
+  holdingExits HoldingExit[] @relation("HoldingExitUser")
   volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionUser")
   vanityMints VanityMint[] @relation("VanityMintUser")
   refreshCaches RefreshCache[]
@@ -80,6 +81,7 @@ model Token {
   transactions Transaction[] @relation("TokenTransactions")
   refreshCaches RefreshCache[]
   launches Launch[] @relation("LaunchToken")
+  holdingExits HoldingExit[] @relation("HoldingExitToken")
   volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionToken")
   vanityMints VanityMint[]
   @@map("Token")
@@ -103,6 +105,20 @@ enum LaunchStatus {
 }
 
 enum LaunchLogLevel {
+  INFO
+  WARN
+  ERROR
+  STEP
+}
+
+enum HoldingExitStatus {
+  PENDING
+  RUNNING
+  FAILED
+  SUCCEEDED
+}
+
+enum HoldingExitLogLevel {
   INFO
   WARN
   ERROR
@@ -167,6 +183,40 @@ model LaunchLog {
   data Json?
   createdAt DateTime @default(now())
   @@map("LaunchLog")
+}
+
+model HoldingExit {
+  id String @id @default(cuid())
+  userId String
+  user User @relation("HoldingExitUser", fields: [userId], references: [id])
+  tokenPublicKey String
+  token Token @relation("HoldingExitToken", fields: [tokenPublicKey], references: [publicKey])
+  status HoldingExitStatus @default(PENDING)
+  progress Int @default(0)
+  currentStep String?
+  input Json
+  result Json?
+  startedAt DateTime?
+  completedAt DateTime?
+  errorMessage String?
+  logs HoldingExitLog[] @relation("HoldingExitLogs")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, tokenPublicKey, status])
+  @@map("HoldingExit")
+}
+
+model HoldingExitLog {
+  id String @id @default(cuid())
+  exitId String
+  exit HoldingExit @relation("HoldingExitLogs", fields: [exitId], references: [id])
+  level HoldingExitLogLevel
+  message String
+  step String?
+  data Json?
+  createdAt DateTime @default(now())
+  @@index([exitId, createdAt])
+  @@map("HoldingExitLog")
 }
 
 model VolumeBotSession {

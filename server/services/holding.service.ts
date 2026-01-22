@@ -205,80 +205,116 @@ export const holdingService = {
       (mintInfo.value?.data as { parsed?: { info?: { decimals?: number } } })
         ?.parsed?.info?.decimals ?? 9;
 
-    const balanceResults = await mapWithConcurrency(
-      wallets,
-      rpcConfig.tuning.holdingBalanceConcurrency,
-      async (wallet) => {
-        const ownerPublicKey = new PublicKey(wallet.publicKey);
-        const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
-          ownerPublicKey,
-          { mint: mintPublicKey }
-        );
-        const tokenBalance = tokenAccounts.value.reduce((total, account) => {
-          const amount =
-            account.account.data.parsed?.info?.tokenAmount?.uiAmount ?? 0;
-          return total + amount;
-        }, 0);
-
-        return { wallet, tokenBalance };
-      }
+    const atas = await Promise.all(
+      wallets.map(async (wallet) => ({
+        wallet,
+        ata: await getAssociatedTokenAddress(
+          mintPublicKey,
+          new PublicKey(wallet.publicKey)
+        ),
+      }))
     );
+
+    const ataAddresses = atas.map((a) => a.ata);
+    const accountInfos = await connection.getMultipleParsedAccounts(ataAddresses);
+
+    const balanceResults = atas.map(({ wallet, ata }, index) => {
+      const accountInfo = accountInfos.value[index];
+      let tokenBalance = 0;
+      if (accountInfo?.data && "parsed" in accountInfo.data) {
+        const parsed = accountInfo.data.parsed as {
+          info?: { tokenAmount?: { uiAmount?: number } };
+        };
+        tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
+      }
+      return { wallet, tokenBalance };
+    });
+
+    const walletPublicKeys = balanceResults.map((r) => r.wallet.publicKey);
+
+    const [transactionAggregates, lastTransactions, existingHoldings] =
+      await Promise.all([
+        prisma.transaction.groupBy({
+          by: ["walletPublicKey", "transactionType"],
+          where: {
+            walletPublicKey: { in: walletPublicKeys },
+            tokenPublicKey: token.publicKey,
+          },
+          _sum: { solAmount: true, tokenAmount: true },
+        }),
+        prisma.$queryRaw<
+          Array<{ walletPublicKey: string; transactionSignature: string }>
+        >`
+          SELECT DISTINCT ON ("walletPublicKey") 
+            "walletPublicKey", 
+            "transactionSignature"
+          FROM "Transaction"
+          WHERE "walletPublicKey" = ANY(${walletPublicKeys})
+            AND "tokenPublicKey" = ${token.publicKey}
+          ORDER BY "walletPublicKey", "createdAt" DESC
+        `,
+        prisma.holding.findMany({
+          where: {
+            walletPublicKey: { in: walletPublicKeys },
+            tokenPublicKey: token.publicKey,
+          },
+          select: { id: true, walletPublicKey: true },
+        }),
+      ]);
+
+    const aggregateMap = new Map<
+      string,
+      { buy: { sol: number; tokens: number }; sell: { sol: number } }
+    >();
+    for (const agg of transactionAggregates) {
+      const existing = aggregateMap.get(agg.walletPublicKey) ?? {
+        buy: { sol: 0, tokens: 0 },
+        sell: { sol: 0 },
+      };
+      if (agg.transactionType === "BUY") {
+        existing.buy.sol = Number(agg._sum.solAmount ?? 0);
+        existing.buy.tokens = Number(agg._sum.tokenAmount ?? 0);
+      } else if (agg.transactionType === "SELL") {
+        existing.sell.sol = Number(agg._sum.solAmount ?? 0);
+      }
+      aggregateMap.set(agg.walletPublicKey, existing);
+    }
+
+    const lastTxMap = new Map<string, string>();
+    for (const tx of lastTransactions) {
+      lastTxMap.set(tx.walletPublicKey, tx.transactionSignature);
+    }
+
+    const existingHoldingMap = new Map<string, string>();
+    for (const holding of existingHoldings) {
+      existingHoldingMap.set(holding.walletPublicKey, holding.id);
+    }
 
     const now = new Date();
     const updateResults = await Promise.all(
       balanceResults.map(async ({ wallet, tokenBalance }) => {
-        const [buyAgg, sellAgg, lastTx] = await Promise.all([
-          prisma.transaction.aggregate({
-            where: {
-              walletPublicKey: wallet.publicKey,
-              tokenPublicKey: token.publicKey,
-              transactionType: "BUY",
-            },
-            _sum: { solAmount: true, tokenAmount: true },
-          }),
-          prisma.transaction.aggregate({
-            where: {
-              walletPublicKey: wallet.publicKey,
-              tokenPublicKey: token.publicKey,
-              transactionType: "SELL",
-            },
-            _sum: { solAmount: true, tokenAmount: true },
-          }),
-          prisma.transaction.findFirst({
-            where: {
-              walletPublicKey: wallet.publicKey,
-              tokenPublicKey: token.publicKey,
-            },
-            orderBy: { createdAt: "desc" },
-            select: { transactionSignature: true },
-          }),
-        ]);
-
-        const totalBuyAmount = Number(buyAgg._sum.solAmount ?? 0);
-        const totalSellAmount = Number(sellAgg._sum.solAmount ?? 0);
-        const totalBuyTokens = Number(buyAgg._sum.tokenAmount ?? 0);
+        const agg = aggregateMap.get(wallet.publicKey) ?? {
+          buy: { sol: 0, tokens: 0 },
+          sell: { sol: 0 },
+        };
+        const totalBuyAmount = agg.buy.sol;
+        const totalSellAmount = agg.sell.sol;
+        const totalBuyTokens = agg.buy.tokens;
         const averageBuyPrice =
           totalBuyTokens > 0 ? totalBuyAmount / totalBuyTokens : 0;
+        const lastTxSignature = lastTxMap.get(wallet.publicKey) ?? "";
+        const existingId = existingHoldingMap.get(wallet.publicKey);
 
         if (tokenBalance > 0) {
-          const existing = await prisma.holding.findFirst({
-            where: {
-              walletPublicKey: wallet.publicKey,
-              tokenPublicKey: token.publicKey,
-            },
-            select: { id: true },
-          });
-
-          if (existing) {
+          if (existingId) {
             return prisma.holding.update({
-              where: { id: existing.id },
+              where: { id: existingId },
               data: {
                 tokenBalance,
                 totalBuyAmount,
                 totalSellAmount,
                 averageBuyPrice,
-                lastTransactionSignature:
-                  lastTx?.transactionSignature ?? "",
+                lastTransactionSignature: lastTxSignature,
                 lastUpdated: now,
                 mintAddress: token.publicKey,
                 tokenName: token.name,
@@ -297,7 +333,7 @@ export const holdingService = {
               totalBuyAmount,
               totalSellAmount,
               averageBuyPrice,
-              lastTransactionSignature: lastTx?.transactionSignature ?? "",
+              lastTransactionSignature: lastTxSignature,
               lastUpdated: now,
               mintAddress: token.publicKey,
               tokenName: token.name,
@@ -308,12 +344,9 @@ export const holdingService = {
           });
         }
 
-        await prisma.holding.deleteMany({
-          where: {
-            walletPublicKey: wallet.publicKey,
-            tokenPublicKey: token.publicKey,
-          },
-        });
+        if (existingId) {
+          await prisma.holding.delete({ where: { id: existingId } });
+        }
 
         return null;
       })

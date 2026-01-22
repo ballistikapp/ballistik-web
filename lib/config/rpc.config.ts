@@ -22,8 +22,8 @@ export const rpcConfig = {
   shyftGrpcRegions,
   tuning: {
     solBalanceBatchSize: 100,
-    tokenBalanceConcurrency: 8,
-    holdingBalanceConcurrency: 8,
+    tokenBalanceConcurrency: 5,
+    holdingBalanceConcurrency: 5,
   },
 };
 

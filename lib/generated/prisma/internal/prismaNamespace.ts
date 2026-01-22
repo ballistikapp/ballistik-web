@@ -391,6 +391,8 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  HoldingExit: 'HoldingExit',
+  HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
   VolumeBotWallet: 'VolumeBotWallet',
   VolumeBotLog: 'VolumeBotLog',
@@ -413,7 +415,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "volumeBotSession" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -932,6 +934,154 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.LaunchLogCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.LaunchLogCountAggregateOutputType> | number
+        }
+      }
+    }
+    HoldingExit: {
+      payload: Prisma.$HoldingExitPayload<ExtArgs>
+      fields: Prisma.HoldingExitFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.HoldingExitFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.HoldingExitFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        findFirst: {
+          args: Prisma.HoldingExitFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.HoldingExitFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        findMany: {
+          args: Prisma.HoldingExitFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>[]
+        }
+        create: {
+          args: Prisma.HoldingExitCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        createMany: {
+          args: Prisma.HoldingExitCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.HoldingExitCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>[]
+        }
+        delete: {
+          args: Prisma.HoldingExitDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        update: {
+          args: Prisma.HoldingExitUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        deleteMany: {
+          args: Prisma.HoldingExitDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.HoldingExitUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.HoldingExitUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>[]
+        }
+        upsert: {
+          args: Prisma.HoldingExitUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitPayload>
+        }
+        aggregate: {
+          args: Prisma.HoldingExitAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateHoldingExit>
+        }
+        groupBy: {
+          args: Prisma.HoldingExitGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.HoldingExitGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.HoldingExitCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.HoldingExitCountAggregateOutputType> | number
+        }
+      }
+    }
+    HoldingExitLog: {
+      payload: Prisma.$HoldingExitLogPayload<ExtArgs>
+      fields: Prisma.HoldingExitLogFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.HoldingExitLogFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.HoldingExitLogFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        findFirst: {
+          args: Prisma.HoldingExitLogFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.HoldingExitLogFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        findMany: {
+          args: Prisma.HoldingExitLogFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>[]
+        }
+        create: {
+          args: Prisma.HoldingExitLogCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        createMany: {
+          args: Prisma.HoldingExitLogCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.HoldingExitLogCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>[]
+        }
+        delete: {
+          args: Prisma.HoldingExitLogDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        update: {
+          args: Prisma.HoldingExitLogUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        deleteMany: {
+          args: Prisma.HoldingExitLogDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.HoldingExitLogUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.HoldingExitLogUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>[]
+        }
+        upsert: {
+          args: Prisma.HoldingExitLogUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$HoldingExitLogPayload>
+        }
+        aggregate: {
+          args: Prisma.HoldingExitLogAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateHoldingExitLog>
+        }
+        groupBy: {
+          args: Prisma.HoldingExitLogGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.HoldingExitLogGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.HoldingExitLogCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.HoldingExitLogCountAggregateOutputType> | number
         }
       }
     }
@@ -1587,6 +1737,38 @@ export const LaunchLogScalarFieldEnum = {
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
 
 
+export const HoldingExitScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  status: 'status',
+  progress: 'progress',
+  currentStep: 'currentStep',
+  input: 'input',
+  result: 'result',
+  startedAt: 'startedAt',
+  completedAt: 'completedAt',
+  errorMessage: 'errorMessage',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type HoldingExitScalarFieldEnum = (typeof HoldingExitScalarFieldEnum)[keyof typeof HoldingExitScalarFieldEnum]
+
+
+export const HoldingExitLogScalarFieldEnum = {
+  id: 'id',
+  exitId: 'exitId',
+  level: 'level',
+  message: 'message',
+  step: 'step',
+  data: 'data',
+  createdAt: 'createdAt'
+} as const
+
+export type HoldingExitLogScalarFieldEnum = (typeof HoldingExitLogScalarFieldEnum)[keyof typeof HoldingExitLogScalarFieldEnum]
+
+
 export const VolumeBotSessionScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -1890,6 +2072,34 @@ export type ListEnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputTyp
 
 
 /**
+ * Reference to a field of type 'HoldingExitStatus'
+ */
+export type EnumHoldingExitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'HoldingExitStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'HoldingExitStatus[]'
+ */
+export type ListEnumHoldingExitStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'HoldingExitStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'HoldingExitLogLevel'
+ */
+export type EnumHoldingExitLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'HoldingExitLogLevel'>
+    
+
+
+/**
+ * Reference to a field of type 'HoldingExitLogLevel[]'
+ */
+export type ListEnumHoldingExitLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'HoldingExitLogLevel[]'>
+    
+
+
+/**
  * Reference to a field of type 'VolumeBotSessionStatus'
  */
 export type EnumVolumeBotSessionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'VolumeBotSessionStatus'>
@@ -2102,6 +2312,8 @@ export type GlobalOmitConfig = {
   tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
   launchLog?: Prisma.LaunchLogOmit
+  holdingExit?: Prisma.HoldingExitOmit
+  holdingExitLog?: Prisma.HoldingExitLogOmit
   volumeBotSession?: Prisma.VolumeBotSessionOmit
   volumeBotWallet?: Prisma.VolumeBotWalletOmit
   volumeBotLog?: Prisma.VolumeBotLogOmit
