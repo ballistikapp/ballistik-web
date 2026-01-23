@@ -4,10 +4,7 @@ export const registerSchema = z
   .object({
     privateKey: z.string().min(32, "Invalid private key").optional(),
     generateWallet: z.boolean().default(false),
-    accountName: z
-      .string()
-      .min(1, "Account name is required")
-      .max(100, "Account name is too long"),
+    accountName: z.string().max(100, "Account name is too long").optional(),
   })
   .refine(
     (data) => {
@@ -23,7 +20,7 @@ export const registerSchema = z
       message:
         "Either provide a private key or request wallet generation, not both",
       path: ["privateKey"],
-    }
+    },
   );
 
 export const loginWithPrivateKeySchema = z.object({

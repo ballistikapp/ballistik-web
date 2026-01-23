@@ -351,9 +351,9 @@ async function buildExitBundleTransactions({
   }
 
   const senders = chunk.slice(1);
-  const senderGroups = chunkWallets(senders, 5);
-  const lastGroup = senderGroups.pop() ?? [];
-  const groups = [...senderGroups, lastGroup];
+  // Reduced from 5 to 3 transfers per group to stay under tx size limit
+  // Each transfer adds ~100 bytes (accounts + instruction data)
+  const senderGroups = chunkWallets(senders, 3);
   const transactions: Transaction[] = [];
   const signerGroups: Keypair[][] = [];
 
@@ -365,9 +365,9 @@ async function buildExitBundleTransactions({
   );
   const program = getPumpProgram(provider);
 
-  for (let groupIndex = 0; groupIndex < groups.length; groupIndex += 1) {
-    const group = groups[groupIndex];
-    const isFinal = groupIndex === groups.length - 1;
+  // Process transfer groups (no sell instruction in these)
+  for (let groupIndex = 0; groupIndex < senderGroups.length; groupIndex += 1) {
+    const group = senderGroups[groupIndex];
     const tx = new Transaction();
 
     if (ensureSellerAta && groupIndex === 0) {
@@ -403,28 +403,41 @@ async function buildExitBundleTransactions({
       transferSigners.push(senderKeypair);
     }
 
-    if (isFinal) {
-      const sellTx = await sellTokensWithNewIdl(
-        program,
-        sellerKeypair,
-        mint,
-        new BN(totalAmount.toString()),
-        new BN(0)
-      );
-      sellTx.instructions.forEach((instruction) => {
-        tx.add(instruction);
-      });
-    }
-
     tx.feePayer = mainWallet.publicKey;
     transactions.push(tx);
-
-    const signers = [mainWallet, ...transferSigners];
-    if (isFinal) {
-      signers.push(sellerKeypair);
-    }
-    signerGroups.push(signers);
+    signerGroups.push([mainWallet, ...transferSigners]);
   }
+
+  // Create a separate sell transaction (no transfers, only sell)
+  // This ensures the sell tx with its 14 accounts stays under size limit
+  const sellTx = new Transaction();
+
+  // If no transfers were made (seller is the only wallet), ensure ATA exists
+  if (senderGroups.length === 0 && ensureSellerAta) {
+    sellTx.add(
+      createAssociatedTokenAccountInstruction(
+        mainWallet.publicKey,
+        sellerAta,
+        sellerPublicKey,
+        mint
+      )
+    );
+  }
+
+  const sellIxTx = await sellTokensWithNewIdl(
+    program,
+    sellerKeypair,
+    mint,
+    new BN(totalAmount.toString()),
+    new BN(0)
+  );
+  sellIxTx.instructions.forEach((instruction) => {
+    sellTx.add(instruction);
+  });
+
+  sellTx.feePayer = mainWallet.publicKey;
+  transactions.push(sellTx);
+  signerGroups.push([mainWallet, sellerKeypair]);
 
   if (transactions.length > MAX_BUNDLE_TXS) {
     throw new AppError("Exit bundle exceeds max transaction count", 400);
@@ -594,7 +607,10 @@ async function runExitFlow(exitId: string) {
       return;
     }
 
-    const chunks = chunkWallets(nonZeroBalances, 24);
+    // Reduced from 24 to 13 to stay within bundle tx limit
+    // With 3 transfers per tx and max 5 txs per bundle (1 for sell):
+    // 4 transfer txs * 3 transfers each = 12 transfers + 1 seller = 13 wallets
+    const chunks = chunkWallets(nonZeroBalances, 13);
     const totalTokens = nonZeroBalances.reduce(
       (total, entry) => total + entry.balance,
       BigInt(0)

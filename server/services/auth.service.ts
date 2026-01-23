@@ -59,9 +59,13 @@ export const authService = {
         },
       });
 
+      const accountName =
+        input.accountName?.trim() ||
+        `${publicKey.slice(0, 4)}-${publicKey.slice(-4)}`;
+
       const user = await prisma.user.create({
         data: {
-          name: input.accountName,
+          name: accountName,
           mainWalletPublicKey: publicKey,
         },
       });
@@ -93,7 +97,7 @@ export const authService = {
   },
 
   async loginWithPrivateKey(
-    input: LoginWithPrivateKeyInput
+    input: LoginWithPrivateKeyInput,
   ): Promise<AuthUserOutput> {
     try {
       let keypair: Keypair;

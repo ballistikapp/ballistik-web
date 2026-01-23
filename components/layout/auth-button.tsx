@@ -21,7 +21,6 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { AuthDialog } from "@/components/auth/auth-dialog";
 import { trpc } from "@/lib/trpc/client";
 import { copyToClipboard } from "@/lib/utils";
 import {
@@ -32,7 +31,6 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 
 export function AuthButton() {
-  const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
   const { data: currentUser, isLoading } = trpc.auth.me.useQuery();
 
   const isLoggedIn = currentUser !== null && currentUser !== undefined;
@@ -90,24 +88,22 @@ export function AuthButton() {
 
   if (!isLoggedIn) {
     return (
-      <>
-        <Button
-          variant="outline"
-          size="default"
-          onClick={() => setAuthDialogOpen(true)}
-          className="gap-2"
-        >
+      <Button
+        variant="outline"
+        size="default"
+        className="gap-2"
+        asChild
+      >
+        <Link href="/auth">
           <IconWallet className="size-5" />
           <span>Login</span>
-        </Button>
-        <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
-      </>
+        </Link>
+      </Button>
     );
   }
 
   return (
-    <>
-      <DropdownMenu>
+    <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button
             variant="ghost"
@@ -210,7 +206,6 @@ export function AuthButton() {
             Log out
           </DropdownMenuItem>
         </DropdownMenuContent>
-      </DropdownMenu>
-    </>
+    </DropdownMenu>
   );
 }
