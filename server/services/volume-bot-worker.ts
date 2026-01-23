@@ -73,16 +73,9 @@ const selectAction = (
   return "WAIT";
 };
 
-const requestStopIfNeeded = async (sessionId: string) => {
-  await prisma.volumeBotSession.updateMany({
-    where: { id: sessionId, status: "RUNNING" },
-    data: { status: "STOP_REQUESTED", stopRequestedAt: new Date() },
-  });
-};
-
 export const processVolumeBotWallet = async (
   volumeWallet: VolumeBotWalletWithRelations
-) => {
+): Promise<Date | null> => {
   const walletId = volumeWallet.id;
   const walletPk = volumeWallet.walletPublicKey.slice(0, 8);
   console.log(`[Worker] Processing wallet ${walletPk} (${walletId})`);
@@ -90,18 +83,18 @@ export const processVolumeBotWallet = async (
   const session = volumeWallet.session;
   if (session.status !== "RUNNING") {
     console.log(`[Worker] Skipping ${walletPk}: session not RUNNING (${session.status})`);
-    return;
+    return null;
   }
 
   if (session.scheduledStopAt && session.scheduledStopAt <= new Date()) {
     console.log(`[Worker] Session ${session.id} scheduled stop reached`);
-    await requestStopIfNeeded(session.id);
-    return;
+    await stopVolumeBotSession(session.id);
+    return null;
   }
 
   if (volumeWallet.status !== "ACTIVE") {
     console.log(`[Worker] Skipping ${walletPk}: wallet not ACTIVE (${volumeWallet.status})`);
-    return;
+    return null;
   }
 
   const config = session.config as VolumeBotConfigInput;
@@ -112,7 +105,7 @@ export const processVolumeBotWallet = async (
       where: { id: volumeWallet.id },
       data: { nextTickAt: nextTick },
     });
-    return;
+    return nextTick;
   }
   console.log(`[Worker] ${walletPk}: Fetching balances...`);
   const connection = getSolanaConnection();
@@ -142,7 +135,7 @@ export const processVolumeBotWallet = async (
       where: { id: volumeWallet.id },
       data: { nextTickAt: nextTick },
     });
-    return;
+    return nextTick;
   }
 
   let signature: string | null = null;
@@ -161,11 +154,12 @@ export const processVolumeBotWallet = async (
 
       if (solBalanceLamports < requiredLamports) {
         console.log(`[Worker] ${walletPk}: Insufficient balance, skipping`);
+        const nextTick = computeNextTickAt(config);
         await prisma.volumeBotWallet.update({
           where: { id: volumeWallet.id },
-          data: { nextTickAt: computeNextTickAt(config) },
+          data: { nextTickAt: nextTick },
         });
-        return;
+        return nextTick;
       }
 
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
@@ -192,11 +186,12 @@ export const processVolumeBotWallet = async (
 
       if (tokenAmount <= BigInt(0)) {
         console.log(`[Worker] ${walletPk}: No tokens to sell, skipping`);
+        const nextTick = computeNextTickAt(config);
         await prisma.volumeBotWallet.update({
           where: { id: volumeWallet.id },
-          data: { nextTickAt: computeNextTickAt(config) },
+          data: { nextTickAt: nextTick },
         });
-        return;
+        return nextTick;
       }
       const provider = new AnchorProvider(
         connection,
@@ -280,6 +275,7 @@ export const processVolumeBotWallet = async (
       },
     });
     console.log(`[Worker] ${walletPk}: Trade complete!`);
+    return nextTick;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error(`[Worker] ${walletPk}: ERROR - ${message}`);
@@ -295,10 +291,12 @@ export const processVolumeBotWallet = async (
         walletPublicKey: volumeWallet.walletPublicKey,
       },
     });
+    const nextTick = computeNextTickAt(config);
     await prisma.volumeBotWallet.update({
       where: { id: volumeWallet.id },
-      data: { nextTickAt: computeNextTickAt(config) },
+      data: { nextTickAt: nextTick },
     });
+    return nextTick;
   }
 };
 
@@ -319,75 +317,91 @@ export const stopVolumeBotSession = async (sessionId: string) => {
     data: { status: "STOPPING" },
   });
 
-  const wallets = await prisma.volumeBotWallet.findMany({
-    where: { sessionId: session.id },
-    include: { wallet: true },
-  });
+  try {
+    const wallets = await prisma.volumeBotWallet.findMany({
+      where: { sessionId: session.id },
+      include: { wallet: true },
+    });
 
-  const connection = getSolanaConnection();
-  const mintPublicKey = new PublicKey(session.tokenPublicKey);
+    const connection = getSolanaConnection();
+    const mintPublicKey = new PublicKey(session.tokenPublicKey);
 
-  if (config.sellOnStop) {
-    await mapWithConcurrency(wallets, 3, async (volumeWallet) => {
-      const walletKeypair = Keypair.fromSecretKey(
-        bs58.decode(volumeWallet.wallet.privateKey)
-      );
-      const tokenBalance = await getTokenBalance(
-        walletKeypair.publicKey,
-        mintPublicKey
-      );
-      if (tokenBalance <= BigInt(0)) {
-        return;
-      }
-      const provider = new AnchorProvider(
-        connection,
-        new NodeWallet(walletKeypair),
-        { commitment: "finalized" }
-      );
-      const program = getPumpProgram(provider);
-      const sellTx = await sellTokensWithNewIdl(
-        program,
-        walletKeypair,
-        mintPublicKey,
-        new BN(tokenBalance.toString()),
-        new BN(0)
-      );
-      const { blockhash, lastValidBlockHeight } =
-        await connection.getLatestBlockhash("confirmed");
-      sellTx.recentBlockhash = blockhash;
-      sellTx.lastValidBlockHeight = lastValidBlockHeight;
-      sellTx.feePayer = walletKeypair.publicKey;
-      await sendAndConfirmTransaction(connection, sellTx, [walletKeypair]);
+    if (config.sellOnStop) {
+      await mapWithConcurrency(wallets, 3, async (volumeWallet) => {
+        const walletKeypair = Keypair.fromSecretKey(
+          bs58.decode(volumeWallet.wallet.privateKey)
+        );
+        const tokenBalance = await getTokenBalance(
+          walletKeypair.publicKey,
+          mintPublicKey
+        );
+        if (tokenBalance <= BigInt(0)) {
+          return;
+        }
+        const provider = new AnchorProvider(
+          connection,
+          new NodeWallet(walletKeypair),
+          { commitment: "finalized" }
+        );
+        const program = getPumpProgram(provider);
+        const sellTx = await sellTokensWithNewIdl(
+          program,
+          walletKeypair,
+          mintPublicKey,
+          new BN(tokenBalance.toString()),
+          new BN(0)
+        );
+        const { blockhash, lastValidBlockHeight } =
+          await connection.getLatestBlockhash("confirmed");
+        sellTx.recentBlockhash = blockhash;
+        sellTx.lastValidBlockHeight = lastValidBlockHeight;
+        sellTx.feePayer = walletKeypair.publicKey;
+        await sendAndConfirmTransaction(connection, sellTx, [walletKeypair]);
+      });
+    }
+
+    const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
+    const reclaimResults = await walletService.returnSolToMainWallet(
+      session.tokenPublicKey,
+      session.userId,
+      walletPublicKeys,
+      undefined,
+      true
+    );
+
+    const now = new Date();
+    await prisma.$transaction(
+      reclaimResults.map((result) =>
+        prisma.volumeBotWallet.updateMany({
+          where: { sessionId: session.id, walletPublicKey: result.publicKey },
+          data: {
+            status: result.signature ? "RECLAIMED" : undefined,
+            reclaimedAt: result.signature ? now : undefined,
+            reclaimTxSignature: result.signature ?? undefined,
+          },
+        })
+      )
+    );
+
+    await prisma.volumeBotSession.update({
+      where: { id: session.id },
+      data: { status: "STOPPED", stoppedAt: now },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    await prisma.volumeBotLog.create({
+      data: {
+        sessionId: session.id,
+        level: "ERROR",
+        type: "stop",
+        message,
+      },
+    });
+    await prisma.volumeBotSession.update({
+      where: { id: session.id },
+      data: { status: "FAILED", stoppedAt: new Date() },
     });
   }
-
-  const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
-  const reclaimResults = await walletService.returnSolToMainWallet(
-    session.tokenPublicKey,
-    session.userId,
-    walletPublicKeys,
-    undefined,
-    true
-  );
-
-  const now = new Date();
-  await prisma.$transaction(
-    reclaimResults.map((result) =>
-      prisma.volumeBotWallet.updateMany({
-        where: { sessionId: session.id, walletPublicKey: result.publicKey },
-        data: {
-          status: result.signature ? "RECLAIMED" : undefined,
-          reclaimedAt: result.signature ? now : undefined,
-          reclaimTxSignature: result.signature ?? undefined,
-        },
-      })
-    )
-  );
-
-  await prisma.volumeBotSession.update({
-    where: { id: session.id },
-    data: { status: "STOPPED", stoppedAt: now },
-  });
 };
 
 export const reclaimVolumeBotSession = async (sessionId: string) => {

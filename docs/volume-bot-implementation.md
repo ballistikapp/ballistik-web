@@ -2,13 +2,13 @@
 
 ## Goals
 - Provide a production-ready volume bot with durable scheduling.
-- Run trading loops outside the web process using a polling worker.
+- Run trading loops inside the web process using in-memory timers.
 - Persist sessions, wallets, and trade logs for recovery and UI status.
 - Support scheduled stop, sell-on-stop, reclaim, and close-accounts actions.
 
 ## Architecture Summary
 - UI and tRPC run in the web service.
-- Worker process polls Postgres for due wallets and executes trades.
+- Timer manager schedules wallet ticks from the web process.
 - Postgres stores state and logs.
 
 ## Data Model
@@ -33,30 +33,34 @@ Structured log entries for trades and errors.
 - `type`: string tag (start, tick, buy, sell, stop, reclaim)
 - `data`: JSON payload (signature, amounts, error details)
 
-## Worker Workflow (Polling)
+## Worker Workflow (Event-Based)
 - `start`: validate input, create session, initialize next tick times
 - `tick`: execute one buy/sell/wait and schedule next tick in DB
 - `stop`: stop session, sell tokens, return SOL
 - `reclaim`: consolidate SOL back to main wallet
 - `close-accounts`: close SPL token accounts for rent reclaim
 
+## Timer Manager
+- In-memory timers scheduled per wallet using `nextTickAt`
+- Recovery on startup reads active sessions/wallets and re-schedules timers
+- Scheduled stops use timers based on `scheduledStopAt`
+
 ## tRPC Endpoints
-- `volumeBot.start` create session and initialize polling
+- `volumeBot.start` create session and schedule timers
 - `volumeBot.status` return session + wallet stats
-- `volumeBot.stop` request stop
+- `volumeBot.stop` stop session immediately
 - `volumeBot.reclaim` run reclaim for the session
 - `volumeBot.closeAccounts` run close-accounts for the session
 - `volumeBot.listSessions` list recent sessions by token/user
 
 ## UI Behavior
 - Token-scoped page (token selected via sidebar switcher).
-- Session status is polled for live stats.
+- Session status is polled every 10s for live stats (client cache reduces redundant refetches).
 - Actions: start, stop, reclaim, close accounts.
 
 ## Runtime Requirements
-- Separate worker process to run polling loop
+- Persistent Node.js process (required for timers)
 - Solana RPC provider
 
 ## Environment Variables
 - `SOLANA_RPC_URL`
-- `VOLUME_BOT_POLL_INTERVAL_MS`

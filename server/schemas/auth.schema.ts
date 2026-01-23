@@ -47,3 +47,9 @@ export type AuthUserOutput = {
     privateKey: string;
   };
 };
+
+export type ContextUser = {
+  id: string;
+  name: string;
+  mainWalletPublicKey: string;
+};

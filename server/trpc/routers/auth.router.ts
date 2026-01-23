@@ -13,7 +13,7 @@ export const authRouter = router({
     .mutation(async ({ input }) => {
       const user = await authService.register(input);
       
-      const token = signToken(user.id, user.mainWalletPublicKey);
+      const token = signToken(user.id, user.mainWalletPublicKey, user.name);
       
       const cookieStore = await cookies();
       cookieStore.set("auth-token", token, {
@@ -35,7 +35,7 @@ export const authRouter = router({
     .mutation(async ({ input }) => {
       const user = await authService.loginWithPrivateKey(input);
       
-      const token = signToken(user.id, user.mainWalletPublicKey);
+      const token = signToken(user.id, user.mainWalletPublicKey, user.name);
       
       const cookieStore = await cookies();
       cookieStore.set("auth-token", token, {

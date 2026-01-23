@@ -7,12 +7,17 @@ const JWT_EXPIRATION = "365d";
 export interface JWTPayload {
   userId: string;
   publicKey: string;
+  name?: string;
   iat?: number;
   exp?: number;
 }
 
-export function signToken(userId: string, publicKey: string): string {
-  return jwt.sign({ userId, publicKey }, JWT_SECRET, {
+export function signToken(
+  userId: string,
+  publicKey: string,
+  name: string
+): string {
+  return jwt.sign({ userId, publicKey, name }, JWT_SECRET, {
     expiresIn: JWT_EXPIRATION,
   });
 }

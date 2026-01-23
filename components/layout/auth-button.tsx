@@ -44,9 +44,7 @@ export function AuthButton() {
       mainWalletQuery.refetch();
     },
   });
-  const mainWalletBalanceSol = Number(
-    mainWalletQuery.data?.balanceSol ?? currentUser?.mainWalletBalanceSol ?? 0
-  );
+  const mainWalletBalanceSol = Number(mainWalletQuery.data?.balanceSol ?? 0);
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {

@@ -136,7 +136,8 @@ export default function VolumeBotPage() {
     { tokenPublicKey: tokenPublicKey || undefined },
     {
       enabled: Boolean(tokenPublicKey && tokenData),
-      refetchInterval: 5000,
+      refetchInterval: 10000,
+      staleTime: 5000,
       retry: false,
     }
   );

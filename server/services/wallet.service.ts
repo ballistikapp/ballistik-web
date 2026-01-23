@@ -3,6 +3,7 @@ import {
   PublicKey,
   SystemProgram,
   Transaction,
+  TransactionExpiredBlockheightExceededError,
   sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -505,57 +506,79 @@ export const walletService = {
       throw new AppError("No valid target wallets provided", 400);
     }
 
-    const connection = getSolanaConnection();
-    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-
     const results = await Promise.all(
       targets.map(async (wallet) => {
+        const connection = getSolanaConnection();
         const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-        let lamports: number;
 
-        if (useMax) {
-          const balanceLamports = await connection.getBalance(sender.publicKey);
-          const feeTransaction = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: sender.publicKey,
-              toPubkey: mainPublicKey,
-              lamports: 1,
-            })
-          );
-          feeTransaction.recentBlockhash = latestBlockhash.blockhash;
-          feeTransaction.feePayer = sender.publicKey;
-          const fee = await connection.getFeeForMessage(
-            feeTransaction.compileMessage(),
-            "confirmed"
-          );
-          const feeLamports = fee.value ?? 5000;
-          lamports = balanceLamports - feeLamports;
-          if (lamports <= 0) {
-            return { publicKey: wallet.publicKey, signature: null };
+        const computeLamports = async (blockhash: string) => {
+          if (useMax) {
+            const balanceLamports = await connection.getBalance(sender.publicKey);
+            const feeTransaction = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: sender.publicKey,
+                toPubkey: mainPublicKey,
+                lamports: 1,
+              })
+            );
+            feeTransaction.recentBlockhash = blockhash;
+            feeTransaction.feePayer = sender.publicKey;
+            const fee = await connection.getFeeForMessage(
+              feeTransaction.compileMessage(),
+              "confirmed"
+            );
+            const feeLamports = fee.value ?? 5000;
+            const lamports = balanceLamports - feeLamports;
+            return lamports > 0 ? lamports : 0;
           }
-        } else {
           if (!amountSol) {
             throw new AppError("Amount in SOL is required", 400);
           }
-          lamports = Math.floor(amountSol * 1_000_000_000);
-        }
+          return Math.floor(amountSol * 1_000_000_000);
+        };
 
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: sender.publicKey,
-            toPubkey: mainPublicKey,
-            lamports,
-          })
-        );
-        transaction.recentBlockhash = latestBlockhash.blockhash;
-        transaction.feePayer = sender.publicKey;
-        const signature = await sendAndConfirmTransaction(
-          connection,
-          transaction,
-          [sender],
-          { commitment: "confirmed" }
-        );
-        return { publicKey: wallet.publicKey, signature };
+        const sendTransfer = async () => {
+          const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          const lamports = await computeLamports(blockhash);
+          if (lamports <= 0) {
+            return null;
+          }
+          const transaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: sender.publicKey,
+              toPubkey: mainPublicKey,
+              lamports,
+            })
+          );
+          transaction.recentBlockhash = blockhash;
+          transaction.feePayer = sender.publicKey;
+          return await sendAndConfirmTransaction(
+            connection,
+            transaction,
+            [sender],
+            { commitment: "confirmed" }
+          );
+        };
+
+        try {
+          const signature = await sendTransfer();
+          return { publicKey: wallet.publicKey, signature };
+        } catch (error) {
+          if (error instanceof TransactionExpiredBlockheightExceededError) {
+            try {
+              const signature = await sendTransfer();
+              return { publicKey: wallet.publicKey, signature };
+            } catch (retryError) {
+              const message =
+                retryError instanceof Error ? retryError.message : String(retryError);
+              console.error("[WalletService] Retry transfer failed", message);
+            }
+          } else {
+            const message = error instanceof Error ? error.message : String(error);
+            console.error("[WalletService] Transfer failed", message);
+          }
+          return { publicKey: wallet.publicKey, signature: null };
+        }
       })
     );
 

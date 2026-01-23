@@ -15,6 +15,7 @@ import {
   closeVolumeBotAccounts,
   reclaimVolumeBotSession,
 } from "@/server/services/volume-bot-worker";
+import { volumeBotTimer } from "@/server/services/volume-bot-timer";
 import { walletService } from "@/server/services/wallet.service";
 
 const validateConfig = (config: VolumeBotConfigInput) => {
@@ -144,6 +145,7 @@ export const volumeBotService = {
       throw new AppError(message, 500);
     }
 
+    await volumeBotTimer.scheduleSession(session.id);
     return { sessionId: session.id };
   },
 
@@ -152,33 +154,43 @@ export const volumeBotService = {
       throw new AppError("Session id or token public key required", 400);
     }
 
-    const session = await prisma.volumeBotSession.findFirst({
+    const sessionWithWallets = await prisma.volumeBotSession.findFirst({
       where: {
         userId,
         ...(input.sessionId ? { id: input.sessionId } : {}),
         ...(input.tokenPublicKey ? { tokenPublicKey: input.tokenPublicKey } : {}),
       },
       orderBy: { createdAt: "desc" },
+      include: {
+        wallets: {
+          orderBy: { createdAt: "asc" },
+          select: {
+            id: true,
+            walletPublicKey: true,
+            role: true,
+            status: true,
+            solBalance: true,
+            tokenBalance: true,
+            tradesExecuted: true,
+            pnlSol: true,
+            lastTradeAt: true,
+            nextTickAt: true,
+            reclaimedAt: true,
+          },
+        },
+      },
     });
 
-    if (!session) {
+    if (!sessionWithWallets) {
       throw new AppError("Volume bot session not found", 404);
     }
 
-    const wallets = await prisma.volumeBotWallet.findMany({
-      where: { sessionId: session.id },
-      include: {
-        wallet: {
-          select: { publicKey: true },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-    });
-
+    const { wallets, ...session } = sessionWithWallets;
     return { session, wallets };
   },
 
   async stopSession(sessionId: string, userId: string) {
+    console.log(`[VolumeBot] stopSession called for ${sessionId}`);
     const session = await prisma.volumeBotSession.findFirst({
       where: { id: sessionId, userId },
       select: { id: true, status: true },
@@ -186,15 +198,33 @@ export const volumeBotService = {
     if (!session) {
       throw new AppError("Volume bot session not found", 404);
     }
-    if (["STOPPING", "STOPPED", "FAILED"].includes(session.status)) {
+    console.log(`[VolumeBot] Session ${sessionId} current status: ${session.status}`);
+    
+    if (["STOPPED", "FAILED"].includes(session.status)) {
+      console.log(`[VolumeBot] Session ${sessionId} already completed, skipping`);
       return { sessionId: session.id };
     }
 
-    await prisma.volumeBotSession.update({
-      where: { id: session.id },
-      data: { status: "STOP_REQUESTED", stopRequestedAt: new Date() },
-    });
+    if (!["STOP_REQUESTED", "STOPPING"].includes(session.status)) {
+      await prisma.volumeBotSession.update({
+        where: { id: session.id },
+        data: { status: "STOP_REQUESTED", stopRequestedAt: new Date() },
+      });
+      console.log(`[VolumeBot] Session ${sessionId} marked as STOP_REQUESTED`);
+    } else {
+      console.log(`[VolumeBot] Session ${sessionId} already stopping, retrying stop`);
+    }
 
+    console.log(`[VolumeBot] Calling volumeBotTimer.requestStop for ${sessionId}`);
+    volumeBotTimer
+      .requestStop(session.id)
+      .then(() => {
+        console.log(`[VolumeBot] requestStop promise resolved for ${sessionId}`);
+      })
+      .catch((error) => {
+        console.error(`[VolumeBot] requestStop failed for ${session.id}:`, error);
+      });
+    
     return { sessionId: session.id };
   },
 

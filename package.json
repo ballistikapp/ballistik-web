@@ -13,8 +13,7 @@
     "db:migrate:dev": "prisma migrate dev",
     "db:migrate:deploy": "prisma migrate deploy",
     "db:studio": "prisma studio",
-    "script:insert-test-wallets": "tsx scripts/insert-test-wallets.ts",
-    "worker:volume-bot": "tsx scripts/volume-bot-worker.ts"
+    "script:insert-test-wallets": "tsx scripts/insert-test-wallets.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.0.0",

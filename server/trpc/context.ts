@@ -1,19 +1,29 @@
 import { type FetchCreateContextFnOptions } from "@trpc/server/adapters/fetch";
 import { cookies } from "next/headers";
 import { verifyToken } from "@/lib/auth/jwt";
-import { authService } from "@/server/services";
 import { logger } from "@/lib/logger";
 import { randomUUID } from "crypto";
+import { initVolumeBotTimers } from "@/lib/volume-bot-init";
+import type { ContextUser } from "@/server/schemas/auth.schema";
 
 export async function createContext(opts?: FetchCreateContextFnOptions) {
+  void initVolumeBotTimers().catch((error) => {
+    const message = error instanceof Error ? error.message : String(error);
+    logger.error("Volume bot timer init failed", { errorMessage: message });
+  });
+
   const cookieStore = await cookies();
   const token = cookieStore.get("auth-token")?.value;
 
-  let user = null;
+  let user: ContextUser | null = null;
   if (token) {
     const payload = verifyToken(token);
     if (payload) {
-      user = await authService.getUserById(payload.userId);
+      user = {
+        id: payload.userId,
+        name: payload.name ?? "User",
+        mainWalletPublicKey: payload.publicKey,
+      };
     }
   }
 
