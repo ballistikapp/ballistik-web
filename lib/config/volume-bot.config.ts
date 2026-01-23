@@ -14,6 +14,8 @@ const volumeBotConfigSchema = z.object({
   slippageBps: z.number().int().min(0),
   maxConcurrentTicks: z.number().int().min(1),
   tickStaleMs: z.number().int().min(1),
+  maxDurationHours: z.number().min(1),
+  orphanedSessionTimeoutMs: z.number().int().min(1),
   solanaRpcUrl: z.string().min(1),
 });
 
@@ -30,6 +32,8 @@ const baseVolumeBotConfig = {
   slippageBps: 1000,
   maxConcurrentTicks: 6,
   tickStaleMs: 10 * 60 * 1000,
+  maxDurationHours: 168, // 7 days max
+  orphanedSessionTimeoutMs: 30 * 60 * 1000, // 30 minutes without activity = orphaned
 };
 
 let cachedVolumeBotConfig: VolumeBotConfig | null = null;

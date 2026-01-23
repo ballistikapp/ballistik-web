@@ -18,7 +18,10 @@ import {
 import { volumeBotTimer } from "@/server/services/volume-bot-timer";
 import { walletService } from "@/server/services/wallet.service";
 
-const validateConfig = (config: VolumeBotConfigInput) => {
+const validateConfig = (
+  config: VolumeBotConfigInput,
+  scheduledStopAt?: Date
+) => {
   const limits = getVolumeBotConfig();
   if (config.walletCount < limits.minWallets || config.walletCount > limits.maxWallets) {
     throw new AppError("Wallet count out of bounds", 400);
@@ -31,6 +34,31 @@ const validateConfig = (config: VolumeBotConfigInput) => {
   }
   if (config.minIntervalSeconds > config.maxIntervalSeconds) {
     throw new AppError("Min interval exceeds max interval", 400);
+  }
+  if (!config.targetDurationHours && !scheduledStopAt) {
+    throw new AppError(
+      "Duration limit required: set targetDurationHours or scheduledStopAt",
+      400
+    );
+  }
+  if (config.targetDurationHours && config.targetDurationHours > limits.maxDurationHours) {
+    throw new AppError(
+      `Duration exceeds maximum of ${limits.maxDurationHours} hours`,
+      400
+    );
+  }
+  if (scheduledStopAt) {
+    const durationMs = scheduledStopAt.getTime() - Date.now();
+    const durationHours = durationMs / (1000 * 60 * 60);
+    if (durationHours > limits.maxDurationHours) {
+      throw new AppError(
+        `Scheduled stop exceeds maximum duration of ${limits.maxDurationHours} hours`,
+        400
+      );
+    }
+    if (durationHours <= 0) {
+      throw new AppError("Scheduled stop time must be in the future", 400);
+    }
   }
 };
 
@@ -81,7 +109,7 @@ export const volumeBotService = {
       throw new AppError("Volume bot already running for this token", 409);
     }
 
-    validateConfig(input.config);
+    validateConfig(input.config, input.scheduledStopAt);
     const scheduledStopAt = resolveScheduledStopAt(
       input.config,
       input.scheduledStopAt

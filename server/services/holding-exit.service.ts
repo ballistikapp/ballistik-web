@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { rpcConfig } from "@/lib/config/rpc.config";
@@ -85,7 +85,7 @@ async function appendExitLog(
       level,
       message,
       step: step ?? null,
-      data: data ?? null,
+      data: data ? (data as Prisma.InputJsonValue) : Prisma.JsonNull,
     },
   });
 }
@@ -102,9 +102,20 @@ async function updateExit(
     completedAt: Date | null;
   }>
 ) {
+  // Transform result field for Prisma's JSON type handling
+  const prismaData = {
+    ...data,
+    result:
+      data.result === undefined
+        ? undefined
+        : data.result === null
+          ? Prisma.JsonNull
+          : (data.result as Prisma.InputJsonValue),
+  };
+
   await prisma.holdingExit.update({
     where: { id: exitId },
-    data,
+    data: prismaData,
   });
 }
 

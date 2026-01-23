@@ -1,3 +1,4 @@
+import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { prisma } from "@/lib/prisma";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import {
@@ -7,6 +8,7 @@ import {
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const RECOVERY_CONCURRENCY = 5;
+const WATCHDOG_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
 type WalletSchedule = {
   walletId: string;
@@ -19,6 +21,7 @@ class VolumeBotTimerManager {
   private walletToSession = new Map<string, string>();
   private sessionToWallets = new Map<string, Set<string>>();
   private sessionStopTimers = new Map<string, NodeJS.Timeout>();
+  private watchdogTimer: NodeJS.Timeout | null = null;
   private shuttingDown = false;
   private shutdownRegistered = false;
 
@@ -155,6 +158,70 @@ class VolumeBotTimerManager {
         await this.handleWalletTick(wallet.id);
       });
     }
+
+    this.startWatchdog();
+  }
+
+  private startWatchdog() {
+    if (this.watchdogTimer || this.shuttingDown) return;
+    console.log("[TimerManager] Starting orphaned session watchdog");
+    this.watchdogTimer = setInterval(() => {
+      void this.checkOrphanedSessions();
+    }, WATCHDOG_INTERVAL_MS);
+  }
+
+  private stopWatchdog() {
+    if (this.watchdogTimer) {
+      clearInterval(this.watchdogTimer);
+      this.watchdogTimer = null;
+    }
+  }
+
+  private async checkOrphanedSessions() {
+    if (this.shuttingDown) return;
+
+    const config = getVolumeBotConfig();
+    const orphanedThreshold = new Date(Date.now() - config.orphanedSessionTimeoutMs);
+
+    const orphanedSessions = await prisma.volumeBotSession.findMany({
+      where: {
+        status: "RUNNING",
+        OR: [
+          { lastTickAt: { lt: orphanedThreshold } },
+          { lastTickAt: null, startedAt: { lt: orphanedThreshold } },
+        ],
+      },
+      select: { id: true, lastTickAt: true, startedAt: true },
+    });
+
+    if (orphanedSessions.length === 0) return;
+
+    console.log(
+      `[Watchdog] Found ${orphanedSessions.length} orphaned session(s), stopping...`
+    );
+
+    for (const session of orphanedSessions) {
+      const lastActivity = session.lastTickAt ?? session.startedAt;
+      console.log(
+        `[Watchdog] Stopping orphaned session ${session.id} (last activity: ${lastActivity?.toISOString() ?? "never"})`
+      );
+      await prisma.volumeBotLog.create({
+        data: {
+          sessionId: session.id,
+          level: "WARN",
+          type: "watchdog",
+          message: `Session auto-stopped by watchdog (no activity for ${Math.round(config.orphanedSessionTimeoutMs / 60000)} minutes)`,
+        },
+      });
+      try {
+        await this.requestStop(session.id);
+      } catch (error) {
+        console.error(
+          `[Watchdog] Failed to stop session ${session.id}:`,
+          error
+        );
+      }
+    }
   }
 
   registerShutdownHandlers() {
@@ -171,6 +238,7 @@ class VolumeBotTimerManager {
   shutdown() {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
+    this.stopWatchdog();
     this.walletTimers.forEach((timer) => clearTimeout(timer));
     this.walletTimers.clear();
     this.walletToSession.clear();
