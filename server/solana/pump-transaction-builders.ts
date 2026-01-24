@@ -40,10 +40,11 @@ export async function buildBuyTokenTransaction(
   buyer: Keypair,
   mint: PublicKey,
   buyAmountLamport: bigint,
-  creator?: PublicKey
+  creator?: PublicKey,
+  minTokensOut?: BN
 ): Promise<Transaction> {
   const spendableLamports = new BN(buyAmountLamport.toString());
-  const minTokensOut = new BN(1);
+  const minOut = minTokensOut ?? new BN(1);
   const provider = new AnchorProvider(
     getSolanaConnection(),
     new NodeWallet(buyer),
@@ -55,7 +56,7 @@ export async function buildBuyTokenTransaction(
     buyer,
     mint,
     spendableLamports,
-    minTokensOut,
+    minOut,
     creator
   );
   tx.feePayer = buyer.publicKey;

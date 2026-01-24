@@ -14,6 +14,11 @@ import { mapWithConcurrency } from "@/lib/utils/async";
 import { getPumpProgram } from "@/server/solana/pump-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
+import {
+  computeMinSolOutForSell,
+  computeMinTokensOutForBuy,
+  fetchPumpQuoteState,
+} from "@/server/solana/pump-quotes";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { walletService } from "@/server/services/wallet.service";
 
@@ -163,11 +168,25 @@ export const processVolumeBotWallet = async (
       }
 
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
+      let minTokensOut = new BN(1);
+      try {
+        const quoteState = await fetchPumpQuoteState(mintPublicKey, walletKeypair);
+        minTokensOut = computeMinTokensOutForBuy(
+          quoteState,
+          buyLamports,
+          config.slippageBps
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[Worker] ${walletPk}: Slippage quote failed (buy): ${message}`);
+      }
       console.log(`[Worker] ${walletPk}: Building buy tx for ${buyLamports} lamports`);
       const buyTx = await buildBuyTokenTransaction(
         walletKeypair,
         mintPublicKey,
-        buyLamports
+        buyLamports,
+        undefined,
+        minTokensOut
       );
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash("confirmed");
@@ -193,6 +212,18 @@ export const processVolumeBotWallet = async (
         });
         return nextTick;
       }
+      let minSolOutput = new BN(0);
+      try {
+        const quoteState = await fetchPumpQuoteState(mintPublicKey, walletKeypair);
+        minSolOutput = computeMinSolOutForSell(
+          quoteState,
+          tokenAmount,
+          config.slippageBps
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(`[Worker] ${walletPk}: Slippage quote failed (sell): ${message}`);
+      }
       const provider = new AnchorProvider(
         connection,
         new NodeWallet(walletKeypair),
@@ -205,7 +236,7 @@ export const processVolumeBotWallet = async (
         walletKeypair,
         mintPublicKey,
         new BN(tokenAmount.toString()),
-        new BN(0)
+        minSolOutput
       );
       const { blockhash, lastValidBlockHeight } =
         await connection.getLatestBlockhash("confirmed");
@@ -344,12 +375,27 @@ export const stopVolumeBotSession = async (sessionId: string) => {
           { commitment: "finalized" }
         );
         const program = getPumpProgram(provider);
+        let minSolOutput = new BN(0);
+        try {
+          const quoteState = await fetchPumpQuoteState(
+            mintPublicKey,
+            walletKeypair
+          );
+          minSolOutput = computeMinSolOutForSell(
+            quoteState,
+            tokenBalance,
+            config.slippageBps
+          );
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`[Worker] stop sell quote failed: ${message}`);
+        }
         const sellTx = await sellTokensWithNewIdl(
           program,
           walletKeypair,
           mintPublicKey,
           new BN(tokenBalance.toString()),
-          new BN(0)
+          minSolOutput
         );
         const { blockhash, lastValidBlockHeight } =
           await connection.getLatestBlockhash("confirmed");

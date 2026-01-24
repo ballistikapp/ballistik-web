@@ -11,8 +11,6 @@ export const volumeBotConfigSchema = z.object({
   maxIntervalSeconds: z.number().int().min(1),
   sellRatio: z.number().min(0).max(1),
   strategy: volumeBotStrategySchema,
-  maxLossPerWalletSol: z.number().min(0),
-  maxTotalLossSol: z.number().min(0),
   slippageBps: z.number().int().min(0),
   targetVolumePerHour: z.number().min(0).optional(),
   targetDurationHours: z.number().min(0).optional(),

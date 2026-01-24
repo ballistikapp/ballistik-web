@@ -33,6 +33,19 @@ Structured log entries for trades and errors.
 - `type`: string tag (start, tick, buy, sell, stop, reclaim)
 - `data`: JSON payload (signature, amounts, error details)
 
+## Config (volumeBot.start)
+- `walletCount`: number of volume wallets created per session
+- `fundingPerWalletSol`: SOL funded to each volume wallet at start
+- `minTradeAmountSol` / `maxTradeAmountSol`: randomized SOL buy size range
+- `minIntervalSeconds` / `maxIntervalSeconds`: randomized per-wallet tick interval range
+- `sellRatio`: fraction of token balance to sell on sell actions (0-1)
+- `strategy`: neutral | pump | dump
+- `slippageBps`: slippage tolerance in basis points applied to min-out on buys/sells (UI default 1000)
+- `targetVolumePerHour`: optional volume pacing target (not currently enforced)
+- `targetDurationHours`: auto-stop after duration if `scheduledStopAt` is not provided
+- `sellOnStop`: sell remaining tokens before reclaiming SOL on stop
+- `scheduledStopAt`: optional explicit stop time override
+
 ## Worker Workflow (Event-Based)
 - `start`: validate input, create session, initialize next tick times
 - `tick`: execute one buy/sell/wait and schedule next tick in DB

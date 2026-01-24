@@ -39,9 +39,7 @@ const presets = {
     maxIntervalSeconds: 600,
     sellRatio: 0.9,
     strategy: "neutral" as const,
-    maxLossPerWalletSol: 0.1,
-    maxTotalLossSol: 1,
-    slippageBps: 500,
+    slippageBps: 1000,
     targetDurationHours: 24,
     sellOnStop: true,
   },
@@ -54,9 +52,7 @@ const presets = {
     maxIntervalSeconds: 600,
     sellRatio: 0.9,
     strategy: "neutral" as const,
-    maxLossPerWalletSol: 0.1,
-    maxTotalLossSol: 1,
-    slippageBps: 500,
+    slippageBps: 1000,
     targetDurationHours: 24,
     sellOnStop: true,
   },
@@ -69,8 +65,6 @@ const presets = {
     maxIntervalSeconds: 180,
     sellRatio: 0.7,
     strategy: "pump" as const,
-    maxLossPerWalletSol: 0.5,
-    maxTotalLossSol: 5,
     slippageBps: 1000,
     targetDurationHours: 24,
     sellOnStop: true,
@@ -103,12 +97,6 @@ export default function VolumeBotPage() {
   const [sellRatio, setSellRatio] = useState(presets.conservative.sellRatio);
   const [strategy, setStrategy] = useState<"neutral" | "pump" | "dump">(
     presets.conservative.strategy
-  );
-  const [maxLossPerWalletSol, setMaxLossPerWalletSol] = useState(
-    presets.conservative.maxLossPerWalletSol
-  );
-  const [maxTotalLossSol, setMaxTotalLossSol] = useState(
-    presets.conservative.maxTotalLossSol
   );
   const [slippageBps, setSlippageBps] = useState(
     presets.conservative.slippageBps
@@ -211,8 +199,6 @@ export default function VolumeBotPage() {
     setMaxIntervalSeconds(nextPreset.maxIntervalSeconds);
     setSellRatio(nextPreset.sellRatio);
     setStrategy(nextPreset.strategy);
-    setMaxLossPerWalletSol(nextPreset.maxLossPerWalletSol);
-    setMaxTotalLossSol(nextPreset.maxTotalLossSol);
     setSlippageBps(nextPreset.slippageBps);
     setTargetDurationHours(nextPreset.targetDurationHours);
     setSellOnStop(nextPreset.sellOnStop);
@@ -234,8 +220,6 @@ export default function VolumeBotPage() {
         maxIntervalSeconds,
         sellRatio,
         strategy,
-        maxLossPerWalletSol,
-        maxTotalLossSol,
         slippageBps,
         targetDurationHours,
         sellOnStop,
@@ -489,34 +473,6 @@ export default function VolumeBotPage() {
                   onChange={(event) =>
                     {
                       setSellRatio(Number(event.target.value));
-                      markCustom();
-                    }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Max loss per wallet (SOL)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={maxLossPerWalletSol}
-                  onChange={(event) =>
-                    {
-                      setMaxLossPerWalletSol(Number(event.target.value));
-                      markCustom();
-                    }}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label>Max total loss (SOL)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.01}
-                  value={maxTotalLossSol}
-                  onChange={(event) =>
-                    {
-                      setMaxTotalLossSol(Number(event.target.value));
                       markCustom();
                     }}
                 />

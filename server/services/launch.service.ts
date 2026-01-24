@@ -15,6 +15,12 @@ import {
   SystemProgram,
   Transaction,
 } from "@solana/web3.js";
+import {
+  createAssociatedTokenAccountInstruction,
+  createTransferInstruction,
+  getAccount,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import bs58 from "bs58";
 import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
@@ -40,6 +46,12 @@ type LaunchRecoveryData = {
   usesMainWalletAsDev: boolean;
   devWalletManaged: boolean;
   bundlerWallets: string[];
+  distributionWallets: string[];
+};
+
+type DistributionWallet = {
+  parentIndex: number;
+  wallet: Keypair;
 };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -134,7 +146,8 @@ function buildLaunchRecoveryData(
   input: LaunchTokenInput,
   mainWalletPublicKey: string,
   devWalletPublicKey: string,
-  bundlerWalletKeypairs: Keypair[]
+  bundlerWalletKeypairs: Keypair[],
+  distributionWallets: DistributionWallet[]
 ): LaunchRecoveryData {
   const usesMainWalletAsDev = devWalletPublicKey === mainWalletPublicKey;
   return {
@@ -144,6 +157,9 @@ function buildLaunchRecoveryData(
     devWalletManaged: input.devWalletOption === "generate",
     bundlerWallets: bundlerWalletKeypairs.map((wallet) =>
       wallet.publicKey.toBase58()
+    ),
+    distributionWallets: distributionWallets.map((wallet) =>
+      wallet.wallet.publicKey.toBase58()
     ),
   };
 }
@@ -160,13 +176,22 @@ function parseLaunchRecoveryObject(
         (item): item is string => typeof item === "string"
       )
     : [];
+  const distributionWallets = Array.isArray(value.distributionWallets)
+    ? value.distributionWallets.filter(
+        (item): item is string => typeof item === "string"
+      )
+    : [];
   const usesMainWalletAsDev =
     value.usesMainWalletAsDev === true ||
     (Boolean(mainWalletPublicKey) &&
       Boolean(devWalletPublicKey) &&
       mainWalletPublicKey === devWalletPublicKey);
   const devWalletManaged = value.devWalletManaged === true;
-  if (!devWalletPublicKey && bundlerWallets.length === 0) {
+  if (
+    !devWalletPublicKey &&
+    bundlerWallets.length === 0 &&
+    distributionWallets.length === 0
+  ) {
     return null;
   }
   return {
@@ -175,6 +200,7 @@ function parseLaunchRecoveryObject(
     usesMainWalletAsDev,
     devWalletManaged,
     bundlerWallets,
+    distributionWallets,
   };
 }
 
@@ -346,11 +372,10 @@ async function isCancelRequested(launchId: string) {
   return Boolean(launch?.cancelRequestedAt);
 }
 
-async function reserveVanityMint(userId: string) {
+async function consumeVanityMint(userId: string) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const candidate = await prisma.vanityMint.findFirst({
       where: {
-        reservedAt: null,
         usedAt: null,
         tokenPublicKey: null,
       },
@@ -364,12 +389,11 @@ async function reserveVanityMint(userId: string) {
     const lock = await prisma.vanityMint.updateMany({
       where: {
         id: candidate.id,
-        reservedAt: null,
         usedAt: null,
         tokenPublicKey: null,
       },
       data: {
-        reservedAt: new Date(),
+        usedAt: new Date(),
         userId,
       },
     });
@@ -380,13 +404,6 @@ async function reserveVanityMint(userId: string) {
   }
 
   return null;
-}
-
-async function releaseVanityMint(id: string) {
-  await prisma.vanityMint.update({
-    where: { id },
-    data: { reservedAt: null, userId: null },
-  });
 }
 
 async function setStep(
@@ -676,10 +693,36 @@ async function ensureBundlerWallets(userId: string, walletCount: number) {
   return bundlerWalletKeypairs;
 }
 
-async function cancelLaunchIfRequested(
-  launchId: string,
-  reservedVanityId?: string | null
+async function ensureDistributionWallets(
+  userId: string,
+  bundlerWalletKeypairs: Keypair[],
+  distributionWalletMultiplier: number
 ) {
+  if (bundlerWalletKeypairs.length === 0 || distributionWalletMultiplier <= 1) {
+    return [] as DistributionWallet[];
+  }
+  const distributionWallets: DistributionWallet[] = [];
+  const walletsPerBundler = Math.max(0, distributionWalletMultiplier - 1);
+  for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
+    for (let j = 0; j < walletsPerBundler; j += 1) {
+      distributionWallets.push({ parentIndex: i, wallet: Keypair.generate() });
+    }
+  }
+  if (distributionWallets.length === 0) {
+    return distributionWallets;
+  }
+  await prisma.wallet.createMany({
+    data: distributionWallets.map((wallet) => ({
+      publicKey: wallet.wallet.publicKey.toBase58(),
+      privateKey: bs58.encode(wallet.wallet.secretKey),
+      type: "DISTRIBUTION",
+      userId,
+    })),
+  });
+  return distributionWallets;
+}
+
+async function cancelLaunchIfRequested(launchId: string) {
   if (!(await isCancelRequested(launchId))) {
     return false;
   }
@@ -688,9 +731,6 @@ async function cancelLaunchIfRequested(
     where: { id: launchId },
     data: { status: "CANCELED", completedAt: new Date() },
   });
-  if (reservedVanityId) {
-    await releaseVanityMint(reservedVanityId);
-  }
   return true;
 }
 
@@ -700,25 +740,31 @@ async function reserveMintIfRequested(
   vanityRequested: boolean
 ) {
   if (!vanityRequested) {
-    return { mintKeypair: Keypair.generate(), reservedVanityId: null };
+    return { mintKeypair: Keypair.generate(), consumedVanityId: null };
   }
-  const reserved = await reserveVanityMint(userId);
-  if (reserved) {
-    await appendLog(launchId, "INFO", "Using vanity mint", "mint", {
-      publicKey: reserved.publicKey,
-    });
-    return {
-      mintKeypair: keypairFromPrivateKey(reserved.privateKey),
-      reservedVanityId: reserved.id,
-    };
+  const consumed = await consumeVanityMint(userId);
+  if (!consumed) {
+    throw new AppError(
+      "Vanity mint requested but no vanity mints available. Please add more vanity mints to the pool.",
+      400
+    );
   }
-  await appendLog(
-    launchId,
-    "WARN",
-    "No vanity mint available, using random",
-    "mint"
-  );
-  return { mintKeypair: Keypair.generate(), reservedVanityId: null };
+  let mintKeypair: Keypair;
+  try {
+    mintKeypair = keypairFromPrivateKey(consumed.privateKey);
+  } catch {
+    throw new AppError(
+      "Vanity mint has an invalid private key. Please check the vanity mint pool.",
+      500
+    );
+  }
+  await appendLog(launchId, "INFO", "Using vanity mint", "mint", {
+    publicKey: consumed.publicKey,
+  });
+  return {
+    mintKeypair,
+    consumedVanityId: consumed.id,
+  };
 }
 
 function buildBundlerBuyTarget(
@@ -750,6 +796,154 @@ function buildBundlerBuyTargets(
     .filter((target) => target.amountLamports > BigInt(0));
 }
 
+async function distributeTokensToWallets(
+  launchId: string,
+  mint: PublicKey,
+  bundlerWalletKeypairs: Keypair[],
+  distributionWallets: DistributionWallet[],
+  distributionWalletMultiplier: number
+) {
+  const startedAt = Date.now();
+  if (
+    distributionWalletMultiplier <= 1 ||
+    bundlerWalletKeypairs.length === 0 ||
+    distributionWallets.length === 0
+  ) {
+    return {
+      totalWallets: distributionWallets.length,
+      sourceWalletsWithBalance: 0,
+      transferCount: 0,
+      totalTokensRaw: "0",
+      signatures: [] as string[],
+      skippedWallets: 0,
+      failedTransfers: 0,
+      canceled: false,
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  const connection = getSolanaConnection();
+  const grouped = new Map<number, Keypair[]>();
+  distributionWallets.forEach((wallet) => {
+    const list = grouped.get(wallet.parentIndex) ?? [];
+    list.push(wallet.wallet);
+    grouped.set(wallet.parentIndex, list);
+  });
+
+  const signatures: string[] = [];
+  let transferCount = 0;
+  let totalTokensRaw = BigInt(0);
+  let sourceWalletsWithBalance = 0;
+  let skippedWallets = 0;
+  let failedTransfers = 0;
+  let canceled = false;
+
+  for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
+    if (await isCancelRequested(launchId)) {
+      canceled = true;
+      break;
+    }
+    const sourceWallet = bundlerWalletKeypairs[i];
+    const childWallets = grouped.get(i) ?? [];
+    if (childWallets.length === 0) {
+      continue;
+    }
+    const sourceAta = await getAssociatedTokenAddress(
+      mint,
+      sourceWallet.publicKey
+    );
+    let tokenBalance = BigInt(0);
+    try {
+      const account = await getAccount(connection, sourceAta);
+      tokenBalance = account.amount;
+    } catch (error) {
+      failedTransfers += 1;
+      await appendLog(launchId, "WARN", "Distribution balance lookup failed", "distribution", {
+        sourceWallet: sourceWallet.publicKey.toBase58(),
+        error: getErrorMessage(error),
+      });
+      continue;
+    }
+    if (tokenBalance <= BigInt(0)) {
+      skippedWallets += 1;
+      continue;
+    }
+    const amountPerWallet = tokenBalance / BigInt(distributionWalletMultiplier);
+    if (amountPerWallet <= BigInt(0)) {
+      skippedWallets += 1;
+      continue;
+    }
+    sourceWalletsWithBalance += 1;
+    for (let j = 0; j < childWallets.length; j += 1) {
+      if (await isCancelRequested(launchId)) {
+        canceled = true;
+        break;
+      }
+      const destination = childWallets[j];
+      const destinationAta = await getAssociatedTokenAddress(
+        mint,
+        destination.publicKey
+      );
+      try {
+        const transaction = new Transaction();
+        const destinationInfo = await connection.getAccountInfo(destinationAta);
+        if (!destinationInfo) {
+          transaction.add(
+            createAssociatedTokenAccountInstruction(
+              sourceWallet.publicKey,
+              destinationAta,
+              destination.publicKey,
+              mint
+            )
+          );
+        }
+        transaction.add(
+          createTransferInstruction(
+            sourceAta,
+            destinationAta,
+            sourceWallet.publicKey,
+            amountPerWallet
+          )
+        );
+        const { blockhash } = await connection.getLatestBlockhash("confirmed");
+        transaction.recentBlockhash = blockhash;
+        transaction.feePayer = sourceWallet.publicKey;
+        const signature = await sendAndConfirmTransaction(
+          connection,
+          transaction,
+          [sourceWallet],
+          { commitment: "confirmed" }
+        );
+        signatures.push(signature);
+        transferCount += 1;
+        totalTokensRaw += amountPerWallet;
+      } catch (error) {
+        failedTransfers += 1;
+        await appendLog(launchId, "WARN", "Distribution transfer failed", "distribution", {
+          sourceWallet: sourceWallet.publicKey.toBase58(),
+          destinationWallet: destination.publicKey.toBase58(),
+          error: getErrorMessage(error),
+        });
+      }
+    }
+    if (canceled) {
+      break;
+    }
+  }
+
+  return {
+    totalWallets: distributionWallets.length,
+    sourceWalletsWithBalance,
+    transferCount,
+    totalTokensRaw: totalTokensRaw.toString(),
+    signatures,
+    skippedWallets,
+    failedTransfers,
+    canceled,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
 async function persistTokenAndWallets(
   input: LaunchTokenInput,
   userId: string,
@@ -757,9 +951,8 @@ async function persistTokenAndWallets(
   mintPrivateKey: string,
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
-  reservedVanityId: string | null,
-  distributionWalletMultiplier: number,
-  launchId: string
+  distributionWallets: DistributionWallet[],
+  consumedVanityId: string | null
 ) {
   let distributionWalletCount = 0;
   const token = await prisma.$transaction(
@@ -801,35 +994,29 @@ async function persistTokenAndWallets(
         });
       }
 
-      if (reservedVanityId) {
+      if (consumedVanityId) {
         await tx.vanityMint.update({
-          where: { id: reservedVanityId },
+          where: { id: consumedVanityId },
           data: {
-            usedAt: new Date(),
             tokenPublicKey: createdToken.publicKey,
           },
         });
       }
 
-      if (distributionWalletMultiplier > 1) {
-        const distributionWallets: Keypair[] = [];
-        const total =
-          bundlerWalletKeypairs.length * (distributionWalletMultiplier - 1);
-        for (let i = 0; i < total; i += 1) {
-          distributionWallets.push(Keypair.generate());
-        }
-        if (distributionWallets.length > 0) {
-          distributionWalletCount = distributionWallets.length;
-          await tx.wallet.createMany({
-            data: distributionWallets.map((wallet) => ({
-              publicKey: wallet.publicKey.toBase58(),
-              privateKey: bs58.encode(wallet.secretKey),
-              type: "DISTRIBUTION",
-              userId,
-              tokenPublicKey: createdToken.publicKey,
-            })),
-          });
-        }
+      if (distributionWallets.length > 0) {
+        distributionWalletCount = distributionWallets.length;
+        await tx.wallet.updateMany({
+          where: {
+            publicKey: {
+              in: distributionWallets.map((wallet) =>
+                wallet.wallet.publicKey.toBase58()
+              ),
+            },
+          },
+          data: {
+            tokenPublicKey: createdToken.publicKey,
+          },
+        });
       }
 
       return createdToken;
@@ -912,6 +1099,7 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
   if (recovery) {
     const walletKeys = new Set<string>();
     recovery.bundlerWallets.forEach((key) => walletKeys.add(key));
+    recovery.distributionWallets.forEach((key) => walletKeys.add(key));
     if (
       recovery.devWalletManaged &&
       recovery.devWalletPublicKey &&
@@ -1236,7 +1424,7 @@ export const launchService = {
       minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
       slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
     } = getLaunchConfig();
-    let reservedVanityId: string | null = null;
+    let consumedVanityId: string | null = null;
     let recoveryData: LaunchRecoveryData | null = null;
 
     try {
@@ -1299,12 +1487,22 @@ export const launchService = {
         input.bundleBuyEnabled && bundlerWalletCount > 0
           ? await ensureBundlerWallets(user.id, bundlerWalletCount)
           : [];
+      const distributionWallets =
+        bundlerWalletKeypairs.length > 0
+          ? await ensureDistributionWallets(
+              user.id,
+              bundlerWalletKeypairs,
+              distributionWalletMultiplier
+            )
+          : [];
       await appendLog(launchId, "INFO", "Wallets prepared", "wallets", {
         mainWalletPublicKey: user.mainWallet.publicKey,
         devWalletPublicKey,
         usesMainWalletAsDev: devWalletPublicKey === user.mainWallet.publicKey,
         devWalletOption: input.devWalletOption,
         bundlerWallets: bundlerWalletKeypairs.length,
+        distributionWallets: distributionWallets.length,
+        distributionWalletMultiplier,
         bundleBuyEnabled: input.bundleBuyEnabled,
         durationMs: Date.now() - walletsStartedAt,
       });
@@ -1312,7 +1510,8 @@ export const launchService = {
         input,
         user.mainWallet.publicKey,
         devWalletPublicKey,
-        bundlerWalletKeypairs
+        bundlerWalletKeypairs,
+        distributionWallets
       );
       await setLaunchRecovery(launchId, recoveryData);
 
@@ -1330,6 +1529,12 @@ export const launchService = {
       );
       const buyRentLamports =
         ataRentLamports + userVolumeAccumulatorRentLamports;
+      const distributionWalletsPerBundler =
+        distributionWalletMultiplier > 1 ? distributionWalletMultiplier - 1 : 0;
+      const distributionAtaLamports =
+        distributionWalletsPerBundler > 0
+          ? ataRentLamports * BigInt(distributionWalletsPerBundler)
+          : BigInt(0);
       const maxBundlerBuySol =
         bundlerBuyAmountSol *
         (1 + Math.max(0, bundlerBuyVariancePercent) / 100);
@@ -1349,7 +1554,7 @@ export const launchService = {
       const bundlerFundingLamports = requiredBuyLamports(
         maxBundlerBuySol,
         0,
-        buyRentLamports
+        buyRentLamports + distributionAtaLamports
       );
       const tipLamports = input.bundleBuyEnabled
         ? BigInt(Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL))
@@ -1383,6 +1588,7 @@ export const launchService = {
         userVolumeAccumulatorRentLamports:
           userVolumeAccumulatorRentLamports.toString(),
         buyRentLamports: buyRentLamports.toString(),
+        distributionAtaLamports: distributionAtaLamports.toString(),
         mainReserveLamports: mainReserveLamports.toString(),
         tipLamports: tipLamports.toString(),
         maxBundlerBuySol,
@@ -1413,15 +1619,15 @@ export const launchService = {
         input.vanityMint
       );
       const { mintKeypair } = mintReservation;
-      reservedVanityId = mintReservation.reservedVanityId;
+      consumedVanityId = mintReservation.consumedVanityId;
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),
         vanityMint: input.vanityMint,
-        reservedVanityId,
+        consumedVanityId,
       });
 
-      if (await cancelLaunchIfRequested(launchId, reservedVanityId)) {
+      if (await cancelLaunchIfRequested(launchId)) {
         return;
       }
 
@@ -1560,6 +1766,28 @@ export const launchService = {
         }
       }
 
+      if (distributionWallets.length > 0) {
+        await setStep(launchId, 72, "distribution", "Distributing tokens");
+        const distributionSummary = await distributeTokensToWallets(
+          launchId,
+          mintKeypair.publicKey,
+          bundlerWalletKeypairs,
+          distributionWallets,
+          distributionWalletMultiplier
+        );
+        await appendLog(launchId, "INFO", "Distribution complete", "distribution", {
+          totalWallets: distributionSummary.totalWallets,
+          sourceWalletsWithBalance: distributionSummary.sourceWalletsWithBalance,
+          transferCount: distributionSummary.transferCount,
+          totalTokensRaw: distributionSummary.totalTokensRaw,
+          signatures: distributionSummary.signatures,
+          skippedWallets: distributionSummary.skippedWallets,
+          failedTransfers: distributionSummary.failedTransfers,
+          canceled: distributionSummary.canceled,
+          durationMs: distributionSummary.durationMs,
+        });
+      }
+
       await updateProgress(launchId, 80, "persist");
       await appendLog(launchId, "STEP", "Saving token", "persist");
 
@@ -1571,9 +1799,8 @@ export const launchService = {
         mintPrivateKey,
         devWalletPublicKey,
         bundlerWalletKeypairs,
-        reservedVanityId,
-        distributionWalletMultiplier,
-        launchId
+        distributionWallets,
+        consumedVanityId
       );
       await appendLog(launchId, "INFO", "Token saved", "persist", {
         tokenPublicKey: token.publicKey,
@@ -1598,15 +1825,13 @@ export const launchService = {
             input,
             user.mainWallet.publicKey,
             devWalletPublicKey,
-            bundlerWalletKeypairs
+            bundlerWalletKeypairs,
+            distributionWallets
           ),
         jitoTipAmountSol,
         Date.now() - launchStartedAt
       );
     } catch (error) {
-      if (reservedVanityId) {
-        await releaseVanityMint(reservedVanityId);
-      }
       const durationMs = Date.now() - launchStartedAt;
       const errorName = error instanceof Error ? error.name : "UnknownError";
       const errorMessage = getErrorMessage(error);

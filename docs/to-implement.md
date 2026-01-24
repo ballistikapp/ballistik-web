@@ -4,7 +4,6 @@
 - Review `server/solana/pump-idl.ts` and `server/solana/pump-new-idl.ts` and decide whether to keep manual instruction builders or update the IDL/Anchor path so the duplication can be removed.
 
 ## Token Launch Extension Points
-- Add distribution transfer logic to move tokens into distribution wallets.
 - Add fee collection and Jito tip handling if needed.
 - Document volume bot workflows in `docs/volume-bot-implementation.md`.
 

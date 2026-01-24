@@ -4,7 +4,7 @@
 - Provide a clean, async launch pipeline with clear progress tracking and logs.
 - Persist launches and allow UI resume after refresh.
 - Use main wallet as funding wallet; generate dev and bundler wallets server-side.
-- Support vanity mint pool selection with safe reservation and release.
+- Support vanity mint pool selection with consume-on-lock behavior (no release).
 - Keep launch logic modular for reuse in tokens and wallets.
 - Volume bot uses dedicated `VolumeBotSession` and `VolumeBotLog` models.
 
@@ -40,10 +40,11 @@ Structured log entries per launch.
 - `data`: optional JSON context
 
 ### VanityMint
-Pool of pre-generated vanity mints.
-- `reservedAt`: optimistic lock for in-progress launch
-- `usedAt`: set on success
-- `tokenPublicKey`: linked when mint is used
+Pool of pre-generated vanity mints (consume-on-lock, no release).
+- `usedAt`: set immediately when a mint is locked for a launch (never released)
+- `tokenPublicKey`: linked when token creation succeeds
+- `userId`: user who consumed the mint
+- If vanity is requested and no mint is available, launch fails with an error
 
 ## Wallet Handling
 ### Main Wallet
@@ -59,7 +60,7 @@ Based on `devWalletOption`:
 If bundle buys are enabled, server generates `BUNDLER` wallets and uses them for buy transactions.
 
 ### Distribution Wallets
-When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets and links them to the token. Token distribution logic is intentionally separate for later extension.
+When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets tied to the launch and splits each bundler wallet's purchased tokens across the new wallets after buys complete. Each source wallet keeps its share (integer division remainder stays in the source).
 
 ### Wallet Associations
 
@@ -70,12 +71,13 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
 2. **Validate**: enforce min buy thresholds and bundle wallet limit.
-3. **Wallets**: load main wallet, resolve dev wallet, generate bundler wallets if enabled.
-4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, and fee buffers.
-5. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
+4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
+5. **Metadata + Mint**: resolve image, build metadata, consume vanity mint if requested (fails if none available).
 6. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
-7. **Persist**: create Token, link wallets, mark vanity mint used, generate distribution wallets if needed.
-8. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
+7. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
+8. **Persist**: create Token, link wallets, link vanity mint to token, link distribution wallets.
+9. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
 - Launch form starts via `launch.start` and polls `launch.status`.
