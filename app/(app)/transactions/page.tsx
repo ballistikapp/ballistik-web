@@ -67,10 +67,6 @@ export default function TransactionsPage() {
 
   const transactions = transactionsData ?? [];
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
-  const isStale =
-    !refreshTimestamp ||
-    Date.now() - new Date(refreshTimestamp).getTime() >=
-      cacheConfig.staleMs.transactions;
   const autoRefreshTriggered = useRef(false);
 
   const handleRefresh = async (options?: { showToast?: boolean }) => {
@@ -89,7 +85,10 @@ export default function TransactionsPage() {
       }
     } catch (error) {
       if (toastId) {
-        toast.error("Failed to refresh transactions", { id: toastId, icon: null });
+        toast.error("Failed to refresh transactions", {
+          id: toastId,
+          icon: null,
+        });
       }
     }
   };
@@ -97,11 +96,22 @@ export default function TransactionsPage() {
   useEffect(() => {
     if (!tokenPublicKey || !tokenData) return;
     if (refreshCacheLoading) return;
-    if (!isStale || isRefreshing) return;
+    if (isRefreshing) return;
+    const isStale =
+      !refreshTimestamp ||
+      Date.now() - new Date(refreshTimestamp).getTime() >=
+        cacheConfig.staleMs.transactions;
+    if (!isStale) return;
     if (autoRefreshTriggered.current) return;
     autoRefreshTriggered.current = true;
     void handleRefresh({ showToast: false });
-  }, [isRefreshing, isStale, refreshCacheLoading, tokenData, tokenPublicKey]);
+  }, [
+    isRefreshing,
+    refreshCacheLoading,
+    refreshTimestamp,
+    tokenData,
+    tokenPublicKey,
+  ]);
 
   if (isLoading) {
     return <DashboardLoading />;
@@ -141,7 +151,7 @@ export default function TransactionsPage() {
           Refresh uses the same cadence as wallet balances.
         </p>
       </div>
-      <div className="pt-6"/>
+      <div className="pt-6" />
 
       <DataTable
         columns={columns}

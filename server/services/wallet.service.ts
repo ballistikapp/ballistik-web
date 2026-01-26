@@ -244,6 +244,77 @@ export const walletService = {
       mainWallet,
     };
   },
+  async getWalletPrivateKey(
+    tokenPublicKey: string,
+    walletPublicKey: string,
+    userId: string
+  ) {
+    const token = await prisma.token.findFirst({
+      where: { publicKey: tokenPublicKey, userId },
+      select: { publicKey: true },
+    });
+
+    if (!token) {
+      throw new AppError("Token not found", 404);
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        mainWallet: {
+          select: {
+            publicKey: true,
+            privateKey: true,
+          },
+        },
+      },
+    });
+
+    const mainWallet = user?.mainWallet ?? null;
+    if (mainWallet?.publicKey === walletPublicKey) {
+      if (!mainWallet.privateKey) {
+        throw new AppError("Private key not available", 404);
+      }
+      return { privateKey: mainWallet.privateKey };
+    }
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { publicKey: walletPublicKey },
+      select: {
+        publicKey: true,
+        type: true,
+        tokenPublicKey: true,
+        privateKey: true,
+      },
+    });
+
+    if (!wallet) {
+      throw new AppError("Wallet not found", 404);
+    }
+
+    if (wallet.type === "DEV") {
+      const devLink = await prisma.tokenDevWallet.findUnique({
+        where: {
+          tokenPublicKey_walletPublicKey: {
+            tokenPublicKey,
+            walletPublicKey,
+          },
+        },
+        select: { walletPublicKey: true },
+      });
+      if (!devLink) {
+        throw new AppError("Wallet not found", 404);
+      }
+    } else if (wallet.tokenPublicKey !== tokenPublicKey) {
+      throw new AppError("Wallet not found", 404);
+    }
+
+    if (!wallet.privateKey) {
+      throw new AppError("Private key not available", 404);
+    }
+
+    return { privateKey: wallet.privateKey };
+  },
 
   async refreshWalletBalances(
     tokenPublicKey: string,
@@ -298,8 +369,10 @@ export const walletService = {
           .filter(
             (
               wallet
-            ): wallet is { publicKey: string; balanceRefreshedAt: Date | null } =>
-              !!wallet
+            ): wallet is {
+              publicKey: string;
+              balanceRefreshedAt: Date | null;
+            } => !!wallet
           )
       : availableWallets;
 
@@ -316,8 +389,10 @@ export const walletService = {
 
     const connection = getSolanaConnection();
     const solBalanceMap = new Map<string, number>();
-    const validWallets: { wallet: typeof targetWallets[number]; key: PublicKey }[] =
-      [];
+    const validWallets: {
+      wallet: (typeof targetWallets)[number];
+      key: PublicKey;
+    }[] = [];
     for (const wallet of targetWallets) {
       try {
         validWallets.push({
@@ -348,17 +423,21 @@ export const walletService = {
       balanceSol: (solBalanceMap.get(wallet.publicKey) ?? 0) / 1_000_000_000,
     }));
 
-    await prisma.$transaction(
-      balances.map((balance) =>
-        prisma.wallet.update({
-          where: { publicKey: balance.publicKey },
-          data: {
-            balanceSol: balance.balanceSol,
-            balanceRefreshedAt: now,
-          },
-        })
-      )
-    );
+    const updateBatchSize = 50;
+    for (let i = 0; i < balances.length; i += updateBatchSize) {
+      const batch = balances.slice(i, i + updateBatchSize);
+      await prisma.$transaction(
+        batch.map((balance) =>
+          prisma.wallet.update({
+            where: { publicKey: balance.publicKey },
+            data: {
+              balanceSol: balance.balanceSol,
+              balanceRefreshedAt: now,
+            },
+          })
+        )
+      );
+    }
 
     await refreshCacheService.touch({
       userId,
@@ -392,7 +471,9 @@ export const walletService = {
     const [user, operationalWallets, devWallet] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { mainWallet: { select: { publicKey: true, privateKey: true } } },
+        select: {
+          mainWallet: { select: { publicKey: true, privateKey: true } },
+        },
       }),
       prisma.wallet.findMany({
         where: {
@@ -416,8 +497,8 @@ export const walletService = {
       ...operationalWallets.map((wallet) => wallet.publicKey),
       ...(devWallet?.wallet ? [devWallet.wallet.publicKey] : []),
     ]);
-    const targets = walletPublicKeys.filter(
-      (publicKey) => allowedWallets.has(publicKey)
+    const targets = walletPublicKeys.filter((publicKey) =>
+      allowedWallets.has(publicKey)
     );
 
     if (targets.length === 0) {
@@ -431,20 +512,39 @@ export const walletService = {
     const results = await Promise.all(
       targets.map(async (publicKey) => {
         const destination = new PublicKey(publicKey);
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: sender.publicKey,
-            toPubkey: destination,
-            lamports,
-          })
-        );
-        const signature = await sendAndConfirmTransaction(
-          connection,
-          transaction,
-          [sender],
-          { commitment: "confirmed" }
-        );
-        return { publicKey, signature };
+        const sendTransfer = async () => {
+          const { blockhash, lastValidBlockHeight } =
+            await connection.getLatestBlockhash("confirmed");
+          const transaction = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: sender.publicKey,
+              toPubkey: destination,
+              lamports,
+            })
+          );
+          transaction.recentBlockhash = blockhash;
+          transaction.lastValidBlockHeight = lastValidBlockHeight;
+          transaction.feePayer = sender.publicKey;
+          return await sendAndConfirmTransaction(
+            connection,
+            transaction,
+            [sender],
+            {
+              commitment: "confirmed",
+            }
+          );
+        };
+
+        try {
+          const signature = await sendTransfer();
+          return { publicKey, signature };
+        } catch (error) {
+          if (error instanceof TransactionExpiredBlockheightExceededError) {
+            const signature = await sendTransfer();
+            return { publicKey, signature };
+          }
+          throw error;
+        }
       })
     );
 
@@ -481,7 +581,9 @@ export const walletService = {
       }),
       prisma.tokenDevWallet.findFirst({
         where: { tokenPublicKey },
-        select: { wallet: { select: { publicKey: true, privateKey: true, type: true } } },
+        select: {
+          wallet: { select: { publicKey: true, privateKey: true, type: true } },
+        },
       }),
     ]);
 
@@ -500,7 +602,9 @@ export const walletService = {
 
     const targets = walletPublicKeys
       .map((publicKey) => allowedWallets.get(publicKey))
-      .filter((wallet): wallet is NonNullable<typeof wallet> => Boolean(wallet));
+      .filter((wallet): wallet is NonNullable<typeof wallet> =>
+        Boolean(wallet)
+      );
 
     if (targets.length === 0) {
       throw new AppError("No valid target wallets provided", 400);
@@ -513,7 +617,9 @@ export const walletService = {
 
         const computeLamports = async (blockhash: string) => {
           if (useMax) {
-            const balanceLamports = await connection.getBalance(sender.publicKey);
+            const balanceLamports = await connection.getBalance(
+              sender.publicKey
+            );
             const feeTransaction = new Transaction().add(
               SystemProgram.transfer({
                 fromPubkey: sender.publicKey,
@@ -538,7 +644,8 @@ export const walletService = {
         };
 
         const sendTransfer = async () => {
-          const { blockhash } = await connection.getLatestBlockhash("confirmed");
+          const { blockhash } =
+            await connection.getLatestBlockhash("confirmed");
           const lamports = await computeLamports(blockhash);
           if (lamports <= 0) {
             return null;
@@ -570,11 +677,14 @@ export const walletService = {
               return { publicKey: wallet.publicKey, signature };
             } catch (retryError) {
               const message =
-                retryError instanceof Error ? retryError.message : String(retryError);
+                retryError instanceof Error
+                  ? retryError.message
+                  : String(retryError);
               console.error("[WalletService] Retry transfer failed", message);
             }
           } else {
-            const message = error instanceof Error ? error.message : String(error);
+            const message =
+              error instanceof Error ? error.message : String(error);
             console.error("[WalletService] Transfer failed", message);
           }
           return { publicKey: wallet.publicKey, signature: null };

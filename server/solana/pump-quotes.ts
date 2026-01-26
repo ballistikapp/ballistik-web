@@ -12,14 +12,21 @@ type PumpQuoteState = {
   creatorFeeBps: bigint;
 };
 
-const MAX_BPS = 10_000n;
+const ZERO = BigInt(0);
+const ONE = BigInt(1);
+const MAX_BPS = BigInt(10_000);
 
 const toBigInt = (value: unknown) => {
   if (typeof value === "bigint") return value;
   if (typeof value === "number") return BigInt(Math.floor(value));
   if (typeof value === "string") return BigInt(value);
-  if (value instanceof BN) return BigInt(value.toString());
-  if (value && typeof (value as { toString?: () => string }).toString === "function") {
+  if (value instanceof BN) {
+    return BigInt((value as BN).toString());
+  }
+  if (
+    value &&
+    typeof (value as { toString?: () => string }).toString === "function"
+  ) {
     return BigInt((value as { toString: () => string }).toString());
   }
   throw new Error("Unsupported numeric value");
@@ -35,13 +42,13 @@ const pickField = (record: Record<string, unknown>, keys: string[]) => {
 };
 
 const clampBps = (bps: number) => {
-  if (!Number.isFinite(bps)) return 0n;
+  if (!Number.isFinite(bps)) return ZERO;
   return BigInt(Math.min(Math.max(Math.round(bps), 0), Number(MAX_BPS)));
 };
 
 const ceilDiv = (a: bigint, b: bigint) => {
-  if (b === 0n) return 0n;
-  return (a + b - 1n) / b;
+  if (b === ZERO) return ZERO;
+  return (a + b - ONE) / b;
 };
 
 const applySlippage = (amount: bigint, slippageBps: number) => {
@@ -54,11 +61,9 @@ export const fetchPumpQuoteState = async (
   payer: Keypair
 ): Promise<PumpQuoteState> => {
   const connection = getSolanaConnection();
-  const provider = new AnchorProvider(
-    connection,
-    new NodeWallet(payer),
-    { commitment: "confirmed" }
-  );
+  const provider = new AnchorProvider(connection, new NodeWallet(payer), {
+    commitment: "confirmed",
+  });
   const program = getPumpProgram(provider);
   const { bondingCurve, global } = derivePumpAddresses(mint);
   const [bondingInfo, globalInfo] = await connection.getMultipleAccountsInfo(
@@ -83,7 +88,10 @@ export const fetchPumpQuoteState = async (
   ) as Record<string, unknown>;
 
   const virtualTokenReserves = toBigInt(
-    pickField(bondingCurveData, ["virtualTokenReserves", "virtual_token_reserves"])
+    pickField(bondingCurveData, [
+      "virtualTokenReserves",
+      "virtual_token_reserves",
+    ])
   );
   const virtualSolReserves = toBigInt(
     pickField(bondingCurveData, ["virtualSolReserves", "virtual_sol_reserves"])
@@ -92,8 +100,10 @@ export const fetchPumpQuoteState = async (
     pickField(globalData, ["feeBasisPoints", "fee_basis_points"]) ?? 0
   );
   const creatorFeeBps = toBigInt(
-    pickField(globalData, ["creatorFeeBasisPoints", "creator_fee_basis_points"]) ??
-      0
+    pickField(globalData, [
+      "creatorFeeBasisPoints",
+      "creator_fee_basis_points",
+    ]) ?? 0
   );
 
   return {
@@ -104,14 +114,12 @@ export const fetchPumpQuoteState = async (
   };
 };
 
-export const computeMinTokensOutForBuy = (
+export const computeBuyQuote = (
   state: PumpQuoteState,
-  spendableLamports: bigint,
-  slippageBps: number
+  spendableLamports: bigint
 ) => {
   const totalFeeBps = state.protocolFeeBps + state.creatorFeeBps;
-  let netSol =
-    (spendableLamports * MAX_BPS) / (MAX_BPS + totalFeeBps);
+  let netSol = (spendableLamports * MAX_BPS) / (MAX_BPS + totalFeeBps);
   const protocolFees = ceilDiv(netSol * state.protocolFeeBps, MAX_BPS);
   const creatorFees = ceilDiv(netSol * state.creatorFeeBps, MAX_BPS);
 
@@ -119,16 +127,47 @@ export const computeMinTokensOutForBuy = (
     netSol = netSol - (netSol + protocolFees + creatorFees - spendableLamports);
   }
 
-  const effectiveSol = netSol > 0n ? netSol - 1n : 0n;
+  const effectiveSol = netSol > ZERO ? netSol - ONE : ZERO;
   const tokensOut =
-    effectiveSol === 0n
-      ? 0n
+    effectiveSol === ZERO
+      ? ZERO
       : (effectiveSol * state.virtualTokenReserves) /
         (state.virtualSolReserves + effectiveSol);
 
+  return {
+    netSolIn: netSol,
+    tokensOut,
+    protocolFees,
+    creatorFees,
+  };
+};
+
+export const computeSellQuote = (
+  state: PumpQuoteState,
+  tokenAmount: bigint
+) => {
+  if (tokenAmount <= ZERO) {
+    return { solOut: ZERO, netSolOut: ZERO, feeAmount: ZERO };
+  }
+  const solOut =
+    (tokenAmount * state.virtualSolReserves) /
+    (state.virtualTokenReserves + tokenAmount);
+  const totalFeeBps = state.protocolFeeBps + state.creatorFeeBps;
+  const feeAmount = ceilDiv(solOut * totalFeeBps, MAX_BPS);
+  const netSolOut = solOut > feeAmount ? solOut - feeAmount : ZERO;
+
+  return { solOut, netSolOut, feeAmount };
+};
+
+export const computeMinTokensOutForBuy = (
+  state: PumpQuoteState,
+  spendableLamports: bigint,
+  slippageBps: number
+) => {
+  const { tokensOut } = computeBuyQuote(state, spendableLamports);
+
   const minOut = applySlippage(tokensOut, slippageBps);
-  const boundedMin =
-    tokensOut === 0n ? 0n : minOut === 0n ? 1n : minOut;
+  const boundedMin = tokensOut === ZERO ? ZERO : minOut === ZERO ? ONE : minOut;
 
   return new BN(boundedMin.toString());
 };
@@ -138,17 +177,31 @@ export const computeMinSolOutForSell = (
   tokenAmount: bigint,
   slippageBps: number
 ) => {
-  if (tokenAmount <= 0n) {
-    return new BN(0);
-  }
-  const solOut =
-    (tokenAmount * state.virtualSolReserves) /
-    (state.virtualTokenReserves + tokenAmount);
-  const totalFeeBps = state.protocolFeeBps + state.creatorFeeBps;
-  const feeAmount = ceilDiv(solOut * totalFeeBps, MAX_BPS);
-  const netSol = solOut > feeAmount ? solOut - feeAmount : 0n;
-  const minOut = applySlippage(netSol, slippageBps);
-  const boundedMin = minOut > 0n ? minOut - 1n : 0n;
+  const { netSolOut } = computeSellQuote(state, tokenAmount);
+  const minOut = applySlippage(netSolOut, slippageBps);
+  const boundedMin = minOut > ZERO ? minOut - ONE : ZERO;
 
   return new BN(boundedMin.toString());
+};
+
+export const estimateTokenAmountForNetSolOut = (
+  state: PumpQuoteState,
+  targetNetSolOut: bigint,
+  maxTokenAmount: bigint
+) => {
+  if (targetNetSolOut <= ZERO || maxTokenAmount <= ZERO) {
+    return ZERO;
+  }
+  let low = ZERO;
+  let high = maxTokenAmount;
+  for (let i = 0; i < 64; i += 1) {
+    const mid = (low + high) / BigInt(2);
+    const { netSolOut } = computeSellQuote(state, mid);
+    if (netSolOut < targetNetSolOut) {
+      low = mid + ONE;
+    } else {
+      high = mid;
+    }
+  }
+  return high;
 };

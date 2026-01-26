@@ -26,8 +26,9 @@ export default function Page() {
   const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
-  const [exitDialogOpen, setExitDialogOpen] = useState(false);
-  const [activeExitId, setActiveExitId] = useState<string | null>(null);
+  const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
+  const [localExitId, setLocalExitId] = useState<string | null>(null);
+  const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
 
   const {
     data: tokenData,
@@ -70,6 +71,7 @@ export default function Page() {
     { tokenPublicKey: tokenPublicKey || "" },
     { enabled: !!tokenPublicKey }
   );
+  const activeExitId = localExitId ?? activeExitQuery.data?.id ?? null;
   const exitStatusQuery = trpc.holding.exitStatus.useQuery(
     { exitId: activeExitId ?? "" },
     {
@@ -77,7 +79,9 @@ export default function Page() {
       refetchInterval: (query) => {
         const exit = query.state.data;
         if (!exit) return 2000;
-        return exit.status === "PENDING" || exit.status === "RUNNING" ? 2000 : false;
+        return exit.status === "PENDING" || exit.status === "RUNNING"
+          ? 2000
+          : false;
       },
     }
   );
@@ -95,7 +99,10 @@ export default function Page() {
     () =>
       holdings.reduce(
         (sum, holding) =>
-          sum + (Number.isFinite(Number(holding.tokenBalance)) ? Number(holding.tokenBalance) : 0),
+          sum +
+          (Number.isFinite(Number(holding.tokenBalance))
+            ? Number(holding.tokenBalance)
+            : 0),
         0
       ),
     [holdings]
@@ -105,10 +112,6 @@ export default function Page() {
     [holdings, rowSelection]
   );
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
-  const isStale =
-    !refreshTimestamp ||
-    Date.now() - new Date(refreshTimestamp).getTime() >=
-      cacheConfig.staleMs.holdings;
   const autoRefreshTriggered = useRef(false);
 
   const handleRefresh = async (options?: { showToast?: boolean }) => {
@@ -132,7 +135,7 @@ export default function Page() {
     }
   };
 
-  const handleSell = async (sellPercentage: number) => {
+  const handleSell = async (sellPercentage: number, closeAta: boolean) => {
     if (!tokenPublicKey || selectedHoldings.length === 0) return;
     const walletPublicKeys = selectedHoldings.map(
       (holding) => holding.wallet.publicKey
@@ -143,9 +146,21 @@ export default function Page() {
         tokenPublicKey,
         walletPublicKeys,
         sellPercentage,
+        closeAta,
       });
-      const summary = `${result.submitted} submitted, ${result.failed} failed`;
-      toast.success(`Sell submitted: ${summary}`, { id: toastId });
+      const summaryParts = [
+        `${result.submitted} submitted`,
+        `${result.failed} failed`,
+      ];
+      if (closeAta && result.ataClose) {
+        summaryParts.push(`${result.ataClose.closed} ATA closed`);
+        if (result.ataClose.failed > 0) {
+          summaryParts.push(`${result.ataClose.failed} close failed`);
+        }
+      }
+      toast.success(`Sell submitted: ${summaryParts.join(", ")}`, {
+        id: toastId,
+      });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
       await refetchHoldings();
       setSellDialogOpen(false);
@@ -164,8 +179,9 @@ export default function Page() {
         tokenPublicKey,
         jitoTipSol,
       });
-      setActiveExitId(result.exitId);
-      setExitDialogOpen(true);
+      setLocalExitId(result.exitId);
+      setManualExitDialogOpen(true);
+      setDismissedExitId(null);
       toast.success("Exit started", { id: toastId });
     } catch (error) {
       const message =
@@ -188,24 +204,50 @@ export default function Page() {
     }
   };
 
-  useEffect(() => {
-    if (!activeExitId && activeExitQuery.data) {
-      setActiveExitId(activeExitQuery.data.id);
-      setExitDialogOpen(true);
-    }
-  }, [activeExitId, activeExitQuery.data]);
-
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;
+  const shouldAutoOpen =
+    Boolean(activeExitId) && dismissedExitId !== activeExitId;
+  const isExitDialogOpen = manualExitDialogOpen || shouldAutoOpen;
+
+  const handleOpenExitDialog = () => {
+    setManualExitDialogOpen(true);
+    setDismissedExitId(null);
+  };
+
+  const handleExitDialogOpenChange = (open: boolean) => {
+    setManualExitDialogOpen(open);
+    if (open) {
+      setDismissedExitId(null);
+      return;
+    }
+    if (activeExitId) {
+      setDismissedExitId(activeExitId);
+    }
+    if (activeExitId && exitStatus && exitStatus !== "RUNNING") {
+      setLocalExitId(null);
+    }
+  };
 
   useEffect(() => {
     if (!tokenPublicKey || !tokenData) return;
     if (refreshCacheLoading) return;
-    if (!isStale || isRefreshing) return;
+    if (isRefreshing) return;
+    const isStale =
+      !refreshTimestamp ||
+      Date.now() - new Date(refreshTimestamp).getTime() >=
+        cacheConfig.staleMs.holdings;
+    if (!isStale) return;
     if (autoRefreshTriggered.current) return;
     autoRefreshTriggered.current = true;
     void handleRefresh({ showToast: false });
-  }, [isRefreshing, isStale, refreshCacheLoading, tokenData, tokenPublicKey]);
+  }, [
+    isRefreshing,
+    refreshCacheLoading,
+    refreshTimestamp,
+    tokenData,
+    tokenPublicKey,
+  ]);
 
   if (isLoading) {
     return <DashboardLoading />;
@@ -243,10 +285,12 @@ export default function Page() {
           View token holdings across wallets.
           <br />
           Holdings refresh mirrors wallet balance updates.
+          <br />
+          Includes wallets with open token accounts (ATAs).
         </p>
       </div>
 
-      <div className="pt-6"/>
+      <div className="pt-6" />
 
       <DataTable
         columns={columns}
@@ -277,8 +321,10 @@ export default function Page() {
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setExitDialogOpen(true)}
-                disabled={startExitMutation.isPending || exitStatus === "RUNNING"}
+                onClick={handleOpenExitDialog}
+                disabled={
+                  startExitMutation.isPending || exitStatus === "RUNNING"
+                }
               >
                 Exit
               </Button>
@@ -301,13 +347,8 @@ export default function Page() {
         onConfirm={handleSell}
       />
       <HoldingExitDialog
-        open={exitDialogOpen}
-        onOpenChange={(open) => {
-          setExitDialogOpen(open);
-          if (!open && exitStatus && exitStatus !== "RUNNING") {
-            setActiveExitId(null);
-          }
-        }}
+        open={isExitDialogOpen}
+        onOpenChange={handleExitDialogOpenChange}
         exit={exitData}
         tokenSymbol={tokenData.symbol}
         totalWallets={holdings.length}

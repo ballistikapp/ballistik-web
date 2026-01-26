@@ -16,10 +16,10 @@ type GrpcClientCtor = new (
 
 async function loadGrpcClient() {
   try {
-    const module = (await import("@triton-one/yellowstone-grpc")) as {
+    const grpcModule = (await import("@triton-one/yellowstone-grpc")) as {
       default?: GrpcClientCtor;
     };
-    return module.default ?? null;
+    return grpcModule.default ?? null;
   } catch {
     return null;
   }
@@ -93,7 +93,10 @@ export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
     stream = await client.subscribe();
     console.log("[gRPC] Stream connected successfully");
   } catch (error) {
-    console.log("[gRPC] Connection failed:", error instanceof Error ? error.message : String(error));
+    console.log(
+      "[gRPC] Connection failed:",
+      error instanceof Error ? error.message : String(error)
+    );
     return null;
   }
 

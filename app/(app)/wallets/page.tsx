@@ -4,6 +4,7 @@ import { useQueryState } from "nuqs";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
+import Link from "next/link";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
@@ -120,10 +121,7 @@ export default function Page() {
   );
 
   const handleRefreshBalances = useCallback(
-    async (
-      walletPublicKeys?: string[],
-      options?: { showToast?: boolean }
-    ) => {
+    async (walletPublicKeys?: string[], options?: { showToast?: boolean }) => {
       if (!tokenPublicKey) return;
       const showToast = options?.showToast !== false;
       const toastId = showToast
@@ -133,7 +131,10 @@ export default function Page() {
         : null;
 
       try {
-        const result = await refreshBalances({ tokenPublicKey, walletPublicKeys });
+        const result = await refreshBalances({
+          tokenPublicKey,
+          walletPublicKeys,
+        });
         await Promise.all([
           refetchOperationalWallets(),
           refetchDevWallet(),
@@ -212,24 +213,25 @@ export default function Page() {
   }, [handleOpenReturn, handleOpenSend, handleRefreshBalances, tokenPublicKey]);
 
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
-  const isStale =
-    !refreshTimestamp ||
-    Date.now() - new Date(refreshTimestamp).getTime() >=
-      cacheConfig.staleMs.wallets;
   const autoRefreshTriggered = useRef(false);
 
   useEffect(() => {
     if (!tokenPublicKey || !tokenData) return;
     if (refreshCacheLoading) return;
-    if (!isStale || isRefreshingBalances) return;
+    if (isRefreshingBalances) return;
+    const isStale =
+      !refreshTimestamp ||
+      Date.now() - new Date(refreshTimestamp).getTime() >=
+        cacheConfig.staleMs.wallets;
+    if (!isStale) return;
     if (autoRefreshTriggered.current) return;
     autoRefreshTriggered.current = true;
     void handleRefreshBalances(undefined, { showToast: false });
   }, [
     handleRefreshBalances,
     isRefreshingBalances,
-    isStale,
     refreshCacheLoading,
+    refreshTimestamp,
     tokenData,
     tokenPublicKey,
   ]);
@@ -309,6 +311,17 @@ export default function Page() {
                 {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
               </Button>
+              {mainWallet && (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={`https://solscan.io/account/${mainWallet.publicKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Solscan
+                  </a>
+                </Button>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -343,6 +356,35 @@ export default function Page() {
                 {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
                 Refresh
               </Button>
+              {devWallet && tokenPublicKey && (
+                <Button variant="outline" size="sm" asChild>
+                  <Link
+                    href={`/wallets/${devWallet.publicKey}?token=${tokenPublicKey}`}
+                  >
+                    View wallet
+                  </Link>
+                </Button>
+              )}
+              {devWallet && (
+                <Button variant="outline" size="sm" asChild>
+                  <a
+                    href={`https://solscan.io/account/${devWallet.publicKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Solscan
+                  </a>
+                </Button>
+              )}
+              {devWallet && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleOpenSend([devWallet.publicKey])}
+                >
+                  Send SOL
+                </Button>
+              )}
               {devWallet && (
                 <Button
                   variant="outline"

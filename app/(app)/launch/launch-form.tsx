@@ -53,7 +53,8 @@ const formSchema = z.object({
     .string()
     .min(20, "Description must be at least 20 characters")
     .max(500, "Description must be at most 500 characters"),
-  tokenImage: z.string(),
+  tokenImage: z.string().min(1, "Main image or video is required"),
+  tokenBanner: z.string(),
   twitter: z.string(),
   telegram: z.string(),
   website: z.string(),
@@ -81,6 +82,51 @@ const formSchema = z.object({
     .min(1, "Distribution multiplier must be at least 1")
     .max(5, "Distribution multiplier must be 5 or less"),
 });
+
+const MAIN_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"];
+const MAIN_VIDEO_MIME_TYPES = ["video/mp4"];
+const BANNER_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"];
+const MAIN_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
+const MAIN_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+const BANNER_MAX_BYTES = Math.floor(4.3 * 1024 * 1024);
+const BANNER_MIN_WIDTH = 1500;
+const BANNER_MIN_HEIGHT = 500;
+const BANNER_ASPECT_RATIO = 3;
+const BANNER_ASPECT_TOLERANCE = 0.05;
+const MAIN_IMAGE_ASPECT_TOLERANCE = 0.1;
+const VIDEO_ASPECT_TOLERANCE = 0.1;
+const VIDEO_RECOMMENDED_MIN = 1080;
+
+const readImageDimensions = (file: File) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const image = new Image();
+    image.onload = () => {
+      resolve({ width: image.width, height: image.height });
+      URL.revokeObjectURL(url);
+    };
+    image.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to read image dimensions"));
+    };
+    image.src = url;
+  });
+
+const readVideoDimensions = (file: File) =>
+  new Promise<{ width: number; height: number }>((resolve, reject) => {
+    const url = URL.createObjectURL(file);
+    const video = document.createElement("video");
+    video.preload = "metadata";
+    video.onloadedmetadata = () => {
+      resolve({ width: video.videoWidth, height: video.videoHeight });
+      URL.revokeObjectURL(url);
+    };
+    video.onerror = () => {
+      URL.revokeObjectURL(url);
+      reject(new Error("Failed to read video metadata"));
+    };
+    video.src = url;
+  });
 
 const steps = [
   {
@@ -126,11 +172,15 @@ function calculateLaunchTotals(values: {
 
 export function LaunchForm() {
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
+  const [bannerPreview, setBannerPreview] = React.useState<string | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = React.useState(false);
-  const [activeLaunchId, setActiveLaunchId] = React.useState<string | null>(null);
+  const [activeLaunchId, setActiveLaunchId] = React.useState<string | null>(
+    null
+  );
   const [isProgressOpen, setIsProgressOpen] = React.useState(false);
   const [launchNotified, setLaunchNotified] = React.useState(false);
-  const fileInputRef = React.useRef<HTMLInputElement>(null);
+  const mainMediaInputRef = React.useRef<HTMLInputElement>(null);
+  const bannerInputRef = React.useRef<HTMLInputElement>(null);
   const launchStorageKey = "sollabs.launch.active";
 
   const startLaunchMutation = trpc.launch.start.useMutation({
@@ -210,7 +260,8 @@ export function LaunchForm() {
 
     if (launch.status === "FAILED" && !launchNotified) {
       toast.error("Launch failed", {
-        description: launch.errorMessage || "Something went wrong during launch.",
+        description:
+          launch.errorMessage || "Something went wrong during launch.",
       });
       setLaunchNotified(true);
     }
@@ -248,25 +299,168 @@ export function LaunchForm() {
     }
   };
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        const result = reader.result as string;
-        setImagePreview(result);
-        form.setFieldValue("tokenImage", result);
-      };
-      reader.readAsDataURL(file);
+  const resetMainMediaInput = () => {
+    if (mainMediaInputRef.current) {
+      mainMediaInputRef.current.value = "";
     }
   };
 
-  const removeImage = () => {
+  const resetBannerInput = () => {
+    if (bannerInputRef.current) {
+      bannerInputRef.current.value = "";
+    }
+  };
+
+  const handleMainMediaUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    const isImage = MAIN_IMAGE_MIME_TYPES.includes(file.type);
+    const isVideo = MAIN_VIDEO_MIME_TYPES.includes(file.type);
+    if (!isImage && !isVideo) {
+      toast.error("Unsupported file type", {
+        description: "Upload a JPG, PNG, GIF, or MP4 file.",
+      });
+      resetMainMediaInput();
+      return;
+    }
+    const maxBytes = isVideo ? MAIN_VIDEO_MAX_BYTES : MAIN_IMAGE_MAX_BYTES;
+    if (file.size > maxBytes) {
+      toast.error("File is too large", {
+        description: isVideo
+          ? "Videos must be 30MB or smaller."
+          : "Images must be 15MB or smaller.",
+      });
+      resetMainMediaInput();
+      return;
+    }
+    if (isImage) {
+      try {
+        const { width, height } = await readImageDimensions(file);
+        const ratio = width / height;
+        if (Math.abs(ratio - 1) > MAIN_IMAGE_ASPECT_TOLERANCE) {
+          toast.message("Image aspect ratio recommendation", {
+            description: "A 1:1 square image is recommended.",
+          });
+        }
+      } catch (error) {
+        toast.error("Unable to read image dimensions", {
+          description: "Please try a different image file.",
+        });
+        resetMainMediaInput();
+        return;
+      }
+    }
+    if (isVideo) {
+      try {
+        const { width, height } = await readVideoDimensions(file);
+        const ratio = width / height;
+        const isWide = Math.abs(ratio - 16 / 9) <= VIDEO_ASPECT_TOLERANCE;
+        const isTall = Math.abs(ratio - 9 / 16) <= VIDEO_ASPECT_TOLERANCE;
+        if (!isWide && !isTall) {
+          toast.message("Video aspect ratio recommendation", {
+            description: "16:9 or 9:16 is recommended.",
+          });
+        }
+        if (Math.max(width, height) < VIDEO_RECOMMENDED_MIN) {
+          toast.message("Video resolution recommendation", {
+            description: "1080p or higher is recommended.",
+          });
+        }
+      } catch (error) {
+        toast.error("Unable to read video metadata", {
+          description: "Please try a different MP4 file.",
+        });
+        resetMainMediaInput();
+        return;
+      }
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setImagePreview(result);
+      form.setFieldValue("tokenImage", result);
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read file", {
+        description: "Please try again.",
+      });
+      resetMainMediaInput();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleBannerUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) {
+      return;
+    }
+    if (!BANNER_IMAGE_MIME_TYPES.includes(file.type)) {
+      toast.error("Unsupported banner type", {
+        description: "Upload a JPG, PNG, or GIF banner.",
+      });
+      resetBannerInput();
+      return;
+    }
+    if (file.size > BANNER_MAX_BYTES) {
+      toast.error("Banner file is too large", {
+        description: "Banners must be 4.3MB or smaller.",
+      });
+      resetBannerInput();
+      return;
+    }
+    try {
+      const { width, height } = await readImageDimensions(file);
+      if (width < BANNER_MIN_WIDTH || height < BANNER_MIN_HEIGHT) {
+        toast.error("Banner is too small", {
+          description: "Banners must be at least 1500x500px.",
+        });
+        resetBannerInput();
+        return;
+      }
+      const ratio = width / height;
+      if (Math.abs(ratio - BANNER_ASPECT_RATIO) > BANNER_ASPECT_TOLERANCE) {
+        toast.error("Banner aspect ratio must be 3:1", {
+          description: "Use a 1500x500px banner for best results.",
+        });
+        resetBannerInput();
+        return;
+      }
+    } catch (error) {
+      toast.error("Unable to read banner dimensions", {
+        description: "Please try a different banner file.",
+      });
+      resetBannerInput();
+      return;
+    }
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const result = reader.result as string;
+      setBannerPreview(result);
+      form.setFieldValue("tokenBanner", result);
+    };
+    reader.onerror = () => {
+      toast.error("Failed to read banner file", {
+        description: "Please try again.",
+      });
+      resetBannerInput();
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const removeMainMedia = () => {
     setImagePreview(null);
     form.setFieldValue("tokenImage", "");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
-    }
+    resetMainMediaInput();
+  };
+
+  const removeBanner = () => {
+    setBannerPreview(null);
+    form.setFieldValue("tokenBanner", "");
+    resetBannerInput();
   };
 
   const form = useForm({
@@ -275,6 +469,7 @@ export function LaunchForm() {
       tokenSymbol: "",
       description: "",
       tokenImage: "",
+      tokenBanner: "",
       twitter: "",
       telegram: "",
       website: "",
@@ -305,6 +500,8 @@ export function LaunchForm() {
     },
   });
 
+  const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
+
   const handleConfirmLaunch = async () => {
     const values = form.state.values;
     const validation = await formSchema.safeParseAsync(values);
@@ -319,6 +516,7 @@ export function LaunchForm() {
       tokenSymbol: values.tokenSymbol,
       description: values.description,
       tokenImage: values.tokenImage,
+      tokenBanner: values.tokenBanner,
       twitter: values.twitter || undefined,
       telegram: values.telegram || undefined,
       website: values.website || undefined,
@@ -346,7 +544,9 @@ export function LaunchForm() {
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-2 text-sm">
                 <Info className="size-4 text-destructive" />
-                <span>Previous launch failed. Recover SOL from launch wallets.</span>
+                <span>
+                  Previous launch failed. Recover SOL from launch wallets.
+                </span>
               </div>
               <Button
                 variant="outline"
@@ -437,7 +637,7 @@ export function LaunchForm() {
                 </div>
 
                 <Field>
-                  <FieldLabel>Token Image</FieldLabel>
+                  <FieldLabel>Main Image</FieldLabel>
                   <div className="flex items-start gap-4">
                     <div
                       className={cn(
@@ -449,14 +649,25 @@ export function LaunchForm() {
                     >
                       {imagePreview ? (
                         <>
-                          <img
-                            src={imagePreview}
-                            alt="Token preview"
-                            className="h-full w-full rounded-xl object-cover"
-                          />
+                          {isVideoPreview ? (
+                            <video
+                              src={imagePreview}
+                              className="h-full w-full rounded-xl object-cover"
+                              muted
+                              loop
+                              playsInline
+                              autoPlay
+                            />
+                          ) : (
+                            <img
+                              src={imagePreview}
+                              alt="Main media preview"
+                              className="h-full w-full rounded-xl object-cover"
+                            />
+                          )}
                           <button
                             type="button"
-                            onClick={removeImage}
+                            onClick={removeMainMedia}
                             className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
                           >
                             <X className="h-3.5 w-3.5" />
@@ -465,7 +676,7 @@ export function LaunchForm() {
                       ) : (
                         <button
                           type="button"
-                          onClick={() => fileInputRef.current?.click()}
+                          onClick={() => mainMediaInputRef.current?.click()}
                           className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground"
                         >
                           <ImagePlus className="h-6 w-6" />
@@ -474,16 +685,90 @@ export function LaunchForm() {
                       )}
                     </div>
                     <input
-                      ref={fileInputRef}
+                      ref={mainMediaInputRef}
                       type="file"
-                      accept="image/png, image/jpeg, image/gif"
-                      onChange={handleImageUpload}
+                      accept="image/png, image/jpeg, image/gif, video/mp4"
+                      onChange={handleMainMediaUpload}
                       className="hidden"
                     />
-                    <div className="text-sm text-muted-foreground">
-                      <p>Recommended: 512x512px</p>
-                      <p>Max size: 2MB</p>
-                      <p>PNG, JPG, or GIF</p>
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p className="font-medium text-foreground">
+                        File size and type
+                      </p>
+                      <p>
+                        Image - max 15MB. ".jpg", ".gif" or ".png" recommended
+                      </p>
+                      <p>Video - max 30MB. ".mp4" recommended</p>
+                      <p className="pt-2 font-medium text-foreground">
+                        Resolution and aspect ratio
+                      </p>
+                      <p>Image - 1:1 square recommended (1000x1000px+)</p>
+                      <p>Video - 16:9 or 9:16, 1080p+ recommended</p>
+                    </div>
+                  </div>
+                </Field>
+                <Field className="col-span-2">
+                  <FieldLabel>Banner</FieldLabel>
+                  <div className="flex items-start gap-4">
+                    <div
+                      className={cn(
+                        "relative flex h-24 w-72 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
+                        bannerPreview
+                          ? "border-transparent"
+                          : "border-muted-foreground/25 hover:border-muted-foreground/50"
+                      )}
+                    >
+                      {bannerPreview ? (
+                        <>
+                          <img
+                            src={bannerPreview}
+                            alt="Banner preview"
+                            className="h-full w-full rounded-xl object-cover"
+                          />
+                          <button
+                            type="button"
+                            onClick={removeBanner}
+                            className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
+                        </>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={() => bannerInputRef.current?.click()}
+                          className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground"
+                        >
+                          <ImagePlus className="h-6 w-6" />
+                          <span className="text-xs">Upload</span>
+                        </button>
+                      )}
+                    </div>
+                    <input
+                      ref={bannerInputRef}
+                      type="file"
+                      accept="image/png, image/jpeg, image/gif"
+                      onChange={handleBannerUpload}
+                      className="hidden"
+                    />
+                    <div className="text-sm text-muted-foreground space-y-1">
+                      <p>
+                        This will be shown on the coin page in addition to the
+                        coin image.
+                      </p>
+                      <p>
+                        Only available on creation and cannot be changed later.
+                      </p>
+                      <p className="pt-2 font-medium text-foreground">
+                        File size and type
+                      </p>
+                      <p>
+                        Image - max 4.3MB. ".jpg", ".gif" or ".png" recommended
+                      </p>
+                      <p className="pt-2 font-medium text-foreground">
+                        Resolution and aspect ratio
+                      </p>
+                      <p>3:1 aspect ratio, 1500x500px recommended</p>
                     </div>
                   </div>
                 </Field>
@@ -688,7 +973,9 @@ export function LaunchForm() {
                     </div>
                   )}
                 </form.Field>
-                <form.Subscribe selector={(state) => state.values.devWalletOption}>
+                <form.Subscribe
+                  selector={(state) => state.values.devWalletOption}
+                >
                   {(devWalletOption) => (
                     <div className="mt-2 h-9">
                       {devWalletOption === "import" && (
@@ -802,7 +1089,8 @@ export function LaunchForm() {
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      Generate a custom token address starting with &quot;pump&quot;
+                      Generate a custom token address starting with
+                      &quot;pump&quot;
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -836,7 +1124,9 @@ export function LaunchForm() {
             </CardHeader>
             <Separator />
             <CardContent>
-              <form.Subscribe selector={(state) => state.values.bundleBuyEnabled}>
+              <form.Subscribe
+                selector={(state) => state.values.bundleBuyEnabled}
+              >
                 {(bundleBuyEnabled) =>
                   bundleBuyEnabled && (
                     <div className="space-y-6">
@@ -854,7 +1144,9 @@ export function LaunchForm() {
                                 max="11"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.valueAsNumber || 0)
+                                  field.handleChange(
+                                    e.target.valueAsNumber || 0
+                                  )
                                 }
                                 placeholder="5"
                               />
@@ -877,7 +1169,9 @@ export function LaunchForm() {
                                 min="0.001"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.valueAsNumber || 0)
+                                  field.handleChange(
+                                    e.target.valueAsNumber || 0
+                                  )
                                 }
                                 placeholder="0.01"
                               />
@@ -903,7 +1197,9 @@ export function LaunchForm() {
                                 max="50"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.valueAsNumber || 0)
+                                  field.handleChange(
+                                    e.target.valueAsNumber || 0
+                                  )
                                 }
                                 placeholder="20"
                               />
@@ -926,7 +1222,9 @@ export function LaunchForm() {
                                 max="5"
                                 value={field.state.value}
                                 onChange={(e) =>
-                                  field.handleChange(e.target.valueAsNumber || 1)
+                                  field.handleChange(
+                                    e.target.valueAsNumber || 1
+                                  )
                                 }
                                 placeholder="1"
                               />
@@ -999,152 +1297,177 @@ export function LaunchForm() {
             <Separator />
             <CardContent>
               <form.Subscribe selector={(state) => state.values}>
-              {(values) => {
-                const { totalCostSol, distributionWallets } =
-                  calculateLaunchTotals(values);
-                return (
-                  <div className="space-y-6">
-                    <div className="flex items-start gap-4">
-                      {imagePreview ? (
-                        <img
-                          src={imagePreview}
-                          alt="Token"
-                          className="h-16 w-16 rounded-xl object-cover"
-                        />
-                      ) : (
-                        <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center">
-                          <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                        </div>
-                      )}
-                      <div>
-                        <p className="text-lg font-semibold">
-                          {values.tokenName || "Token Name"}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          ${values.tokenSymbol || "SYMBOL"}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid gap-3 text-sm">
-                      <div className="grid grid-cols-[140px_1fr] gap-2">
-                        <span className="text-muted-foreground">
-                          Description
-                        </span>
-                        <span className="text-foreground line-clamp-2">
-                          {values.description || "-"}
-                        </span>
-                      </div>
-                      {(values.twitter ||
-                        values.telegram ||
-                        values.website) && (
-                        <div className="grid grid-cols-[140px_1fr] gap-2">
-                          <span className="text-muted-foreground">
-                            Social Links
-                          </span>
-                          <div className="flex gap-2">
-                            {values.twitter && (
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                Twitter
-                              </span>
-                            )}
-                            {values.telegram && (
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                Telegram
-                              </span>
-                            )}
-                            {values.website && (
-                              <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                Website
-                              </span>
-                            )}
+                {(values) => {
+                  const { totalCostSol, distributionWallets } =
+                    calculateLaunchTotals(values);
+                  return (
+                    <div className="space-y-6">
+                      <div className="flex items-start gap-4">
+                        {imagePreview ? (
+                          isVideoPreview ? (
+                            <video
+                              src={imagePreview}
+                              className="h-16 w-16 rounded-xl object-cover"
+                              muted
+                              loop
+                              playsInline
+                              autoPlay
+                            />
+                          ) : (
+                            <img
+                              src={imagePreview}
+                              alt="Token"
+                              className="h-16 w-16 rounded-xl object-cover"
+                            />
+                          )
+                        ) : (
+                          <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center">
+                            <ImagePlus className="h-6 w-6 text-muted-foreground" />
                           </div>
+                        )}
+                        <div>
+                          <p className="text-lg font-semibold">
+                            {values.tokenName || "Token Name"}
+                          </p>
+                          <p className="text-sm text-muted-foreground">
+                            ${values.tokenSymbol || "SYMBOL"}
+                          </p>
+                        </div>
+                      </div>
+                      {bannerPreview && (
+                        <div className="rounded-xl overflow-hidden border">
+                          <img
+                            src={bannerPreview}
+                            alt="Banner"
+                            className="h-24 w-full object-cover"
+                          />
                         </div>
                       )}
-                    </div>
 
-                    <div className="border-t pt-4">
-                      <div className="text-sm font-medium mb-3">
-                        Launch Configuration
-                      </div>
                       <div className="grid gap-3 text-sm">
                         <div className="grid grid-cols-[140px_1fr] gap-2">
                           <span className="text-muted-foreground">
-                            Dev Wallet
+                            Description
                           </span>
-                          <span>
-                            {values.devWalletOption === "import"
-                              ? "Imported wallet"
-                              : values.devWalletOption === "generate"
-                              ? "Will be generated"
-                              : "Main wallet"}
+                          <span className="text-foreground line-clamp-2">
+                            {values.description || "-"}
                           </span>
                         </div>
-                        <div className="grid grid-cols-[140px_1fr] gap-2">
-                          <span className="text-muted-foreground">Dev Buy</span>
-                          <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
+                        {(values.twitter ||
+                          values.telegram ||
+                          values.website) && (
+                          <div className="grid grid-cols-[140px_1fr] gap-2">
+                            <span className="text-muted-foreground">
+                              Social Links
+                            </span>
+                            <div className="flex gap-2">
+                              {values.twitter && (
+                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  Twitter
+                                </span>
+                              )}
+                              {values.telegram && (
+                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  Telegram
+                                </span>
+                              )}
+                              {values.website && (
+                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                  Website
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="border-t pt-4">
+                        <div className="text-sm font-medium mb-3">
+                          Launch Configuration
                         </div>
-                        <div className="grid grid-cols-[140px_1fr] gap-2">
-                          <span className="text-muted-foreground">
-                            Jito Tip
-                          </span>
-                          <span>{values.jitoTipAmountSol.toFixed(4)} SOL</span>
-                        </div>
-                        {values.bundleBuyEnabled && (
-                          <>
+                        <div className="grid gap-3 text-sm">
+                          <div className="grid grid-cols-[140px_1fr] gap-2">
+                            <span className="text-muted-foreground">
+                              Dev Wallet
+                            </span>
+                            <span>
+                              {values.devWalletOption === "import"
+                                ? "Imported wallet"
+                                : values.devWalletOption === "generate"
+                                  ? "Will be generated"
+                                  : "Main wallet"}
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-[140px_1fr] gap-2">
+                            <span className="text-muted-foreground">
+                              Dev Buy
+                            </span>
+                            <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
+                          </div>
+                          <div className="grid grid-cols-[140px_1fr] gap-2">
+                            <span className="text-muted-foreground">
+                              Jito Tip
+                            </span>
+                            <span>
+                              {values.jitoTipAmountSol.toFixed(4)} SOL
+                            </span>
+                          </div>
+                          {values.bundleBuyEnabled && (
+                            <>
+                              <div className="grid grid-cols-[140px_1fr] gap-2">
+                                <span className="text-muted-foreground">
+                                  Bundle Buy
+                                </span>
+                                <span>
+                                  {values.bundlerWalletCount} wallets ×{" "}
+                                  {values.bundlerBuyAmountSol} SOL (±
+                                  {values.bundlerBuyVariancePercent}%)
+                                </span>
+                              </div>
+                              {values.distributionWalletMultiplier > 1 && (
+                                <div className="grid grid-cols-[140px_1fr] gap-2">
+                                  <span className="text-muted-foreground">
+                                    Distribution
+                                  </span>
+                                  <span>
+                                    {distributionWallets} wallets after ×
+                                    {values.distributionWalletMultiplier}{" "}
+                                    distribution
+                                  </span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                          {!values.bundleBuyEnabled && (
                             <div className="grid grid-cols-[140px_1fr] gap-2">
                               <span className="text-muted-foreground">
                                 Bundle Buy
                               </span>
-                              <span>
-                                {values.bundlerWalletCount} wallets ×{" "}
-                                {values.bundlerBuyAmountSol} SOL (±
-                                {values.bundlerBuyVariancePercent}%)
-                              </span>
+                              <span>Disabled</span>
                             </div>
-                            {values.distributionWalletMultiplier > 1 && (
-                              <div className="grid grid-cols-[140px_1fr] gap-2">
-                                <span className="text-muted-foreground">
-                                  Distribution
-                                </span>
-                                <span>
-                                  {distributionWallets} wallets after ×
-                                  {values.distributionWalletMultiplier} distribution
-                                </span>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        {!values.bundleBuyEnabled && (
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Bundle Buy
-                            </span>
-                            <span>Disabled</span>
-                          </div>
-                        )}
-                        {values.vanityMint && (
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Vanity Address
-                            </span>
-                            <span className="text-green-600">Enabled</span>
-                          </div>
-                        )}
+                          )}
+                          {values.vanityMint && (
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">
+                                Vanity Address
+                              </span>
+                              <span className="text-green-600">Enabled</span>
+                            </div>
+                          )}
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="border-t pt-4">
-                      <div className="flex justify-between items-center text-sm">
-                        <span className="font-medium">Total Cost</span>
-                        <span className="text-lg font-bold">
-                          {totalCostSol.toFixed(4)} SOL
-                        </span>
+                      <div className="border-t pt-4">
+                        <div className="flex justify-between items-center text-sm">
+                          <span className="font-medium">Total Cost</span>
+                          <span className="text-lg font-bold">
+                            {totalCostSol.toFixed(4)} SOL
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              }}
+                  );
+                }}
               </form.Subscribe>
             </CardContent>
           </Card>
@@ -1175,6 +1498,7 @@ export function LaunchForm() {
           onConfirm={handleConfirmLaunch}
           launchInput={form.state.values}
           imagePreview={imagePreview}
+          bannerPreview={bannerPreview}
           isLoading={startLaunchMutation.isPending}
         />
         <LaunchProgressDialog
@@ -1188,7 +1512,8 @@ export function LaunchForm() {
           }}
           onClose={() => {
             setIsProgressOpen(false);
-            const status = launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
+            const status =
+              launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
             if (status === "SUCCEEDED") {
               clearActiveLaunch();
             }

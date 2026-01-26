@@ -22,11 +22,15 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import bs58 from "bs58";
-import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
+import { PumpFunSDK, calculateWithSlippageBuy } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
+import {
+  buildCreateTokenTransaction,
+  type PumpMetadataUpload,
+} from "@/server/solana/pump-transaction-builders";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
-type LaunchRecord = Prisma.LaunchGetPayload<{}>;
+type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
 
 function toLamports(amount: number) {
   return BigInt(Math.floor(amount * LAMPORTS_PER_SOL));
@@ -39,6 +43,23 @@ function lamportsToSol(lamports: bigint) {
 function normalizeSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
 }
+
+const MAIN_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/jpg",
+]);
+const MAIN_VIDEO_MIME_TYPES = new Set(["video/mp4"]);
+const BANNER_IMAGE_MIME_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/jpg",
+]);
+const MAIN_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
+const MAIN_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
+const BANNER_MAX_BYTES = Math.floor(4.3 * 1024 * 1024);
 
 type LaunchRecoveryData = {
   mainWalletPublicKey: string;
@@ -56,6 +77,60 @@ type DistributionWallet = {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
+
+function normalizeMimeType(mime: string) {
+  return mime.split(";")[0]?.trim().toLowerCase() ?? "";
+}
+
+function fileExtensionForMime(mime: string) {
+  if (mime === "image/jpeg" || mime === "image/jpg") {
+    return "jpg";
+  }
+  if (mime === "image/png") {
+    return "png";
+  }
+  if (mime === "image/gif") {
+    return "gif";
+  }
+  if (mime === "video/mp4") {
+    return "mp4";
+  }
+  return "bin";
+}
+
+function parseDataUrl(dataUrl: string) {
+  const [header, data] = dataUrl.split(",");
+  const mimeMatch = header?.match(/data:(.*?);base64/);
+  if (!mimeMatch) {
+    throw new AppError("Invalid file format", 400);
+  }
+  const mime = normalizeMimeType(mimeMatch[1]);
+  const buffer = Buffer.from(data, "base64");
+  return { mime, buffer };
+}
+
+function ensureMainMediaConstraints(mime: string, size: number) {
+  const isImage = MAIN_IMAGE_MIME_TYPES.has(mime);
+  const isVideo = MAIN_VIDEO_MIME_TYPES.has(mime);
+  if (!isImage && !isVideo) {
+    throw new AppError("Unsupported main media type", 400);
+  }
+  if (isImage && size > MAIN_IMAGE_MAX_BYTES) {
+    throw new AppError("Main image must be 15MB or smaller", 400);
+  }
+  if (isVideo && size > MAIN_VIDEO_MAX_BYTES) {
+    throw new AppError("Main video must be 30MB or smaller", 400);
+  }
+}
+
+function ensureBannerConstraints(mime: string, size: number) {
+  if (!BANNER_IMAGE_MIME_TYPES.has(mime)) {
+    throw new AppError("Unsupported banner image type", 400);
+  }
+  if (size > BANNER_MAX_BYTES) {
+    throw new AppError("Banner image must be 4.3MB or smaller", 400);
+  }
 }
 
 function getErrorMessage(error: unknown) {
@@ -168,9 +243,13 @@ function parseLaunchRecoveryObject(
   value: Record<string, unknown>
 ): LaunchRecoveryData | null {
   const mainWalletPublicKey =
-    typeof value.mainWalletPublicKey === "string" ? value.mainWalletPublicKey : "";
+    typeof value.mainWalletPublicKey === "string"
+      ? value.mainWalletPublicKey
+      : "";
   const devWalletPublicKey =
-    typeof value.devWalletPublicKey === "string" ? value.devWalletPublicKey : "";
+    typeof value.devWalletPublicKey === "string"
+      ? value.devWalletPublicKey
+      : "";
   const bundlerWallets = Array.isArray(value.bundlerWallets)
     ? value.bundlerWallets.filter(
         (item): item is string => typeof item === "string"
@@ -218,7 +297,10 @@ function parseLaunchRecoveryData(result: Prisma.JsonValue | null) {
   return parseLaunchRecoveryObject(result);
 }
 
-async function setLaunchRecovery(launchId: string, recovery: LaunchRecoveryData) {
+async function setLaunchRecovery(
+  launchId: string,
+  recovery: LaunchRecoveryData
+) {
   await prisma.launch.update({
     where: { id: launchId },
     data: {
@@ -229,14 +311,19 @@ async function setLaunchRecovery(launchId: string, recovery: LaunchRecoveryData)
 
 function buildTokenMetadata(
   input: LaunchTokenInput,
-  file: File
-): CreateTokenMetadata {
-  const metadata: CreateTokenMetadata = {
+  file: File,
+  bannerFile?: File | null
+): PumpMetadataUpload {
+  const metadata: PumpMetadataUpload = {
     name: input.tokenName.trim(),
     symbol: normalizeSymbol(input.tokenSymbol),
     description: input.description.trim(),
     file,
   };
+
+  if (bannerFile) {
+    metadata.bannerFile = bannerFile;
+  }
 
   if (input.twitter?.trim()) {
     metadata.twitter = input.twitter.trim();
@@ -251,29 +338,58 @@ function buildTokenMetadata(
   return metadata;
 }
 
-async function resolveImageFile(tokenImage: string, symbol: string) {
+async function resolveMainMediaFile(tokenImage: string, symbol: string) {
   if (!tokenImage) {
-    throw new AppError("Token image is required", 400);
+    throw new AppError("Main image or video is required", 400);
   }
 
-  if (tokenImage.startsWith("data:image")) {
-    const [header, data] = tokenImage.split(",");
-    const mimeMatch = header.match(/:(.*?);/);
-    if (!mimeMatch) {
-      throw new AppError("Invalid image format", 400);
-    }
-    const mime = mimeMatch[1];
-    const buffer = Buffer.from(data, "base64");
-    return new File([buffer], `${symbol}.png`, { type: mime });
+  if (tokenImage.startsWith("data:")) {
+    const { mime, buffer } = parseDataUrl(tokenImage);
+    ensureMainMediaConstraints(mime, buffer.length);
+    const extension = fileExtensionForMime(mime);
+    return new File([buffer], `${symbol}.${extension}`, { type: mime });
   }
 
   const response = await fetch(tokenImage);
   if (!response.ok) {
-    throw new AppError("Failed to fetch token image", 400);
+    throw new AppError("Failed to fetch main media", 400);
   }
   const arrayBuffer = await response.arrayBuffer();
-  const contentType = response.headers.get("content-type") || "image/png";
-  return new File([arrayBuffer], `${symbol}.png`, { type: contentType });
+  const contentType = normalizeMimeType(
+    response.headers.get("content-type") || ""
+  );
+  const buffer = Buffer.from(arrayBuffer);
+  ensureMainMediaConstraints(contentType, buffer.length);
+  const extension = fileExtensionForMime(contentType);
+  return new File([buffer], `${symbol}.${extension}`, { type: contentType });
+}
+
+async function resolveBannerFile(tokenBanner: string, symbol: string) {
+  if (!tokenBanner?.trim()) {
+    return null;
+  }
+
+  if (tokenBanner.startsWith("data:")) {
+    const { mime, buffer } = parseDataUrl(tokenBanner);
+    ensureBannerConstraints(mime, buffer.length);
+    const extension = fileExtensionForMime(mime);
+    return new File([buffer], `${symbol}-banner.${extension}`, { type: mime });
+  }
+
+  const response = await fetch(tokenBanner);
+  if (!response.ok) {
+    throw new AppError("Failed to fetch banner image", 400);
+  }
+  const arrayBuffer = await response.arrayBuffer();
+  const contentType = normalizeMimeType(
+    response.headers.get("content-type") || ""
+  );
+  const buffer = Buffer.from(arrayBuffer);
+  ensureBannerConstraints(contentType, buffer.length);
+  const extension = fileExtensionForMime(contentType);
+  return new File([buffer], `${symbol}-banner.${extension}`, {
+    type: contentType,
+  });
 }
 
 async function createPumpSdk(creator: Keypair) {
@@ -438,7 +554,9 @@ async function waitForMintAccount(mintPublicKey: string) {
         dataLength: account.data.length,
       };
     }
-    await new Promise((resolve) => setTimeout(resolve, MINT_CONFIRM_INTERVAL_MS));
+    await new Promise((resolve) =>
+      setTimeout(resolve, MINT_CONFIRM_INTERVAL_MS)
+    );
   }
 
   throw new AppError(
@@ -482,9 +600,7 @@ async function fundWalletsFromMain(
   const startedAt = Date.now();
   const uniqueTargets = targets.filter(
     (target, index, all) =>
-      all.findIndex((item) =>
-        item.publicKey.equals(target.publicKey)
-      ) === index
+      all.findIndex((item) => item.publicKey.equals(target.publicKey)) === index
   );
 
   if (uniqueTargets.length === 0) {
@@ -494,7 +610,11 @@ async function fundWalletsFromMain(
       totalSol: "0.0000",
       durationMs: Date.now() - startedAt,
     });
-    return { fundedCount: 0, totalLamports: BigInt(0), signatures: [] as string[] };
+    return {
+      fundedCount: 0,
+      totalLamports: BigInt(0),
+      signatures: [] as string[],
+    };
   }
 
   const [mainBalance, ...targetBalances] = await Promise.all([
@@ -522,7 +642,11 @@ async function fundWalletsFromMain(
       totalSol: "0.0000",
       durationMs: Date.now() - startedAt,
     });
-    return { fundedCount: 0, totalLamports: BigInt(0), signatures: [] as string[] };
+    return {
+      fundedCount: 0,
+      totalLamports: BigInt(0),
+      signatures: [] as string[],
+    };
   }
 
   const totalLamports = fundingPlan.reduce(
@@ -577,10 +701,7 @@ function validateLaunchInput(input: LaunchTokenInput) {
   const { minBuyAmountSol: MIN_BUY_AMOUNT_SOL } = getLaunchConfig();
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
-  const bundlerWalletCount = Math.max(
-    0,
-    Math.floor(input.bundlerWalletCount)
-  );
+  const bundlerWalletCount = Math.max(0, Math.floor(input.bundlerWalletCount));
   const bundlerBuyAmountSol = input.bundlerBuyAmountSol;
   const bundlerBuyVariancePercent = input.bundlerBuyVariancePercent;
   const distributionWalletMultiplier = Math.max(
@@ -592,7 +713,10 @@ function validateLaunchInput(input: LaunchTokenInput) {
     throw new AppError("Dev buy amount must be greater than 0", 400);
   }
   if (devBuyAmountSol > 0 && devBuyAmountSol < MIN_BUY_AMOUNT_SOL) {
-    throw new AppError(`Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL`, 400);
+    throw new AppError(
+      `Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL`,
+      400
+    );
   }
   if (bundlerBuyAmountSol > 0 && bundlerBuyAmountSol < MIN_BUY_AMOUNT_SOL) {
     throw new AppError(
@@ -858,10 +982,16 @@ async function distributeTokensToWallets(
       tokenBalance = account.amount;
     } catch (error) {
       failedTransfers += 1;
-      await appendLog(launchId, "WARN", "Distribution balance lookup failed", "distribution", {
-        sourceWallet: sourceWallet.publicKey.toBase58(),
-        error: getErrorMessage(error),
-      });
+      await appendLog(
+        launchId,
+        "WARN",
+        "Distribution balance lookup failed",
+        "distribution",
+        {
+          sourceWallet: sourceWallet.publicKey.toBase58(),
+          error: getErrorMessage(error),
+        }
+      );
       continue;
     }
     if (tokenBalance <= BigInt(0)) {
@@ -919,11 +1049,17 @@ async function distributeTokensToWallets(
         totalTokensRaw += amountPerWallet;
       } catch (error) {
         failedTransfers += 1;
-        await appendLog(launchId, "WARN", "Distribution transfer failed", "distribution", {
-          sourceWallet: sourceWallet.publicKey.toBase58(),
-          destinationWallet: destination.publicKey.toBase58(),
-          error: getErrorMessage(error),
-        });
+        await appendLog(
+          launchId,
+          "WARN",
+          "Distribution transfer failed",
+          "distribution",
+          {
+            sourceWallet: sourceWallet.publicKey.toBase58(),
+            destinationWallet: destination.publicKey.toBase58(),
+            error: getErrorMessage(error),
+          }
+        );
       }
     }
     if (canceled) {
@@ -1069,7 +1205,13 @@ async function finalizeLaunch(
     tokenPublicKey,
     ...(durationMs !== undefined ? { durationMs } : {}),
   };
-  await appendLog(launchId, "INFO", "Launch complete", "complete", completionData);
+  await appendLog(
+    launchId,
+    "INFO",
+    "Launch complete",
+    "complete",
+    completionData
+  );
 }
 
 async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
@@ -1082,7 +1224,10 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
   }
 
   const resolvedLaunch = await markLaunchStaleIfNeeded(launch);
-  if (resolvedLaunch.status === "PENDING" || resolvedLaunch.status === "RUNNING") {
+  if (
+    resolvedLaunch.status === "PENDING" ||
+    resolvedLaunch.status === "RUNNING"
+  ) {
     throw new AppError("Launch is still in progress", 400);
   }
 
@@ -1226,9 +1371,8 @@ export const launchService = {
     );
     const orderedWallets = walletPublicKeys
       .map((publicKey) => walletMap.get(publicKey))
-      .filter(
-        (wallet): wallet is NonNullable<typeof walletRecords[number]> =>
-          Boolean(wallet)
+      .filter((wallet): wallet is NonNullable<(typeof walletRecords)[number]> =>
+        Boolean(wallet)
       );
 
     const connection = getSolanaConnection();
@@ -1274,8 +1418,11 @@ export const launchService = {
   ) {
     const { transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS } =
       getLaunchConfig();
-    const { launch, mainWalletPublicKey, walletPublicKeys: recoveryWallets } =
-      await loadLaunchRecoveryInfo(launchId, userId);
+    const {
+      launch,
+      mainWalletPublicKey,
+      walletPublicKeys: recoveryWallets,
+    } = await loadLaunchRecoveryInfo(launchId, userId);
 
     if (launch.status !== "FAILED" && launch.status !== "CANCELED") {
       throw new AppError("Launch is not eligible for recovery", 400);
@@ -1307,8 +1454,7 @@ export const launchService = {
     for (const wallet of wallets) {
       const walletPublicKey = new PublicKey(wallet.publicKey);
       const balanceLamports = await connection.getBalance(walletPublicKey);
-      const lamportsToSend =
-        balanceLamports - TRANSFER_FEE_BUFFER_LAMPORTS;
+      const lamportsToSend = balanceLamports - TRANSFER_FEE_BUFFER_LAMPORTS;
       if (lamportsToSend <= 0) {
         results.push({
           publicKey: wallet.publicKey,
@@ -1428,8 +1574,20 @@ export const launchService = {
     let recoveryData: LaunchRecoveryData | null = null;
 
     try {
-      const tokenImageSource = input.tokenImage
-        ? input.tokenImage.startsWith("data:image")
+      const tokenMediaSource = input.tokenImage
+        ? input.tokenImage.startsWith("data:")
+          ? "inline"
+          : "url"
+        : "missing";
+      const tokenMediaType = input.tokenImage
+        ? input.tokenImage.startsWith("data:video")
+          ? "video"
+          : input.tokenImage.startsWith("data:image")
+            ? "image"
+            : "unknown"
+        : "missing";
+      const tokenBannerSource = input.tokenBanner?.trim()
+        ? input.tokenBanner.startsWith("data:")
           ? "inline"
           : "url"
         : "missing";
@@ -1445,7 +1603,9 @@ export const launchService = {
         bundlerBuyVariancePercent: input.bundlerBuyVariancePercent,
         distributionWalletMultiplier: input.distributionWalletMultiplier,
         jitoTipAmountSol: input.jitoTipAmountSol,
-        tokenImageSource,
+        tokenMediaSource,
+        tokenMediaType,
+        tokenBannerSource,
         hasTwitter: Boolean(input.twitter?.trim()),
         hasTelegram: Boolean(input.telegram?.trim()),
         hasWebsite: Boolean(input.website?.trim()),
@@ -1602,13 +1762,22 @@ export const launchService = {
 
       await setStep(launchId, 18, "metadata", "Preparing metadata");
       const metadataStartedAt = Date.now();
-      const file = await resolveImageFile(input.tokenImage, input.tokenSymbol);
-      const metadata = buildTokenMetadata(input, file);
+      const file = await resolveMainMediaFile(
+        input.tokenImage,
+        input.tokenSymbol
+      );
+      const bannerFile = await resolveBannerFile(
+        input.tokenBanner ?? "",
+        input.tokenSymbol
+      );
+      const metadata = buildTokenMetadata(input, file, bannerFile);
       await appendLog(launchId, "INFO", "Metadata prepared", "metadata", {
         durationMs: Date.now() - metadataStartedAt,
-        tokenImageSource,
+        tokenMediaSource,
         imageType: file.type,
         imageSize: file.size,
+        bannerType: bannerFile?.type ?? null,
+        bannerSize: bannerFile?.size ?? null,
       });
 
       await setStep(launchId, 30, "mint", "Preparing mint");
@@ -1634,7 +1803,8 @@ export const launchService = {
       await setStep(launchId, 45, "create", "Creating token");
       const createStartedAt = Date.now();
       const pumpSdk = await createPumpSdk(devWalletKeypair);
-      let bundleResult: { bundleId: string; signatures: string[] } | null = null;
+      let bundleResult: { bundleId: string; signatures: string[] } | null =
+        null;
       let createSignature: string | null = null;
       let bundleId: string | null = null;
       if (input.bundleBuyEnabled) {
@@ -1679,16 +1849,44 @@ export const launchService = {
           durationMs: Date.now() - createStartedAt,
         });
       } else {
-        const createResult = await pumpSdk.createAndBuy(
+        const { createTx } = await buildCreateTokenTransaction(
           devWalletKeypair,
           mintKeypair,
-          metadata,
-          toLamports(devBuyAmountSol)
+          metadata
         );
-        createSignature =
-          (createResult as { signature?: string })?.signature ?? null;
+        const connection = getSolanaConnection();
+        if (devBuyAmountSol > 0) {
+          const globalAccount = await pumpSdk.getGlobalAccount("confirmed");
+          const buyAmount = globalAccount.getInitialBuyPrice(
+            toLamports(devBuyAmountSol)
+          );
+          const buyAmountWithSlippage = calculateWithSlippageBuy(
+            toLamports(devBuyAmountSol),
+            SLIPPAGE_BASIS_POINTS
+          );
+          const buyTx = await pumpSdk.getBuyInstructions(
+            devWalletKeypair.publicKey,
+            mintKeypair.publicKey,
+            globalAccount.feeRecipient,
+            buyAmount,
+            buyAmountWithSlippage
+          );
+          createTx.add(...buyTx.instructions);
+        }
+        if (!createTx.feePayer) {
+          createTx.feePayer = devWalletKeypair.publicKey;
+        }
+        const latestBlockhash =
+          await connection.getLatestBlockhash("confirmed");
+        createTx.recentBlockhash = latestBlockhash.blockhash;
+        createSignature = await sendAndConfirmTransaction(
+          connection,
+          createTx,
+          [devWalletKeypair, mintKeypair],
+          { commitment: "confirmed" }
+        );
         await appendLog(launchId, "INFO", "Create submitted", "create", {
-          signature: (createResult as { signature?: string })?.signature,
+          signature: createSignature,
           durationMs: Date.now() - createStartedAt,
         });
       }
@@ -1740,9 +1938,8 @@ export const launchService = {
               "confirmed"
             );
             tx.feePayer = buyer.publicKey;
-            const latestBlockhash = await connection.getLatestBlockhash(
-              "confirmed"
-            );
+            const latestBlockhash =
+              await connection.getLatestBlockhash("confirmed");
             tx.recentBlockhash = latestBlockhash.blockhash;
             const signature = await sendAndConfirmTransaction(
               connection,
@@ -1775,17 +1972,24 @@ export const launchService = {
           distributionWallets,
           distributionWalletMultiplier
         );
-        await appendLog(launchId, "INFO", "Distribution complete", "distribution", {
-          totalWallets: distributionSummary.totalWallets,
-          sourceWalletsWithBalance: distributionSummary.sourceWalletsWithBalance,
-          transferCount: distributionSummary.transferCount,
-          totalTokensRaw: distributionSummary.totalTokensRaw,
-          signatures: distributionSummary.signatures,
-          skippedWallets: distributionSummary.skippedWallets,
-          failedTransfers: distributionSummary.failedTransfers,
-          canceled: distributionSummary.canceled,
-          durationMs: distributionSummary.durationMs,
-        });
+        await appendLog(
+          launchId,
+          "INFO",
+          "Distribution complete",
+          "distribution",
+          {
+            totalWallets: distributionSummary.totalWallets,
+            sourceWalletsWithBalance:
+              distributionSummary.sourceWalletsWithBalance,
+            transferCount: distributionSummary.transferCount,
+            totalTokensRaw: distributionSummary.totalTokensRaw,
+            signatures: distributionSummary.signatures,
+            skippedWallets: distributionSummary.skippedWallets,
+            failedTransfers: distributionSummary.failedTransfers,
+            canceled: distributionSummary.canceled,
+            durationMs: distributionSummary.durationMs,
+          }
+        );
       }
 
       await updateProgress(launchId, 80, "persist");
@@ -1809,9 +2013,15 @@ export const launchService = {
       });
 
       if (distributionWalletCount > 0) {
-        await appendLog(launchId, "INFO", "Distribution wallets linked", "distribution", {
-          count: distributionWalletCount,
-        });
+        await appendLog(
+          launchId,
+          "INFO",
+          "Distribution wallets linked",
+          "distribution",
+          {
+            count: distributionWalletCount,
+          }
+        );
       }
 
       await finalizeLaunch(
@@ -1882,10 +2092,13 @@ export const launchService = {
           recoveryResult as Prisma.InputJsonValue
         );
       } catch (recoveryError) {
-        const recoveryMessage = getErrorMessage(recoveryError) || "Recovery failed";
+        const recoveryMessage =
+          getErrorMessage(recoveryError) || "Recovery failed";
         await appendLog(launchId, "WARN", recoveryMessage, "recovery", {
           errorName:
-            recoveryError instanceof Error ? recoveryError.name : "UnknownError",
+            recoveryError instanceof Error
+              ? recoveryError.name
+              : "UnknownError",
           ...(recoveryMessage ? { errorMessage: recoveryMessage } : {}),
         });
       }

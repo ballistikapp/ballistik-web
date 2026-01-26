@@ -25,6 +25,15 @@ export const getWalletByTokenSchema = z.object({
 
 export type GetWalletByTokenInput = z.infer<typeof getWalletByTokenSchema>;
 
+export const getWalletPrivateKeySchema = z.object({
+  tokenPublicKey: z.string().min(1, "Token public key is required"),
+  walletPublicKey: z.string().min(1, "Wallet public key is required"),
+});
+
+export type GetWalletPrivateKeyInput = z.infer<
+  typeof getWalletPrivateKeySchema
+>;
+
 export const refreshWalletBalancesSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   walletPublicKeys: z.array(z.string().min(1)).optional(),

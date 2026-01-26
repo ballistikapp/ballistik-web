@@ -15,6 +15,9 @@ import { getPumpProgram } from "@/server/solana/pump-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
 import {
+  computeBuyQuote,
+  computeSellQuote,
+  estimateTokenAmountForNetSolOut,
   computeMinSolOutForSell,
   computeMinTokensOutForBuy,
   fetchPumpQuoteState,
@@ -25,6 +28,13 @@ import { walletService } from "@/server/services/wallet.service";
 type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
 }>;
+
+type StoredVolumeBotConfig = VolumeBotConfigInput & {
+  targetSolApplied?: number;
+  targetDurationHours?: number;
+};
+
+type VolumeBotAction = "BUY" | "SELL" | "WAIT";
 
 const getTokenBalance = async (
   walletPublicKey: PublicKey,
@@ -46,6 +56,20 @@ const getTokenBalance = async (
 const randomBetween = (min: number, max: number) =>
   Math.random() * (max - min) + min;
 
+const FEE_BUFFER_LAMPORTS = 3_000_000;
+const SELL_RATIO_BPS = 10_000;
+
+const isFeeError = (error: unknown) => {
+  const message =
+    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
+  return (
+    message.includes("insufficient") ||
+    message.includes("not enough") ||
+    message.includes("lamports") ||
+    message.includes("fee")
+  );
+};
+
 const computeNextTickAt = (config: VolumeBotConfigInput) => {
   const delaySeconds = Math.floor(
     randomBetween(config.minIntervalSeconds, config.maxIntervalSeconds)
@@ -54,28 +78,56 @@ const computeNextTickAt = (config: VolumeBotConfigInput) => {
 };
 
 const selectAction = (
-  strategy: VolumeBotConfigInput["strategy"],
+  buyProbability: number,
   hasTokens: boolean
+): VolumeBotAction => {
+  if (!hasTokens) {
+    return "BUY";
+  }
+  const clampedBias = Math.min(Math.max(buyProbability, 0), 100);
+  return Math.random() * 100 < clampedBias ? "BUY" : "SELL";
+};
+
+const applyTradeVariance = (amount: number, variancePct: number) => {
+  if (!Number.isFinite(amount) || amount <= 0) return 0;
+  if (!Number.isFinite(variancePct) || variancePct <= 0) return amount;
+  const variance = Math.min(Math.max(variancePct, 0), 100) / 100;
+  const multiplier = 1 + (Math.random() * 2 - 1) * variance;
+  return amount * multiplier;
+};
+
+const computeTargetTradeSol = (
+  config: VolumeBotConfigInput,
+  remainingSol: number,
+  remainingSeconds: number,
+  walletCount: number
 ) => {
-  if (strategy === "neutral") {
-    return hasTokens ? "SELL" : "BUY";
+  const absRemaining = Math.abs(remainingSol);
+  if (absRemaining <= 0) {
+    return 0;
   }
-  if (strategy === "pump") {
-    if (hasTokens && Math.random() < 0.3) {
-      return "SELL";
-    }
-    return "BUY";
+  const avgInterval =
+    (config.minIntervalSeconds + config.maxIntervalSeconds) / 2;
+  const safeInterval = Math.max(1, avgInterval);
+  const ticksRemaining = Math.max(1, Math.ceil(remainingSeconds / safeInterval));
+  const effectiveWallets = Math.max(1, walletCount);
+  const desiredPerTick = absRemaining / ticksRemaining / effectiveWallets;
+  return Math.min(config.maxTradeAmountSol, Math.max(0, desiredPerTick));
+};
+
+const computePacedSellRatio = (
+  config: VolumeBotConfigInput,
+  targetTradeSol: number
+) => {
+  if (!Number.isFinite(targetTradeSol) || targetTradeSol <= 0) {
+    return 0;
   }
-  if (strategy === "dump") {
-    if (hasTokens && Math.random() < 0.7) {
-      return "SELL";
-    }
-    if (!hasTokens && Math.random() > 0.3) {
-      return "WAIT";
-    }
-    return "BUY";
+  if (!Number.isFinite(config.maxTradeAmountSol) || config.maxTradeAmountSol <= 0) {
+    return 0;
   }
-  return "WAIT";
+  const ratio = targetTradeSol / config.maxTradeAmountSol;
+  const scaledRatio = config.sellRatio * Math.min(Math.max(ratio, 0), 1);
+  return Math.min(Math.max(scaledRatio, 0), config.sellRatio);
 };
 
 export const processVolumeBotWallet = async (
@@ -101,8 +153,12 @@ export const processVolumeBotWallet = async (
     console.log(`[Worker] Skipping ${walletPk}: wallet not ACTIVE (${volumeWallet.status})`);
     return null;
   }
+  if (volumeWallet.wallet.type === "DEV") {
+    console.log(`[Worker] Skipping ${walletPk}: DEV wallet not allowed`);
+    return null;
+  }
 
-  const config = session.config as VolumeBotConfigInput;
+  const config = session.config as StoredVolumeBotConfig;
   if (!volumeWallet.nextTickAt) {
     const nextTick = computeNextTickAt(config);
     console.log(`[Worker] ${walletPk}: No nextTickAt, scheduling for ${nextTick.toISOString()}`);
@@ -119,7 +175,7 @@ export const processVolumeBotWallet = async (
     bs58.decode(volumeWallet.wallet.privateKey)
   );
 
-  const solBalanceLamports = await connection.getBalance(
+  let solBalanceLamports = await connection.getBalance(
     walletKeypair.publicKey
   );
   const tokenBalance = await getTokenBalance(
@@ -130,8 +186,114 @@ export const processVolumeBotWallet = async (
 
   console.log(`[Worker] ${walletPk}: SOL=${solBalanceLamports / 1e9}, tokens=${tokenBalance}, hasTokens=${hasTokens}`);
 
-  const action = selectAction(config.strategy, hasTokens);
+  const ensureWalletSol = async (minimumLamports: number) => {
+    if (solBalanceLamports >= minimumLamports) {
+      return true;
+    }
+    const shortfallLamports = minimumLamports - solBalanceLamports;
+    const topUpLamports = shortfallLamports + FEE_BUFFER_LAMPORTS;
+    const topUpSol = topUpLamports / 1_000_000_000;
+    try {
+      await walletService.sendSolFromMainWallet(
+        session.tokenPublicKey,
+        session.userId,
+        [volumeWallet.walletPublicKey],
+        topUpSol
+      );
+      solBalanceLamports = await connection.getBalance(
+        walletKeypair.publicKey
+      );
+      return solBalanceLamports >= minimumLamports;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[Worker] ${walletPk}: Fee top-up failed: ${message}`);
+      return false;
+    }
+  };
+
+  let targetTradeSol: number | null = null;
+  let targetDirection: VolumeBotAction | null = null;
+  let pacedSellRatio: number | null = null;
+  let remainingSolAbs: number | null = null;
+  let targetSolAbs: number | null = null;
+  if (config.strategy !== "neutral") {
+    const targetSol = config.targetSolApplied ?? config.strategyTargetSol ?? 0;
+    if (targetSol > 0) {
+      const targetSigned = config.strategy === "dump" ? -targetSol : targetSol;
+      const progressSol = Number(session.totalPnlSol ?? 0) || 0;
+      const targetDurationSeconds =
+        config.targetDurationSeconds ??
+        (config.targetDurationHours
+          ? config.targetDurationHours * 60 * 60
+          : null);
+      const scheduledStopAt =
+        session.scheduledStopAt ??
+        (session.startedAt && targetDurationSeconds
+          ? new Date(
+              session.startedAt.getTime() +
+                targetDurationSeconds * 1000
+            )
+          : null);
+      const remainingSeconds = scheduledStopAt
+        ? Math.max(0, (scheduledStopAt.getTime() - Date.now()) / 1000)
+        : 0;
+      if (remainingSeconds <= 0) {
+        console.log(`[Worker] Session ${session.id} duration exceeded`);
+        await stopVolumeBotSession(session.id);
+        return null;
+      }
+      const remainingSigned = targetSigned - progressSol;
+      const remainingSol = Math.abs(remainingSigned);
+      if (remainingSol > 0) {
+        targetDirection = remainingSigned > 0 ? "BUY" : "SELL";
+      }
+      remainingSolAbs = remainingSol;
+      targetSolAbs = Math.abs(targetSigned);
+      const totalWalletCount = Math.max(
+        1,
+        (config.generatedWalletCount ?? 0) +
+          (config.selectedWalletPublicKeys?.length ?? 0)
+      );
+      const perWalletRemaining = remainingSol / totalWalletCount;
+      const baseTradeSol = computeTargetTradeSol(
+        config,
+        remainingSol,
+        remainingSeconds,
+        totalWalletCount
+      );
+      let variedTrade = applyTradeVariance(baseTradeSol, config.tradeVariancePct);
+      const maxPacedTradeSol = Math.min(config.maxTradeAmountSol, perWalletRemaining);
+      const boundedTrade = Math.min(
+        Math.max(0, variedTrade),
+        Math.max(0, maxPacedTradeSol)
+      );
+      targetTradeSol = boundedTrade;
+      pacedSellRatio = computePacedSellRatio(config, targetTradeSol);
+    }
+  }
+
+  const baseBias = Math.min(Math.max(config.buyBiasPct ?? 50, 0), 100);
+  let buyProbability = 50;
+  if (config.strategy === "dump") {
+    buyProbability = 100 - baseBias;
+  } else if (config.strategy === "pump") {
+    buyProbability = baseBias;
+  }
+  if (
+    targetDirection &&
+    remainingSolAbs !== null &&
+    targetSolAbs !== null &&
+    targetSolAbs > 0
+  ) {
+    const urgency = Math.min(Math.max(remainingSolAbs / targetSolAbs, 0), 1);
+    buyProbability =
+      targetDirection === "BUY"
+        ? buyProbability + (100 - buyProbability) * urgency
+        : buyProbability - buyProbability * urgency;
+  }
+  const action = selectAction(buyProbability, hasTokens);
   console.log(`[Worker] ${walletPk}: Selected action=${action} (strategy=${config.strategy})`);
+  const isTargetAligned = Boolean(targetDirection && action === targetDirection);
 
   if (action === "WAIT") {
     const nextTick = computeNextTickAt(config);
@@ -146,18 +308,45 @@ export const processVolumeBotWallet = async (
   let signature: string | null = null;
   let tradeAmountSol = 0;
   let tokenAmount = BigInt(0);
+  let netSolChangeSol = 0;
 
   try {
     if (action === "BUY") {
-      tradeAmountSol = randomBetween(
-        config.minTradeAmountSol,
-        config.maxTradeAmountSol
-      );
-      const feeBufferLamports = 2_000_000;
-      const requiredLamports = tradeAmountSol * 1_000_000_000 + feeBufferLamports;
+      const baseTradeSol =
+        targetTradeSol !== null && isTargetAligned
+          ? targetTradeSol
+          : randomBetween(config.minTradeAmountSol, config.maxTradeAmountSol);
+      tradeAmountSol =
+        targetTradeSol !== null && isTargetAligned
+          ? baseTradeSol
+          : applyTradeVariance(baseTradeSol, config.tradeVariancePct);
+      tradeAmountSol =
+        targetTradeSol !== null && isTargetAligned
+          ? Math.min(config.maxTradeAmountSol, Math.max(0, tradeAmountSol))
+          : Math.min(
+              config.maxTradeAmountSol,
+              Math.max(config.minTradeAmountSol, tradeAmountSol)
+            );
+      if (!isTargetAligned && targetTradeSol !== null) {
+        tradeAmountSol = Math.min(
+          tradeAmountSol,
+          Math.max(0, targetTradeSol)
+        );
+      }
+      if (tradeAmountSol <= 0) {
+        const nextTick = computeNextTickAt(config);
+        await prisma.volumeBotWallet.update({
+          where: { id: volumeWallet.id },
+          data: { nextTickAt: nextTick },
+        });
+        return nextTick;
+      }
+      const requiredLamports =
+        tradeAmountSol * 1_000_000_000 + FEE_BUFFER_LAMPORTS;
       console.log(`[Worker] ${walletPk}: BUY ${tradeAmountSol} SOL, required=${requiredLamports / 1e9}, have=${solBalanceLamports / 1e9}`);
 
-      if (solBalanceLamports < requiredLamports) {
+      const hasFunds = await ensureWalletSol(requiredLamports);
+      if (!hasFunds) {
         console.log(`[Worker] ${walletPk}: Insufficient balance, skipping`);
         const nextTick = computeNextTickAt(config);
         await prisma.volumeBotWallet.update({
@@ -170,12 +359,18 @@ export const processVolumeBotWallet = async (
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
       let minTokensOut = new BN(1);
       try {
-        const quoteState = await fetchPumpQuoteState(mintPublicKey, walletKeypair);
+        const quoteState = await fetchPumpQuoteState(
+          mintPublicKey,
+          walletKeypair
+        );
         minTokensOut = computeMinTokensOutForBuy(
           quoteState,
           buyLamports,
           config.slippageBps
         );
+        const buyQuote = computeBuyQuote(quoteState, buyLamports);
+        netSolChangeSol = Number(buyQuote.netSolIn) / 1_000_000_000;
+        tokenAmount = buyQuote.tokensOut;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[Worker] ${walletPk}: Slippage quote failed (buy): ${message}`);
@@ -194,14 +389,82 @@ export const processVolumeBotWallet = async (
       buyTx.lastValidBlockHeight = lastValidBlockHeight;
       buyTx.feePayer = walletKeypair.publicKey;
       console.log(`[Worker] ${walletPk}: Sending buy tx...`);
-      signature = await sendAndConfirmTransaction(connection, buyTx, [
-        walletKeypair,
-      ]);
+      try {
+        signature = await sendAndConfirmTransaction(connection, buyTx, [
+          walletKeypair,
+        ]);
+      } catch (error) {
+        if (isFeeError(error)) {
+          const toppedUp = await ensureWalletSol(requiredLamports);
+          if (toppedUp) {
+            signature = await sendAndConfirmTransaction(connection, buyTx, [
+              walletKeypair,
+            ]);
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       console.log(`[Worker] ${walletPk}: Buy tx confirmed: ${signature}`);
     } else {
-      tokenAmount =
-        (tokenBalance * BigInt(Math.floor(config.sellRatio * 100))) / BigInt(100);
-      console.log(`[Worker] ${walletPk}: SELL ${tokenAmount} tokens (${config.sellRatio * 100}% of ${tokenBalance})`);
+      const feeReady = await ensureWalletSol(FEE_BUFFER_LAMPORTS);
+      if (!feeReady) {
+        console.log(`[Worker] ${walletPk}: Fee shortage, skipping sell`);
+        const nextTick = computeNextTickAt(config);
+        await prisma.volumeBotWallet.update({
+          where: { id: volumeWallet.id },
+          data: { nextTickAt: nextTick },
+        });
+        return nextTick;
+      }
+      if (targetTradeSol !== null && isTargetAligned) {
+        let targetQuoteFailed = false;
+        tradeAmountSol = targetTradeSol;
+        const desiredNetSolLamports = BigInt(
+          Math.floor(targetTradeSol * 1_000_000_000)
+        );
+        try {
+          const quoteState = await fetchPumpQuoteState(
+            mintPublicKey,
+            walletKeypair
+          );
+          const estimatedTokens = estimateTokenAmountForNetSolOut(
+            quoteState,
+            desiredNetSolLamports,
+            tokenBalance
+          );
+          tokenAmount = estimatedTokens > tokenBalance ? tokenBalance : estimatedTokens;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          console.warn(`[Worker] ${walletPk}: Target quote failed (sell): ${message}`);
+          targetQuoteFailed = true;
+        }
+        if (targetQuoteFailed && tokenAmount === BigInt(0) && tokenBalance > BigInt(0)) {
+          const baseSellRatio = pacedSellRatio ?? config.sellRatio;
+          const variedSellRatio = Math.min(
+            1,
+            Math.max(0, applyTradeVariance(baseSellRatio, config.tradeVariancePct))
+          );
+          tokenAmount =
+            (tokenBalance * BigInt(Math.floor(variedSellRatio * SELL_RATIO_BPS))) /
+            BigInt(SELL_RATIO_BPS);
+        }
+      } else {
+        const baseSellRatio =
+          pacedSellRatio !== null ? pacedSellRatio : config.sellRatio;
+        const variedSellRatio = Math.min(
+          1,
+          Math.max(0, applyTradeVariance(baseSellRatio, config.tradeVariancePct))
+        );
+        tokenAmount =
+          (tokenBalance * BigInt(Math.floor(variedSellRatio * SELL_RATIO_BPS))) /
+          BigInt(SELL_RATIO_BPS);
+      }
+      console.log(
+        `[Worker] ${walletPk}: SELL ${tokenAmount} tokens (${config.sellRatio * 100}% of ${tokenBalance})`
+      );
 
       if (tokenAmount <= BigInt(0)) {
         console.log(`[Worker] ${walletPk}: No tokens to sell, skipping`);
@@ -214,12 +477,20 @@ export const processVolumeBotWallet = async (
       }
       let minSolOutput = new BN(0);
       try {
-        const quoteState = await fetchPumpQuoteState(mintPublicKey, walletKeypair);
+        const quoteState = await fetchPumpQuoteState(
+          mintPublicKey,
+          walletKeypair
+        );
         minSolOutput = computeMinSolOutForSell(
           quoteState,
           tokenAmount,
           config.slippageBps
         );
+        const sellQuote = computeSellQuote(quoteState, tokenAmount);
+        netSolChangeSol = -Number(sellQuote.netSolOut) / 1_000_000_000;
+        if (targetTradeSol === null) {
+          tradeAmountSol = Math.abs(netSolChangeSol);
+        }
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         console.warn(`[Worker] ${walletPk}: Slippage quote failed (sell): ${message}`);
@@ -244,9 +515,24 @@ export const processVolumeBotWallet = async (
       sellTx.lastValidBlockHeight = lastValidBlockHeight;
       sellTx.feePayer = walletKeypair.publicKey;
       console.log(`[Worker] ${walletPk}: Sending sell tx...`);
-      signature = await sendAndConfirmTransaction(connection, sellTx, [
-        walletKeypair,
-      ]);
+      try {
+        signature = await sendAndConfirmTransaction(connection, sellTx, [
+          walletKeypair,
+        ]);
+      } catch (error) {
+        if (isFeeError(error)) {
+          const toppedUp = await ensureWalletSol(FEE_BUFFER_LAMPORTS);
+          if (toppedUp) {
+            signature = await sendAndConfirmTransaction(connection, sellTx, [
+              walletKeypair,
+            ]);
+          } else {
+            throw error;
+          }
+        } else {
+          throw error;
+        }
+      }
       console.log(`[Worker] ${walletPk}: Sell tx confirmed: ${signature}`);
     }
 
@@ -260,6 +546,12 @@ export const processVolumeBotWallet = async (
     );
     const solDelta =
       (updatedSolLamports - solBalanceLamports) / 1_000_000_000;
+    const appliedNetSolChange =
+      action === "BUY" ? Math.abs(solDelta) : -Math.abs(solDelta);
+    netSolChangeSol = appliedNetSolChange;
+    if (action === "SELL" && tradeAmountSol === 0) {
+      tradeAmountSol = Math.abs(solDelta);
+    }
     const now = new Date();
     const nextTick = computeNextTickAt(config);
 
@@ -284,6 +576,9 @@ export const processVolumeBotWallet = async (
         totalVolumeUsd: {
           increment: action === "BUY" ? tradeAmountSol : Math.abs(solDelta),
         },
+        totalPnlSol: {
+          increment: appliedNetSolChange,
+        },
         runtimeSeconds: session.startedAt
           ? Math.floor((Date.now() - session.startedAt.getTime()) / 1000)
           : 0,
@@ -302,6 +597,7 @@ export const processVolumeBotWallet = async (
         data: {
           tradeAmountSol,
           tokenAmount: tokenAmount.toString(),
+          netSolChangeSol: appliedNetSolChange,
         },
       },
     });
@@ -342,7 +638,6 @@ export const stopVolumeBotSession = async (sessionId: string) => {
   }
   console.log(`[Worker] Stopping session ${sessionId}, status=${session.status}`);
 
-  const config = session.config as VolumeBotConfigInput;
   await prisma.volumeBotSession.update({
     where: { id: session.id },
     data: { status: "STOPPING" },
@@ -353,58 +648,6 @@ export const stopVolumeBotSession = async (sessionId: string) => {
       where: { sessionId: session.id },
       include: { wallet: true },
     });
-
-    const connection = getSolanaConnection();
-    const mintPublicKey = new PublicKey(session.tokenPublicKey);
-
-    if (config.sellOnStop) {
-      await mapWithConcurrency(wallets, 3, async (volumeWallet) => {
-        const walletKeypair = Keypair.fromSecretKey(
-          bs58.decode(volumeWallet.wallet.privateKey)
-        );
-        const tokenBalance = await getTokenBalance(
-          walletKeypair.publicKey,
-          mintPublicKey
-        );
-        if (tokenBalance <= BigInt(0)) {
-          return;
-        }
-        const provider = new AnchorProvider(
-          connection,
-          new NodeWallet(walletKeypair),
-          { commitment: "finalized" }
-        );
-        const program = getPumpProgram(provider);
-        let minSolOutput = new BN(0);
-        try {
-          const quoteState = await fetchPumpQuoteState(
-            mintPublicKey,
-            walletKeypair
-          );
-          minSolOutput = computeMinSolOutForSell(
-            quoteState,
-            tokenBalance,
-            config.slippageBps
-          );
-        } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
-          console.warn(`[Worker] stop sell quote failed: ${message}`);
-        }
-        const sellTx = await sellTokensWithNewIdl(
-          program,
-          walletKeypair,
-          mintPublicKey,
-          new BN(tokenBalance.toString()),
-          minSolOutput
-        );
-        const { blockhash, lastValidBlockHeight } =
-          await connection.getLatestBlockhash("confirmed");
-        sellTx.recentBlockhash = blockhash;
-        sellTx.lastValidBlockHeight = lastValidBlockHeight;
-        sellTx.feePayer = walletKeypair.publicKey;
-        await sendAndConfirmTransaction(connection, sellTx, [walletKeypair]);
-      });
-    }
 
     const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
     const reclaimResults = await walletService.returnSolToMainWallet(

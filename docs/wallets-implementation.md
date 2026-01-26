@@ -11,6 +11,7 @@ Wallets are token-scoped for operational usage, while the main wallet is user-sc
 - Main wallet is user-scoped via `User.mainWallet`.
 
 Prisma changes:
+
 - `Wallet.tokenPublicKey` (nullable)
 - `Token.operationalWallets` (relation to `Wallet`)
 - `TokenDevWallet` join model for dev wallet sharing
@@ -24,15 +25,18 @@ Prisma changes:
 ## Queries and Services
 
 tRPC procedures:
+
 - `wallet.getOperationalByToken` fetches operational wallets by `tokenPublicKey`.
 - `wallet.getDevByToken` fetches dev wallet for a token via `TokenDevWallet`.
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.
+- `wallet.getPrivateKey` fetches a wallet private key on-demand after access checks.
 - `wallet.refreshBalances` refreshes balances via server-side RPC with a 15s debounce.
 - `wallet.sendSol` sends SOL from main wallet to selected token wallets.
 - `wallet.returnSol` returns SOL from selected token wallets to main wallet.
 
 Service rules:
+
 - Operational wallets must match `Wallet.tokenPublicKey`.
 - Dev wallet access is validated through `TokenDevWallet`.
 - Main wallet is always user-scoped via `User.mainWallet`.
@@ -59,11 +63,15 @@ Service rules:
 ## UI Behavior
 
 Wallets list page:
+
 - Separates main/dev wallets from operational wallets.
 - Provides bulk actions for refresh, send, and return.
+- Dev wallet actions include send and return.
 
 Wallet detail page:
+
 - Non-main wallets allow send and return actions.
+- Private keys are fetched on demand from a dialog in the wallet detail view.
 
 ## Balance Strategy
 

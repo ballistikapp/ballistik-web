@@ -6,6 +6,7 @@ import { toast } from "sonner";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { trpc } from "@/lib/trpc/client";
+import { copyToClipboard } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -66,7 +67,8 @@ export function LaunchProgressDialog({
     status === "SUCCEEDED" || status === "FAILED" || status === "CANCELED";
   const currentStep = launch?.currentStep || "Preparing";
   const tokenPublicKey = launch?.tokenPublicKey ?? "";
-  const hasTokenLink = status === "SUCCEEDED" && Boolean(tokenPublicKey);
+  const hasTokenPublicKey = Boolean(tokenPublicKey);
+  const hasTokenLink = status === "SUCCEEDED" && hasTokenPublicKey;
   const recoveryEnabled =
     Boolean(launch?.id) && (status === "FAILED" || status === "CANCELED");
   const recoveryQuery = trpc.launch.recoveryWallets.useQuery(
@@ -103,7 +105,10 @@ export function LaunchProgressDialog({
         (item) => item.status === "failed"
       ).length;
       if (returnedCount === 0 && failedCount === 0) {
-        toast.message("No SOL available to return", { id: toastId, icon: null });
+        toast.message("No SOL available to return", {
+          id: toastId,
+          icon: null,
+        });
       } else if (failedCount > 0) {
         toast.error("Some returns failed", {
           id: toastId,
@@ -143,13 +148,22 @@ export function LaunchProgressDialog({
         <div className="space-y-4 min-w-0">
           <Progress value={progress} className="w-full" />
           <Separator />
-          {status === "SUCCEEDED" && (
-            <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-              <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                Launch succeeded
+          {hasTokenPublicKey && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 p-3 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="text-sm font-medium">Token public key</div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() =>
+                    copyToClipboard(tokenPublicKey, "Token public key")
+                  }
+                >
+                  Copy
+                </Button>
               </div>
-              <div className="text-xs text-muted-foreground break-all">
-                Token public key: {tokenPublicKey || "Unavailable"}
+              <div className="font-mono text-sm break-all">
+                {tokenPublicKey}
               </div>
               <div className="flex justify-end">
                 {hasTokenLink ? (
@@ -217,7 +231,8 @@ export function LaunchProgressDialog({
                 ) : (
                   <>
                     <div className="text-xs text-muted-foreground break-all">
-                      Returning funds to {recoveryQuery.data?.mainWalletPublicKey}
+                      Returning funds to{" "}
+                      {recoveryQuery.data?.mainWalletPublicKey}
                     </div>
                     {recoveryQuery.data?.source === "fallback" && (
                       <div className="text-xs text-muted-foreground">
@@ -276,7 +291,9 @@ export function LaunchProgressDialog({
                           !hasRecoverableBalance
                         }
                       >
-                        {recoverMutation.isPending ? "Returning..." : "Return SOL"}
+                        {recoverMutation.isPending
+                          ? "Returning..."
+                          : "Return SOL"}
                       </Button>
                     </div>
                   </>

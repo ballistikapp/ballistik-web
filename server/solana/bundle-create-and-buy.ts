@@ -1,22 +1,22 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   TransactionMessage,
   VersionedTransaction,
 } from "@solana/web3.js";
-import { PumpFunSDK, type CreateTokenMetadata } from "pumpdotfun-sdk";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { buildBundleTransactionsForCreateAndBuys } from "@/server/solana/bundle-transaction-builder";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
-import { buildCreateTokenTransaction } from "@/server/solana/pump-transaction-builders";
+import {
+  buildCreateTokenTransaction,
+  type PumpMetadataUpload,
+} from "@/server/solana/pump-transaction-builders";
 
 type BundleLaunchInput = {
   launchId?: string;
   creator: Keypair;
   mint: Keypair;
-  metadata: CreateTokenMetadata;
+  metadata: PumpMetadataUpload;
   creatorBuyAmountLamport: bigint;
   buyerWallets: Keypair[];
   buyAmountsLamport: bigint[];
@@ -53,14 +53,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     creatorBuyLamports: input.creatorBuyAmountLamport.toString(),
     tipLamports: input.tipLamports,
   });
-  const provider = new AnchorProvider(
-    getSolanaConnection(),
-    new NodeWallet(input.creator),
-    { commitment: "finalized" }
-  );
-  const pumpSdk = new PumpFunSDK(provider);
   const { createTx, metadataUri } = await buildCreateTokenTransaction(
-    pumpSdk,
     input.creator,
     input.mint,
     input.metadata
@@ -152,8 +145,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     });
     return result;
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error("Bundle send failed", {
       ...logContext,
       errorMessage,
@@ -163,4 +155,3 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     throw error;
   }
 }
-

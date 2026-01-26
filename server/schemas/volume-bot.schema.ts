@@ -3,7 +3,8 @@ import { z } from "zod";
 export const volumeBotStrategySchema = z.enum(["neutral", "pump", "dump"]);
 
 export const volumeBotConfigSchema = z.object({
-  walletCount: z.number().int().min(1),
+  generatedWalletCount: z.number().int().min(0),
+  selectedWalletPublicKeys: z.array(z.string().min(1)).default([]),
   fundingPerWalletSol: z.number().min(0),
   minTradeAmountSol: z.number().min(0),
   maxTradeAmountSol: z.number().min(0),
@@ -11,10 +12,24 @@ export const volumeBotConfigSchema = z.object({
   maxIntervalSeconds: z.number().int().min(1),
   sellRatio: z.number().min(0).max(1),
   strategy: volumeBotStrategySchema,
+  buyBiasPct: z.number().min(0).max(100),
+  tradeVariancePct: z.number().min(0).max(100),
   slippageBps: z.number().int().min(0),
+  strategyTargetSol: z.number().min(0).optional(),
   targetVolumePerHour: z.number().min(0).optional(),
   targetDurationHours: z.number().min(0).optional(),
-  sellOnStop: z.boolean().default(true),
+  targetDurationSeconds: z.number().min(60).optional(),
+});
+
+export const volumeBotSelectionSummarySchema = z.object({
+  tokenPublicKey: z.string().min(1),
+  selectedWalletPublicKeys: z.array(z.string().min(1)).default([]),
+  strategy: volumeBotStrategySchema,
+  targetSol: z.number().min(0).optional(),
+});
+
+export const volumeBotEligibleWalletsSchema = z.object({
+  tokenPublicKey: z.string().min(1),
 });
 
 export const startVolumeBotSchema = z.object({
@@ -55,4 +70,10 @@ export type CloseVolumeBotAccountsInput = z.infer<
 >;
 export type ListVolumeBotSessionsInput = z.infer<
   typeof listVolumeBotSessionsSchema
+>;
+export type VolumeBotSelectionSummaryInput = z.infer<
+  typeof volumeBotSelectionSummarySchema
+>;
+export type VolumeBotEligibleWalletsInput = z.infer<
+  typeof volumeBotEligibleWalletsSchema
 >;

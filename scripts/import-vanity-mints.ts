@@ -56,14 +56,18 @@ async function importVanityMints() {
     });
     const existingPublicKeys = new Set(existingMints.map((m) => m.publicKey));
 
-    console.log(`📊 Found ${existingMints.length} existing vanity mint(s) in database\n`);
+    console.log(
+      `📊 Found ${existingMints.length} existing vanity mint(s) in database\n`
+    );
 
     const mintsToInsert = vanityMints.filter(
       (mint) => !existingPublicKeys.has(mint.public_key)
     );
 
     if (mintsToInsert.length === 0) {
-      console.log("✅ All vanity mints already exist in database. Nothing to insert.");
+      console.log(
+        "✅ All vanity mints already exist in database. Nothing to insert."
+      );
       return;
     }
 
@@ -72,7 +76,7 @@ async function importVanityMints() {
     // Insert in batches to avoid overwhelming the database
     const BATCH_SIZE = 100;
     let insertedCount = 0;
-    let skippedCount = vanityMints.length - mintsToInsert.length;
+    const skippedCount = vanityMints.length - mintsToInsert.length;
 
     for (let i = 0; i < mintsToInsert.length; i += BATCH_SIZE) {
       const batch = mintsToInsert.slice(i, i + BATCH_SIZE);

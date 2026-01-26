@@ -15,6 +15,15 @@ import { DashboardLoading } from "../../dashboard/dashboard-loading";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
 import { Spinner } from "@/components/ui/spinner";
 
@@ -24,6 +33,8 @@ export default function WalletPage() {
   const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
+  const [privateKeyDialogOpen, setPrivateKeyDialogOpen] = useState(false);
+  const [privateKey, setPrivateKey] = useState<string | null>(null);
 
   const {
     data,
@@ -40,6 +51,7 @@ export default function WalletPage() {
 
   const { mutateAsync: refreshBalances, isPending: isRefreshingBalances } =
     trpc.wallet.refreshBalances.useMutation();
+  const getPrivateKeyMutation = trpc.wallet.getPrivateKey.useMutation();
 
   const getCooldownMessage = () => {
     const lastRefreshedAt = data?.wallet.balanceRefreshedAt;
@@ -54,6 +66,31 @@ export default function WalletPage() {
     }
     const waitSeconds = Math.max(1, Math.ceil(remainingMs / 1000));
     return `Wallet balance was refreshed recently. Try again in ${waitSeconds}s.`;
+  };
+
+  const handlePrivateKeyDialogChange = (open: boolean) => {
+    setPrivateKeyDialogOpen(open);
+    if (!open) {
+      setPrivateKey(null);
+      getPrivateKeyMutation.reset();
+    }
+  };
+
+  const handleGetPrivateKey = async () => {
+    if (!tokenPublicKey || !walletPublicKey) return;
+    try {
+      const result = await getPrivateKeyMutation.mutateAsync({
+        tokenPublicKey,
+        walletPublicKey,
+      });
+      setPrivateKey(result.privateKey);
+    } catch (fetchError) {
+      const message =
+        fetchError instanceof Error
+          ? fetchError.message
+          : "Failed to fetch private key";
+      toast.error(message);
+    }
   };
 
   const handleRefresh = async () => {
@@ -74,7 +111,10 @@ export default function WalletPage() {
         toast.info(getCooldownMessage(), { id: toastId, icon: null });
       }
     } catch (error) {
-      toast.error("Failed to refresh wallet balance", { id: toastId, icon: null });
+      toast.error("Failed to refresh wallet balance", {
+        id: toastId,
+        icon: null,
+      });
     }
   };
 
@@ -134,11 +174,32 @@ export default function WalletPage() {
                 <Button
                   size="sm"
                   variant="outline"
-                  onClick={() => copyToClipboard(wallet.publicKey, "Public key")}
+                  onClick={() =>
+                    copyToClipboard(wallet.publicKey, "Public key")
+                  }
                 >
                   Copy
                 </Button>
+                <Button size="sm" variant="outline" asChild>
+                  <a
+                    href={`https://solscan.io/account/${wallet.publicKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    View on Solscan
+                  </a>
+                </Button>
               </div>
+            </div>
+            <div className="flex flex-col gap-2">
+              <div className="text-sm text-muted-foreground">Private Key</div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setPrivateKeyDialogOpen(true)}
+              >
+                Show private key
+              </Button>
             </div>
             <div className="flex flex-col gap-2">
               <div className="text-sm text-muted-foreground">Token</div>
@@ -195,6 +256,60 @@ export default function WalletPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog
+        open={privateKeyDialogOpen}
+        onOpenChange={handlePrivateKeyDialogChange}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Private key</DialogTitle>
+            <DialogDescription>
+              Fetch and copy the private key for this wallet.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            {privateKey ? (
+              <Textarea
+                readOnly
+                rows={4}
+                value={privateKey}
+                className="font-mono text-xs"
+              />
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Click get private key to fetch it from the server.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => handlePrivateKeyDialogChange(false)}
+              disabled={getPrivateKeyMutation.isPending}
+            >
+              Close
+            </Button>
+            {privateKey ? (
+              <Button
+                onClick={() => copyToClipboard(privateKey, "Private key")}
+              >
+                Copy private key
+              </Button>
+            ) : (
+              <Button
+                onClick={handleGetPrivateKey}
+                disabled={getPrivateKeyMutation.isPending || !tokenPublicKey}
+              >
+                {getPrivateKeyMutation.isPending && (
+                  <Spinner className="mr-2 size-4" />
+                )}
+                Get private key
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {!isMainWallet && tokenPublicKey && (
         <>

@@ -22,6 +22,7 @@ export const sellHoldingsByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   walletPublicKeys: z.array(z.string().min(1)).min(1),
   sellPercentage: z.number().min(1).max(100),
+  closeAta: z.boolean().optional().default(false),
 });
 
 export type SellHoldingsByTokenInput = z.infer<

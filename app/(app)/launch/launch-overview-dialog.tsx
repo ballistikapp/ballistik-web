@@ -22,6 +22,7 @@ interface LaunchOverviewDialogProps {
     tokenSymbol: string;
     description: string;
     tokenImage: string;
+    tokenBanner: string;
     twitter: string;
     telegram: string;
     website: string;
@@ -36,6 +37,7 @@ interface LaunchOverviewDialogProps {
     distributionWalletMultiplier: number;
   };
   imagePreview: string | null;
+  bannerPreview: string | null;
   isLoading?: boolean;
 }
 
@@ -45,8 +47,10 @@ export function LaunchOverviewDialog({
   onConfirm,
   launchInput,
   imagePreview,
+  bannerPreview,
   isLoading = false,
 }: LaunchOverviewDialogProps) {
+  const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
   const totalCost =
     launchInput.devBuyAmountSol +
     (launchInput.bundleBuyEnabled
@@ -67,11 +71,22 @@ export function LaunchOverviewDialog({
         <div className="space-y-6">
           <div className="flex items-start gap-4">
             {imagePreview ? (
-              <img
-                src={imagePreview}
-                alt="Token"
-                className="h-16 w-16 rounded-xl object-cover"
-              />
+              isVideoPreview ? (
+                <video
+                  src={imagePreview}
+                  className="h-16 w-16 rounded-xl object-cover"
+                  muted
+                  loop
+                  playsInline
+                  autoPlay
+                />
+              ) : (
+                <img
+                  src={imagePreview}
+                  alt="Token"
+                  className="h-16 w-16 rounded-xl object-cover"
+                />
+              )
             ) : (
               <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center">
                 <ImagePlus className="h-6 w-6 text-muted-foreground" />
@@ -86,6 +101,15 @@ export function LaunchOverviewDialog({
               </p>
             </div>
           </div>
+          {bannerPreview && (
+            <div className="rounded-xl overflow-hidden border">
+              <img
+                src={bannerPreview}
+                alt="Banner"
+                className="h-24 w-full object-cover"
+              />
+            </div>
+          )}
 
           <div className="grid gap-3 text-sm">
             <div className="grid grid-cols-[140px_1fr] gap-2">
@@ -129,8 +153,8 @@ export function LaunchOverviewDialog({
                   {launchInput.devWalletOption === "import"
                     ? "Imported wallet"
                     : launchInput.devWalletOption === "generate"
-                    ? "Will be generated"
-                    : "Main wallet"}
+                      ? "Will be generated"
+                      : "Main wallet"}
                 </span>
               </div>
               <div className="grid grid-cols-[140px_1fr] gap-2">
@@ -160,8 +184,7 @@ export function LaunchOverviewDialog({
                         {launchInput.bundlerWalletCount *
                           launchInput.distributionWalletMultiplier}{" "}
                         wallets after ×
-                        {launchInput.distributionWalletMultiplier}{" "}
-                        distribution
+                        {launchInput.distributionWalletMultiplier} distribution
                       </span>
                     </div>
                   )}

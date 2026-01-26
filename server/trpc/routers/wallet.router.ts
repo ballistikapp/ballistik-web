@@ -5,6 +5,7 @@ import {
   getDevWalletByTokenSchema,
   getMainWalletSchema,
   getOperationalWalletsByTokenSchema,
+  getWalletPrivateKeySchema,
   refreshWalletBalancesSchema,
   refreshMainWalletBalanceSchema,
   returnSolSchema,
@@ -37,6 +38,15 @@ export const walletRouter = router({
     .input(getWalletByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await walletService.getWalletByToken(
+        input.tokenPublicKey,
+        input.walletPublicKey,
+        ctx.user.id
+      );
+    }),
+  getPrivateKey: protectedProcedure
+    .input(getWalletPrivateKeySchema)
+    .mutation(async ({ input, ctx }) => {
+      return await walletService.getWalletPrivateKey(
         input.tokenPublicKey,
         input.walletPublicKey,
         ctx.user.id

@@ -13,7 +13,8 @@ export const launchTokenSchema = z.object({
     .string()
     .min(20, "Description must be at least 20 characters")
     .max(500, "Description must be at most 500 characters"),
-  tokenImage: z.string(),
+  tokenImage: z.string().min(1, "Main image or video is required"),
+  tokenBanner: z.string().optional(),
   twitter: z.string().optional(),
   telegram: z.string().optional(),
   website: z.string().optional(),

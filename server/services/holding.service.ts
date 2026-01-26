@@ -7,10 +7,15 @@ import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   PublicKey,
+  Transaction,
   sendAndConfirmTransaction,
   type Connection,
 } from "@solana/web3.js";
-import { getAccount, getAssociatedTokenAddress } from "@solana/spl-token";
+import {
+  createCloseAccountInstruction,
+  getAccount,
+  getAssociatedTokenAddress,
+} from "@solana/spl-token";
 import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { rpcConfig } from "@/lib/config/rpc.config";
@@ -111,11 +116,17 @@ async function getAllowedWalletsWithKeys(
     }),
     prisma.tokenDevWallet.findFirst({
       where: { tokenPublicKey },
-      select: { wallet: { select: { publicKey: true, type: true, privateKey: true } } },
+      select: {
+        wallet: { select: { publicKey: true, type: true, privateKey: true } },
+      },
     }),
     prisma.user.findUnique({
       where: { id: userId },
-      select: { mainWallet: { select: { publicKey: true, type: true, privateKey: true } } },
+      select: {
+        mainWallet: {
+          select: { publicKey: true, type: true, privateKey: true },
+        },
+      },
     }),
   ]);
 
@@ -215,11 +226,20 @@ export const holdingService = {
       }))
     );
 
+    type ParsedAccountInfoItem = Awaited<
+      ReturnType<Connection["getMultipleParsedAccounts"]>
+    >["value"][number];
     const ataAddresses = atas.map((a) => a.ata);
-    const accountInfos = await connection.getMultipleParsedAccounts(ataAddresses);
+    const accountInfos: ParsedAccountInfoItem[] = [];
+    for (let i = 0; i < ataAddresses.length; i += 100) {
+      const batch = ataAddresses.slice(i, i + 100);
+      const batchInfos = await connection.getMultipleParsedAccounts(batch);
+      accountInfos.push(...batchInfos.value);
+    }
 
     const balanceResults = atas.map(({ wallet, ata }, index) => {
-      const accountInfo = accountInfos.value[index];
+      const accountInfo = accountInfos[index];
+      const ataExists = Boolean(accountInfo?.data);
       let tokenBalance = 0;
       if (accountInfo?.data && "parsed" in accountInfo.data) {
         const parsed = accountInfo.data.parsed as {
@@ -227,7 +247,7 @@ export const holdingService = {
         };
         tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
       }
-      return { wallet, tokenBalance };
+      return { wallet, tokenBalance, ataExists };
     });
 
     const walletPublicKeys = balanceResults.map((r) => r.wallet.publicKey);
@@ -292,7 +312,7 @@ export const holdingService = {
 
     const now = new Date();
     const updateResults = await Promise.all(
-      balanceResults.map(async ({ wallet, tokenBalance }) => {
+      balanceResults.map(async ({ wallet, tokenBalance, ataExists }) => {
         const agg = aggregateMap.get(wallet.publicKey) ?? {
           buy: { sol: 0, tokens: 0 },
           sell: { sol: 0 },
@@ -305,7 +325,7 @@ export const holdingService = {
         const lastTxSignature = lastTxMap.get(wallet.publicKey) ?? "";
         const existingId = existingHoldingMap.get(wallet.publicKey);
 
-        if (tokenBalance > 0) {
+        if (tokenBalance > 0 || ataExists) {
           if (existingId) {
             return prisma.holding.update({
               where: { id: existingId },
@@ -377,6 +397,18 @@ export const holdingService = {
     const connection = getSolanaConnection();
     const mintPublicKey = new PublicKey(token.publicKey);
     const sellPercentage = Math.floor(input.sellPercentage);
+    const shouldCloseAta = Boolean(input.closeAta);
+    const mainWalletRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        mainWallet: {
+          select: { publicKey: true, privateKey: true },
+        },
+      },
+    });
+    const mainWalletKeypair = mainWalletRecord?.mainWallet?.privateKey
+      ? Keypair.fromSecretKey(bs58.decode(mainWalletRecord.mainWallet.privateKey))
+      : null;
 
     const results = await Promise.all(
       wallets.map(async (wallet) => {
@@ -431,7 +463,8 @@ export const holdingService = {
             signature,
           };
         } catch (error) {
-          const message = error instanceof Error ? error.message : String(error);
+          const message =
+            error instanceof Error ? error.message : String(error);
           return {
             walletPublicKey: wallet.publicKey,
             status: "FAILED",
@@ -441,14 +474,102 @@ export const holdingService = {
       })
     );
 
+    const ataCloseResults = shouldCloseAta
+      ? await mapWithConcurrency(wallets, 2, async (wallet) => {
+          try {
+            const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+            const ata = await getAssociatedTokenAddress(
+              mintPublicKey,
+              owner.publicKey
+            );
+            const feePayer =
+              mainWalletKeypair &&
+              mainWalletKeypair.publicKey.toBase58() !==
+                owner.publicKey.toBase58()
+                ? mainWalletKeypair
+                : owner;
+            const destination = mainWalletKeypair?.publicKey ?? owner.publicKey;
+            let account;
+            try {
+              account = await getAccount(connection, ata);
+            } catch (error) {
+              if (
+                error instanceof Error &&
+                (error.message.includes("Account does not exist") ||
+                  error.message.includes("could not find account") ||
+                  error.name === "TokenAccountNotFoundError")
+              ) {
+                return {
+                  walletPublicKey: wallet.publicKey,
+                  status: "SKIPPED",
+                  error: "ATA not found",
+                };
+              }
+              throw error;
+            }
+
+            if (account.amount > BigInt(0)) {
+              return {
+                walletPublicKey: wallet.publicKey,
+                status: "SKIPPED",
+                error: "Balance not zero",
+              };
+            }
+
+            const closeTx = new Transaction().add(
+              createCloseAccountInstruction(
+                ata,
+                destination,
+                owner.publicKey
+              )
+            );
+            const { blockhash, lastValidBlockHeight } =
+              await connection.getLatestBlockhash("confirmed");
+            closeTx.recentBlockhash = blockhash;
+            closeTx.lastValidBlockHeight = lastValidBlockHeight;
+            closeTx.feePayer = feePayer.publicKey;
+            const signers =
+              feePayer.publicKey.toBase58() === owner.publicKey.toBase58()
+                ? [feePayer]
+                : [feePayer, owner];
+            await sendAndConfirmTransaction(connection, closeTx, signers, {
+              commitment: "confirmed",
+            });
+
+            return { walletPublicKey: wallet.publicKey, status: "CLOSED" };
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            return {
+              walletPublicKey: wallet.publicKey,
+              status: "FAILED",
+              error: message,
+            };
+          }
+        })
+      : [];
+
     const submitted = results.filter((result) => result.status === "SUBMITTED");
     const failed = results.filter((result) => result.status === "FAILED");
+    const ataClosed = ataCloseResults.filter(
+      (result) => result.status === "CLOSED"
+    );
+    const ataCloseFailed = ataCloseResults.filter(
+      (result) => result.status === "FAILED"
+    );
 
     return {
       tokenPublicKey: token.publicKey,
       submitted: submitted.length,
       failed: failed.length,
       results,
+      ataClose: shouldCloseAta
+        ? {
+            closed: ataClosed.length,
+            failed: ataCloseFailed.length,
+            results: ataCloseResults,
+          }
+        : null,
     };
   },
 };

@@ -280,76 +280,23 @@ export async function createTokenWithNewIdl(
       uri: uri.substring(0, 50) + "...",
       creator: creatorPubkey.toBase58(),
     });
+    const tx = await program.methods
+      .create(name, symbol, uri, creatorPubkey)
+      .accounts({
+        mint: mint.publicKey,
+        associatedBondingCurve,
+        metadata: metadataPDA,
+        user: creatorPubkey,
+      })
+      .signers([mint])
+      .transaction();
 
+    tx.feePayer = creatorPubkey;
 
-    const discriminator = Buffer.from([24, 30, 200, 40, 5, 28, 7, 119]);
-
-    logger.info("Create discriminator", discriminator.toString("hex"));
-
-    const encodeString = (str: string): Buffer => {
-      const utf8 = Buffer.from(str, "utf8");
-      const len = Buffer.alloc(4);
-      len.writeUInt32LE(utf8.length, 0);
-      return Buffer.concat([len, utf8]);
-    };
-
-    const encodePubkey = (pubkey: PublicKey): Buffer => {
-      return Buffer.from(pubkey.toBytes());
-    };
-
-    const nameBuf = encodeString(name);
-    const symbolBuf = encodeString(symbol);
-    const uriBuf = encodeString(uri);
-    const creatorBuf = encodePubkey(creatorPubkey);
-
-    const instructionData = Buffer.concat([
-      discriminator,
-      nameBuf,
-      symbolBuf,
-      uriBuf,
-      creatorBuf,
-    ]);
-
-    logger.info("Create instruction data length", instructionData.length);
-
-    const accounts = [
-      { pubkey: mint.publicKey, isSigner: true, isWritable: true }, // mint
-      { pubkey: addresses.mintAuthority, isSigner: false, isWritable: false }, // mint_authority
-      { pubkey: addresses.bondingCurve, isSigner: false, isWritable: true }, // bonding_curve
-      { pubkey: associatedBondingCurve, isSigner: false, isWritable: true }, // associated_bonding_curve
-      { pubkey: addresses.global, isSigner: false, isWritable: false }, // global
-      { pubkey: TOKEN_METADATA_PROGRAM_ID, isSigner: false, isWritable: false }, // mpl_token_metadata
-      { pubkey: metadataPDA, isSigner: false, isWritable: true }, // metadata
-      { pubkey: creator.publicKey, isSigner: true, isWritable: true }, // user
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      {
-        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
-        isSigner: false,
-        isWritable: false,
-      }, // associated_token_program
-      { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false }, // rent
-      { pubkey: eventAuthority, isSigner: false, isWritable: false }, // event_authority
-      { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false }, // program
-    ];
-
-    logger.info("Create instruction accounts", accounts.length);
-
-    const instruction = new TransactionInstruction({
-      programId: PUMP_PROGRAM_ID,
-      keys: accounts.map((acc) => ({
-        pubkey: acc.pubkey,
-        isSigner: acc.isSigner,
-        isWritable: acc.isWritable,
-      })),
-      data: instructionData,
+    logger.info("Create transaction built", {
+      instructionCount: tx.instructions.length,
+      feePayer: tx.feePayer?.toBase58(),
     });
-
-    const tx = new Transaction();
-    tx.add(instruction);
-    tx.feePayer = creator.publicKey;
-
-    logger.info("Create transaction built");
     return tx;
   } catch (error: unknown) {
     const err = error instanceof Error ? error : new Error(String(error));

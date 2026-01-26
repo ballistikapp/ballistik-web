@@ -15,6 +15,7 @@ import {
   SystemProgram,
   Transaction,
   sendAndConfirmTransaction,
+  type Connection,
 } from "@solana/web3.js";
 import {
   createAssociatedTokenAccountInstruction,
@@ -193,8 +194,16 @@ async function getTokenBalancesForWallets(
     }))
   );
 
+  type AccountInfoItem = Awaited<
+    ReturnType<Connection["getMultipleAccountsInfo"]>
+  >[number];
   const ataAddresses = atas.map((a) => a.ata);
-  const accountInfos = await connection.getMultipleAccountsInfo(ataAddresses);
+  const accountInfos: AccountInfoItem[] = [];
+  for (let i = 0; i < ataAddresses.length; i += 100) {
+    const batch = ataAddresses.slice(i, i + 100);
+    const batchInfos = await connection.getMultipleAccountsInfo(batch);
+    accountInfos.push(...batchInfos);
+  }
 
   return atas.map(({ wallet }, index) => {
     const accountInfo = accountInfos[index];

@@ -2,10 +2,12 @@ import { router, protectedProcedure } from "../trpc";
 import { volumeBotService } from "@/server/services/volume-bot.service";
 import {
   closeVolumeBotAccountsSchema,
+  volumeBotEligibleWalletsSchema,
   listVolumeBotSessionsSchema,
   reclaimVolumeBotSchema,
   startVolumeBotSchema,
   stopVolumeBotSchema,
+  volumeBotSelectionSummarySchema,
   volumeBotStatusSchema,
 } from "@/server/schemas/volume-bot.schema";
 
@@ -39,5 +41,20 @@ export const volumeBotRouter = router({
     .input(listVolumeBotSessionsSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.listSessions(input, ctx.user.id);
+    }),
+  eligibleWallets: protectedProcedure
+    .input(volumeBotEligibleWalletsSchema)
+    .query(async ({ input, ctx }) => {
+      return await volumeBotService.listEligibleWallets(input, ctx.user.id);
+    }),
+  selectionSummary: protectedProcedure
+    .input(volumeBotSelectionSummarySchema)
+    .query(async ({ input, ctx }) => {
+      return await volumeBotService.getSelectionSummary(input, ctx.user.id);
+    }),
+  logs: protectedProcedure
+    .input(stopVolumeBotSchema)
+    .query(async ({ input, ctx }) => {
+      return await volumeBotService.getLogs(input.sessionId, ctx.user.id);
     }),
 });
