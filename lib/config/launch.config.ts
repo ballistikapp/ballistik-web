@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { getEnv } from "@/lib/config/env";
-import { getDefaultJitoBlockEngineUrl } from "@/src/lib/config/jito.config";
+import { getDefaultJitoBlockEngineUrl } from "@/lib/config/jito.config";
 
 const launchConfigSchema = z.object({
   // Minimum buy amount per wallet (SOL).

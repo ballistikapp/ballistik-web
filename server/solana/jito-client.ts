@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import {
   getDefaultJitoBlockEngineUrl,
   jitoConfig,
-} from "@/src/lib/config/jito.config";
+} from "@/lib/config/jito.config";
 
 function toGrpcEndpoint(url: string) {
   const parsed = new URL(url);
@@ -28,7 +28,8 @@ const tipCache = new Map<string, TipCacheEntry>();
 function resolveGrpcEndpoints(rpcUrl: string) {
   const urls = jitoConfig.blockEngineUrls;
   const normalized = rpcUrl.toLowerCase();
-  const isTestnet = normalized.includes("testnet") || normalized.includes("devnet");
+  const isTestnet =
+    normalized.includes("testnet") || normalized.includes("devnet");
   const filtered = urls.filter((url) => url.includes("testnet") === isTestnet);
   const selected = filtered.length > 0 ? filtered : urls;
   const endpoints = Array.from(new Set(selected.map(toGrpcEndpoint)));
@@ -51,7 +52,10 @@ function normalizeError(value: unknown) {
 
 type JitoState = {
   endpoints: string[];
-  clients: { endpoint: string; client: ReturnType<typeof searcher.searcherClient> }[];
+  clients: {
+    endpoint: string;
+    client: ReturnType<typeof searcher.searcherClient>;
+  }[];
   preferredEndpoint: string;
 };
 
@@ -88,10 +92,7 @@ function orderedClients() {
   if (startIndex <= 0) {
     return clients;
   }
-  return [
-    ...clients.slice(startIndex),
-    ...clients.slice(0, startIndex),
-  ];
+  return [...clients.slice(startIndex), ...clients.slice(0, startIndex)];
 }
 
 function setPreferredEndpoint(endpoint: string) {
@@ -147,7 +148,9 @@ export async function getTipAccount() {
   throw new Error("No tip accounts available");
 }
 
-export async function sendBundle(bundleToSend: import("jito-ts").bundle.Bundle) {
+export async function sendBundle(
+  bundleToSend: import("jito-ts").bundle.Bundle
+) {
   let lastError: JitoSendResult | null = null;
   for (const entry of orderedClients()) {
     try {
