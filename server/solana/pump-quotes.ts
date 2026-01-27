@@ -1,8 +1,6 @@
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { BN } from "@coral-xyz/anchor";
 import type { Keypair, PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { getPumpProgram } from "@/server/solana/pump-idl";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 
 type PumpQuoteState = {
@@ -16,29 +14,10 @@ const ZERO = BigInt(0);
 const ONE = BigInt(1);
 const MAX_BPS = BigInt(10_000);
 
-const toBigInt = (value: unknown) => {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number") return BigInt(Math.floor(value));
-  if (typeof value === "string") return BigInt(value);
-  if (value instanceof BN) {
-    return BigInt((value as BN).toString());
-  }
-  if (
-    value &&
-    typeof (value as { toString?: () => string }).toString === "function"
-  ) {
-    return BigInt((value as { toString: () => string }).toString());
-  }
-  throw new Error("Unsupported numeric value");
-};
+const DISCRIMINATOR_SIZE = 8;
 
-const pickField = (record: Record<string, unknown>, keys: string[]) => {
-  for (const key of keys) {
-    if (record[key] !== undefined) {
-      return record[key];
-    }
-  }
-  return undefined;
+const readU64 = (buffer: Buffer, offset: number): bigint => {
+  return buffer.readBigUInt64LE(offset);
 };
 
 const clampBps = (bps: number) => {
@@ -56,15 +35,44 @@ const applySlippage = (amount: bigint, slippageBps: number) => {
   return (amount * (MAX_BPS - bps)) / MAX_BPS;
 };
 
+const decodeBondingCurve = (data: Buffer) => {
+  const offset = DISCRIMINATOR_SIZE;
+  return {
+    virtualTokenReserves: readU64(data, offset + 0),
+    virtualSolReserves: readU64(data, offset + 8),
+    realTokenReserves: readU64(data, offset + 16),
+    realSolReserves: readU64(data, offset + 24),
+    tokenTotalSupply: readU64(data, offset + 32),
+  };
+};
+
+const decodeGlobal = (data: Buffer) => {
+  let offset = DISCRIMINATOR_SIZE;
+  offset += 1;
+  offset += 32;
+  offset += 32;
+  offset += 8;
+  offset += 8;
+  offset += 8;
+  offset += 8;
+  const feeBasisPoints = readU64(data, offset);
+  offset += 8;
+  offset += 32;
+  offset += 1;
+  offset += 8;
+  const creatorFeeBasisPoints = readU64(data, offset);
+
+  return {
+    feeBasisPoints,
+    creatorFeeBasisPoints,
+  };
+};
+
 export const fetchPumpQuoteState = async (
   mint: PublicKey,
-  payer: Keypair
+  _payer: Keypair
 ): Promise<PumpQuoteState> => {
   const connection = getSolanaConnection();
-  const provider = new AnchorProvider(connection, new NodeWallet(payer), {
-    commitment: "confirmed",
-  });
-  const program = getPumpProgram(provider);
   const { bondingCurve, global } = derivePumpAddresses(mint);
   const [bondingInfo, globalInfo] = await connection.getMultipleAccountsInfo(
     [bondingCurve, global],
@@ -78,39 +86,14 @@ export const fetchPumpQuoteState = async (
     throw new Error("Global account not found");
   }
 
-  const bondingCurveData = program.coder.accounts.decode(
-    "BondingCurve",
-    bondingInfo.data
-  ) as Record<string, unknown>;
-  const globalData = program.coder.accounts.decode(
-    "Global",
-    globalInfo.data
-  ) as Record<string, unknown>;
-
-  const virtualTokenReserves = toBigInt(
-    pickField(bondingCurveData, [
-      "virtualTokenReserves",
-      "virtual_token_reserves",
-    ])
-  );
-  const virtualSolReserves = toBigInt(
-    pickField(bondingCurveData, ["virtualSolReserves", "virtual_sol_reserves"])
-  );
-  const protocolFeeBps = toBigInt(
-    pickField(globalData, ["feeBasisPoints", "fee_basis_points"]) ?? 0
-  );
-  const creatorFeeBps = toBigInt(
-    pickField(globalData, [
-      "creatorFeeBasisPoints",
-      "creator_fee_basis_points",
-    ]) ?? 0
-  );
+  const bondingCurveData = decodeBondingCurve(bondingInfo.data as Buffer);
+  const globalData = decodeGlobal(globalInfo.data as Buffer);
 
   return {
-    virtualTokenReserves,
-    virtualSolReserves,
-    protocolFeeBps,
-    creatorFeeBps,
+    virtualTokenReserves: bondingCurveData.virtualTokenReserves,
+    virtualSolReserves: bondingCurveData.virtualSolReserves,
+    protocolFeeBps: globalData.feeBasisPoints,
+    creatorFeeBps: globalData.creatorFeeBasisPoints,
   };
 };
 
