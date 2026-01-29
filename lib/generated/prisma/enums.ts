@@ -63,6 +63,7 @@ export type HoldingExitLogLevel = (typeof HoldingExitLogLevel)[keyof typeof Hold
 
 export const VolumeBotSessionStatus = {
   DRAFT: 'DRAFT',
+  SCHEDULED: 'SCHEDULED',
   RUNNING: 'RUNNING',
   STOP_REQUESTED: 'STOP_REQUESTED',
   STOPPING: 'STOPPING',

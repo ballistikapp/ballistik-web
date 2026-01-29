@@ -2,19 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useQueryState } from "nuqs";
 import { toast } from "sonner";
-import {
-  ArrowDownRight,
-  ArrowUpRight,
-  SlidersHorizontal,
-  ShieldCheck,
-  Minus,
-  TrendingUp,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
 import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
@@ -32,8 +22,8 @@ import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../../dashboard/dashboard-loading";
 import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Badge } from "@/components/ui/badge";
 import { Spinner } from "@/components/ui/spinner";
+import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -47,52 +37,26 @@ import {
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
 
-const presets = {
-  conservative: {
-    generatedWalletCount: 10,
-    fundingPerWalletSol: 0.5,
-    minTradeAmountSol: 0.01,
-    maxTradeAmountSol: 0.03,
-    minIntervalSeconds: 180,
-    maxIntervalSeconds: 600,
-    sellRatio: 0.9,
-    strategy: "neutral" as const,
-    buyBiasPct: 50,
-    tradeVariancePct: 15,
-    slippageBps: 1000,
-    targetDurationSeconds: DEFAULT_DURATION_SECONDS,
-    strategyTargetSol: 5,
-  },
-  custom: {
-    generatedWalletCount: 10,
-    fundingPerWalletSol: 0.5,
-    minTradeAmountSol: 0.01,
-    maxTradeAmountSol: 0.03,
-    minIntervalSeconds: 180,
-    maxIntervalSeconds: 600,
-    sellRatio: 0.9,
-    strategy: "neutral" as const,
-    buyBiasPct: 50,
-    tradeVariancePct: 15,
-    slippageBps: 1000,
-    targetDurationSeconds: DEFAULT_DURATION_SECONDS,
-    strategyTargetSol: 5,
-  },
-  aggressive: {
-    generatedWalletCount: 30,
-    fundingPerWalletSol: 1,
-    minTradeAmountSol: 0.05,
-    maxTradeAmountSol: 0.15,
-    minIntervalSeconds: 30,
-    maxIntervalSeconds: 180,
-    sellRatio: 0.7,
-    strategy: "pump" as const,
-    buyBiasPct: 80,
-    tradeVariancePct: 25,
-    slippageBps: 1000,
-    targetDurationSeconds: DEFAULT_DURATION_SECONDS,
-    strategyTargetSol: 5,
-  },
+type RangeInput = {
+  solMin: number;
+  solMax: number;
+  increment: number | null;
+  probability: number;
+  intervalMin: number;
+  intervalMax: number;
+  direction: "buy" | "sell" | "both";
+  buyProbability?: number;
+};
+
+const defaultRange: RangeInput = {
+  solMin: 0.01,
+  solMax: 0.03,
+  increment: 0.01,
+  probability: 1,
+  intervalMin: 180,
+  intervalMax: 600,
+  direction: "both",
+  buyProbability: 0.5,
 };
 
 const formatDuration = (seconds: number) => {
@@ -109,66 +73,48 @@ const formatDuration = (seconds: number) => {
   return `${minutes}m`;
 };
 
-const formatSolEstimate = (value?: number | null) => {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
-  }
-  if (value > 0 && value < 0.001) {
-    return "<0.001 SOL";
-  }
-  return `${value.toFixed(3)} SOL`;
+const parseDateTime = (value: string) => {
+  if (!value) return undefined;
+  const parsed = new Date(value);
+  return Number.isNaN(parsed.getTime()) ? undefined : parsed;
 };
+
+const formatNumber = (value?: number | null, fallback = "—") => {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return fallback;
+  }
+  return value.toFixed(2);
+};
+
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
 
 export default function VolumeBotStartPage() {
   const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
   const router = useRouter();
-  const [selectedPreset, setSelectedPreset] =
-    useState<keyof typeof presets>("conservative");
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [walletsExpanded, setWalletsExpanded] = useState(false);
   const [isRefreshingWallets, setIsRefreshingWallets] = useState(false);
+  const [ranges, setRanges] = useState<RangeInput[]>([defaultRange]);
 
-  const [generatedWalletCount, setGeneratedWalletCount] = useState(
-    presets.conservative.generatedWalletCount
-  );
+  const [generatedWalletCount, setGeneratedWalletCount] = useState(10);
   const [selectedWalletPublicKeys, setSelectedWalletPublicKeys] = useState<
     string[]
   >([]);
-  const [fundingPerWalletSol, setFundingPerWalletSol] = useState(
-    presets.conservative.fundingPerWalletSol
-  );
-  const [minTradeAmountSol, setMinTradeAmountSol] = useState(
-    presets.conservative.minTradeAmountSol
-  );
-  const [maxTradeAmountSol, setMaxTradeAmountSol] = useState(
-    presets.conservative.maxTradeAmountSol
-  );
-  const [minIntervalSeconds, setMinIntervalSeconds] = useState(
-    presets.conservative.minIntervalSeconds
-  );
-  const [maxIntervalSeconds, setMaxIntervalSeconds] = useState(
-    presets.conservative.maxIntervalSeconds
-  );
-  const [sellRatio, setSellRatio] = useState(presets.conservative.sellRatio);
-  const [strategy, setStrategy] = useState<"neutral" | "pump" | "dump">(
-    presets.conservative.strategy
-  );
-  const [buyBiasPct, setBuyBiasPct] = useState(presets.conservative.buyBiasPct);
-  const [tradeVariancePct, setTradeVariancePct] = useState(
-    presets.conservative.tradeVariancePct
-  );
-  const [slippageBps, setSlippageBps] = useState(
-    presets.conservative.slippageBps
-  );
-  const [durationPreset, setDurationPreset] = useState(
-    String(presets.conservative.targetDurationSeconds)
-  );
-  const [customDurationSeconds, setCustomDurationSeconds] = useState(
+  const [fundingPerGeneratedWallet, setFundingPerGeneratedWallet] = useState(0.5);
+  const [topUpAmount, setTopUpAmount] = useState(0.01);
+  const [slippageBps, setSlippageBps] = useState(1000);
+  const [sellFallbackRatio, setSellFallbackRatio] = useState(0.5);
+  const [pauseOnHighSlippage, setPauseOnHighSlippage] = useState(true);
+  const [maxSlippageFailures, setMaxSlippageFailures] = useState(3);
+  const [targetDurationSeconds, setTargetDurationSeconds] = useState(
     DEFAULT_DURATION_SECONDS
   );
-  const [strategyTargetSol, setStrategyTargetSol] = useState(
-    presets.conservative.strategyTargetSol
-  );
+  const [scheduledStartAt, setScheduledStartAt] = useState("");
+  const [scheduledStopAt, setScheduledStopAt] = useState("");
+  const [fundingTouched, setFundingTouched] = useState(false);
+  const [presetName, setPresetName] = useState("");
+  const [selectedPresetId, setSelectedPresetId] = useState<string | null>(null);
 
   const {
     data: tokenData,
@@ -195,26 +141,98 @@ export default function VolumeBotStartPage() {
     { enabled: Boolean(tokenPublicKey && tokenData) }
   );
 
+  const presetsQuery = trpc.volumeBot.listPresets.useQuery({}, { retry: false });
+
+  const savePresetMutation = trpc.volumeBot.savePreset.useMutation({
+    onSuccess: (preset) => {
+      toast.success("Preset saved");
+      presetsQuery.refetch();
+      setSelectedPresetId(preset.id);
+      setPresetName(preset.name);
+    },
+    onError: (presetError) => {
+      toast.error(presetError.message || "Failed to save preset");
+    },
+  });
+
+  const deletePresetMutation = trpc.volumeBot.deletePreset.useMutation({
+    onSuccess: () => {
+      toast.success("Preset deleted");
+      presetsQuery.refetch();
+      setSelectedPresetId(null);
+      setPresetName("");
+    },
+    onError: (presetError) => {
+      toast.error(presetError.message || "Failed to delete preset");
+    },
+  });
+
+  const totalWallets = selectedWalletPublicKeys.length + generatedWalletCount;
+  const probabilitySum = useMemo(
+    () => ranges.reduce((sum, range) => sum + range.probability, 0),
+    [ranges]
+  );
+  const selectedPreset = useMemo(() => {
+    return presetsQuery.data?.find((preset) => preset.id === selectedPresetId);
+  }, [presetsQuery.data, selectedPresetId]);
+
+  const configInput = useMemo(
+    () => ({
+      ranges: ranges.map((range) => ({
+        ...range,
+        increment:
+          range.increment !== null && range.increment > 0
+            ? range.increment
+            : null,
+        buyProbability: range.direction === "both" ? range.buyProbability : undefined,
+      })),
+      walletConfig: {
+        generatedWalletCount,
+        selectedWalletPublicKeys,
+        fundingPerGeneratedWallet,
+        topUpAmount,
+      },
+      behaviorConfig: {
+        slippageBps,
+        sellFallbackRatio,
+        pauseOnHighSlippage,
+        maxSlippageFailures,
+      },
+      targetDurationSeconds,
+    }),
+    [
+      ranges,
+      generatedWalletCount,
+      selectedWalletPublicKeys,
+      fundingPerGeneratedWallet,
+      topUpAmount,
+      slippageBps,
+      sellFallbackRatio,
+      pauseOnHighSlippage,
+      maxSlippageFailures,
+      targetDurationSeconds,
+    ]
+  );
+
   const selectionSummaryQuery = trpc.volumeBot.selectionSummary.useQuery(
     {
       tokenPublicKey: tokenPublicKey || "",
-      selectedWalletPublicKeys,
-      strategy,
-      targetSol: strategyTargetSol,
+      config: configInput,
     },
     {
       enabled:
         Boolean(tokenPublicKey && tokenData) &&
-        strategy === "dump" &&
-        selectedWalletPublicKeys.length > 0 &&
-        strategyTargetSol > 0,
+        ranges.length > 0 &&
+        totalWallets > 0 &&
+        targetDurationSeconds > 0 &&
+        Math.abs(probabilitySum - 1) < 0.001,
       retry: false,
     }
   );
 
   const startMutation = trpc.volumeBot.start.useMutation({
-    onError: (error) => {
-      toast.error(error.message || "Failed to start volume bot");
+    onError: (startError) => {
+      toast.error(startError.message || "Failed to start volume bot");
     },
   });
 
@@ -222,13 +240,9 @@ export default function VolumeBotStartPage() {
   const isRunning =
     session?.status === "RUNNING" ||
     session?.status === "STOP_REQUESTED" ||
-    session?.status === "STOPPING";
+    session?.status === "STOPPING" ||
+    session?.status === "SCHEDULED";
 
-  const totalFunding = useMemo(
-    () => generatedWalletCount * fundingPerWalletSol,
-    [generatedWalletCount, fundingPerWalletSol]
-  );
-  const totalWallets = selectedWalletPublicKeys.length + generatedWalletCount;
   const eligibleWallets = eligibleWalletsQuery.data?.wallets ?? [];
   const selectedTokenBalance = useMemo(() => {
     if (selectedWalletPublicKeys.length === 0) {
@@ -243,19 +257,121 @@ export default function VolumeBotStartPage() {
       .filter((wallet) => wallet.tokenBalanceUi > 0)
       .sort((a, b) => b.tokenBalanceUi - a.tokenBalanceUi);
   }, [eligibleWallets]);
-  const targetDurationSeconds = useMemo(() => {
-    if (durationPreset === "custom") {
-      const seconds = Number.isFinite(customDurationSeconds)
-        ? customDurationSeconds
-        : 0;
-      return Math.max(60, Math.round(seconds));
-    }
-    const presetValue = Number.parseInt(durationPreset, 10);
-    return Number.isFinite(presetValue) && presetValue > 0 ? presetValue : 0;
-  }, [durationPreset, customDurationSeconds]);
 
-  const markCustom = () => {
-    setSelectedPreset("custom");
+  const totalFunding = useMemo(
+    () => generatedWalletCount * fundingPerGeneratedWallet,
+    [generatedWalletCount, fundingPerGeneratedWallet]
+  );
+
+  const localPreflight = useMemo(() => {
+    if (ranges.length === 0 || totalWallets <= 0 || targetDurationSeconds <= 0) {
+      return null;
+    }
+    let netSolDirection = 0;
+    let avgIntervalWeighted = 0;
+    let avgTradeSizeWeighted = 0;
+    let minVolumePerMinute = 0;
+    let maxVolumePerMinute = 0;
+    for (const range of ranges) {
+      const avgAmount = (range.solMin + range.solMax) / 2;
+      const avgInterval = (range.intervalMin + range.intervalMax) / 2;
+      avgIntervalWeighted += range.probability * avgInterval;
+      avgTradeSizeWeighted += range.probability * avgAmount;
+      if (range.direction === "buy") {
+        netSolDirection += range.probability * avgAmount;
+      } else if (range.direction === "sell") {
+        netSolDirection -= range.probability * avgAmount;
+      } else {
+        const buyProbability = range.buyProbability ?? 0;
+        netSolDirection +=
+          range.probability * avgAmount * (2 * buyProbability - 1);
+      }
+      minVolumePerMinute +=
+        (range.solMin * 60) /
+        range.intervalMax *
+        range.probability *
+        totalWallets;
+      maxVolumePerMinute +=
+        (range.solMax * 60) /
+        range.intervalMin *
+        range.probability *
+        totalWallets;
+    }
+    const estimatedTradesPerWallet =
+      avgIntervalWeighted > 0 ? targetDurationSeconds / avgIntervalWeighted : 0;
+    const totalExpectedVolume =
+      estimatedTradesPerWallet * avgTradeSizeWeighted * totalWallets;
+    const bufferMultiplier =
+      netSolDirection > 0 && totalExpectedVolume > 0
+        ? clampNumber(1 + netSolDirection / totalExpectedVolume, 1, 2)
+        : 1;
+    const baseFunding = estimatedTradesPerWallet * avgTradeSizeWeighted;
+    const suggestedFunding =
+      Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100;
+    const minutes = targetDurationSeconds / 60;
+    return {
+      netSolDirection,
+      avgIntervalWeighted,
+      avgTradeSizeWeighted,
+      estimatedTradesPerWallet,
+      suggestedFunding,
+      volumePerMinute: {
+        min: minVolumePerMinute,
+        max: maxVolumePerMinute,
+      },
+      totalVolume: {
+        min: minVolumePerMinute * minutes,
+        max: maxVolumePerMinute * minutes,
+      },
+    };
+  }, [ranges, totalWallets, targetDurationSeconds]);
+
+  const selectionSummary = selectionSummaryQuery.data;
+  const effectivePreflight = selectionSummary ?? localPreflight;
+  const netSolDirection = effectivePreflight?.netSolDirection ?? 0;
+  const netDirectionLabel =
+    netSolDirection > 0 ? "Net buy" : netSolDirection < 0 ? "Net sell" : "Neutral";
+  const suggestedFunding =
+    selectionSummary?.suggestedFundingPerGeneratedWallet ??
+    localPreflight?.suggestedFunding;
+  const fundingBelowSuggested =
+    suggestedFunding !== undefined
+      ? fundingPerGeneratedWallet < suggestedFunding
+      : false;
+  const sellWarning = selectionSummary?.sellWarning ?? false;
+  const totalSellableValue = selectionSummary?.totalSellableValue ?? null;
+
+  useEffect(() => {
+    if (fundingTouched) {
+      return;
+    }
+    if (suggestedFunding && Number.isFinite(suggestedFunding)) {
+      setFundingPerGeneratedWallet(suggestedFunding);
+    }
+  }, [suggestedFunding, fundingTouched]);
+
+  const updateRange = (
+    index: number,
+    key: keyof RangeInput,
+    value: RangeInput[keyof RangeInput]
+  ) => {
+    setRanges((current) =>
+      current.map((range, rangeIndex) =>
+        rangeIndex === index ? { ...range, [key]: value } : range
+      )
+    );
+  };
+
+  const addRange = () => {
+    if (ranges.length >= 5) {
+      toast.error("Max 5 ranges allowed");
+      return;
+    }
+    setRanges((current) => [...current, { ...defaultRange, probability: 0 }]);
+  };
+
+  const removeRange = (index: number) => {
+    setRanges((current) => current.filter((_, rangeIndex) => rangeIndex !== index));
   };
 
   const toggleWallet = (walletPublicKey: string) => {
@@ -267,27 +383,60 @@ export default function VolumeBotStartPage() {
     });
   };
 
-  const handlePresetChange = (preset: keyof typeof presets) => {
-    if (preset === "custom") {
-      setSelectedPreset("custom");
+  const handleApplyPreset = () => {
+    if (!selectedPreset) {
+      toast.error("Select a preset to apply");
       return;
     }
-    const nextPreset = presets[preset];
-    setSelectedPreset(preset);
-    setGeneratedWalletCount(nextPreset.generatedWalletCount);
-    setFundingPerWalletSol(nextPreset.fundingPerWalletSol);
-    setMinTradeAmountSol(nextPreset.minTradeAmountSol);
-    setMaxTradeAmountSol(nextPreset.maxTradeAmountSol);
-    setMinIntervalSeconds(nextPreset.minIntervalSeconds);
-    setMaxIntervalSeconds(nextPreset.maxIntervalSeconds);
-    setSellRatio(nextPreset.sellRatio);
-    setStrategy(nextPreset.strategy);
-    setBuyBiasPct(nextPreset.buyBiasPct);
-    setTradeVariancePct(nextPreset.tradeVariancePct);
-    setSlippageBps(nextPreset.slippageBps);
-    setDurationPreset(String(nextPreset.targetDurationSeconds));
-    setCustomDurationSeconds(nextPreset.targetDurationSeconds);
-    setStrategyTargetSol(nextPreset.strategyTargetSol);
+    const presetConfig = selectedPreset.config as VolumeBotConfigInput;
+    if (!presetConfig || !Array.isArray(presetConfig.ranges)) {
+      toast.error("Preset config is invalid");
+      return;
+    }
+    setRanges(
+      presetConfig.ranges.map((range) => ({
+        ...range,
+        increment:
+          range.increment !== null && range.increment !== undefined
+            ? range.increment
+            : null,
+        buyProbability:
+          range.direction === "both"
+            ? range.buyProbability ?? 0.5
+            : undefined,
+      }))
+    );
+    setGeneratedWalletCount(presetConfig.walletConfig.generatedWalletCount);
+    setSelectedWalletPublicKeys(presetConfig.walletConfig.selectedWalletPublicKeys);
+    setFundingPerGeneratedWallet(presetConfig.walletConfig.fundingPerGeneratedWallet);
+    setTopUpAmount(presetConfig.walletConfig.topUpAmount);
+    setSlippageBps(presetConfig.behaviorConfig.slippageBps);
+    setSellFallbackRatio(presetConfig.behaviorConfig.sellFallbackRatio);
+    setPauseOnHighSlippage(presetConfig.behaviorConfig.pauseOnHighSlippage);
+    setMaxSlippageFailures(presetConfig.behaviorConfig.maxSlippageFailures);
+    setTargetDurationSeconds(presetConfig.targetDurationSeconds);
+    setFundingTouched(true);
+    setPresetName(selectedPreset.name);
+  };
+
+  const handleSavePreset = async () => {
+    const trimmedName = presetName.trim();
+    if (!trimmedName) {
+      toast.error("Preset name required");
+      return;
+    }
+    await savePresetMutation.mutateAsync({
+      name: trimmedName,
+      config: configInput,
+    });
+  };
+
+  const handleDeletePreset = async () => {
+    if (!selectedPreset) {
+      toast.error("Select a preset to delete");
+      return;
+    }
+    await deletePresetMutation.mutateAsync({ presetId: selectedPreset.id });
   };
 
   const handleStart = async () => {
@@ -295,49 +444,54 @@ export default function VolumeBotStartPage() {
       toast.error("Select a token first");
       return;
     }
-    if (strategy === "dump" && selectedWalletPublicKeys.length === 0) {
-      toast.error("Select at least one wallet for dump");
+    if (ranges.length === 0) {
+      toast.error("Add at least one range");
       return;
     }
-    if (strategy !== "neutral" && strategyTargetSol <= 0) {
-      toast.error("Set a target SOL amount for pump or dump");
+    if (Math.abs(probabilitySum - 1) >= 0.001) {
+      toast.error("Range probabilities must sum to 1.0");
+      return;
+    }
+    if (totalWallets < 1 || totalWallets > 50) {
+      toast.error("Total wallets must be between 1 and 50");
       return;
     }
     if (targetDurationSeconds <= 0) {
-      toast.error("Select a duration for the run");
+      toast.error("Duration must be at least 1 second");
+      return;
+    }
+    const missingBuyProbability = ranges.some(
+      (range) =>
+        range.direction === "both" &&
+        (range.buyProbability === undefined || Number.isNaN(range.buyProbability))
+    );
+    if (missingBuyProbability) {
+      toast.error("Set buy probability for ranges with direction both");
+      return;
+    }
+    if (netSolDirection < 0 && selectedWalletPublicKeys.length === 0) {
+      toast.error("Net sell sessions require wallets with token holdings");
+      return;
+    }
+    if (
+      netSolDirection < 0 &&
+      totalSellableValue !== null &&
+      totalSellableValue <= 0
+    ) {
+      toast.error("Selected wallets have no tokens to sell");
       return;
     }
     setConfirmOpen(true);
-    if (strategy === "dump") {
-      await selectionSummaryQuery.refetch();
-    }
   };
 
   const handleConfirmStart = async () => {
-    const latestSummary =
-      strategy === "dump" ? (await selectionSummaryQuery.refetch()).data : null;
-    if (strategy === "dump" && latestSummary?.insufficient) {
-      toast.warning("Dump target capped by available balances");
-    }
+    const scheduledStart = parseDateTime(scheduledStartAt);
+    const scheduledStop = parseDateTime(scheduledStopAt);
     const result = await startMutation.mutateAsync({
       tokenPublicKey: tokenPublicKey || "",
-      config: {
-        generatedWalletCount,
-        selectedWalletPublicKeys,
-        fundingPerWalletSol,
-        minTradeAmountSol,
-        maxTradeAmountSol,
-        minIntervalSeconds,
-        maxIntervalSeconds,
-        sellRatio,
-        strategy,
-        buyBiasPct,
-        tradeVariancePct,
-        slippageBps,
-        strategyTargetSol:
-          strategy !== "neutral" ? strategyTargetSol : undefined,
-        targetDurationSeconds,
-      },
+      config: configInput,
+      scheduledStartAt: scheduledStart,
+      scheduledStopAt: scheduledStop,
     });
     toast.success("Volume bot started");
     setConfirmOpen(false);
@@ -351,10 +505,6 @@ export default function VolumeBotStartPage() {
   if (!tokenData) {
     return <TokenNotFound error={error} onRetry={() => refetch()} />;
   }
-
-  const inlineWarning =
-    strategy === "dump" && selectionSummaryQuery.data?.insufficient;
-  const targetApplied = selectionSummaryQuery.data?.targetSolApplied;
 
   return (
     <div className="flex flex-col gap-6">
@@ -406,97 +556,235 @@ export default function VolumeBotStartPage() {
       <section className="space-y-6 pb-8">
         <Card>
           <CardHeader>
-            <CardTitle className="text-primary text-xl">
-              Presets & Strategy
-            </CardTitle>
+            <CardTitle className="text-primary text-xl">Presets</CardTitle>
           </CardHeader>
           <Separator />
-          <CardContent className="space-y-6">
-            <div className="space-y-3">
-              <div>
-                <Label className="text-base">Preset</Label>
-                <p className="text-sm text-muted-foreground">
-                  Choose a starting profile and fine-tune below.
-                </p>
+          <CardContent className="space-y-4">
+            <div className="grid gap-3 md:grid-cols-3">
+              <div className="space-y-2">
+                <Label>Preset</Label>
+                <Select
+                  value={selectedPresetId ?? ""}
+                  onValueChange={(value) => {
+                    const nextValue = value || null;
+                    setSelectedPresetId(nextValue);
+                    const preset = presetsQuery.data?.find(
+                      (item) => item.id === nextValue
+                    );
+                    setPresetName(preset?.name ?? "");
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select preset" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(presetsQuery.data ?? []).map((preset) => (
+                      <SelectItem key={preset.id} value={preset.id}>
+                        {preset.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {(["conservative", "aggressive", "custom"] as const).map(
-                  (preset) => (
-                    <button
-                      key={preset}
-                      type="button"
-                      onClick={() => handlePresetChange(preset)}
-                      className={`flex flex-col gap-2 rounded-lg bg-background border px-5 py-4 text-left transition ${
-                        selectedPreset === preset
-                          ? "border-primary"
-                          : "border-muted bg-background/50 hover:border-primary/50"
-                      }`}
-                    >
-                      <span className="flex items-center gap-2 text-base font-semibold capitalize">
-                        {preset === "conservative" ? (
-                          <ShieldCheck className="h-5 w-5" />
-                        ) : preset === "aggressive" ? (
-                          <TrendingUp className="h-5 w-5" />
-                        ) : (
-                          <SlidersHorizontal className="h-5 w-5" />
-                        )}
-                        {preset}
-                      </span>
-                      <span className="text-sm text-muted-foreground">
-                        {preset === "conservative"
-                          ? "Balanced trades with slower pacing."
-                          : preset === "aggressive"
-                            ? "Higher volume with tighter intervals."
-                            : "Manual tuning for advanced setups."}
-                      </span>
-                    </button>
-                  )
-                )}
+              <div className="space-y-2">
+                <Label>Name</Label>
+                <Input
+                  value={presetName}
+                  onChange={(event) => setPresetName(event.target.value)}
+                />
+              </div>
+              <div className="flex items-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleApplyPreset}
+                  disabled={!selectedPresetId}
+                >
+                  Apply
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={handleDeletePreset}
+                  disabled={!selectedPresetId || deletePresetMutation.isPending}
+                >
+                  Delete
+                </Button>
+                <Button
+                  type="button"
+                  onClick={handleSavePreset}
+                  disabled={savePresetMutation.isPending}
+                >
+                  Save
+                </Button>
               </div>
             </div>
+          </CardContent>
+        </Card>
 
-            <div className="space-y-3">
-              <div>
-                <Label className="text-base">Strategy</Label>
-                <p className="text-sm text-muted-foreground">
-                  Tune how the bot impacts price action.
-                </p>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <CardTitle className="text-primary text-xl">Ranges</CardTitle>
+            <Button type="button" variant="outline" size="sm" onClick={addRange}>
+              Add range
+            </Button>
+          </CardHeader>
+          <Separator />
+          <CardContent className="space-y-4">
+            {ranges.map((range, index) => (
+              <div key={index} className="rounded border p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm font-semibold">Range {index + 1}</div>
+                  {ranges.length > 1 && (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => removeRange(index)}
+                    >
+                      Remove
+                    </Button>
+                  )}
+                </div>
+                <div className="grid gap-3 md:grid-cols-4">
+                  <div className="space-y-2">
+                    <Label>solMin</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.001}
+                      value={range.solMin}
+                      onChange={(event) =>
+                        updateRange(index, "solMin", Number(event.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>solMax</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.001}
+                      value={range.solMax}
+                      onChange={(event) =>
+                        updateRange(index, "solMax", Number(event.target.value))
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Increment (optional)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      step={0.001}
+                      value={range.increment ?? ""}
+                      onChange={(event) =>
+                        updateRange(
+                          index,
+                          "increment",
+                          event.target.value === ""
+                            ? null
+                            : Number(event.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Probability (0-1)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.01}
+                      value={range.probability}
+                      onChange={(event) =>
+                        updateRange(
+                          index,
+                          "probability",
+                          Number(event.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Interval min (sec)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={range.intervalMin}
+                      onChange={(event) =>
+                        updateRange(
+                          index,
+                          "intervalMin",
+                          Number(event.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Interval max (sec)</Label>
+                    <Input
+                      type="number"
+                      min={1}
+                      value={range.intervalMax}
+                      onChange={(event) =>
+                        updateRange(
+                          index,
+                          "intervalMax",
+                          Number(event.target.value)
+                        )
+                      }
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Direction</Label>
+                    <Select
+                      value={range.direction}
+                      onValueChange={(value) => {
+                        const nextDirection = value as RangeInput["direction"];
+                        updateRange(index, "direction", nextDirection);
+                        if (nextDirection === "both" && range.buyProbability === undefined) {
+                          updateRange(index, "buyProbability", 0.5);
+                        }
+                        if (nextDirection !== "both") {
+                          updateRange(index, "buyProbability", undefined);
+                        }
+                      }}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="buy">buy</SelectItem>
+                        <SelectItem value="sell">sell</SelectItem>
+                        <SelectItem value="both">both</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {range.direction === "both" && (
+                    <div className="space-y-2">
+                      <Label>Buy probability (0-1)</Label>
+                      <Input
+                        type="number"
+                        min={0}
+                        max={1}
+                        step={0.01}
+                        value={range.buyProbability ?? ""}
+                        onChange={(event) =>
+                          updateRange(
+                            index,
+                            "buyProbability",
+                            Number(event.target.value)
+                          )
+                        }
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
-                {(["neutral", "pump", "dump"] as const).map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => {
-                      setStrategy(option);
-                      markCustom();
-                    }}
-                    className={`flex flex-col gap-2 rounded-lg bg-background border px-5 py-4 text-left transition ${
-                      strategy === option
-                        ? "border-primary"
-                        : "border-muted bg-background/50 hover:border-primary/50"
-                    }`}
-                  >
-                    <span className="flex items-center gap-2 text-base font-semibold capitalize">
-                      {option === "neutral" ? (
-                        <Minus className="h-5 w-5" />
-                      ) : option === "pump" ? (
-                        <ArrowUpRight className="h-5 w-5" />
-                      ) : (
-                        <ArrowDownRight className="h-5 w-5" />
-                      )}
-                      {option}
-                    </span>
-                    <span className="text-sm text-muted-foreground">
-                      {option === "neutral"
-                        ? "Balanced buy/sell activity."
-                        : option === "pump"
-                          ? "Bias toward buy pressure."
-                          : "Bias toward sell pressure."}
-                    </span>
-                  </button>
-                ))}
-              </div>
+            ))}
+            <div className="text-xs text-muted-foreground">
+              Probability sum: {probabilitySum.toFixed(3)} (must be 1.000)
             </div>
           </CardContent>
         </Card>
@@ -518,11 +806,6 @@ export default function VolumeBotStartPage() {
                   {selectedTokenBalance.toFixed(4)} tokens
                 </div>
               </div>
-              {walletsExpanded ? (
-                <ChevronUp className="h-4 w-4" />
-              ) : (
-                <ChevronDown className="h-4 w-4" />
-              )}
             </button>
             <Button
               type="button"
@@ -534,9 +817,7 @@ export default function VolumeBotStartPage() {
                 try {
                   await Promise.all([
                     eligibleWalletsQuery.refetch(),
-                    strategy === "dump"
-                      ? selectionSummaryQuery.refetch()
-                      : Promise.resolve(),
+                    selectionSummaryQuery.refetch(),
                   ]);
                 } finally {
                   setIsRefreshingWallets(false);
@@ -590,19 +871,13 @@ export default function VolumeBotStartPage() {
                           {wallet.publicKey.slice(0, 8)}...
                           {wallet.publicKey.slice(-6)}
                         </div>
-                        <Badge variant="outline">{wallet.type}</Badge>
                       </div>
                       <div className="text-right text-muted-foreground">
                         <div>{wallet.tokenBalanceUi.toFixed(4)} tokens</div>
                         <div className="text-xs">
-                          {(() => {
-                            const solDisplay = formatSolEstimate(
-                              wallet.tokenBalanceSol
-                            );
-                            return solDisplay === "—"
-                              ? "—"
-                              : `~${solDisplay}`;
-                          })()}
+                          {wallet.tokenBalanceSol !== null
+                            ? `~${wallet.tokenBalanceSol.toFixed(3)} SOL`
+                            : "—"}
                         </div>
                       </div>
                     </label>
@@ -613,22 +888,12 @@ export default function VolumeBotStartPage() {
                 Wallet list hidden.
               </div>
             )}
-            {inlineWarning && (
-              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
-                Selected wallets can only sell ~
-                {selectionSummaryQuery.data?.estimatedNetSolOut.toFixed(2)} SOL.
-                The dump target will be capped to {targetApplied?.toFixed(2)}{" "}
-                SOL.
-              </div>
-            )}
           </CardContent>
         </Card>
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-primary text-xl">
-              Configuration
-            </CardTitle>
+            <CardTitle className="text-primary text-xl">Configuration</CardTitle>
           </CardHeader>
           <Separator />
           <CardContent className="space-y-6">
@@ -639,14 +904,10 @@ export default function VolumeBotStartPage() {
                   type="number"
                   min={0}
                   value={generatedWalletCount}
-                  onChange={(event) => {
-                    setGeneratedWalletCount(Number(event.target.value));
-                    markCustom();
-                  }}
+                  onChange={(event) =>
+                    setGeneratedWalletCount(Number(event.target.value))
+                  }
                 />
-                <p className="text-xs text-muted-foreground">
-                  New wallets created and funded for this run.
-                </p>
               </div>
               <div className="space-y-2">
                 <Label>Funding per generated wallet (SOL)</Label>
@@ -654,146 +915,49 @@ export default function VolumeBotStartPage() {
                   type="number"
                   min={0}
                   step={0.01}
-                  value={fundingPerWalletSol}
+                  value={fundingPerGeneratedWallet}
                   onChange={(event) => {
-                    setFundingPerWalletSol(Number(event.target.value));
-                    markCustom();
+                    setFundingPerGeneratedWallet(Number(event.target.value));
+                    setFundingTouched(true);
                   }}
                 />
-                <p className="text-xs text-muted-foreground">
-                  SOL sent from the main wallet to each generated wallet.
-                </p>
               </div>
-              {strategy !== "neutral" && (
-                <div className="space-y-2">
-                  <Label>Target net SOL ({strategy})</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    step={0.01}
-                    value={strategyTargetSol}
-                    onChange={(event) => {
-                      setStrategyTargetSol(Number(event.target.value));
-                      markCustom();
-                    }}
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Net SOL change from bot trades on the bonding curve.
-                  </p>
-                </div>
-              )}
               <div className="space-y-2">
-                <Label>Buy bias (%)</Label>
+                <Label>Top-up amount for selected wallets (SOL)</Label>
                 <Input
                   type="number"
                   min={0}
-                  max={100}
-                  step={1}
-                  value={buyBiasPct}
-                  onChange={(event) => {
-                    setBuyBiasPct(Number(event.target.value));
-                    markCustom();
-                  }}
+                  step={0.01}
+                  value={topUpAmount}
+                  onChange={(event) => setTopUpAmount(Number(event.target.value))}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Higher means more buys. Dump flips the bias toward sells.
-                </p>
               </div>
               <div className="space-y-2">
-                <Label>Trade variance (%)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  max={100}
-                  step={1}
-                  value={tradeVariancePct}
-                  onChange={(event) => {
-                    setTradeVariancePct(Number(event.target.value));
-                    markCustom();
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Random variance applied to trade size around the target.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Min trade (SOL)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.001}
-                  value={minTradeAmountSol}
-                  onChange={(event) => {
-                    setMinTradeAmountSol(Number(event.target.value));
-                    markCustom();
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Smallest trade size the bot will attempt.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Max trade (SOL)</Label>
-                <Input
-                  type="number"
-                  min={0}
-                  step={0.001}
-                  value={maxTradeAmountSol}
-                  onChange={(event) => {
-                    setMaxTradeAmountSol(Number(event.target.value));
-                    markCustom();
-                  }}
-                />
-                <p className="text-xs text-muted-foreground">
-                  Largest trade size the bot will attempt.
-                </p>
-              </div>
-              <div className="space-y-2">
-                <Label>Min interval (sec)</Label>
+                <Label>Duration (seconds)</Label>
                 <Input
                   type="number"
                   min={1}
-                  value={minIntervalSeconds}
-                  onChange={(event) => {
-                    setMinIntervalSeconds(Number(event.target.value));
-                    markCustom();
-                  }}
+                  value={targetDurationSeconds}
+                  onChange={(event) =>
+                    setTargetDurationSeconds(Number(event.target.value))
+                  }
                 />
-                <p className="text-xs text-muted-foreground">
-                  Shortest delay between wallet ticks.
-                </p>
               </div>
               <div className="space-y-2">
-                <Label>Max interval (sec)</Label>
+                <Label>Scheduled start (optional)</Label>
                 <Input
-                  type="number"
-                  min={1}
-                  value={maxIntervalSeconds}
-                  onChange={(event) => {
-                    setMaxIntervalSeconds(Number(event.target.value));
-                    markCustom();
-                  }}
+                  type="datetime-local"
+                  value={scheduledStartAt}
+                  onChange={(event) => setScheduledStartAt(event.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Longest delay between wallet ticks.
-                </p>
               </div>
               <div className="space-y-2">
-                <Label>Sell ratio</Label>
+                <Label>Scheduled stop (optional)</Label>
                 <Input
-                  type="number"
-                  min={0}
-                  max={1}
-                  step={0.1}
-                  value={sellRatio}
-                  onChange={(event) => {
-                    setSellRatio(Number(event.target.value));
-                    markCustom();
-                  }}
+                  type="datetime-local"
+                  value={scheduledStopAt}
+                  onChange={(event) => setScheduledStopAt(event.target.value)}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Portion of token balance sold on each sell action.
-                </p>
               </div>
               <div className="space-y-2">
                 <Label>Slippage (bps)</Label>
@@ -801,56 +965,41 @@ export default function VolumeBotStartPage() {
                   type="number"
                   min={0}
                   value={slippageBps}
-                  onChange={(event) => {
-                    setSlippageBps(Number(event.target.value));
-                    markCustom();
-                  }}
+                  onChange={(event) => setSlippageBps(Number(event.target.value))}
                 />
-                <p className="text-xs text-muted-foreground">
-                  Max price movement tolerated for trades.
-                </p>
               </div>
               <div className="space-y-2">
-                <Label>Duration</Label>
-                <Select
-                  value={durationPreset}
-                  onValueChange={(value) => {
-                    setDurationPreset(value);
-                    markCustom();
-                  }}
-                >
-                  <SelectTrigger className="w-full">
-                    <SelectValue placeholder="Select duration" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="300">5 minutes (300s)</SelectItem>
-                    <SelectItem value="900">15 minutes (900s)</SelectItem>
-                    <SelectItem value="3600">1 hour (3600s)</SelectItem>
-                    <SelectItem value="21600">6 hours (21600s)</SelectItem>
-                    <SelectItem value="86400">24 hours (86400s)</SelectItem>
-                    <SelectItem value="custom">Custom</SelectItem>
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  Total run duration before auto-stop.
-                </p>
-                {durationPreset === "custom" && (
-                  <Input
-                    type="number"
-                    min={60}
-                    step={1}
-                    value={customDurationSeconds}
-                    onChange={(event) => {
-                      setCustomDurationSeconds(Number(event.target.value));
-                      markCustom();
-                    }}
-                  />
-                )}
-                {durationPreset === "custom" && (
-                  <p className="text-xs text-muted-foreground">
-                    Custom duration in seconds.
-                  </p>
-                )}
+                <Label>Sell fallback ratio (0-1)</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={1}
+                  step={0.01}
+                  value={sellFallbackRatio}
+                  onChange={(event) =>
+                    setSellFallbackRatio(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Max slippage failures</Label>
+                <Input
+                  type="number"
+                  min={1}
+                  value={maxSlippageFailures}
+                  onChange={(event) =>
+                    setMaxSlippageFailures(Number(event.target.value))
+                  }
+                />
+              </div>
+              <div className="flex items-center gap-2 pt-6">
+                <Checkbox
+                  checked={pauseOnHighSlippage}
+                  onCheckedChange={(checked) =>
+                    setPauseOnHighSlippage(Boolean(checked))
+                  }
+                />
+                <Label>Pause wallets on high slippage</Label>
               </div>
             </div>
           </CardContent>
@@ -858,39 +1007,18 @@ export default function VolumeBotStartPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-primary text-xl">Preview</CardTitle>
+            <CardTitle className="text-primary text-xl">Preflight</CardTitle>
           </CardHeader>
           <Separator />
-          <CardContent className="space-y-6">
-            <div className="grid gap-4 md:grid-cols-2">
+          <CardContent className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <div className="text-xs text-muted-foreground">
-                  Total wallets
-                </div>
+                <div className="text-xs text-muted-foreground">Total wallets</div>
                 <div className="text-lg font-semibold">{totalWallets}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">
-                  Generated funding
-                </div>
-                <div className="text-lg font-semibold">
-                  {totalFunding.toFixed(2)} SOL
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">Trade range</div>
-                <div className="text-lg font-semibold">
-                  {minTradeAmountSol.toFixed(3)} -{" "}
-                  {maxTradeAmountSol.toFixed(3)} SOL
-                </div>
-              </div>
-              <div>
-                <div className="text-xs text-muted-foreground">
-                  Interval range
-                </div>
-                <div className="text-lg font-semibold">
-                  {minIntervalSeconds} - {maxIntervalSeconds} sec
-                </div>
+                <div className="text-xs text-muted-foreground">Net direction</div>
+                <div className="text-lg font-semibold">{netDirectionLabel}</div>
               </div>
               <div>
                 <div className="text-xs text-muted-foreground">Duration</div>
@@ -898,9 +1026,79 @@ export default function VolumeBotStartPage() {
                   {formatDuration(targetDurationSeconds)}
                 </div>
               </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Volume per minute
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(effectivePreflight?.volumePerMinute?.min)}-
+                  {formatNumber(effectivePreflight?.volumePerMinute?.max)} SOL
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">Total volume</div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(effectivePreflight?.totalVolume?.min)}-
+                  {formatNumber(effectivePreflight?.totalVolume?.max)} SOL
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Suggested funding
+                </div>
+                <div className="text-lg font-semibold">
+                  {suggestedFunding ? `${suggestedFunding.toFixed(2)} SOL` : "—"}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Estimated trades per wallet
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(effectivePreflight?.estimatedTradesPerWallet)}
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Avg trade size
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(effectivePreflight?.avgTradeSizeWeighted)} SOL
+                </div>
+              </div>
             </div>
+            {fundingBelowSuggested && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Funding per generated wallet is below the suggested amount.
+              </div>
+            )}
+            {selectionSummaryQuery.error && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                Preflight error: {selectionSummaryQuery.error.message}
+              </div>
+            )}
+            {sellWarning && (
+              <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                Selected wallets may not have sufficient tokens for configured
+                sell volume.
+              </div>
+            )}
+            {ranges.some((r) => r.intervalMin < 5) && (
+              <div className="rounded border border-blue-200 bg-blue-50 px-3 py-2 text-sm text-blue-900">
+                <strong>High-frequency mode:</strong> Intervals below 5s use
+                gRPC streaming. Max{" "}
+                {Math.floor(18 * Math.min(...ranges.map((r) => r.intervalMin)))}{" "}
+                wallets allowed.
+              </div>
+            )}
+            {netSolDirection < 0 && selectedWalletPublicKeys.length === 0 && (
+              <div className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-900">
+                Net sell sessions require wallets with token holdings.
+              </div>
+            )}
           </CardContent>
         </Card>
+
         <div className="flex items-center justify-end">
           <Button
             size="lg"
@@ -918,23 +1116,17 @@ export default function VolumeBotStartPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirm volume bot run</AlertDialogTitle>
             <AlertDialogDescription>
-              Review the target and wallet selection before starting.
+              Review the configuration before starting.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 text-sm">
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Strategy</span>
-              <span className="font-semibold capitalize">{strategy}</span>
+              <span className="text-muted-foreground">Ranges</span>
+              <span className="font-semibold">{ranges.length}</span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Selected wallets</span>
-              <span className="font-semibold">
-                {selectedWalletPublicKeys.length}
-              </span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Generated wallets</span>
-              <span className="font-semibold">{generatedWalletCount}</span>
+              <span className="text-muted-foreground">Total wallets</span>
+              <span className="font-semibold">{totalWallets}</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Duration</span>
@@ -942,33 +1134,18 @@ export default function VolumeBotStartPage() {
                 {formatDuration(targetDurationSeconds)}
               </span>
             </div>
-            {strategy !== "neutral" && (
-              <>
-                <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Target SOL</span>
-                  <span className="font-semibold">
-                    {strategyTargetSol.toFixed(2)}
-                  </span>
-                </div>
-                {strategy === "dump" && selectionSummaryQuery.data && (
-                  <div className="flex items-center justify-between">
-                    <span className="text-muted-foreground">
-                      Applied target
-                    </span>
-                    <span className="font-semibold">
-                      {selectionSummaryQuery.data.targetSolApplied?.toFixed(2)}
-                    </span>
-                  </div>
-                )}
-              </>
+            {scheduledStartAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Scheduled start</span>
+                <span className="font-semibold">{scheduledStartAt}</span>
+              </div>
             )}
-            {strategy === "dump" &&
-              selectionSummaryQuery.data?.insufficient && (
-                <div className="rounded border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                  Selected wallets cannot cover the target. The run will cap to{" "}
-                  {selectionSummaryQuery.data.targetSolApplied?.toFixed(2)} SOL.
-                </div>
-              )}
+            {scheduledStopAt && (
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Scheduled stop</span>
+                <span className="font-semibold">{scheduledStopAt}</span>
+              </div>
+            )}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

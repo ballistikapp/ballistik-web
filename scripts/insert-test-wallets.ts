@@ -9,7 +9,10 @@ import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { WalletType } from "../lib/generated/prisma/enums";
 
-dotenv.config({ path: join(process.cwd(), ".env.development.local") });
+dotenv.config({
+  path: join(process.cwd(), ".env.development.local"),
+  quiet: true,
+});
 
 const connectionString =
   process.env.PROD_STORAGE_POSTGRES_URL || process.env.DEV_STORAGE_POSTGRES_URL;

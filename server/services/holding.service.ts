@@ -407,7 +407,9 @@ export const holdingService = {
       },
     });
     const mainWalletKeypair = mainWalletRecord?.mainWallet?.privateKey
-      ? Keypair.fromSecretKey(bs58.decode(mainWalletRecord.mainWallet.privateKey))
+      ? Keypair.fromSecretKey(
+          bs58.decode(mainWalletRecord.mainWallet.privateKey)
+        )
       : null;
 
     const results = await Promise.all(
@@ -449,11 +451,25 @@ export const holdingService = {
             new BN(sellAmount.toString()),
             new BN(0)
           );
-          tx.feePayer = seller.publicKey;
+          const feePayer =
+            mainWalletKeypair &&
+            mainWalletKeypair.publicKey.toBase58() !==
+              seller.publicKey.toBase58()
+              ? mainWalletKeypair
+              : seller;
+          const { blockhash, lastValidBlockHeight } =
+            await connection.getLatestBlockhash("confirmed");
+          tx.recentBlockhash = blockhash;
+          tx.lastValidBlockHeight = lastValidBlockHeight;
+          tx.feePayer = feePayer.publicKey;
+          const signers =
+            feePayer.publicKey.toBase58() === seller.publicKey.toBase58()
+              ? [seller]
+              : [feePayer, seller];
           const signature = await sendAndConfirmTransaction(
             connection,
             tx,
-            [seller],
+            signers,
             { commitment: "confirmed" }
           );
 
@@ -517,11 +533,7 @@ export const holdingService = {
             }
 
             const closeTx = new Transaction().add(
-              createCloseAccountInstruction(
-                ata,
-                destination,
-                owner.publicKey
-              )
+              createCloseAccountInstruction(ata, destination, owner.publicKey)
             );
             const { blockhash, lastValidBlockHeight } =
               await connection.getLatestBlockhash("confirmed");

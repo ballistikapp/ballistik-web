@@ -3,6 +3,7 @@ import bs58 from "bs58";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
 import { prisma } from "@/lib/prisma";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
+import { rpcConfig } from "@/lib/config/rpc.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
 import type {
@@ -21,89 +22,238 @@ import {
 } from "@/server/services/volume-bot-worker";
 import { volumeBotTimer } from "@/server/services/volume-bot-timer";
 import { walletService } from "@/server/services/wallet.service";
-import { computeSellQuote, fetchPumpQuoteState } from "@/server/solana/pump-quotes";
+import {
+  computeSellQuote,
+  fetchPumpQuoteState,
+} from "@/server/solana/pump-quotes";
 
-const validateConfig = (
-  config: VolumeBotConfigInput,
-  scheduledStopAt: Date | undefined,
+const clampNumber = (value: number, min: number, max: number) =>
+  Math.min(Math.max(value, min), max);
+
+const getAverageRangeAmount = (range: VolumeBotConfigInput["ranges"][number]) =>
+  (range.solMin + range.solMax) / 2;
+
+const getAverageRangeInterval = (
+  range: VolumeBotConfigInput["ranges"][number]
+) => (range.intervalMin + range.intervalMax) / 2;
+
+const getRangeSellProbability = (
+  range: VolumeBotConfigInput["ranges"][number]
+) => {
+  if (range.direction === "buy") {
+    return 0;
+  }
+  if (range.direction === "sell") {
+    return 1;
+  }
+  return 1 - (range.buyProbability ?? 0);
+};
+
+const computeNetSolDirection = (ranges: VolumeBotConfigInput["ranges"]) => {
+  return ranges.reduce((sum, range) => {
+    const avgAmount = getAverageRangeAmount(range);
+    if (range.direction === "buy") {
+      return sum + range.probability * avgAmount;
+    }
+    if (range.direction === "sell") {
+      return sum - range.probability * avgAmount;
+    }
+    const buyProbability = range.buyProbability ?? 0;
+    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+  }, 0);
+};
+
+const computeNetSolRangePerTrade = (ranges: VolumeBotConfigInput["ranges"]) => {
+  let minNetSol = 0;
+  let maxNetSol = 0;
+  for (const range of ranges) {
+    if (range.direction === "buy") {
+      minNetSol += range.probability * range.solMin;
+      maxNetSol += range.probability * range.solMax;
+    } else if (range.direction === "sell") {
+      minNetSol -= range.probability * range.solMax;
+      maxNetSol -= range.probability * range.solMin;
+    } else {
+      const buyProbability = range.buyProbability ?? 0;
+      const sellProbability = 1 - buyProbability;
+      minNetSol +=
+        range.probability *
+        (buyProbability * range.solMin - sellProbability * range.solMax);
+      maxNetSol +=
+        range.probability *
+        (buyProbability * range.solMax - sellProbability * range.solMin);
+    }
+  }
+  return { min: minNetSol, max: maxNetSol };
+};
+
+const computeNetSolRanges = (
+  ranges: VolumeBotConfigInput["ranges"],
+  totalWalletCount: number,
+  targetDurationSeconds: number
+) => {
+  const netSolPerTrade = computeNetSolRangePerTrade(ranges);
+  const avgInterval = computeWeightedInterval(ranges);
+  if (!Number.isFinite(avgInterval) || avgInterval <= 0) {
+    return {
+      perMinute: { min: 0, max: 0 },
+      total: { min: 0, max: 0 },
+    };
+  }
+  const tradesPerMinutePerWallet = 60 / avgInterval;
+  const tradesPerMinute = tradesPerMinutePerWallet * totalWalletCount;
+  const minutes = targetDurationSeconds / 60;
+  return {
+    perMinute: {
+      min: netSolPerTrade.min * tradesPerMinute,
+      max: netSolPerTrade.max * tradesPerMinute,
+    },
+    total: {
+      min: netSolPerTrade.min * tradesPerMinute * minutes,
+      max: netSolPerTrade.max * tradesPerMinute * minutes,
+    },
+  };
+};
+
+const computeWeightedInterval = (ranges: VolumeBotConfigInput["ranges"]) =>
+  ranges.reduce(
+    (sum, range) => sum + range.probability * getAverageRangeInterval(range),
+    0
+  );
+
+const computeWeightedTradeSize = (ranges: VolumeBotConfigInput["ranges"]) =>
+  ranges.reduce(
+    (sum, range) => sum + range.probability * getAverageRangeAmount(range),
+    0
+  );
+
+const computeEstimatedTradesPerWallet = (
+  ranges: VolumeBotConfigInput["ranges"],
+  targetDurationSeconds: number
+) => {
+  const avgIntervalWeighted = computeWeightedInterval(ranges);
+  if (!Number.isFinite(avgIntervalWeighted) || avgIntervalWeighted <= 0) {
+    return 0;
+  }
+  return targetDurationSeconds / avgIntervalWeighted;
+};
+
+const computeVolumeEstimates = (
+  ranges: VolumeBotConfigInput["ranges"],
+  totalWalletCount: number,
+  targetDurationSeconds: number
+) => {
+  let minPerMinute = 0;
+  let maxPerMinute = 0;
+  for (const range of ranges) {
+    minPerMinute +=
+      ((range.solMin * 60) / range.intervalMax) *
+      range.probability *
+      totalWalletCount;
+    maxPerMinute +=
+      ((range.solMax * 60) / range.intervalMin) *
+      range.probability *
+      totalWalletCount;
+  }
+  const minutes = targetDurationSeconds / 60;
+  return {
+    perMinute: { min: minPerMinute, max: maxPerMinute },
+    total: { min: minPerMinute * minutes, max: maxPerMinute * minutes },
+  };
+};
+
+const computeSuggestedFunding = (
+  ranges: VolumeBotConfigInput["ranges"],
+  totalWalletCount: number,
+  targetDurationSeconds: number
+) => {
+  const avgIntervalWeighted = computeWeightedInterval(ranges);
+  const estimatedTradesPerWallet = computeEstimatedTradesPerWallet(
+    ranges,
+    targetDurationSeconds
+  );
+  const avgTradeSizeWeighted = computeWeightedTradeSize(ranges);
+  const netSolDirection = computeNetSolDirection(ranges);
+  const totalExpectedVolume =
+    estimatedTradesPerWallet * avgTradeSizeWeighted * totalWalletCount;
+  const bufferMultiplier =
+    netSolDirection > 0 && totalExpectedVolume > 0
+      ? clampNumber(1 + netSolDirection / totalExpectedVolume, 1, 2)
+      : 1;
+  const baseFunding = estimatedTradesPerWallet * avgTradeSizeWeighted;
+  const suggestedFunding =
+    Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100;
+  return {
+    avgIntervalWeighted,
+    avgTradeSizeWeighted,
+    estimatedTradesPerWallet,
+    netSolDirection,
+    totalExpectedVolume,
+    bufferMultiplier,
+    baseFunding,
+    suggestedFunding,
+  };
+};
+
+const computeEstimatedSellVolume = (
+  ranges: VolumeBotConfigInput["ranges"],
+  estimatedTradesPerWallet: number,
   totalWalletCount: number
 ) => {
+  const sellVolumePerTrade = ranges.reduce((sum, range) => {
+    const avgAmount = getAverageRangeAmount(range);
+    const sellProbability = getRangeSellProbability(range);
+    return sum + range.probability * sellProbability * avgAmount;
+  }, 0);
+  return sellVolumePerTrade * estimatedTradesPerWallet * totalWalletCount;
+};
+
+const validateSchedule = (
+  config: VolumeBotConfigInput,
+  scheduledStartAt?: Date,
+  scheduledStopAt?: Date
+) => {
   const limits = getVolumeBotConfig();
-  if (totalWalletCount < limits.minWallets || totalWalletCount > limits.maxWallets) {
-    throw new AppError("Wallet count out of bounds", 400);
+  if (scheduledStartAt) {
+    const delayMs = scheduledStartAt.getTime() - Date.now();
+    if (delayMs <= 0) {
+      throw new AppError("Scheduled start time must be in the future", 400);
+    }
+    if (delayMs > 30 * 24 * 60 * 60 * 1000) {
+      throw new AppError("Scheduled start must be within 30 days", 400);
+    }
   }
-  if (config.fundingPerWalletSol < limits.minFundingPerWalletSol) {
-    throw new AppError("Funding per wallet too low", 400);
-  }
-  if (config.minTradeAmountSol > config.maxTradeAmountSol) {
-    throw new AppError("Min trade amount exceeds max trade amount", 400);
-  }
-  if (config.minIntervalSeconds > config.maxIntervalSeconds) {
-    throw new AppError("Min interval exceeds max interval", 400);
-  }
-  if (config.strategy !== "neutral" && !config.strategyTargetSol) {
-    throw new AppError("Target SOL amount required for pump/dump", 400);
-  }
-  if (!config.targetDurationSeconds && !config.targetDurationHours && !scheduledStopAt) {
-    throw new AppError(
-      "Duration limit required: set targetDurationSeconds or scheduledStopAt",
-      400
-    );
-  }
-  const targetDurationSeconds =
-    config.targetDurationSeconds ??
-    (config.targetDurationHours ? config.targetDurationHours * 60 * 60 : undefined);
-  if (
-    targetDurationSeconds &&
-    targetDurationSeconds > limits.maxDurationSeconds
-  ) {
-    const maxHours = limits.maxDurationHours;
-    throw new AppError(
-      `Duration exceeds maximum of ${maxHours} hours`,
-      400
-    );
-  }
+  const effectiveStart = scheduledStartAt ?? new Date();
   if (scheduledStopAt) {
-    const durationMs = scheduledStopAt.getTime() - Date.now();
-    const durationHours = durationMs / (1000 * 60 * 60);
-    if (durationHours > limits.maxDurationHours) {
+    const durationMs = scheduledStopAt.getTime() - effectiveStart.getTime();
+    if (durationMs <= 0) {
+      throw new AppError("Scheduled stop must be after start time", 400);
+    }
+    if (durationMs > limits.maxDurationSeconds * 1000) {
       throw new AppError(
         `Scheduled stop exceeds maximum duration of ${limits.maxDurationHours} hours`,
         400
       );
     }
-    if (durationHours <= 0) {
-      throw new AppError("Scheduled stop time must be in the future", 400);
-    }
+  }
+  if (config.targetDurationSeconds > limits.maxDurationSeconds) {
+    throw new AppError(
+      `Duration exceeds maximum of ${limits.maxDurationHours} hours`,
+      400
+    );
   }
 };
 
 const resolveScheduledStopAt = (
   config: VolumeBotConfigInput,
+  scheduledStartAt: Date | null,
   scheduledStopAt?: Date
 ) => {
   if (scheduledStopAt) {
     return scheduledStopAt;
   }
-  if (config.targetDurationSeconds) {
-    return new Date(Date.now() + config.targetDurationSeconds * 1000);
-  }
-  if (config.targetDurationHours) {
-    return new Date(Date.now() + config.targetDurationHours * 60 * 60 * 1000);
-  }
-  return null;
-};
-
-const FEE_BUFFER_SOL = 0.003;
-
-const randomBetween = (min: number, max: number) =>
-  Math.random() * (max - min) + min;
-
-const computeNextTickAt = (config: VolumeBotConfigInput) => {
-  const delaySeconds = Math.floor(
-    randomBetween(config.minIntervalSeconds, config.maxIntervalSeconds)
-  );
-  return new Date(Date.now() + delaySeconds * 1000);
+  const startAt = scheduledStartAt ?? new Date();
+  return new Date(startAt.getTime() + config.targetDurationSeconds * 1000);
 };
 
 const quotePayer = Keypair.generate();
@@ -122,19 +272,22 @@ const formatTokenBalance = (raw: bigint, decimals: number) => {
   const base = BigInt(10) ** BigInt(decimals);
   const integer = raw / base;
   const fraction = raw % base;
-  const fractionStr = fraction
-    .toString()
-    .padStart(decimals, "0")
-    .slice(0, 6);
+  const fractionStr = fraction.toString().padStart(decimals, "0").slice(0, 6);
   return Number(`${integer.toString()}.${fractionStr}`);
 };
+
+const RPC_BATCH_SIZE = rpcConfig.tuning.solBalanceBatchSize;
+const RPC_BATCH_CONCURRENCY = rpcConfig.tuning.tokenBalanceConcurrency;
 
 const fetchTokenBalances = async (
   mintPublicKey: PublicKey,
   walletPublicKeys: string[]
 ) => {
   if (walletPublicKeys.length === 0) {
-    return { balances: [], tokenDecimals: await getMintDecimals(mintPublicKey) };
+    return {
+      balances: [],
+      tokenDecimals: await getMintDecimals(mintPublicKey),
+    };
   }
   const connection = getSolanaConnection();
   const tokenDecimals = await getMintDecimals(mintPublicKey);
@@ -143,10 +296,36 @@ const fetchTokenBalances = async (
       getAssociatedTokenAddress(mintPublicKey, new PublicKey(walletPublicKey))
     )
   );
-  const accountInfos = await connection.getMultipleParsedAccounts(atas);
+
+  const batches: PublicKey[][] = [];
+  for (let i = 0; i < atas.length; i += RPC_BATCH_SIZE) {
+    batches.push(atas.slice(i, i + RPC_BATCH_SIZE));
+  }
+
+  const allAccountInfos: (
+    | Awaited<
+        ReturnType<typeof connection.getMultipleParsedAccounts>
+      >["value"][number]
+    | null
+  )[] = new Array(atas.length).fill(null);
+
+  for (let i = 0; i < batches.length; i += RPC_BATCH_CONCURRENCY) {
+    const concurrentBatches = batches.slice(i, i + RPC_BATCH_CONCURRENCY);
+    const results = await Promise.all(
+      concurrentBatches.map((batch) =>
+        connection.getMultipleParsedAccounts(batch)
+      )
+    );
+    let offset = i * RPC_BATCH_SIZE;
+    for (const result of results) {
+      for (const accountInfo of result.value) {
+        allAccountInfos[offset++] = accountInfo;
+      }
+    }
+  }
 
   const balances = walletPublicKeys.map((walletPublicKey, index) => {
-    const accountInfo = accountInfos.value[index];
+    const accountInfo = allAccountInfos[index];
     let raw = BigInt(0);
     let decimals = tokenDecimals;
     if (accountInfo?.data && "parsed" in accountInfo.data) {
@@ -206,9 +385,9 @@ const resolveEligibleWallets = async (
   ]);
 
   const mainWalletPublicKey = user?.mainWalletPublicKey ?? null;
-  const wallets = [
-    ...operationalWallets,
-  ].filter((wallet) => wallet.publicKey !== mainWalletPublicKey);
+  const wallets = [...operationalWallets].filter(
+    (wallet) => wallet.publicKey !== mainWalletPublicKey
+  );
 
   return { token, wallets };
 };
@@ -224,7 +403,7 @@ export const volumeBotService = {
       where: {
         userId,
         tokenPublicKey: token.publicKey,
-        status: { in: ["RUNNING", "STOP_REQUESTED", "STOPPING"] },
+        status: { in: ["SCHEDULED", "RUNNING", "STOP_REQUESTED", "STOPPING"] },
       },
       select: { id: true },
     });
@@ -234,36 +413,47 @@ export const volumeBotService = {
     }
 
     const selectedWalletPublicKeys = Array.from(
-      new Set(input.config.selectedWalletPublicKeys ?? [])
+      new Set(input.config.walletConfig.selectedWalletPublicKeys ?? [])
     );
     const selectedWallets = eligibleWallets.filter((wallet) =>
       selectedWalletPublicKeys.includes(wallet.publicKey)
     );
     if (selectedWalletPublicKeys.length !== selectedWallets.length) {
-      throw new AppError("Selected wallets are not eligible for this token", 400);
+      throw new AppError(
+        "Selected wallets are not eligible for this token",
+        400
+      );
     }
     const missingKey = selectedWallets.find((wallet) => !wallet.privateKey);
     if (missingKey) {
       throw new AppError("Selected wallet is missing a private key", 400);
     }
-    if (input.config.strategy === "dump" && selectedWallets.length === 0) {
-      throw new AppError("Select wallets for dump strategy", 400);
-    }
-
     const totalWalletCount =
-      selectedWallets.length + input.config.generatedWalletCount;
-    validateConfig(input.config, input.scheduledStopAt, totalWalletCount);
-    const scheduledStopAt = resolveScheduledStopAt(
+      selectedWallets.length + input.config.walletConfig.generatedWalletCount;
+    validateSchedule(
       input.config,
+      input.scheduledStartAt,
       input.scheduledStopAt
     );
-
-    const keypairs = Array.from({ length: input.config.generatedWalletCount }, () =>
-      Keypair.generate()
+    const scheduledStartAt = input.scheduledStartAt ?? null;
+    const scheduledStopAt = resolveScheduledStopAt(
+      input.config,
+      scheduledStartAt,
+      input.scheduledStopAt
     );
     const now = new Date();
-    let targetSolApplied = input.config.strategyTargetSol ?? 0;
-    if (input.config.strategy === "dump" && targetSolApplied > 0) {
+    const isScheduled = scheduledStartAt ? scheduledStartAt > now : false;
+    const status = isScheduled ? "SCHEDULED" : "RUNNING";
+    const startedAt = isScheduled ? null : now;
+
+    const netSolDirection = computeNetSolDirection(input.config.ranges);
+    if (netSolDirection < 0) {
+      if (selectedWallets.length === 0) {
+        throw new AppError(
+          "Net sell sessions require wallets with token holdings",
+          400
+        );
+      }
       const mintPublicKey = new PublicKey(token.publicKey);
       const { balances } = await fetchTokenBalances(
         mintPublicKey,
@@ -273,23 +463,26 @@ export const volumeBotService = {
         (sum, balance) => sum + balance.tokenBalanceRaw,
         BigInt(0)
       );
-      try {
-        const quoteState = await fetchPumpQuoteState(mintPublicKey, quotePayer);
-        const { netSolOut } = computeSellQuote(quoteState, totalTokenRaw);
-        const maxNetSolOutSol = Number(netSolOut) / 1_000_000_000;
-        targetSolApplied = Math.min(targetSolApplied, maxNetSolOutSol);
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        console.warn(`[VolumeBot] Target cap quote failed: ${message}`);
+      if (totalTokenRaw === BigInt(0)) {
+        throw new AppError(
+          "Net sell sessions require wallets with token holdings",
+          400
+        );
       }
     }
+
+    const keypairs = Array.from(
+      { length: input.config.walletConfig.generatedWalletCount },
+      () => Keypair.generate()
+    );
 
     const session = await prisma.$transaction(async (tx) => {
       const configSnapshot = {
         ...input.config,
-        selectedWalletPublicKeys,
-        generatedWalletCount: input.config.generatedWalletCount,
-        targetSolApplied,
+        walletConfig: {
+          ...input.config.walletConfig,
+          selectedWalletPublicKeys,
+        },
       };
       console.log("[VolumeBot] Starting session", {
         tokenPublicKey: token.publicKey,
@@ -299,15 +492,17 @@ export const volumeBotService = {
           selectedWalletCount: selectedWallets.length,
           generatedWalletCount: keypairs.length,
         },
+        scheduledStartAt,
         scheduledStopAt,
       });
       const createdSession = await tx.volumeBotSession.create({
         data: {
           userId,
           tokenPublicKey: token.publicKey,
-          status: "RUNNING",
+          status,
           config: configSnapshot,
-          startedAt: now,
+          scheduledStartAt,
+          startedAt,
           scheduledStopAt,
         },
       });
@@ -329,7 +524,7 @@ export const volumeBotService = {
           data: selectedWallets.map((wallet) => ({
             sessionId: createdSession.id,
             walletPublicKey: wallet.publicKey,
-            nextTickAt: computeNextTickAt(input.config),
+            nextTickAt: null,
           })),
         });
       }
@@ -339,7 +534,7 @@ export const volumeBotService = {
           data: keypairs.map((keypair) => ({
             sessionId: createdSession.id,
             walletPublicKey: keypair.publicKey.toBase58(),
-            nextTickAt: computeNextTickAt(input.config),
+            nextTickAt: null,
           })),
         });
       }
@@ -347,62 +542,74 @@ export const volumeBotService = {
       return createdSession;
     });
 
-    const walletPublicKeys = keypairs.map((keypair) =>
-      keypair.publicKey.toBase58()
-    );
-    const fundingAmountSol = Math.max(
-      input.config.fundingPerWalletSol + FEE_BUFFER_SOL,
-      FEE_BUFFER_SOL
-    );
-
-    try {
-      if (walletPublicKeys.length > 0) {
-        await walletService.sendSolFromMainWallet(
-          token.publicKey,
-          userId,
-          walletPublicKeys,
-          fundingAmountSol
-        );
+    if (status === "RUNNING") {
+      const walletPublicKeys = keypairs.map((keypair) =>
+        keypair.publicKey.toBase58()
+      );
+      const fundingAmountSol = Math.max(
+        input.config.walletConfig.fundingPerGeneratedWallet,
+        0
+      );
+      try {
+        if (walletPublicKeys.length > 0) {
+          console.log(
+            `[VolumeBot] Funding ${walletPublicKeys.length} generated wallets with ${fundingAmountSol} SOL`
+          );
+          await walletService.sendSolFromMainWallet(
+            token.publicKey,
+            userId,
+            walletPublicKeys,
+            fundingAmountSol
+          );
+        }
+        if (selectedWallets.length > 0) {
+          const connection = getSolanaConnection();
+          await Promise.all(
+            selectedWallets.map(async (wallet) => {
+              const balanceLamports = await connection.getBalance(
+                new PublicKey(wallet.publicKey)
+              );
+              const balanceSol = balanceLamports / 1_000_000_000;
+              if (balanceSol >= input.config.walletConfig.topUpAmount) {
+                console.log(
+                  `[VolumeBot] Wallet ${wallet.publicKey} has sufficient balance (${balanceSol} SOL)`
+                );
+                return;
+              }
+              const topUpSol =
+                input.config.walletConfig.topUpAmount - balanceSol;
+              if (topUpSol <= 0) {
+                return;
+              }
+              console.log(
+                `[VolumeBot] Topping up wallet ${wallet.publicKey} by ${topUpSol} SOL`
+              );
+              await walletService.sendSolFromMainWallet(
+                token.publicKey,
+                userId,
+                [wallet.publicKey],
+                topUpSol
+              );
+            })
+          );
+        }
+      } catch (error) {
+        await prisma.volumeBotSession.update({
+          where: { id: session.id },
+          data: { status: "FAILED", stoppedAt: new Date() },
+        });
+        const message = error instanceof Error ? error.message : String(error);
+        throw new AppError(message, 500);
       }
-      if (selectedWallets.length > 0) {
-        const connection = getSolanaConnection();
-        await Promise.all(
-          selectedWallets.map(async (wallet) => {
-            const balanceLamports = await connection.getBalance(
-              new PublicKey(wallet.publicKey)
-            );
-            const balanceSol = balanceLamports / 1_000_000_000;
-            if (balanceSol >= FEE_BUFFER_SOL) {
-              return;
-            }
-            const topUpSol = FEE_BUFFER_SOL - balanceSol;
-            if (topUpSol <= 0) {
-              return;
-            }
-            await walletService.sendSolFromMainWallet(
-              token.publicKey,
-              userId,
-              [wallet.publicKey],
-              topUpSol
-            );
-          })
-        );
-      }
-    } catch (error) {
-      await prisma.volumeBotSession.update({
-        where: { id: session.id },
-        data: { status: "FAILED", stoppedAt: new Date() },
-      });
-      const message = error instanceof Error ? error.message : String(error);
-      throw new AppError(message, 500);
     }
 
     await volumeBotTimer.scheduleSession(session.id);
     return {
       sessionId: session.id,
-      targetSolApplied,
       selectedWalletCount: selectedWallets.length,
       generatedWalletCount: keypairs.length,
+      scheduledStartAt,
+      scheduledStopAt,
     };
   },
 
@@ -415,7 +622,9 @@ export const volumeBotService = {
       where: {
         userId,
         ...(input.sessionId ? { id: input.sessionId } : {}),
-        ...(input.tokenPublicKey ? { tokenPublicKey: input.tokenPublicKey } : {}),
+        ...(input.tokenPublicKey
+          ? { tokenPublicKey: input.tokenPublicKey }
+          : {}),
       },
       orderBy: { createdAt: "desc" },
       include: {
@@ -456,10 +665,14 @@ export const volumeBotService = {
     if (!session) {
       throw new AppError("Volume bot session not found", 404);
     }
-    console.log(`[VolumeBot] Session ${sessionId} current status: ${session.status}`);
-    
+    console.log(
+      `[VolumeBot] Session ${sessionId} current status: ${session.status}`
+    );
+
     if (["STOPPED", "FAILED"].includes(session.status)) {
-      console.log(`[VolumeBot] Session ${sessionId} already completed, skipping`);
+      console.log(
+        `[VolumeBot] Session ${sessionId} already completed, skipping`
+      );
       return { sessionId: session.id };
     }
 
@@ -470,19 +683,28 @@ export const volumeBotService = {
       });
       console.log(`[VolumeBot] Session ${sessionId} marked as STOP_REQUESTED`);
     } else {
-      console.log(`[VolumeBot] Session ${sessionId} already stopping, retrying stop`);
+      console.log(
+        `[VolumeBot] Session ${sessionId} already stopping, retrying stop`
+      );
     }
 
-    console.log(`[VolumeBot] Calling volumeBotTimer.requestStop for ${sessionId}`);
+    console.log(
+      `[VolumeBot] Calling volumeBotTimer.requestStop for ${sessionId}`
+    );
     volumeBotTimer
       .requestStop(session.id)
       .then(() => {
-        console.log(`[VolumeBot] requestStop promise resolved for ${sessionId}`);
+        console.log(
+          `[VolumeBot] requestStop promise resolved for ${sessionId}`
+        );
       })
       .catch((error) => {
-        console.error(`[VolumeBot] requestStop failed for ${session.id}:`, error);
+        console.error(
+          `[VolumeBot] requestStop failed for ${session.id}:`,
+          error
+        );
       });
-    
+
     return { sessionId: session.id };
   },
 
@@ -514,25 +736,34 @@ export const volumeBotService = {
     return await prisma.volumeBotSession.findMany({
       where: {
         userId,
-        ...(input.tokenPublicKey ? { tokenPublicKey: input.tokenPublicKey } : {}),
+        ...(input.tokenPublicKey
+          ? { tokenPublicKey: input.tokenPublicKey }
+          : {}),
       },
       orderBy: { createdAt: "desc" },
       take: input.limit,
     });
   },
 
-  async listEligibleWallets(input: VolumeBotEligibleWalletsInput, userId: string) {
+  async listEligibleWallets(
+    input: VolumeBotEligibleWalletsInput,
+    userId: string
+  ) {
     const { token, wallets } = await resolveEligibleWallets(
       input.tokenPublicKey,
       userId
     );
     const walletPublicKeys = wallets.map((wallet) => wallet.publicKey);
     const mintPublicKey = new PublicKey(token.publicKey);
-    const { balances } = await fetchTokenBalances(mintPublicKey, walletPublicKeys);
+    const { balances } = await fetchTokenBalances(
+      mintPublicKey,
+      walletPublicKeys
+    );
     const balanceMap = new Map(
       balances.map((balance) => [balance.walletPublicKey, balance])
     );
-    let quoteState: Awaited<ReturnType<typeof fetchPumpQuoteState>> | null = null;
+    let quoteState: Awaited<ReturnType<typeof fetchPumpQuoteState>> | null =
+      null;
     try {
       quoteState = await fetchPumpQuoteState(mintPublicKey, quotePayer);
     } catch (error) {
@@ -587,67 +818,118 @@ export const volumeBotService = {
       input.tokenPublicKey,
       userId
     );
-    const selectedWallets = wallets.filter((wallet) =>
-      input.selectedWalletPublicKeys.includes(wallet.publicKey)
+    const selectedWalletPublicKeys = Array.from(
+      new Set(input.config.walletConfig.selectedWalletPublicKeys ?? [])
     );
-    if (input.selectedWalletPublicKeys.length !== selectedWallets.length) {
-      throw new AppError("Selected wallets are not eligible for this token", 400);
+    const selectedWallets = wallets.filter((wallet) =>
+      selectedWalletPublicKeys.includes(wallet.publicKey)
+    );
+    if (selectedWalletPublicKeys.length !== selectedWallets.length) {
+      throw new AppError(
+        "Selected wallets are not eligible for this token",
+        400
+      );
     }
     const mintPublicKey = new PublicKey(token.publicKey);
-    const { balances, tokenDecimals } = await fetchTokenBalances(
-      mintPublicKey,
-      input.selectedWalletPublicKeys
+    let balances: Awaited<ReturnType<typeof fetchTokenBalances>>["balances"] =
+      [];
+    let tokenDecimals = 0;
+    try {
+      const tokenData = await fetchTokenBalances(
+        mintPublicKey,
+        selectedWalletPublicKeys
+      );
+      balances = tokenData.balances;
+      tokenDecimals = tokenData.tokenDecimals;
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(`[VolumeBot] Failed to fetch token balances: ${message}`);
+    }
+
+    const totalWalletCount =
+      input.config.walletConfig.generatedWalletCount +
+      selectedWalletPublicKeys.length;
+    const netSolDirection = computeNetSolDirection(input.config.ranges);
+    const hasSellRanges = input.config.ranges.some(
+      (range) => range.direction !== "buy"
     );
-    const totalTokenRaw = balances.reduce(
-      (sum, balance) => sum + balance.tokenBalanceRaw,
-      BigInt(0)
+    const fundingMetrics = computeSuggestedFunding(
+      input.config.ranges,
+      totalWalletCount,
+      input.config.targetDurationSeconds
     );
-    const totalTokenUi = balances.reduce(
-      (sum, balance) => sum + balance.tokenBalanceUi,
-      0
+    const volumeEstimates = computeVolumeEstimates(
+      input.config.ranges,
+      totalWalletCount,
+      input.config.targetDurationSeconds
     );
-    let maxNetSolOutSol = 0;
+    const netSolRanges = computeNetSolRanges(
+      input.config.ranges,
+      totalWalletCount,
+      input.config.targetDurationSeconds
+    );
+    const estimatedSellVolume = computeEstimatedSellVolume(
+      input.config.ranges,
+      fundingMetrics.estimatedTradesPerWallet,
+      totalWalletCount
+    );
+
+    let totalSellableValue = 0;
     let priceUnavailable = false;
     try {
       const quoteState = await fetchPumpQuoteState(mintPublicKey, quotePayer);
-      const { netSolOut } = computeSellQuote(quoteState, totalTokenRaw);
-      maxNetSolOutSol = Number(netSolOut) / 1_000_000_000;
+      const priceLamportsPerToken =
+        Number(quoteState.virtualSolReserves) /
+        Number(quoteState.virtualTokenReserves);
+      for (const balance of balances) {
+        const { netSolOut } = computeSellQuote(
+          quoteState,
+          balance.tokenBalanceRaw
+        );
+        let tokenBalanceSol = Number(netSolOut) / 1_000_000_000;
+        if (
+          tokenBalanceSol === 0 &&
+          balance.tokenBalanceRaw > BigInt(0) &&
+          Number.isFinite(priceLamportsPerToken)
+        ) {
+          tokenBalanceSol =
+            (balance.tokenBalanceUi * priceLamportsPerToken) / 1_000_000_000;
+        }
+        totalSellableValue += tokenBalanceSol;
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[VolumeBot] Selection quote failed: ${message}`);
       priceUnavailable = true;
     }
-    const targetSol = input.targetSol ?? null;
-    const targetSolApplied =
-      input.strategy === "dump" && targetSol !== null && !priceUnavailable
-        ? Math.min(targetSol, maxNetSolOutSol)
-        : targetSol;
-    const insufficient =
-      input.strategy === "dump" &&
-      targetSol !== null &&
+    const sellWarning =
+      hasSellRanges &&
+      netSolDirection >= 0 &&
       !priceUnavailable &&
-      targetSol > maxNetSolOutSol;
+      totalSellableValue > 0 &&
+      estimatedSellVolume > totalSellableValue * 0.5;
 
     return {
       token,
-      selectedWallets: balances.map((balance) => {
-        const wallet = selectedWallets.find(
-          (item) => item.publicKey === balance.walletPublicKey
-        );
-        return {
-          publicKey: balance.walletPublicKey,
-          type: wallet?.type ?? "VOLUME",
-          tokenBalanceUi: balance.tokenBalanceUi,
-          tokenBalanceRaw: balance.tokenBalanceRaw.toString(),
-          tokenDecimals: balance.tokenDecimals,
-        };
-      }),
-      totalTokenUi,
       tokenDecimals,
-      estimatedNetSolOut: maxNetSolOutSol,
-      targetSol,
-      targetSolApplied,
-      insufficient,
+      selectedWalletCount: selectedWallets.length,
+      totalWalletCount,
+      netSolDirection,
+      netSolRangePerMinute: netSolRanges.perMinute,
+      netSolRangeTotal: netSolRanges.total,
+      hasSellRanges,
+      volumePerMinute: volumeEstimates.perMinute,
+      totalVolume: volumeEstimates.total,
+      avgIntervalWeighted: fundingMetrics.avgIntervalWeighted,
+      avgTradeSizeWeighted: fundingMetrics.avgTradeSizeWeighted,
+      estimatedTradesPerWallet: fundingMetrics.estimatedTradesPerWallet,
+      suggestedFundingPerGeneratedWallet: fundingMetrics.suggestedFunding,
+      fundingBelowSuggested:
+        input.config.walletConfig.fundingPerGeneratedWallet <
+        fundingMetrics.suggestedFunding,
+      estimatedSellVolume,
+      totalSellableValue: priceUnavailable ? null : totalSellableValue,
+      sellWarning,
       priceUnavailable,
     };
   },

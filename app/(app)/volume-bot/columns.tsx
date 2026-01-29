@@ -13,6 +13,7 @@ const statusVariants: Record<
   string,
   "default" | "secondary" | "outline" | "destructive"
 > = {
+  SCHEDULED: "secondary",
   RUNNING: "default",
   STOP_REQUESTED: "secondary",
   STOPPING: "secondary",
@@ -22,6 +23,7 @@ const statusVariants: Record<
 };
 
 const statusLabels: Record<string, string> = {
+  SCHEDULED: "Scheduled",
   RUNNING: "Running",
   STOP_REQUESTED: "Stop requested",
   STOPPING: "Stopping",
@@ -52,8 +54,23 @@ function formatRuntime(seconds?: number | null) {
   return `${secs}s`;
 }
 
-const resolveTargetSol = (config?: VolumeBotConfigInput & { targetSolApplied?: number }) =>
-  config?.targetSolApplied ?? config?.strategyTargetSol ?? null;
+const resolveNetDirection = (config?: VolumeBotConfigInput) => {
+  const ranges = config?.ranges ?? [];
+  const netSolDirection = ranges.reduce((sum, range) => {
+    const avgAmount = (range.solMin + range.solMax) / 2;
+    if (range.direction === "buy") {
+      return sum + range.probability * avgAmount;
+    }
+    if (range.direction === "sell") {
+      return sum - range.probability * avgAmount;
+    }
+    const buyProbability = range.buyProbability ?? 0;
+    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+  }, 0);
+  if (netSolDirection > 0) return "net buy";
+  if (netSolDirection < 0) return "net sell";
+  return "neutral";
+};
 
 type ColumnOptions = {
   tokenPublicKey?: string | null;
@@ -131,22 +148,21 @@ export function getColumns({
       },
     },
     {
-      id: "targetSol",
+      id: "ranges",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title="Target (SOL)"
+          title="Ranges"
           className="justify-end"
         />
       ),
       cell: ({ row }) => {
-        const config = row.original.config as VolumeBotConfigInput & {
-          targetSolApplied?: number;
-        };
-        const targetSol = resolveTargetSol(config);
+        const config = row.original.config as VolumeBotConfigInput;
+        const rangeCount = config?.ranges?.length ?? 0;
+        const netDirection = resolveNetDirection(config);
         return (
           <div className="text-right font-mono">
-            {targetSol !== null ? targetSol.toFixed(2) : "—"}
+            {rangeCount} · {netDirection}
           </div>
         );
       },

@@ -61,6 +61,7 @@ export const ModelName = {
   HoldingExit: 'HoldingExit',
   HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
+  VolumeBotPreset: 'VolumeBotPreset',
   VolumeBotWallet: 'VolumeBotWallet',
   VolumeBotLog: 'VolumeBotLog',
   VanityMint: 'VanityMint',
@@ -218,6 +219,7 @@ export const VolumeBotSessionScalarFieldEnum = {
   tokenPublicKey: 'tokenPublicKey',
   status: 'status',
   config: 'config',
+  scheduledStartAt: 'scheduledStartAt',
   startedAt: 'startedAt',
   stopRequestedAt: 'stopRequestedAt',
   scheduledStopAt: 'scheduledStopAt',
@@ -232,6 +234,18 @@ export const VolumeBotSessionScalarFieldEnum = {
 } as const
 
 export type VolumeBotSessionScalarFieldEnum = (typeof VolumeBotSessionScalarFieldEnum)[keyof typeof VolumeBotSessionScalarFieldEnum]
+
+
+export const VolumeBotPresetScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  config: 'config',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotPresetScalarFieldEnum = (typeof VolumeBotPresetScalarFieldEnum)[keyof typeof VolumeBotPresetScalarFieldEnum]
 
 
 export const VolumeBotWalletScalarFieldEnum = {

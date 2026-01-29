@@ -21,8 +21,9 @@ Holdings show per-wallet token balances, aggregated buy/sell totals, and last ac
 1. User selects holdings rows and opens the Sell dialog.
 2. Client sends `holding.sellByToken` with token public key, wallet public keys, and sell percentage.
 3. Service fetches on-chain token balances, computes sell amounts, and submits RPC sell transactions per wallet.
-4. If close ATA is enabled, the service closes empty associated token accounts after selling.
-5. Client refreshes holdings after mutations complete.
+4. Sell transactions can use the main wallet as fee payer when available.
+5. If close ATA is enabled, the service closes empty associated token accounts after selling.
+6. Client refreshes holdings after mutations complete.
 
 ## UI Behavior
 

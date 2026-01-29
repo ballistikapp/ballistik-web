@@ -25,6 +25,7 @@ model User {
   launches Launch[] @relation("LaunchUser")
   holdingExits HoldingExit[] @relation("HoldingExitUser")
   volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionUser")
+  volumeBotPresets VolumeBotPreset[] @relation("VolumeBotPresetUser")
   vanityMints VanityMint[] @relation("VanityMintUser")
   refreshCaches RefreshCache[]
   createdAt DateTime @default(now())
@@ -127,6 +128,7 @@ enum HoldingExitLogLevel {
 
 enum VolumeBotSessionStatus {
   DRAFT
+  SCHEDULED
   RUNNING
   STOP_REQUESTED
   STOPPING
@@ -227,6 +229,7 @@ model VolumeBotSession {
   token Token @relation("VolumeBotSessionToken", fields: [tokenPublicKey], references: [publicKey])
   status VolumeBotSessionStatus @default(DRAFT)
   config Json
+  scheduledStartAt DateTime?
   startedAt DateTime?
   stopRequestedAt DateTime?
   scheduledStopAt DateTime?
@@ -243,6 +246,19 @@ model VolumeBotSession {
   @@index([userId, status])
   @@index([tokenPublicKey, status])
   @@map("VolumeBotSession")
+}
+
+model VolumeBotPreset {
+  id String @id @default(cuid())
+  userId String
+  user User @relation("VolumeBotPresetUser", fields: [userId], references: [id])
+  name String
+  config Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([userId, name])
+  @@index([userId, updatedAt])
+  @@map("VolumeBotPreset")
 }
 
 model VolumeBotWallet {

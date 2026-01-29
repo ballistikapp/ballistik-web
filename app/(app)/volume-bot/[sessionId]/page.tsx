@@ -78,19 +78,22 @@ export default function VolumeBotRunPage() {
   const logs = logsQuery.data ?? [];
   const backToken = tokenPublicKey || session?.tokenPublicKey;
   const backHref = backToken ? `/volume-bot?token=${backToken}` : "/volume-bot";
-  const config = session?.config as
-    | (VolumeBotConfigInput & { targetSolApplied?: number })
-    | undefined;
-  const targetSolApplied =
-    config?.targetSolApplied ?? config?.strategyTargetSol ?? null;
-  const targetSigned =
-    targetSolApplied && config?.strategy === "dump"
-      ? -targetSolApplied
-      : (targetSolApplied ?? null);
+  const config = session?.config as VolumeBotConfigInput | undefined;
+  const ranges = config?.ranges ?? [];
+  const netSolDirection = ranges.reduce((sum, range) => {
+    const avgAmount = (range.solMin + range.solMax) / 2;
+    if (range.direction === "buy") {
+      return sum + range.probability * avgAmount;
+    }
+    if (range.direction === "sell") {
+      return sum - range.probability * avgAmount;
+    }
+    const buyProbability = range.buyProbability ?? 0;
+    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+  }, 0);
+  const netDirectionLabel =
+    netSolDirection > 0 ? "Net buy" : netSolDirection < 0 ? "Net sell" : "Neutral";
   const netSol = Number(session?.totalPnlSol ?? 0);
-  const remainingSol = targetSigned !== null ? targetSigned - netSol : null;
-  const remainingAbs =
-    remainingSol !== null ? Math.max(0, Math.abs(remainingSol)) : null;
   const [runtimeSeconds, setRuntimeSeconds] = useState(
     session?.runtimeSeconds ?? 0
   );
@@ -216,24 +219,55 @@ export default function VolumeBotRunPage() {
               <div className="text-sm font-semibold">{runtimeSeconds}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Target (SOL)</div>
-              <div className="text-sm font-semibold">
-                {targetSigned !== null ? targetSigned.toFixed(2) : "—"}
-              </div>
+              <div className="text-xs text-muted-foreground">Net direction</div>
+              <div className="text-sm font-semibold">{netDirectionLabel}</div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Net SOL</div>
               <div className="text-sm font-semibold">{netSol.toFixed(3)}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">
-                Remaining (SOL)
-              </div>
+              <div className="text-xs text-muted-foreground">Ranges</div>
+              <div className="text-sm font-semibold">{ranges.length}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">Duration (sec)</div>
               <div className="text-sm font-semibold">
-                {remainingAbs !== null ? remainingAbs.toFixed(3) : "—"}
+                {config?.targetDurationSeconds ?? "—"}
               </div>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-primary text-xl">Ranges</CardTitle>
+        </CardHeader>
+        <Separator />
+        <CardContent className="space-y-2">
+          {ranges.length === 0 && (
+            <div className="text-sm text-muted-foreground">
+              No ranges configured.
+            </div>
+          )}
+          {ranges.map((range, index) => (
+            <div
+              key={`${range.solMin}-${range.solMax}-${index}`}
+              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+            >
+              <div>
+                Range {index + 1}: {range.solMin.toFixed(3)}-
+                {range.solMax.toFixed(3)} SOL
+              </div>
+              <div className="text-xs text-muted-foreground text-right">
+                prob {range.probability.toFixed(2)} · interval{" "}
+                {range.intervalMin}-{range.intervalMax}s · {range.direction}
+                {range.direction === "both" &&
+                  ` (${(range.buyProbability ?? 0).toFixed(2)} buy)`}
+              </div>
+            </div>
+          ))}
         </CardContent>
       </Card>
 

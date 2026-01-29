@@ -90,6 +90,11 @@ export type HoldingExitLog = Prisma.HoldingExitLogModel
  */
 export type VolumeBotSession = Prisma.VolumeBotSessionModel
 /**
+ * Model VolumeBotPreset
+ * 
+ */
+export type VolumeBotPreset = Prisma.VolumeBotPresetModel
+/**
  * Model VolumeBotWallet
  * 
  */

@@ -7,7 +7,10 @@ import { PrismaClient } from "../lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 
-dotenv.config({ path: join(process.cwd(), ".env.development.local") });
+dotenv.config({
+  path: join(process.cwd(), ".env.development.local"),
+  quiet: true,
+});
 
 const connectionString =
   process.env.PROD_STORAGE_POSTGRES_URL || process.env.DEV_STORAGE_POSTGRES_URL;

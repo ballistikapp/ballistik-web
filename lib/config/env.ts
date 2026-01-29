@@ -33,7 +33,7 @@ const loadEnvFiles = () => {
   }
 
   envFiles.forEach((path) => {
-    loadEnv({ path, override: false });
+    loadEnv({ path, override: false, quiet: true });
   });
 };
 

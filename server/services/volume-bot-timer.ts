@@ -1,10 +1,16 @@
+import { PublicKey } from "@solana/web3.js";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { prisma } from "@/lib/prisma";
+import { getSolanaConnection } from "@/lib/solana/connection";
 import { mapWithConcurrency } from "@/lib/utils/async";
+import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
+import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import {
   processVolumeBotWallet,
   stopVolumeBotSession,
 } from "@/server/services/volume-bot-worker";
+import { walletService } from "@/server/services/wallet.service";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const RECOVERY_CONCURRENCY = 5;
@@ -21,6 +27,7 @@ class VolumeBotTimerManager {
   private walletToSession = new Map<string, string>();
   private sessionToWallets = new Map<string, Set<string>>();
   private sessionStopTimers = new Map<string, NodeJS.Timeout>();
+  private sessionStartTimers = new Map<string, NodeJS.Timeout>();
   private watchdogTimer: NodeJS.Timeout | null = null;
   private shuttingDown = false;
   private shutdownRegistered = false;
@@ -28,9 +35,21 @@ class VolumeBotTimerManager {
   async scheduleSession(sessionId: string) {
     const session = await prisma.volumeBotSession.findUnique({
       where: { id: sessionId },
-      select: { id: true, status: true, scheduledStopAt: true },
+      select: {
+        id: true,
+        status: true,
+        scheduledStopAt: true,
+        scheduledStartAt: true,
+      },
     });
-    if (!session || session.status !== "RUNNING") {
+    if (!session) {
+      return;
+    }
+    if (session.status === "SCHEDULED") {
+      this.scheduleStartTimer(session.id, session.scheduledStartAt);
+      return;
+    }
+    if (session.status !== "RUNNING") {
       return;
     }
 
@@ -96,6 +115,8 @@ class VolumeBotTimerManager {
     }
     this.sessionToWallets.delete(sessionId);
     this.clearStopTimer(sessionId);
+    this.clearStartTimer(sessionId);
+    volumeBotGrpc.unsubscribeFromSession(sessionId);
   }
 
   async requestStop(sessionId: string) {
@@ -121,13 +142,39 @@ class VolumeBotTimerManager {
 
   async recover() {
     const sessions = await prisma.volumeBotSession.findMany({
-      where: { status: "RUNNING" },
-      select: { id: true, scheduledStopAt: true },
+      where: { status: { in: ["RUNNING", "SCHEDULED"] } },
+      select: {
+        id: true,
+        status: true,
+        scheduledStopAt: true,
+        scheduledStartAt: true,
+        tokenPublicKey: true,
+      },
     });
 
-    sessions.forEach((session) =>
+    const runningSessions = sessions.filter(
+      (session) => session.status === "RUNNING"
+    );
+    const scheduledSessions = sessions.filter(
+      (session) => session.status === "SCHEDULED"
+    );
+
+    runningSessions.forEach((session) =>
       this.scheduleStopTimer(session.id, session.scheduledStopAt)
     );
+
+    scheduledSessions.forEach((session) =>
+      this.scheduleStartTimer(session.id, session.scheduledStartAt)
+    );
+
+    if (runningSessions.length > 0) {
+      const connected = await volumeBotGrpc.connect();
+      if (connected) {
+        for (const session of runningSessions) {
+          await this.subscribeSessionToGrpc(session.id, session.tokenPublicKey);
+        }
+      }
+    }
 
     const wallets = await prisma.volumeBotWallet.findMany({
       where: {
@@ -245,6 +292,8 @@ class VolumeBotTimerManager {
     this.sessionToWallets.clear();
     this.sessionStopTimers.forEach((timer) => clearTimeout(timer));
     this.sessionStopTimers.clear();
+    this.sessionStartTimers.forEach((timer) => clearTimeout(timer));
+    this.sessionStartTimers.clear();
   }
 
   private scheduleStopTimer(sessionId: string, scheduledStopAt: Date | null) {
@@ -264,6 +313,190 @@ class VolumeBotTimerManager {
     const timer = this.sessionStopTimers.get(sessionId);
     if (timer) clearTimeout(timer);
     this.sessionStopTimers.delete(sessionId);
+  }
+
+  private scheduleStartTimer(sessionId: string, scheduledStartAt: Date | null) {
+    if (!scheduledStartAt) return;
+    this.clearStartTimer(sessionId);
+
+    const delayMs = scheduledStartAt.getTime() - Date.now();
+    if (delayMs <= 0) {
+      void this.startScheduledSession(sessionId);
+      return;
+    }
+
+    if (delayMs <= MAX_TIMEOUT_MS) {
+      const timeout = setTimeout(() => {
+        void this.startScheduledSession(sessionId);
+      }, delayMs);
+      this.sessionStartTimers.set(sessionId, timeout);
+      return;
+    }
+
+    const timeout = setTimeout(() => {
+      this.scheduleStartTimer(sessionId, scheduledStartAt);
+    }, 24 * 60 * 60 * 1000);
+    this.sessionStartTimers.set(sessionId, timeout);
+  }
+
+  private clearStartTimer(sessionId: string) {
+    const timer = this.sessionStartTimers.get(sessionId);
+    if (timer) clearTimeout(timer);
+    this.sessionStartTimers.delete(sessionId);
+  }
+
+  private async fundSessionWallets(
+    sessionId: string,
+    tokenPublicKey: string,
+    userId: string,
+    config: VolumeBotConfigInput
+  ) {
+    const selectedWalletPublicKeys = Array.from(
+      new Set(config.walletConfig.selectedWalletPublicKeys ?? [])
+    );
+    const sessionWallets = await prisma.volumeBotWallet.findMany({
+      where: { sessionId },
+      select: { walletPublicKey: true },
+    });
+    const selectedSet = new Set(selectedWalletPublicKeys);
+    const generatedWalletPublicKeys = sessionWallets
+      .map((wallet) => wallet.walletPublicKey)
+      .filter((walletPublicKey) => !selectedSet.has(walletPublicKey));
+
+    if (generatedWalletPublicKeys.length > 0) {
+      const amount = Math.max(config.walletConfig.fundingPerGeneratedWallet, 0);
+      console.log(
+        `[TimerManager] Funding ${generatedWalletPublicKeys.length} generated wallets with ${amount} SOL`
+      );
+      await walletService.sendSolFromMainWallet(
+        tokenPublicKey,
+        userId,
+        generatedWalletPublicKeys,
+        amount
+      );
+    }
+
+    if (selectedWalletPublicKeys.length > 0) {
+      const connection = getSolanaConnection();
+      await Promise.all(
+        selectedWalletPublicKeys.map(async (walletPublicKey) => {
+          const balanceLamports = await connection.getBalance(
+            new PublicKey(walletPublicKey)
+          );
+          const balanceSol = balanceLamports / 1_000_000_000;
+          if (balanceSol >= config.walletConfig.topUpAmount) {
+            console.log(
+              `[TimerManager] Wallet ${walletPublicKey} has sufficient balance (${balanceSol} SOL)`
+            );
+            return;
+          }
+          const topUpSol = config.walletConfig.topUpAmount - balanceSol;
+          if (topUpSol <= 0) {
+            return;
+          }
+          console.log(
+            `[TimerManager] Topping up wallet ${walletPublicKey} by ${topUpSol} SOL`
+          );
+          await walletService.sendSolFromMainWallet(
+            tokenPublicKey,
+            userId,
+            [walletPublicKey],
+            topUpSol
+          );
+        })
+      );
+    }
+  }
+
+  private async startScheduledSession(sessionId: string) {
+    this.clearStartTimer(sessionId);
+    const session = await prisma.volumeBotSession.findUnique({
+      where: { id: sessionId },
+      select: {
+        id: true,
+        status: true,
+        config: true,
+        tokenPublicKey: true,
+        userId: true,
+      },
+    });
+    if (!session || session.status !== "SCHEDULED") {
+      return;
+    }
+    const now = new Date();
+    await prisma.volumeBotSession.update({
+      where: { id: session.id },
+      data: { status: "RUNNING", startedAt: now },
+    });
+    try {
+      const config = session.config as VolumeBotConfigInput;
+      await this.fundSessionWallets(
+        session.id,
+        session.tokenPublicKey,
+        session.userId,
+        config
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      await prisma.volumeBotLog.create({
+        data: {
+          sessionId: session.id,
+          level: "ERROR",
+          type: "start",
+          message,
+        },
+      });
+      await prisma.volumeBotSession.update({
+        where: { id: session.id },
+        data: { status: "FAILED", stoppedAt: new Date() },
+      });
+      return;
+    }
+
+    await this.subscribeSessionToGrpc(session.id, session.tokenPublicKey);
+    await this.scheduleSession(session.id);
+  }
+
+  private async subscribeSessionToGrpc(
+    sessionId: string,
+    tokenPublicKey: string
+  ) {
+    try {
+      if (!volumeBotGrpc.isConnected()) {
+        const connected = await volumeBotGrpc.connect();
+        if (!connected) {
+          console.log(
+            `[TimerManager] gRPC not available for session ${sessionId}, using RPC fallback`
+          );
+          return;
+        }
+      }
+
+      const sessionWallets = await prisma.volumeBotWallet.findMany({
+        where: { sessionId, status: "ACTIVE" },
+        select: { walletPublicKey: true },
+      });
+
+      const walletPubkeys = sessionWallets.map((w) => w.walletPublicKey);
+      const mintPubkey = new PublicKey(tokenPublicKey);
+      const { bondingCurve } = derivePumpAddresses(mintPubkey);
+
+      await volumeBotGrpc.subscribeToSession(
+        sessionId,
+        walletPubkeys,
+        tokenPublicKey,
+        bondingCurve.toBase58()
+      );
+
+      console.log(
+        `[TimerManager] Subscribed session ${sessionId} to gRPC with ${walletPubkeys.length} wallets`
+      );
+    } catch (error) {
+      console.error(
+        `[TimerManager] Failed to subscribe session ${sessionId} to gRPC:`,
+        error instanceof Error ? error.message : String(error)
+      );
+    }
   }
 
   private async handleWalletTick(walletId: string) {

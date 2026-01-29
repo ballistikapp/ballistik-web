@@ -1,8 +1,8 @@
 import { config } from "dotenv";
 import { defineConfig } from "prisma/config";
 
-config({ path: ".env.development" });
-config({ path: ".env.development.local" });
+config({ path: ".env.development", quiet: true });
+config({ path: ".env.development.local", quiet: true });
 
 export default defineConfig({
   datasource: {

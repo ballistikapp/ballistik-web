@@ -394,6 +394,7 @@ export const ModelName = {
   HoldingExit: 'HoldingExit',
   HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
+  VolumeBotPreset: 'VolumeBotPreset',
   VolumeBotWallet: 'VolumeBotWallet',
   VolumeBotLog: 'VolumeBotLog',
   VanityMint: 'VanityMint',
@@ -415,7 +416,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1159,6 +1160,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    VolumeBotPreset: {
+      payload: Prisma.$VolumeBotPresetPayload<ExtArgs>
+      fields: Prisma.VolumeBotPresetFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.VolumeBotPresetFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.VolumeBotPresetFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        findFirst: {
+          args: Prisma.VolumeBotPresetFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.VolumeBotPresetFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        findMany: {
+          args: Prisma.VolumeBotPresetFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>[]
+        }
+        create: {
+          args: Prisma.VolumeBotPresetCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        createMany: {
+          args: Prisma.VolumeBotPresetCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.VolumeBotPresetCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>[]
+        }
+        delete: {
+          args: Prisma.VolumeBotPresetDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        update: {
+          args: Prisma.VolumeBotPresetUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        deleteMany: {
+          args: Prisma.VolumeBotPresetDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.VolumeBotPresetUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.VolumeBotPresetUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>[]
+        }
+        upsert: {
+          args: Prisma.VolumeBotPresetUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$VolumeBotPresetPayload>
+        }
+        aggregate: {
+          args: Prisma.VolumeBotPresetAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateVolumeBotPreset>
+        }
+        groupBy: {
+          args: Prisma.VolumeBotPresetGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotPresetGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.VolumeBotPresetCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.VolumeBotPresetCountAggregateOutputType> | number
+        }
+      }
+    }
     VolumeBotWallet: {
       payload: Prisma.$VolumeBotWalletPayload<ExtArgs>
       fields: Prisma.VolumeBotWalletFieldRefs
@@ -1775,6 +1850,7 @@ export const VolumeBotSessionScalarFieldEnum = {
   tokenPublicKey: 'tokenPublicKey',
   status: 'status',
   config: 'config',
+  scheduledStartAt: 'scheduledStartAt',
   startedAt: 'startedAt',
   stopRequestedAt: 'stopRequestedAt',
   scheduledStopAt: 'scheduledStopAt',
@@ -1789,6 +1865,18 @@ export const VolumeBotSessionScalarFieldEnum = {
 } as const
 
 export type VolumeBotSessionScalarFieldEnum = (typeof VolumeBotSessionScalarFieldEnum)[keyof typeof VolumeBotSessionScalarFieldEnum]
+
+
+export const VolumeBotPresetScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  name: 'name',
+  config: 'config',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type VolumeBotPresetScalarFieldEnum = (typeof VolumeBotPresetScalarFieldEnum)[keyof typeof VolumeBotPresetScalarFieldEnum]
 
 
 export const VolumeBotWalletScalarFieldEnum = {
@@ -2315,6 +2403,7 @@ export type GlobalOmitConfig = {
   holdingExit?: Prisma.HoldingExitOmit
   holdingExitLog?: Prisma.HoldingExitLogOmit
   volumeBotSession?: Prisma.VolumeBotSessionOmit
+  volumeBotPreset?: Prisma.VolumeBotPresetOmit
   volumeBotWallet?: Prisma.VolumeBotWalletOmit
   volumeBotLog?: Prisma.VolumeBotLogOmit
   vanityMint?: Prisma.VanityMintOmit

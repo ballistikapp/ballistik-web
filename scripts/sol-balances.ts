@@ -5,7 +5,7 @@ import * as dotenv from "dotenv";
 import { readFileSync } from "fs";
 import { resolve } from "path";
 
-dotenv.config();
+dotenv.config({ quiet: true });
 
 type BalanceResult = {
   publicKey: string;

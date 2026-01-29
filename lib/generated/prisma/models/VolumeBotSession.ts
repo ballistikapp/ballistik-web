@@ -45,6 +45,7 @@ export type VolumeBotSessionMinAggregateOutputType = {
   userId: string | null
   tokenPublicKey: string | null
   status: $Enums.VolumeBotSessionStatus | null
+  scheduledStartAt: Date | null
   startedAt: Date | null
   stopRequestedAt: Date | null
   scheduledStopAt: Date | null
@@ -63,6 +64,7 @@ export type VolumeBotSessionMaxAggregateOutputType = {
   userId: string | null
   tokenPublicKey: string | null
   status: $Enums.VolumeBotSessionStatus | null
+  scheduledStartAt: Date | null
   startedAt: Date | null
   stopRequestedAt: Date | null
   scheduledStopAt: Date | null
@@ -82,6 +84,7 @@ export type VolumeBotSessionCountAggregateOutputType = {
   tokenPublicKey: number
   status: number
   config: number
+  scheduledStartAt: number
   startedAt: number
   stopRequestedAt: number
   scheduledStopAt: number
@@ -116,6 +119,7 @@ export type VolumeBotSessionMinAggregateInputType = {
   userId?: true
   tokenPublicKey?: true
   status?: true
+  scheduledStartAt?: true
   startedAt?: true
   stopRequestedAt?: true
   scheduledStopAt?: true
@@ -134,6 +138,7 @@ export type VolumeBotSessionMaxAggregateInputType = {
   userId?: true
   tokenPublicKey?: true
   status?: true
+  scheduledStartAt?: true
   startedAt?: true
   stopRequestedAt?: true
   scheduledStopAt?: true
@@ -153,6 +158,7 @@ export type VolumeBotSessionCountAggregateInputType = {
   tokenPublicKey?: true
   status?: true
   config?: true
+  scheduledStartAt?: true
   startedAt?: true
   stopRequestedAt?: true
   scheduledStopAt?: true
@@ -259,6 +265,7 @@ export type VolumeBotSessionGroupByOutputType = {
   tokenPublicKey: string
   status: $Enums.VolumeBotSessionStatus
   config: runtime.JsonValue
+  scheduledStartAt: Date | null
   startedAt: Date | null
   stopRequestedAt: Date | null
   scheduledStopAt: Date | null
@@ -301,6 +308,7 @@ export type VolumeBotSessionWhereInput = {
   tokenPublicKey?: Prisma.StringFilter<"VolumeBotSession"> | string
   status?: Prisma.EnumVolumeBotSessionStatusFilter<"VolumeBotSession"> | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonFilter<"VolumeBotSession">
+  scheduledStartAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   startedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   stopRequestedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   scheduledStopAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
@@ -324,6 +332,7 @@ export type VolumeBotSessionOrderByWithRelationInput = {
   tokenPublicKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   config?: Prisma.SortOrder
+  scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   startedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   stopRequestedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStopAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -350,6 +359,7 @@ export type VolumeBotSessionWhereUniqueInput = Prisma.AtLeast<{
   tokenPublicKey?: Prisma.StringFilter<"VolumeBotSession"> | string
   status?: Prisma.EnumVolumeBotSessionStatusFilter<"VolumeBotSession"> | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonFilter<"VolumeBotSession">
+  scheduledStartAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   startedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   stopRequestedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   scheduledStopAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
@@ -373,6 +383,7 @@ export type VolumeBotSessionOrderByWithAggregationInput = {
   tokenPublicKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   config?: Prisma.SortOrder
+  scheduledStartAt?: Prisma.SortOrderInput | Prisma.SortOrder
   startedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   stopRequestedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   scheduledStopAt?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -400,6 +411,7 @@ export type VolumeBotSessionScalarWhereWithAggregatesInput = {
   tokenPublicKey?: Prisma.StringWithAggregatesFilter<"VolumeBotSession"> | string
   status?: Prisma.EnumVolumeBotSessionStatusWithAggregatesFilter<"VolumeBotSession"> | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonWithAggregatesFilter<"VolumeBotSession">
+  scheduledStartAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotSession"> | Date | string | null
   startedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotSession"> | Date | string | null
   stopRequestedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotSession"> | Date | string | null
   scheduledStopAt?: Prisma.DateTimeNullableWithAggregatesFilter<"VolumeBotSession"> | Date | string | null
@@ -417,6 +429,7 @@ export type VolumeBotSessionCreateInput = {
   id?: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -440,6 +453,7 @@ export type VolumeBotSessionUncheckedCreateInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -459,6 +473,7 @@ export type VolumeBotSessionUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -482,6 +497,7 @@ export type VolumeBotSessionUncheckedUpdateInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -503,6 +519,7 @@ export type VolumeBotSessionCreateManyInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -520,6 +537,7 @@ export type VolumeBotSessionUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -539,6 +557,7 @@ export type VolumeBotSessionUncheckedUpdateManyInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -568,6 +587,7 @@ export type VolumeBotSessionCountOrderByAggregateInput = {
   tokenPublicKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   config?: Prisma.SortOrder
+  scheduledStartAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   stopRequestedAt?: Prisma.SortOrder
   scheduledStopAt?: Prisma.SortOrder
@@ -593,6 +613,7 @@ export type VolumeBotSessionMaxOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  scheduledStartAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   stopRequestedAt?: Prisma.SortOrder
   scheduledStopAt?: Prisma.SortOrder
@@ -611,6 +632,7 @@ export type VolumeBotSessionMinOrderByAggregateInput = {
   userId?: Prisma.SortOrder
   tokenPublicKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
+  scheduledStartAt?: Prisma.SortOrder
   startedAt?: Prisma.SortOrder
   stopRequestedAt?: Prisma.SortOrder
   scheduledStopAt?: Prisma.SortOrder
@@ -756,6 +778,7 @@ export type VolumeBotSessionCreateWithoutUserInput = {
   id?: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -777,6 +800,7 @@ export type VolumeBotSessionUncheckedCreateWithoutUserInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -827,6 +851,7 @@ export type VolumeBotSessionScalarWhereInput = {
   tokenPublicKey?: Prisma.StringFilter<"VolumeBotSession"> | string
   status?: Prisma.EnumVolumeBotSessionStatusFilter<"VolumeBotSession"> | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonFilter<"VolumeBotSession">
+  scheduledStartAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   startedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   stopRequestedAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
   scheduledStopAt?: Prisma.DateTimeNullableFilter<"VolumeBotSession"> | Date | string | null
@@ -844,6 +869,7 @@ export type VolumeBotSessionCreateWithoutTokenInput = {
   id?: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -865,6 +891,7 @@ export type VolumeBotSessionUncheckedCreateWithoutTokenInput = {
   userId: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -910,6 +937,7 @@ export type VolumeBotSessionCreateWithoutWalletsInput = {
   id?: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -932,6 +960,7 @@ export type VolumeBotSessionUncheckedCreateWithoutWalletsInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -966,6 +995,7 @@ export type VolumeBotSessionUpdateWithoutWalletsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -988,6 +1018,7 @@ export type VolumeBotSessionUncheckedUpdateWithoutWalletsInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1006,6 +1037,7 @@ export type VolumeBotSessionCreateWithoutLogsInput = {
   id?: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -1028,6 +1060,7 @@ export type VolumeBotSessionUncheckedCreateWithoutLogsInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -1062,6 +1095,7 @@ export type VolumeBotSessionUpdateWithoutLogsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1084,6 +1118,7 @@ export type VolumeBotSessionUncheckedUpdateWithoutLogsInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1103,6 +1138,7 @@ export type VolumeBotSessionCreateManyUserInput = {
   tokenPublicKey: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -1120,6 +1156,7 @@ export type VolumeBotSessionUpdateWithoutUserInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1141,6 +1178,7 @@ export type VolumeBotSessionUncheckedUpdateWithoutUserInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1161,6 +1199,7 @@ export type VolumeBotSessionUncheckedUpdateManyWithoutUserInput = {
   tokenPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1179,6 +1218,7 @@ export type VolumeBotSessionCreateManyTokenInput = {
   userId: string
   status?: $Enums.VolumeBotSessionStatus
   config: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Date | string | null
   startedAt?: Date | string | null
   stopRequestedAt?: Date | string | null
   scheduledStopAt?: Date | string | null
@@ -1196,6 +1236,7 @@ export type VolumeBotSessionUpdateWithoutTokenInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1217,6 +1258,7 @@ export type VolumeBotSessionUncheckedUpdateWithoutTokenInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1237,6 +1279,7 @@ export type VolumeBotSessionUncheckedUpdateManyWithoutTokenInput = {
   userId?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumVolumeBotSessionStatusFieldUpdateOperationsInput | $Enums.VolumeBotSessionStatus
   config?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  scheduledStartAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   stopRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   scheduledStopAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
@@ -1296,6 +1339,7 @@ export type VolumeBotSessionSelect<ExtArgs extends runtime.Types.Extensions.Inte
   tokenPublicKey?: boolean
   status?: boolean
   config?: boolean
+  scheduledStartAt?: boolean
   startedAt?: boolean
   stopRequestedAt?: boolean
   scheduledStopAt?: boolean
@@ -1320,6 +1364,7 @@ export type VolumeBotSessionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   tokenPublicKey?: boolean
   status?: boolean
   config?: boolean
+  scheduledStartAt?: boolean
   startedAt?: boolean
   stopRequestedAt?: boolean
   scheduledStopAt?: boolean
@@ -1341,6 +1386,7 @@ export type VolumeBotSessionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   tokenPublicKey?: boolean
   status?: boolean
   config?: boolean
+  scheduledStartAt?: boolean
   startedAt?: boolean
   stopRequestedAt?: boolean
   scheduledStopAt?: boolean
@@ -1362,6 +1408,7 @@ export type VolumeBotSessionSelectScalar = {
   tokenPublicKey?: boolean
   status?: boolean
   config?: boolean
+  scheduledStartAt?: boolean
   startedAt?: boolean
   stopRequestedAt?: boolean
   scheduledStopAt?: boolean
@@ -1375,7 +1422,7 @@ export type VolumeBotSessionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type VolumeBotSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tokenPublicKey" | "status" | "config" | "startedAt" | "stopRequestedAt" | "scheduledStopAt" | "stoppedAt" | "lastTickAt" | "totalVolumeUsd" | "totalTrades" | "totalPnlSol" | "runtimeSeconds" | "createdAt" | "updatedAt", ExtArgs["result"]["volumeBotSession"]>
+export type VolumeBotSessionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tokenPublicKey" | "status" | "config" | "scheduledStartAt" | "startedAt" | "stopRequestedAt" | "scheduledStopAt" | "stoppedAt" | "lastTickAt" | "totalVolumeUsd" | "totalTrades" | "totalPnlSol" | "runtimeSeconds" | "createdAt" | "updatedAt", ExtArgs["result"]["volumeBotSession"]>
 export type VolumeBotSessionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   token?: boolean | Prisma.TokenDefaultArgs<ExtArgs>
@@ -1406,6 +1453,7 @@ export type $VolumeBotSessionPayload<ExtArgs extends runtime.Types.Extensions.In
     tokenPublicKey: string
     status: $Enums.VolumeBotSessionStatus
     config: runtime.JsonValue
+    scheduledStartAt: Date | null
     startedAt: Date | null
     stopRequestedAt: Date | null
     scheduledStopAt: Date | null
@@ -1849,6 +1897,7 @@ export interface VolumeBotSessionFieldRefs {
   readonly tokenPublicKey: Prisma.FieldRef<"VolumeBotSession", 'String'>
   readonly status: Prisma.FieldRef<"VolumeBotSession", 'VolumeBotSessionStatus'>
   readonly config: Prisma.FieldRef<"VolumeBotSession", 'Json'>
+  readonly scheduledStartAt: Prisma.FieldRef<"VolumeBotSession", 'DateTime'>
   readonly startedAt: Prisma.FieldRef<"VolumeBotSession", 'DateTime'>
   readonly stopRequestedAt: Prisma.FieldRef<"VolumeBotSession", 'DateTime'>
   readonly scheduledStopAt: Prisma.FieldRef<"VolumeBotSession", 'DateTime'>

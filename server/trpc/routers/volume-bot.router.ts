@@ -1,5 +1,6 @@
 import { router, protectedProcedure } from "../trpc";
 import { volumeBotService } from "@/server/services/volume-bot.service";
+import { volumeBotPresetService } from "@/server/services/volume-bot-presets.service";
 import {
   closeVolumeBotAccountsSchema,
   volumeBotEligibleWalletsSchema,
@@ -9,6 +10,9 @@ import {
   stopVolumeBotSchema,
   volumeBotSelectionSummarySchema,
   volumeBotStatusSchema,
+  listVolumeBotPresetsSchema,
+  saveVolumeBotPresetSchema,
+  deleteVolumeBotPresetSchema,
 } from "@/server/schemas/volume-bot.schema";
 
 export const volumeBotRouter = router({
@@ -56,5 +60,20 @@ export const volumeBotRouter = router({
     .input(stopVolumeBotSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.getLogs(input.sessionId, ctx.user.id);
+    }),
+  listPresets: protectedProcedure
+    .input(listVolumeBotPresetsSchema)
+    .query(async ({ ctx }) => {
+      return await volumeBotPresetService.listPresets(ctx.user.id);
+    }),
+  savePreset: protectedProcedure
+    .input(saveVolumeBotPresetSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await volumeBotPresetService.savePreset(input, ctx.user.id);
+    }),
+  deletePreset: protectedProcedure
+    .input(deleteVolumeBotPresetSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await volumeBotPresetService.deletePreset(input.presetId, ctx.user.id);
     }),
 });
