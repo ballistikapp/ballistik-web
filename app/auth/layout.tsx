@@ -1,15 +1,18 @@
 import { Suspense } from "react";
+import { redirect } from "next/navigation";
+import { getServerUser } from "@/lib/utils/auth";
 
-export default function AuthLayout({
+export default async function AuthLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return (
-    <Suspense fallback={<AuthLoadingFallback />}>
-      {children}
-    </Suspense>
-  );
+  const user = await getServerUser();
+  if (user) {
+    redirect("/");
+  }
+
+  return <Suspense fallback={<AuthLoadingFallback />}>{children}</Suspense>;
 }
 
 function AuthLoadingFallback() {

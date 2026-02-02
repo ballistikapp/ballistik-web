@@ -7,6 +7,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import NextTopLoader from "nextjs-toploader";
 import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
+import { TokenProvider } from "@/contexts/token-context";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -38,17 +39,19 @@ export default function RootLayout({
         <NuqsAdapter>
           <TooltipProvider delayDuration={0}>
             <TRPCProvider>
-              <NextTopLoader color="#333" height={5} showSpinner={false} />
-              {children}
-              <Toaster
-                richColors
-                closeButton
-                position="bottom-center"
-                theme="dark"
-                toastOptions={{
-                  className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
-                }}
-              />
+              <TokenProvider>
+                <NextTopLoader color="#333" height={5} showSpinner={false} />
+                {children}
+                <Toaster
+                  richColors
+                  closeButton
+                  position="bottom-center"
+                  theme="dark"
+                  toastOptions={{
+                    className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
+                  }}
+                />
+              </TokenProvider>
             </TRPCProvider>
           </TooltipProvider>
         </NuqsAdapter>

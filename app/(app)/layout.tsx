@@ -1,8 +1,10 @@
+import { redirect } from "next/navigation";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { tokenService } from "@/server/services/token.service";
 import { TokenProvider } from "@/contexts/token-context";
+import { getServerUser } from "@/lib/utils/auth";
 
 export const dynamic = "force-dynamic";
 
@@ -11,7 +13,12 @@ export default async function MainLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const tokens = await tokenService.getUserTokens();
+  const user = await getServerUser();
+  if (!user) {
+    redirect("/auth");
+  }
+
+  const tokens = await tokenService.getUserTokens(user.id);
   return (
     <TokenProvider>
       <SidebarProvider

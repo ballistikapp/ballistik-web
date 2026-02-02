@@ -15,10 +15,8 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
   const [selectedTokenPublicKey, setSelectedTokenPublicKeyState] = useState<
     string | null
   >(null);
-  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
-    setMounted(true);
     if (typeof window !== "undefined") {
       const stored = localStorage.getItem(SELECTED_TOKEN_KEY);
       if (stored) {
@@ -37,10 +35,6 @@ export function TokenProvider({ children }: { children: React.ReactNode }) {
       }
     }
   };
-
-  if (!mounted) {
-    return <>{children}</>;
-  }
 
   return (
     <TokenContext.Provider

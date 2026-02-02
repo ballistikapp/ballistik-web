@@ -69,6 +69,11 @@ server/
 - Users are identified by the main wallet (`User.mainWallet`)
 - Main wallet is user-scoped and used for authorization
 - Token operational wallets are token-scoped and tied to a single token
+- Auth proxy is optimistic (checks token presence only, not validity)
+- Protected layouts (`(app)/layout.tsx`, `page.tsx`) perform server-side user
+  lookup and redirect to `/auth` when unauthenticated
+- `/auth` layout redirects to `/` when a valid user is present
+- Auth cookies use `secure` only for non-local hosts (including private IPs)
 
 ## Docs Discipline
 

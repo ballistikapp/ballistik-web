@@ -33,7 +33,7 @@ import {
   FieldLabel,
   FieldDescription,
 } from "@/components/ui/field";
-import { useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams } from "next/navigation";
 
 type WalletMode = "connect" | "generate";
 
@@ -287,7 +287,6 @@ function WalletKeysDialog({
 
 export default function AuthPage() {
   const searchParams = useSearchParams();
-  const router = useRouter();
   const initialView =
     searchParams.get("view") === "login" ? "signin" : "register";
   const defaultWalletMode = "generate" as WalletMode;
@@ -348,7 +347,7 @@ export default function AuthPage() {
         setShowKeysDialog(true);
       } else {
         resetForms();
-        router.push("/");
+        window.location.href = "/";
       }
     },
     onError: (error) => {
@@ -361,7 +360,7 @@ export default function AuthPage() {
       onSuccess: () => {
         toast.success("Signed in successfully!");
         resetForms();
-        router.push("/");
+        window.location.href = "/";
       },
       onError: (error) => {
         toast.error(error.message || "Failed to sign in");
@@ -722,7 +721,7 @@ export default function AuthPage() {
         privateKey={generatedWallet?.privateKey || ""}
         onComplete={() => {
           resetForms();
-          router.push("/");
+          window.location.href = "/";
         }}
       />
     </div>

@@ -8,8 +8,6 @@ const envSchema = z.object({
 
 const dbEnvSchema = z.object({
   DATABASE_URL: z.string().min(1).optional(),
-  DEV_STORAGE_POSTGRES_URL: z.string().min(1).optional(),
-  PROD_STORAGE_POSTGRES_URL: z.string().min(1).optional(),
 });
 
 let cachedEnv: Env | null = null;
@@ -51,22 +49,15 @@ export const getEnv = (): Env => {
 
 export type Env = z.infer<typeof envSchema>;
 
-export const getDatabaseUrl = (): string | null => {
+export const getDatabaseUrl = (): string | undefined => {
   loadEnvFiles();
-  if (!cachedDbEnv) {
-    cachedDbEnv = dbEnvSchema.parse({
-      DATABASE_URL: process.env.DATABASE_URL,
-      DEV_STORAGE_POSTGRES_URL: process.env.DEV_STORAGE_POSTGRES_URL,
-      PROD_STORAGE_POSTGRES_URL: process.env.PROD_STORAGE_POSTGRES_URL,
-    });
+  if (cachedDbEnv) {
+    return cachedDbEnv.DATABASE_URL;
   }
-
-  return (
-    cachedDbEnv.DEV_STORAGE_POSTGRES_URL ??
-    cachedDbEnv.DATABASE_URL ??
-    cachedDbEnv.PROD_STORAGE_POSTGRES_URL ??
-    null
-  );
+  cachedDbEnv = dbEnvSchema.parse({
+    DATABASE_URL: process.env.DATABASE_URL,
+  });
+  return cachedDbEnv.DATABASE_URL;
 };
 
 export type DbEnv = z.infer<typeof dbEnvSchema>;
