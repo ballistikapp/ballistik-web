@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import { type Icon } from "@tabler/icons-react";
+import { CoinsIcon } from "lucide-react";
+import Link from "next/link";
 
 import {
   SidebarGroup,
@@ -11,7 +13,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 
-export function NavSecondary({
+export const NavSecondary = React.memo(function NavSecondary({
   items,
   ...props
 }: {
@@ -25,18 +27,25 @@ export function NavSecondary({
     <SidebarGroup {...props}>
       <SidebarGroupContent>
         <SidebarMenu>
-          {items.map((item) => (
+          <SidebarMenuItem>
+            <div className="flex pl-2 pb-2 font-bold tracking-tighter text-5xl">
+              <CoinsIcon className="size-[52px] text-primary mr-2 -mt-1.5" />
+              <span className="text-muted-foreground/70">sol</span>
+              <span className="text-muted-foreground/40">labs</span>
+            </div>
+          </SidebarMenuItem>
+          {/* {items.map((item) => (
             <SidebarMenuItem key={item.title}>
-              <SidebarMenuButton asChild>
-                <a href={item.url}>
+              <SidebarMenuButton asChild tooltip={item.title}>
+                <Link href={item.url}>
                   <item.icon />
                   <span>{item.title}</span>
-                </a>
+                </Link>
               </SidebarMenuButton>
             </SidebarMenuItem>
-          ))}
+          ))} */}
         </SidebarMenu>
       </SidebarGroupContent>
     </SidebarGroup>
   );
-}
+});

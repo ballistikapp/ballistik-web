@@ -1,21 +1,23 @@
 import type { Metadata } from "next";
-import {
-  //  Geist, Geist_Mono,
-  Roboto,
-} from "next/font/google";
+import { Geist, Geist_Mono, Roboto } from "next/font/google";
 import "./globals.css";
+import { TRPCProvider } from "@/lib/trpc/provider";
+import { NuqsAdapter } from "nuqs/adapters/next/app";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Toaster } from "sonner";
+import NextTopLoader from 'nextjs-toploader';
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
-// const geistSans = Geist({
-//   variable: "--font-geist-sans",
-//   subsets: ["latin"],
-// });
+const geistSans = Geist({
+  variable: "--font-geist-sans",
+  subsets: ["latin"],
+});
 
-// const geistMono = Geist_Mono({
-//   variable: "--font-geist-mono",
-//   subsets: ["latin"],
-// });
+const geistMono = Geist_Mono({
+  variable: "--font-geist-mono",
+  subsets: ["latin"],
+});
 
 export const metadata: Metadata = {
   title: "Create Next App",
@@ -28,12 +30,27 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={"dark " + roboto.variable}>
+    <html lang="en">
       <body
-        // className={`${geistSans.variable} ${geistMono.variable} antialiased`}
-        className={`antialiased`}
+        className={`dark ${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        {children}
+        <NuqsAdapter>
+          <TooltipProvider delayDuration={0}>
+            <TRPCProvider>
+              <NextTopLoader color="#333" height={5} showSpinner={false} />
+              {children}
+              <Toaster
+                richColors
+                closeButton
+                position="bottom-center"
+                theme="dark"
+                toastOptions={{
+                  className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
+                }}
+              />
+            </TRPCProvider>
+          </TooltipProvider>
+        </NuqsAdapter>
       </body>
     </html>
   );

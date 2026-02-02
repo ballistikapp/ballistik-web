@@ -1,0 +1,90 @@
+---
+description: "Migration guidelines and feature implementation patterns"
+alwaysApply: true
+---
+
+# Migration Guidelines
+
+When porting features from sollabv0 to sollabs-web:
+
+1. **Analyze the feature** in sollabv0:
+
+   - Understand the business logic
+   - Identify database operations
+   - Note API endpoints and their behavior
+
+2. **Design the implementation**:
+
+   - Create/update Prisma schema if needed
+   - Define Zod schemas for validation
+   - Plan service layer functions
+   - Design tRPC router endpoints
+
+3. **Implement in layers**:
+
+   - Start with Prisma schema (if new tables needed)
+   - Add Zod schemas
+   - Implement service functions
+   - Create tRPC router
+   - Build UI components
+
+4. **Improve over v0**:
+
+   - Better error handling
+   - Type safety throughout
+   - Cleaner separation of concerns
+   - More robust validation
+
+## Common Patterns
+
+### Creating a New Feature
+
+1. **Schema** (`server/schemas/[feature].schema.ts`):
+
+```typescript
+import { z } from "zod";
+
+export const createFeatureSchema = z.object({
+  name: z.string().min(1),
+});
+
+export type CreateFeatureInput = z.infer<typeof createFeatureSchema>;
+```
+
+2. **Service** (`server/services/[feature].service.ts`):
+
+```typescript
+import type { CreateFeatureInput } from "@/server/schemas";
+import { prisma } from "@/lib/generated/prisma";
+
+export const featureService = {
+  async create(input: CreateFeatureInput) {
+    return await prisma.feature.create({ data: input });
+  },
+};
+```
+
+3. **Router** (`server/trpc/routers/[feature].router.ts`):
+
+```typescript
+import { router, publicProcedure } from "../trpc";
+import { createFeatureSchema } from "@/server/schemas";
+import { featureService } from "@/server/services";
+
+export const featureRouter = router({
+  create: publicProcedure
+    .input(createFeatureSchema)
+    .mutation(async ({ input }) => {
+      return await featureService.create(input);
+    }),
+});
+```
+
+4. **Add to app router** (`server/trpc/routers/_app.ts`):
+
+```typescript
+export const appRouter = router({
+  // ... existing routers
+  feature: featureRouter,
+});
+```
