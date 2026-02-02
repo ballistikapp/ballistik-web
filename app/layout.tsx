@@ -5,7 +5,8 @@ import { TRPCProvider } from "@/lib/trpc/provider";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
-import NextTopLoader from 'nextjs-toploader';
+import NextTopLoader from "nextjs-toploader";
+import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
 
 const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
 
@@ -51,6 +52,7 @@ export default function RootLayout({
             </TRPCProvider>
           </TooltipProvider>
         </NuqsAdapter>
+        <ClickyAnalytics />
       </body>
     </html>
   );
