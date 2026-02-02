@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
+import { tokenTransactionsGrpc } from "@/server/solana/token-transactions-grpc";
+import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import {
   LAMPORTS_PER_SOL,
   type ParsedTransactionWithMeta,
@@ -10,6 +12,7 @@ import {
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import type {
   ListTransactionsByTokenInput,
+  LiveTransactionsByTokenInput,
   RefreshTransactionsByTokenInput,
 } from "@/server/schemas/transaction.schema";
 
@@ -31,6 +34,12 @@ type ParsedTransactionResult = {
   blockTime: Date | null;
 };
 
+type LiveTransactionItem = ParsedTransactionResult & {
+  isOwned: boolean;
+  walletType: WalletType | null;
+  seenAt: Date;
+};
+
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 
 type TokenBalanceEntry = NonNullable<
@@ -50,7 +59,74 @@ function sumTokenBalances(
   }, 0);
 }
 
+function sumTokenBalancesByOwner(
+  balances: TokenBalanceEntry[] | null | undefined,
+  mint: string
+) {
+  const totals = new Map<string, number>();
+  if (!balances?.length) return totals;
+  balances.forEach((balance) => {
+    if (balance.mint !== mint || !balance.owner) return;
+    const amount = balance.uiTokenAmount?.uiAmount ?? 0;
+    totals.set(balance.owner, (totals.get(balance.owner) ?? 0) + amount);
+  });
+  return totals;
+}
+
 function getWrappedSolDiff(
+  tx: ParsedTransactionWithMeta,
+  walletPublicKey: string
+) {
+  if (!tx.meta) return 0;
+  const preBalance = sumTokenBalances(
+    tx.meta.preTokenBalances,
+    walletPublicKey,
+    WRAPPED_SOL_MINT
+  );
+  const postBalance = sumTokenBalances(
+    tx.meta.postTokenBalances,
+    walletPublicKey,
+    WRAPPED_SOL_MINT
+  );
+  return postBalance - preBalance;
+}
+
+function resolveAccountKey(
+  key: ParsedTransactionWithMeta["transaction"]["message"]["accountKeys"][number]
+) {
+  if (typeof key === "string") return key;
+  if (key && typeof key === "object" && "pubkey" in key) {
+    const maybePubkey = key.pubkey;
+    if (
+      maybePubkey &&
+      typeof maybePubkey === "object" &&
+      "toBase58" in maybePubkey &&
+      typeof maybePubkey.toBase58 === "function"
+    ) {
+      return maybePubkey.toBase58();
+    }
+  }
+  if (key && typeof key === "object" && "toBase58" in key) {
+    const toBase58 = key.toBase58;
+    if (typeof toBase58 === "function") {
+      return toBase58.call(key);
+    }
+  }
+  return null;
+}
+
+function getSystemSolDiff(tx: ParsedTransactionWithMeta, walletPublicKey: string) {
+  const accountIndex = tx.transaction.message.accountKeys.findIndex(
+    (key) => resolveAccountKey(key) === walletPublicKey
+  );
+  if (accountIndex === -1) return 0;
+  const preSolBalance = tx.meta?.preBalances?.[accountIndex];
+  const postSolBalance = tx.meta?.postBalances?.[accountIndex];
+  if (preSolBalance === undefined || postSolBalance === undefined) return 0;
+  return (postSolBalance - preSolBalance) / LAMPORTS_PER_SOL;
+}
+
+function getWrappedSolDiffForOwner(
   tx: ParsedTransactionWithMeta,
   walletPublicKey: string
 ) {
@@ -200,6 +276,91 @@ function parseTransactionForToken(
     feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
     blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
   };
+}
+
+function parseTransactionForTokenOwners(
+  signature: string,
+  tx: ParsedTransactionWithMeta | null,
+  tokenPublicKey: string
+): ParsedTransactionResult[] {
+  if (!tx || !tx.meta) {
+    return [];
+  }
+
+  const preByOwner = sumTokenBalancesByOwner(
+    tx.meta.preTokenBalances,
+    tokenPublicKey
+  );
+  const postByOwner = sumTokenBalancesByOwner(
+    tx.meta.postTokenBalances,
+    tokenPublicKey
+  );
+
+  const owners = new Set<string>([
+    ...Array.from(preByOwner.keys()),
+    ...Array.from(postByOwner.keys()),
+  ]);
+
+  if (owners.size === 0) {
+    return [];
+  }
+
+  const isCreate = tx.meta.logMessages?.some(
+    (log) =>
+      log.includes("Instruction: InitializeMint") ||
+      log.includes("Instruction: Create")
+  );
+
+  const results: ParsedTransactionResult[] = [];
+
+  owners.forEach((owner) => {
+    const preAmount = preByOwner.get(owner) ?? 0;
+    const postAmount = postByOwner.get(owner) ?? 0;
+    const tokenDiff = postAmount - preAmount;
+    if (tokenDiff === 0) return;
+
+    const systemSolDiff = getSystemSolDiff(tx, owner);
+    const wrappedSolDiff = getWrappedSolDiffForOwner(tx, owner);
+    const solDiff =
+      Math.abs(wrappedSolDiff) > Math.abs(systemSolDiff)
+        ? wrappedSolDiff
+        : systemSolDiff;
+
+    if (tokenDiff > 0) {
+      const solAmount = Math.max(0, -solDiff);
+      const tokenAmount = tokenDiff;
+      results.push({
+        walletPublicKey: owner,
+        transactionType: isCreate ? "CREATE" : "BUY",
+        status: tx.meta.err ? "FAILED" : "CONFIRMED",
+        transactionSignature: signature,
+        solAmount,
+        tokenAmount,
+        pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
+        slippageBps: 0,
+        feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+        blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
+      });
+      return;
+    }
+
+    const solAmount = Math.max(0, solDiff);
+    const tokenAmount = Math.abs(tokenDiff);
+    results.push({
+      walletPublicKey: owner,
+      transactionType: "SELL",
+      status: tx.meta.err ? "FAILED" : "CONFIRMED",
+      transactionSignature: signature,
+      solAmount,
+      tokenAmount,
+      pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
+      slippageBps: 0,
+      feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+      blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
+    });
+  });
+
+  return results;
 }
 
 export const transactionService = {
@@ -452,8 +613,110 @@ export const transactionService = {
 
     return newTransactions;
   },
+  async liveByToken(input: LiveTransactionsByTokenInput, userId: string) {
+    const limit = Math.min(Math.max(input.limit ?? 60, 10), 200);
+    const { token, wallets } = await getAllowedWallets(
+      input.tokenPublicKey,
+      userId
+    );
+
+    const ownedWallets = new Map(
+      wallets.map((wallet) => [wallet.publicKey, wallet.type])
+    );
+
+    const mint = new PublicKey(token.publicKey);
+    const { bondingCurve } = derivePumpAddresses(mint);
+
+    await tokenTransactionsGrpc.subscribeToToken(token.publicKey, [
+      token.publicKey,
+      bondingCurve.toBase58(),
+    ]);
+
+    const streamStatus = tokenTransactionsGrpc.getStatus();
+    const state = tokenTransactionsGrpc.getState(token.publicKey);
+    if (!state) {
+      return {
+        tokenPublicKey: token.publicKey,
+        transactions: [],
+        totals: {
+          totalLiquiditySol: 0,
+          foreignLiquiditySol: 0,
+        },
+        streamStatus,
+      };
+    }
+
+    const signatureEntries = state.signatures.slice(0, limit * 4);
+    const missingSignatures = signatureEntries
+      .filter((entry) => !state.parsedBySignature.has(entry.signature))
+      .map((entry) => entry.signature);
+
+    if (missingSignatures.length > 0) {
+      const connection = getSolanaConnection();
+      const parsedBatch = await connection.getParsedTransactions(
+        missingSignatures,
+        { maxSupportedTransactionVersion: 0 }
+      );
+      parsedBatch.forEach((parsed, index) => {
+        const signature = missingSignatures[index];
+        if (signature) {
+          state.parsedBySignature.set(signature, parsed ?? null);
+        }
+      });
+    }
+
+    const entries: LiveTransactionItem[] = [];
+
+    signatureEntries.forEach((entry) => {
+      const parsed = state.parsedBySignature.get(entry.signature) ?? null;
+      const parsedEntries = parseTransactionForTokenOwners(
+        entry.signature,
+        parsed,
+        token.publicKey
+      );
+      parsedEntries.forEach((transaction) => {
+        const walletType = ownedWallets.get(transaction.walletPublicKey) ?? null;
+        entries.push({
+          ...transaction,
+          isOwned: Boolean(walletType),
+          walletType,
+          seenAt: new Date(entry.seenAt),
+        });
+      });
+    });
+
+    entries.sort((a, b) => {
+      const aTime = (a.blockTime ?? a.seenAt).getTime();
+      const bTime = (b.blockTime ?? b.seenAt).getTime();
+      return bTime - aTime;
+    });
+
+    const transactions = entries.slice(0, limit);
+    const totalLiquiditySol = transactions.reduce(
+      (sum, tx) => sum + tx.solAmount,
+      0
+    );
+    const foreignLiquiditySol = transactions.reduce(
+      (sum, tx) => (tx.isOwned ? sum : sum + tx.solAmount),
+      0
+    );
+
+    return {
+      tokenPublicKey: token.publicKey,
+      transactions,
+      totals: {
+        totalLiquiditySol,
+        foreignLiquiditySol,
+      },
+      streamStatus,
+    };
+  },
 };
 
 export type TransactionItem = Awaited<
   ReturnType<typeof transactionService.listByToken>
 >[number];
+
+export type LiveTransactionResponse = Awaited<
+  ReturnType<typeof transactionService.liveByToken>
+>;

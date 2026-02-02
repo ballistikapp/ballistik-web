@@ -118,17 +118,6 @@ export const volumeBotConfigSchema = z
         path: ["ranges"],
       });
     }
-    const probabilitySum = config.ranges.reduce(
-      (sum, range) => sum + range.probability,
-      0
-    );
-    if (Math.abs(probabilitySum - 1) >= 0.001) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        message: "Range probabilities must sum to 1.0",
-        path: ["ranges"],
-      });
-    }
     for (const range of config.ranges) {
       if (range.probability < limits.minRangeProbability) {
         ctx.addIssue({

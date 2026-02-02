@@ -7,6 +7,28 @@
 - Persist sessions, wallets, and trade logs for recovery and UI status.
 - Support scheduled start, scheduled stop, reclaim, and close-accounts actions.
 
+## Recent Changes: Independent Range Intervals
+
+**Date**: 2026-01-29
+
+### What Changed
+
+Previously, the volume bot selected one range per wallet tick using weighted probabilities, and that range's interval determined when the next tick would occur.
+
+Now, **each range runs on its own independent timer**. For a session with 10 wallets and 3 ranges, there are 30 concurrent timers (10 × 3).
+
+### Key Differences
+
+1. **Probability Semantics**: `probability` now means "execution probability when this range's timer fires" instead of "selection weight"
+2. **No Probability Sum Requirement**: Ranges no longer need to sum to 1.0 since they're independent
+3. **Concurrent Execution**: All ranges fire on their own schedules simultaneously
+4. **In-Flight Protection**: Wallets can't execute multiple trades concurrently; if one range is trading, others skip
+5. **Volume Calculation**: Sum across all ranges since they run in parallel
+
+### Why This Change
+
+This provides more predictable and consistent behavior - a range with 1-5 second interval will actually fire every 1-5 seconds regardless of other ranges, making volume patterns more reliable and easier to reason about.
+
 ## Architecture Summary
 
 - UI and tRPC run in the web service.
@@ -85,24 +107,27 @@ Indexes are defined for efficient queries:
 
 ### Range Configuration
 
-Each range defines a trade size pattern and timing:
+Each range defines a trade size pattern and timing. **Ranges run independently** - each range has its own interval timer per wallet:
 
 - `solMin` / `solMax`: minimum and maximum trade size in SOL
 - `increment`: step size for round numbers; if set, build steps from `solMin` to `solMax` and pick uniformly
-- `probability`: selection frequency (0-1); all range probabilities must sum to 1
-- `intervalMin` / `intervalMax`: seconds between consecutive trades for this range
+- `probability`: execution probability (0-1); probability that a trade executes when the range's interval fires
+- `intervalMin` / `intervalMax`: seconds between consecutive ticks for **this specific range** (independent of other ranges)
 - `direction`: `buy` | `sell` | `both`
 - `buyProbability`: required when `direction = both` (0-1)
+
+**Important**: Unlike the old behavior where ranges were selected by probability at each tick, **each range now runs on its own independent timer**. The `probability` field now controls whether a trade executes when the range's timer fires, not the selection frequency.
 
 **Trade Amount Selection**:
 
 - If `increment > 0`: build steps `[solMin, solMin + increment, ...]` up to `solMax`, then select a step uniformly.
 - If `increment` is null/0/undefined: generate uniform random `solMin..solMax`.
 
-**Range Selection**:
+**Execution Probability Check**:
 
-- Generate `R1 = Math.random()` in `[0, 1)`.
-- Accumulate probabilities until sum >= `R1`.
+- When a range's timer fires, generate `R1 = Math.random()` in `[0, 1)`.
+- If `R1 > range.probability`, skip trade execution and reschedule for the next interval.
+- This allows ranges to fire regularly but execute trades only with a certain probability.
 
 **Direction Selection**:
 
@@ -110,7 +135,7 @@ Each range defines a trade size pattern and timing:
 - If `direction = sell`: return sell.
 - If `direction = both`: generate independent `R2 = Math.random()` and compare with `buyProbability`.
 
-CRITICAL: Never reuse random values between range selection (`R1`) and direction selection (`R2`).
+CRITICAL: Random values are generated independently for probability check (`R1`) and direction selection (`R2`).
 
 ### Wallet Configuration
 
@@ -134,9 +159,9 @@ CRITICAL: Never reuse random values between range selection (`R1`) and direction
 
 ### Validation Rules
 
-1. `sum(range.probability) = 1.0` with tolerance `Math.abs(sum - 1.0) < 0.001`.
+1. Each `range.probability` must be in range `[0, 1]`. **Note**: Probability sum validation is removed since ranges run independently.
 2. Each range: `solMin <= solMax`, `intervalMin <= intervalMax`.
-3. `solMin >= 0.001`, `solMax <= 10`, `intervalMin >= 10`, `intervalMax <= 3600`.
+3. `solMin >= 0.001`, `solMax <= 10`, `intervalMin >= 1`, `intervalMax <= 3600`.
 4. `totalWalletCount = generated + selected` must be `1-50`.
 5. `targetDurationSeconds` must be `1-604800`.
 6. If `scheduledStartAt` is set, it must be in the future and within 30 days.
@@ -164,17 +189,55 @@ Validation behavior:
 
 ### Volume Estimation
 
+**With independent range intervals**, each range fires on its own schedule and probability controls execution:
+
 For each range:
 
 - `avgAmount = (solMin + solMax) / 2`
 - `avgInterval = (intervalMin + intervalMax) / 2`
-- `tradesPerMinute = 60 / avgInterval * probability * totalWalletCount`
-- `volumePerMinute = avgAmount * tradesPerMinute`
-- `minVolumePerMinute = solMin * 60 / intervalMax * probability * totalWalletCount`
-- `maxVolumePerMinute = solMax * 60 / intervalMin * probability * totalWalletCount`
+- `ticksPerMinute = 60 / avgInterval`
+- `executionsPerMinute = ticksPerMinute * probability * totalWalletCount`
+- `volumePerMinute = avgAmount * executionsPerMinute`
+- `minVolumePerMinute = solMin * (60 / intervalMax) * probability * totalWalletCount`
+- `maxVolumePerMinute = solMax * (60 / intervalMin) * probability * totalWalletCount`
 
-Sum across ranges and multiply by `(targetDurationSeconds / 60)` for session totals.
+Sum across **all ranges** (they run concurrently) and multiply by `(targetDurationSeconds / 60)` for session totals.
 Display: `X-Y SOL/min, A-B SOL total session`.
+
+**Example**: 3 ranges with 10 wallets each:
+- Range 0: interval 10-20s, probability 0.5 → ~1.5 trades/min (10 wallets × 60/15 × 0.5)
+- Range 1: interval 5-10s, probability 0.3 → ~2.4 trades/min (10 wallets × 60/7.5 × 0.3)
+- Range 2: interval 30-60s, probability 1.0 → ~1.3 trades/min (10 wallets × 60/45 × 1.0)
+- **Total**: ~5.2 trades/min across all ranges
+
+### Net Delta SOL Estimation
+
+Shows the min and max expected net SOL change (profit/loss) for the session. This helps users understand the expected P&L before starting the bot.
+
+**Per-trade net delta calculation** for each range:
+
+- `direction = buy`: `minNetDelta = +probability * solMin`, `maxNetDelta = +probability * solMax`
+- `direction = sell`: `minNetDelta = -probability * solMax`, `maxNetDelta = -probability * solMin`
+- `direction = both`: 
+  - `minNetDelta = probability * (buyProbability * solMin - sellProbability * solMax)`
+  - `maxNetDelta = probability * (buyProbability * solMax - sellProbability * solMin)`
+
+**Per-minute and total calculation**:
+
+- `netSolPerTrade = { min: sum(minNetDelta), max: sum(maxNetDelta) }` across all ranges
+- `tradesPerMinute = (60 / avgIntervalWeighted) * totalWalletCount`
+- `netSolPerMinute = { min: netSolPerTrade.min * tradesPerMinute, max: netSolPerTrade.max * tradesPerMinute }`
+- `netSolTotal = { min: netSolPerMinute.min * minutes, max: netSolPerMinute.max * minutes }`
+
+**Display on Start Volume Bot page** (preflight section):
+
+- **Net Δ SOL per minute**: `X—Y SOL` (min to max range)
+- **Total net Δ SOL (at end)**: `A—B SOL` (min to max range for full session)
+
+These metrics appear alongside volume estimates and help users understand:
+- Whether the session will be net profitable or net cost
+- The range of possible outcomes based on configuration
+- Expected SOL balance change at session end
 
 ### Funding Calculation (Suggested)
 
@@ -193,49 +256,55 @@ The UI pre-fills `fundingPerGeneratedWallet` with `suggestedFunding` and warns i
 
 ### Lifecycle Operations
 
-- `start`: validate input, create session, fund wallets, schedule timers
-- `tick`: execute one trade and schedule next tick
-- `stop`: request stop, cancel timers, return SOL to main wallet (tokens remain)
+- `start`: validate input, create session, fund wallets, schedule independent timers for each wallet-range combination
+- `tick`: execute one trade for a specific wallet-range pair and schedule next tick for that range
+- `stop`: request stop, cancel all timers, return SOL to main wallet (tokens remain)
 - `reclaim`: consolidate SOL back to main wallet (manual action post-stop)
 - `close-accounts`: close empty SPL token accounts for rent reclaim
 
-### Scheduling Phase (per wallet)
+### Scheduling Phase (per wallet-range pair)
 
-1. Select range using weighted probabilities (R1).
-2. Generate interval using `randomBetween(intervalMin, intervalMax)`.
-3. Set `nextTradeAt = now + interval`.
-4. Store assigned range for the wallet tick and schedule timer.
+1. For each wallet, schedule a timer for **each range independently**.
+2. Generate interval using `randomBetween(range.intervalMin, range.intervalMax)`.
+3. Set `nextTickAt = now + interval` for this specific wallet-range pair.
+4. Store timer with key `walletId:rangeIndex`.
 
-### Execution Phase (when timer fires)
+**Key Change**: Instead of one timer per wallet, there are now `walletCount * rangeCount` timers running concurrently.
+
+### Execution Phase (when wallet-range timer fires)
 
 1. Validate session status = RUNNING and wallet status = ACTIVE.
 2. Check `scheduledStopAt` or duration exceeded and stop if needed.
-3. Select trade amount from the assigned range.
-4. Select direction using independent random `R2` if `direction = both`.
-5. Fetch balances from chain (SOL and tokens).
-6. Build transaction with slippage protection.
-7. Execute transaction and wait for confirmation.
-8. Update balances and stats.
-9. Schedule next tick.
+3. **Check execution probability**: `Math.random() > range.probability` → skip and reschedule.
+4. **Check if wallet has trade in-flight**: if yes, skip and reschedule (prevents concurrent trades).
+5. Select trade amount from this specific range.
+6. Select direction using independent random `R2` if `direction = both`.
+7. Fetch balances from chain (SOL and tokens) using gRPC cache or RPC fallback.
+8. Build transaction with slippage protection.
+9. Execute transaction and wait for confirmation.
+10. Update balances and stats.
+11. Schedule next tick for **this specific wallet-range pair**.
 
 ### Wallet Eligibility & Retry
 
 Cooldown:
 
-- `cooldownSeconds = Math.max(range.intervalMin * 0.3, 10)`
+- `cooldownSeconds = Math.max(range.intervalMin * 0.5, 0.5)`
 - Eligible when `(now - lastTradeAt) > cooldownSeconds`
 
 Eligibility filters:
 
 - `status = ACTIVE`
-- `inFlightTrade = false`
+- `inFlightTrade = false` (per wallet, prevents concurrent trades from multiple ranges)
 - For buys: `solBalance >= tradeAmount + 0.003`
 - For sells: `tokenBalance > 0`
+
+**Important**: The `inFlightTrade` check prevents a wallet from executing multiple trades concurrently (e.g., when multiple range timers fire at the same time). If a wallet is already trading, other ranges will skip and reschedule.
 
 If no eligible wallets:
 
 - Retry up to 3 times with 5 second delays (15 seconds total).
-- After 3 failures, log a warning with ineligibility reasons, skip trade, and schedule the next tick.
+- After 3 failures, log a warning with ineligibility reasons, skip trade, and schedule the next tick for that specific range.
 
 ### Sell Transaction Handling
 
@@ -279,9 +348,13 @@ After each trade:
 
 ### Core Scheduling
 
-- In-memory timers scheduled per wallet using `nextTickAt`
+- In-memory timers scheduled per **wallet-range pair** using computed `nextTickAt`
+- Timer keys use format: `walletId:rangeIndex` (e.g., `abc123:0`, `abc123:1`)
+- Each wallet has `rangeCount` independent timers running concurrently
 - Per-session stop timers based on `scheduledStopAt`
 - Max timeout: ~24.8 days (JavaScript setTimeout limit)
+
+**Example**: A session with 10 wallets and 3 ranges will have 30 concurrent timers (10 × 3).
 
 ### Scheduled Start
 
@@ -297,8 +370,9 @@ After each trade:
 ### Recovery
 
 - On startup, reads all RUNNING sessions and ACTIVE wallets.
-- Re-schedules timers for upcoming ticks.
-- Immediately processes overdue ticks (concurrency: 5).
+- For each wallet, schedules timers for **all ranges** (fresh intervals computed).
+- Immediately processes all wallet-range combinations (concurrency: 5).
+- Since timers are in-memory only, recovery starts all ranges fresh with new random intervals.
 
 ### Watchdog
 
@@ -337,7 +411,14 @@ After each trade:
 All endpoints require authentication (`protectedProcedure`).
 
 - `volumeBot.start` — create session and schedule timers
-- `volumeBot.status` — return session + wallet stats (by sessionId or tokenPublicKey)
+- `volumeBot.status` — return session + wallet stats + range metrics (by sessionId or tokenPublicKey)
+  - Returns: `session`, `wallets`, `rangeMetrics`
+  - `session.totalPnlSol`: total net delta SOL at session end
+  - `session.netDeltaSolPerMinute`: net delta SOL per minute (totalPnlSol / runtimeMinutes)
+  - `rangeMetrics`: array of per-range expected net delta SOL metrics
+    - `rangeIndex`: range position in config
+    - `expectedNetDeltaSolPerTrade`: expected net SOL change per trade for this range
+    - `expectedNetDeltaSolPerMinute`: expected net SOL change per minute across all wallets
 - `volumeBot.stop` — request session stop (async, returns immediately)
 - `volumeBot.reclaim` — consolidate SOL from session wallets to main wallet
 - `volumeBot.closeAccounts` — close empty SPL token accounts for rent reclaim
@@ -357,6 +438,19 @@ All endpoints require authentication (`protectedProcedure`).
 - Remove legacy strategy fields.
 - Defer styling and polish.
 - Presets: select, apply, save, delete from the start page.
+
+### Session Page Display
+
+The session page (`/volume-bot/[sessionId]`) displays:
+
+**Whole Session Metrics:**
+- Total net delta SOL at session end (`totalPnlSol`)
+- Net delta SOL per minute (`netDeltaSolPerMinute = totalPnlSol / runtimeMinutes`)
+
+**Per-Range Metrics:**
+- For each range, display expected net delta SOL per minute
+- Calculated based on range configuration (direction, probability, interval, amount)
+- Accounts for all wallets in the session
 
 ## Initialization
 

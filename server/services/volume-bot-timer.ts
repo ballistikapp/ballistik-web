@@ -7,7 +7,7 @@ import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import {
-  processVolumeBotWallet,
+  processVolumeBotWalletRange,
   stopVolumeBotSession,
 } from "@/server/services/volume-bot-worker";
 import { walletService } from "@/server/services/wallet.service";
@@ -16,21 +16,26 @@ const MAX_TIMEOUT_MS = 2_147_483_647;
 const RECOVERY_CONCURRENCY = 5;
 const WATCHDOG_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
 
-type WalletSchedule = {
+type WalletRangeSchedule = {
   walletId: string;
   sessionId: string;
+  rangeIndex: number;
   nextTickAt: Date;
 };
 
 class VolumeBotTimerManager {
-  private walletTimers = new Map<string, NodeJS.Timeout>();
-  private walletToSession = new Map<string, string>();
-  private sessionToWallets = new Map<string, Set<string>>();
+  private walletRangeTimers = new Map<string, NodeJS.Timeout>();
+  private walletRangeToSession = new Map<string, string>();
+  private sessionToWalletRanges = new Map<string, Set<string>>();
   private sessionStopTimers = new Map<string, NodeJS.Timeout>();
   private sessionStartTimers = new Map<string, NodeJS.Timeout>();
   private watchdogTimer: NodeJS.Timeout | null = null;
   private shuttingDown = false;
   private shutdownRegistered = false;
+
+  private makeWalletRangeKey(walletId: string, rangeIndex: number): string {
+    return `${walletId}:${rangeIndex}`;
+  }
 
   async scheduleSession(sessionId: string) {
     const session = await prisma.volumeBotSession.findUnique({
@@ -40,6 +45,7 @@ class VolumeBotTimerManager {
         status: true,
         scheduledStopAt: true,
         scheduledStartAt: true,
+        config: true,
       },
     });
     if (!session) {
@@ -57,63 +63,78 @@ class VolumeBotTimerManager {
 
     const wallets = await prisma.volumeBotWallet.findMany({
       where: { sessionId: session.id, status: "ACTIVE" },
-      select: { id: true, sessionId: true, nextTickAt: true },
+      select: { id: true, sessionId: true },
     });
 
+    const config = session.config as VolumeBotConfigInput;
     wallets.forEach((wallet) => {
-      const nextTickAt = wallet.nextTickAt ?? new Date();
-      this.scheduleWallet({
-        walletId: wallet.id,
-        sessionId: wallet.sessionId,
-        nextTickAt,
+      config.ranges.forEach((range, rangeIndex) => {
+        const nextTickAt = this.computeNextTickAt(range);
+        this.scheduleWalletRange({
+          walletId: wallet.id,
+          sessionId: wallet.sessionId,
+          rangeIndex,
+          nextTickAt,
+        });
       });
     });
   }
 
-  scheduleWallet(schedule: WalletSchedule) {
+  scheduleWalletRange(schedule: WalletRangeSchedule) {
     if (this.shuttingDown) return;
-    const { walletId, sessionId, nextTickAt } = schedule;
-    this.cancelWallet(walletId);
+    const { walletId, sessionId, rangeIndex, nextTickAt } = schedule;
+    const key = this.makeWalletRangeKey(walletId, rangeIndex);
+    this.cancelWalletRange(key);
 
     const delayMs = Math.max(0, nextTickAt.getTime() - Date.now());
     const safeDelayMs = Math.min(delayMs, MAX_TIMEOUT_MS);
 
     const timeout = setTimeout(() => {
-      void this.handleWalletTick(walletId);
+      void this.handleWalletRangeTick(walletId, rangeIndex);
     }, safeDelayMs);
 
-    this.walletTimers.set(walletId, timeout);
-    this.walletToSession.set(walletId, sessionId);
-    if (!this.sessionToWallets.has(sessionId)) {
-      this.sessionToWallets.set(sessionId, new Set());
+    this.walletRangeTimers.set(key, timeout);
+    this.walletRangeToSession.set(key, sessionId);
+    if (!this.sessionToWalletRanges.has(sessionId)) {
+      this.sessionToWalletRanges.set(sessionId, new Set());
     }
-    this.sessionToWallets.get(sessionId)?.add(walletId);
+    this.sessionToWalletRanges.get(sessionId)?.add(key);
   }
 
-  cancelWallet(walletId: string) {
-    const timer = this.walletTimers.get(walletId);
+  cancelWalletRange(key: string) {
+    const timer = this.walletRangeTimers.get(key);
     if (timer) {
       clearTimeout(timer);
     }
-    this.walletTimers.delete(walletId);
+    this.walletRangeTimers.delete(key);
 
-    const sessionId = this.walletToSession.get(walletId);
-    this.walletToSession.delete(walletId);
+    const sessionId = this.walletRangeToSession.get(key);
+    this.walletRangeToSession.delete(key);
     if (sessionId) {
-      const walletSet = this.sessionToWallets.get(sessionId);
-      walletSet?.delete(walletId);
-      if (walletSet && walletSet.size === 0) {
-        this.sessionToWallets.delete(sessionId);
+      const keySet = this.sessionToWalletRanges.get(sessionId);
+      keySet?.delete(key);
+      if (keySet && keySet.size === 0) {
+        this.sessionToWalletRanges.delete(sessionId);
       }
     }
   }
 
+  cancelAllWalletRanges(walletId: string) {
+    const keysToCancel: string[] = [];
+    this.walletRangeTimers.forEach((_, key) => {
+      if (key.startsWith(`${walletId}:`)) {
+        keysToCancel.push(key);
+      }
+    });
+    keysToCancel.forEach((key) => this.cancelWalletRange(key));
+  }
+
   cancelSession(sessionId: string) {
-    const walletSet = this.sessionToWallets.get(sessionId);
-    if (walletSet) {
-      walletSet.forEach((walletId) => this.cancelWallet(walletId));
+    const keySet = this.sessionToWalletRanges.get(sessionId);
+    if (keySet) {
+      keySet.forEach((key) => this.cancelWalletRange(key));
     }
-    this.sessionToWallets.delete(sessionId);
+    this.sessionToWalletRanges.delete(sessionId);
     this.clearStopTimer(sessionId);
     this.clearStartTimer(sessionId);
     volumeBotGrpc.unsubscribeFromSession(sessionId);
@@ -121,7 +142,7 @@ class VolumeBotTimerManager {
 
   async requestStop(sessionId: string) {
     console.log(`[TimerManager] requestStop called for session ${sessionId}`);
-    console.log(`[TimerManager] Current tracked sessions: ${Array.from(this.sessionToWallets.keys()).join(", ") || "none"}`);
+    console.log(`[TimerManager] Current tracked sessions: ${Array.from(this.sessionToWalletRanges.keys()).join(", ") || "none"}`);
     this.cancelSession(sessionId);
     try {
       await stopVolumeBotSession(sessionId);
@@ -140,6 +161,12 @@ class VolumeBotTimerManager {
     }
   }
 
+  private computeNextTickAt(range: VolumeBotConfigInput["ranges"][number]): Date {
+    const randomBetween = (min: number, max: number) => Math.random() * (max - min) + min;
+    const delaySeconds = Math.floor(randomBetween(range.intervalMin, range.intervalMax));
+    return new Date(Date.now() + delaySeconds * 1000);
+  }
+
   async recover() {
     const sessions = await prisma.volumeBotSession.findMany({
       where: { status: { in: ["RUNNING", "SCHEDULED"] } },
@@ -149,6 +176,7 @@ class VolumeBotTimerManager {
         scheduledStopAt: true,
         scheduledStartAt: true,
         tokenPublicKey: true,
+        config: true,
       },
     });
 
@@ -181,28 +209,20 @@ class VolumeBotTimerManager {
         status: "ACTIVE",
         session: { status: "RUNNING" },
       },
-      select: { id: true, sessionId: true, nextTickAt: true },
+      select: { id: true, sessionId: true, session: { select: { config: true } } },
     });
 
-    const now = Date.now();
-    const overdue = wallets.filter(
-      (wallet) => !wallet.nextTickAt || wallet.nextTickAt.getTime() <= now
-    );
-    const upcoming = wallets.filter(
-      (wallet) => wallet.nextTickAt && wallet.nextTickAt.getTime() > now
-    );
-
-    upcoming.forEach((wallet) => {
-      this.scheduleWallet({
-        walletId: wallet.id,
-        sessionId: wallet.sessionId,
-        nextTickAt: wallet.nextTickAt as Date,
+    const walletRangeSchedules: Array<{ walletId: string; rangeIndex: number }> = [];
+    wallets.forEach((wallet) => {
+      const config = wallet.session.config as VolumeBotConfigInput;
+      config.ranges.forEach((_, rangeIndex) => {
+        walletRangeSchedules.push({ walletId: wallet.id, rangeIndex });
       });
     });
 
-    if (overdue.length > 0) {
-      await mapWithConcurrency(overdue, RECOVERY_CONCURRENCY, async (wallet) => {
-        await this.handleWalletTick(wallet.id);
+    if (walletRangeSchedules.length > 0) {
+      await mapWithConcurrency(walletRangeSchedules, RECOVERY_CONCURRENCY, async ({ walletId, rangeIndex }) => {
+        await this.handleWalletRangeTick(walletId, rangeIndex);
       });
     }
 
@@ -286,10 +306,10 @@ class VolumeBotTimerManager {
     if (this.shuttingDown) return;
     this.shuttingDown = true;
     this.stopWatchdog();
-    this.walletTimers.forEach((timer) => clearTimeout(timer));
-    this.walletTimers.clear();
-    this.walletToSession.clear();
-    this.sessionToWallets.clear();
+    this.walletRangeTimers.forEach((timer) => clearTimeout(timer));
+    this.walletRangeTimers.clear();
+    this.walletRangeToSession.clear();
+    this.sessionToWalletRanges.clear();
     this.sessionStopTimers.forEach((timer) => clearTimeout(timer));
     this.sessionStopTimers.clear();
     this.sessionStartTimers.forEach((timer) => clearTimeout(timer));
@@ -499,8 +519,9 @@ class VolumeBotTimerManager {
     }
   }
 
-  private async handleWalletTick(walletId: string) {
-    this.cancelWallet(walletId);
+  private async handleWalletRangeTick(walletId: string, rangeIndex: number) {
+    const key = this.makeWalletRangeKey(walletId, rangeIndex);
+    this.cancelWalletRange(key);
 
     const volumeWallet = await prisma.volumeBotWallet.findUnique({
       where: { id: walletId },
@@ -510,14 +531,21 @@ class VolumeBotTimerManager {
       return;
     }
 
-    const nextTickAt = await processVolumeBotWallet(volumeWallet);
+    const config = volumeWallet.session.config as VolumeBotConfigInput;
+    const range = config.ranges[rangeIndex];
+    if (!range) {
+      return;
+    }
+
+    const nextTickAt = await processVolumeBotWalletRange(volumeWallet, rangeIndex);
     if (!nextTickAt || volumeWallet.session.status !== "RUNNING") {
       return;
     }
 
-    this.scheduleWallet({
+    this.scheduleWalletRange({
       walletId: volumeWallet.id,
       sessionId: volumeWallet.sessionId,
+      rangeIndex,
       nextTickAt,
     });
   }

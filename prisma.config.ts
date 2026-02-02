@@ -6,10 +6,6 @@ config({ path: ".env.development.local", quiet: true });
 
 export default defineConfig({
   datasource: {
-    url:
-      process.env.DEV_STORAGE_POSTGRES_URL ||
-      process.env.DATABASE_URL ||
-      process.env.PROD_STORAGE_POSTGRES_URL ||
-      "",
+    url: process.env.DATABASE_URL || "",
   },
 });

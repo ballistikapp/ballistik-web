@@ -63,10 +63,6 @@ const FEE_TOP_UP_SOL = 0.005;
 
 const inFlightTrades = new Set<string>();
 const slippageFailures = new Map<string, number>();
-const assignedRanges = new Map<
-  string,
-  VolumeBotConfigInput["ranges"][number]
->();
 
 const isFeeError = (error: unknown) => {
   const message =
@@ -115,17 +111,6 @@ const computeNextTickAt = (range: VolumeBotConfigInput["ranges"][number]) => {
   return new Date(Date.now() + delaySeconds * 1000);
 };
 
-const selectRange = (ranges: VolumeBotConfigInput["ranges"]) => {
-  const r1 = Math.random();
-  let cumulative = 0;
-  for (const range of ranges) {
-    cumulative += range.probability;
-    if (r1 <= cumulative) {
-      return range;
-    }
-  }
-  return ranges[ranges.length - 1];
-};
 
 const selectDirection = (
   range: VolumeBotConfigInput["ranges"][number]
@@ -184,45 +169,14 @@ const markInFlight = (walletId: string, inFlight: boolean) => {
   }
 };
 
-const assignRangeForWallet = (
-  walletId: string,
-  ranges: VolumeBotConfigInput["ranges"]
-) => {
-  const range = selectRange(ranges);
-  assignedRanges.set(walletId, range);
-  return range;
-};
 
-const getAssignedRange = (
-  walletId: string,
-  ranges: VolumeBotConfigInput["ranges"]
-) => {
-  const existing = assignedRanges.get(walletId);
-  if (existing) {
-    return existing;
-  }
-  return assignRangeForWallet(walletId, ranges);
-};
-
-const scheduleNextTickForWallet = async (
-  walletId: string,
-  ranges: VolumeBotConfigInput["ranges"]
-) => {
-  const range = assignRangeForWallet(walletId, ranges);
-  const nextTick = computeNextTickAt(range);
-  await prisma.volumeBotWallet.update({
-    where: { id: walletId },
-    data: { nextTickAt: nextTick },
-  });
-  return nextTick;
-};
-
-export const processVolumeBotWallet = async (
-  volumeWallet: VolumeBotWalletWithRelations
+export const processVolumeBotWalletRange = async (
+  volumeWallet: VolumeBotWalletWithRelations,
+  rangeIndex: number
 ): Promise<Date | null> => {
   const walletId = volumeWallet.id;
   const walletPk = volumeWallet.walletPublicKey.slice(0, 8);
-  console.log(`[Worker] Processing wallet ${walletPk} (${walletId})`);
+  console.log(`[Worker] Processing wallet ${walletPk} range ${rangeIndex} (${walletId})`);
 
   const session = volumeWallet.session;
   if (session.status !== "RUNNING") {
@@ -250,27 +204,36 @@ export const processVolumeBotWallet = async (
   }
 
   const config = session.config as StoredVolumeBotConfig;
-  if (!volumeWallet.nextTickAt) {
-    const nextTick = await scheduleNextTickForWallet(walletId, config.ranges);
-    console.log(
-      `[Worker] ${walletPk}: No nextTickAt, scheduling for ${nextTick.toISOString()}`
-    );
-    return nextTick;
+  const range = config.ranges[rangeIndex];
+  if (!range) {
+    console.log(`[Worker] ${walletPk}: Range ${rangeIndex} not found`);
+    return null;
   }
 
-  const assignedRange = getAssignedRange(walletId, config.ranges);
-  const cooldownSeconds = getCooldownSeconds(assignedRange);
+  const nextTickAt = computeNextTickAt(range);
+
+  if (Math.random() > range.probability) {
+    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Skipping execution (probability check failed)`);
+    return nextTickAt;
+  }
+
+  if (inFlightTrades.has(walletId)) {
+    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Skipping, trade already in flight`);
+    return nextTickAt;
+  }
+
+  const cooldownSeconds = getCooldownSeconds(range);
   const lastTradeAt = volumeWallet.lastTradeAt;
 
-  const tradeAmountSol = selectTradeAmountSol(assignedRange);
+  const tradeAmountSol = selectTradeAmountSol(range);
   if (!Number.isFinite(tradeAmountSol) || tradeAmountSol <= 0) {
-    const nextTick = await scheduleNextTickForWallet(walletId, config.ranges);
-    return nextTick;
+    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Invalid trade amount`);
+    return nextTickAt;
   }
 
-  const action = selectDirection(assignedRange);
+  const action = selectDirection(range);
   console.log(
-    `[Worker] ${walletPk}: Selected action=${action} (range=${assignedRange.solMin}-${assignedRange.solMax}, interval=${assignedRange.intervalMin}-${assignedRange.intervalMax})`
+    `[Worker] ${walletPk} range ${rangeIndex}: Selected action=${action} (range=${range.solMin}-${range.solMax}, interval=${range.intervalMin}-${range.intervalMax})`
   );
 
   const connection = getSolanaConnection();
@@ -360,7 +323,6 @@ export const processVolumeBotWallet = async (
   }
 
   if (!eligible || !eligibility) {
-    const nextTick = await scheduleNextTickForWallet(walletId, config.ranges);
     await prisma.volumeBotLog.create({
       data: {
         sessionId: session.id,
@@ -372,10 +334,11 @@ export const processVolumeBotWallet = async (
           reasons: eligibility?.reasons ?? [],
           action,
           tradeAmountSol,
+          rangeIndex,
         },
       },
     });
-    return nextTick;
+    return nextTickAt;
   }
 
   let solBalanceLamports = eligibility.solBalanceLamports;
@@ -472,10 +435,6 @@ export const processVolumeBotWallet = async (
       }
     } else {
       if (tokenBalance <= BigInt(0)) {
-        const nextTick = await scheduleNextTickForWallet(
-          walletId,
-          config.ranges
-        );
         await prisma.volumeBotLog.create({
           data: {
             sessionId: session.id,
@@ -483,9 +442,10 @@ export const processVolumeBotWallet = async (
             type: "sell_skipped",
             message: "Sell skipped: no tokens",
             walletPublicKey: volumeWallet.walletPublicKey,
+            data: { rangeIndex },
           },
         });
-        return nextTick;
+        return nextTickAt;
       }
 
       const desiredNetSolLamports = BigInt(
@@ -527,10 +487,6 @@ export const processVolumeBotWallet = async (
       }
 
       if (tokenAmount <= BigInt(0)) {
-        const nextTick = await scheduleNextTickForWallet(
-          walletId,
-          config.ranges
-        );
         await prisma.volumeBotLog.create({
           data: {
             sessionId: session.id,
@@ -538,9 +494,10 @@ export const processVolumeBotWallet = async (
             type: "sell_skipped",
             message: "Sell skipped: no tokens",
             walletPublicKey: volumeWallet.walletPublicKey,
+            data: { rangeIndex },
           },
         });
-        return nextTick;
+        return nextTickAt;
       }
 
       let minSolOutput = new BN(0);
@@ -640,7 +597,6 @@ export const processVolumeBotWallet = async (
           tokenBalance: Number(updatedTokenBalance) / 1_000_000,
           tradesExecuted: { increment: 1 },
           lastTradeAt: now,
-          nextTickAt: null,
         },
       });
       await prisma.volumeBotSession.update({
@@ -669,13 +625,13 @@ export const processVolumeBotWallet = async (
           data: {
             tradeAmountSol,
             actualSol: actualSolAbs,
+            rangeIndex,
           },
         },
       });
       return null;
     }
 
-    const nextTick = await scheduleNextTickForWallet(walletId, config.ranges);
     await prisma.volumeBotWallet.update({
       where: { id: volumeWallet.id },
       data: {
@@ -683,7 +639,6 @@ export const processVolumeBotWallet = async (
         tokenBalance: Number(updatedTokenBalance) / 1_000_000,
         tradesExecuted: { increment: 1 },
         lastTradeAt: now,
-        nextTickAt: nextTick,
       },
     });
 
@@ -718,15 +673,16 @@ export const processVolumeBotWallet = async (
           tokenAmount: tokenAmount.toString(),
           netSolChangeSol: appliedNetSolChange,
           sellMode,
+          rangeIndex,
         },
       },
     });
-    return nextTick;
+    return nextTickAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[Worker] ${walletPk}: ERROR - ${message}`);
+    console.error(`[Worker] ${walletPk} range ${rangeIndex}: ERROR - ${message}`);
     if (error instanceof Error && error.stack) {
-      console.error(`[Worker] ${walletPk}: Stack:`, error.stack);
+      console.error(`[Worker] ${walletPk} range ${rangeIndex}: Stack:`, error.stack);
     }
     await prisma.volumeBotLog.create({
       data: {
@@ -735,10 +691,10 @@ export const processVolumeBotWallet = async (
         type: "tick",
         message,
         walletPublicKey: volumeWallet.walletPublicKey,
+        data: { rangeIndex },
       },
     });
-    const nextTick = await scheduleNextTickForWallet(walletId, config.ranges);
-    return nextTick;
+    return nextTickAt;
   } finally {
     markInFlight(walletId, false);
   }

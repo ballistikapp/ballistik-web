@@ -8,6 +8,13 @@ Transactions track per-wallet buy, sell, and create activity for a token. Each r
 
 - `transaction.listByToken` returns stored transactions for a token with wallet metadata.
 - `transaction.refreshByToken` scans recent on-chain signatures for allowed wallets and persists new or updated rows.
+- `transaction.liveByToken` streams recent transactions for a token across all wallets using RabbitStream.
+
+## Live Monitoring
+
+- RabbitStream gRPC subscriptions include the token mint and bonding curve accounts.
+- Live results include owned/foreign wallet labels plus per-item SOL/token amounts.
+- Totals include `totalLiquiditySol` and `foreignLiquiditySol` for the current feed window.
 
 ## Price Calculation
 

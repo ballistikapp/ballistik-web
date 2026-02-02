@@ -75,6 +75,7 @@ export default function VolumeBotRunPage() {
 
   const session = statusData?.session;
   const wallets = statusData?.wallets ?? [];
+  const rangeMetrics = statusData?.rangeMetrics ?? [];
   const logs = logsQuery.data ?? [];
   const backToken = tokenPublicKey || session?.tokenPublicKey;
   const backHref = backToken ? `/volume-bot?token=${backToken}` : "/volume-bot";
@@ -94,6 +95,7 @@ export default function VolumeBotRunPage() {
   const netDirectionLabel =
     netSolDirection > 0 ? "Net buy" : netSolDirection < 0 ? "Net sell" : "Neutral";
   const netSol = Number(session?.totalPnlSol ?? 0);
+  const netSolPerMinute = Number(session?.netDeltaSolPerMinute ?? 0);
   const [runtimeSeconds, setRuntimeSeconds] = useState(
     session?.runtimeSeconds ?? 0
   );
@@ -223,8 +225,16 @@ export default function VolumeBotRunPage() {
               <div className="text-sm font-semibold">{netDirectionLabel}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Net SOL</div>
+              <div className="text-xs text-muted-foreground">Net SOL (total)</div>
               <div className="text-sm font-semibold">{netSol.toFixed(3)}</div>
+            </div>
+            <div>
+              <div className="text-xs text-muted-foreground">
+                Net SOL per min
+              </div>
+              <div className="text-sm font-semibold">
+                {netSolPerMinute.toFixed(4)}
+              </div>
             </div>
             <div>
               <div className="text-xs text-muted-foreground">Ranges</div>
@@ -251,23 +261,33 @@ export default function VolumeBotRunPage() {
               No ranges configured.
             </div>
           )}
-          {ranges.map((range, index) => (
-            <div
-              key={`${range.solMin}-${range.solMax}-${index}`}
-              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-            >
-              <div>
-                Range {index + 1}: {range.solMin.toFixed(3)}-
-                {range.solMax.toFixed(3)} SOL
+          {ranges.map((range, index) => {
+            const metric = rangeMetrics[index];
+            const expectedNetDeltaPerMinute =
+              metric?.expectedNetDeltaSolPerMinute ?? 0;
+            return (
+              <div
+                key={`${range.solMin}-${range.solMax}-${index}`}
+                className="flex flex-col gap-1 rounded border px-3 py-2 text-sm"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    Range {index + 1}: {range.solMin.toFixed(3)}-
+                    {range.solMax.toFixed(3)} SOL
+                  </div>
+                  <div className="text-xs text-muted-foreground text-right">
+                    prob {range.probability.toFixed(2)} · interval{" "}
+                    {range.intervalMin}-{range.intervalMax}s · {range.direction}
+                    {range.direction === "both" &&
+                      ` (${(range.buyProbability ?? 0).toFixed(2)} buy)`}
+                  </div>
+                </div>
+                <div className="text-xs text-muted-foreground">
+                  Expected net Δ SOL/min: {expectedNetDeltaPerMinute.toFixed(4)}
+                </div>
               </div>
-              <div className="text-xs text-muted-foreground text-right">
-                prob {range.probability.toFixed(2)} · interval{" "}
-                {range.intervalMin}-{range.intervalMax}s · {range.direction}
-                {range.direction === "both" &&
-                  ` (${(range.buyProbability ?? 0).toFixed(2)} buy)`}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </CardContent>
       </Card>
 

@@ -272,6 +272,8 @@ export default function VolumeBotStartPage() {
     let avgTradeSizeWeighted = 0;
     let minVolumePerMinute = 0;
     let maxVolumePerMinute = 0;
+    let minNetSolPerTrade = 0;
+    let maxNetSolPerTrade = 0;
     for (const range of ranges) {
       const avgAmount = (range.solMin + range.solMax) / 2;
       const avgInterval = (range.intervalMin + range.intervalMax) / 2;
@@ -279,12 +281,23 @@ export default function VolumeBotStartPage() {
       avgTradeSizeWeighted += range.probability * avgAmount;
       if (range.direction === "buy") {
         netSolDirection += range.probability * avgAmount;
+        minNetSolPerTrade += range.probability * range.solMin;
+        maxNetSolPerTrade += range.probability * range.solMax;
       } else if (range.direction === "sell") {
         netSolDirection -= range.probability * avgAmount;
+        minNetSolPerTrade -= range.probability * range.solMax;
+        maxNetSolPerTrade -= range.probability * range.solMin;
       } else {
         const buyProbability = range.buyProbability ?? 0;
+        const sellProbability = 1 - buyProbability;
         netSolDirection +=
           range.probability * avgAmount * (2 * buyProbability - 1);
+        minNetSolPerTrade +=
+          range.probability *
+          (buyProbability * range.solMin - sellProbability * range.solMax);
+        maxNetSolPerTrade +=
+          range.probability *
+          (buyProbability * range.solMax - sellProbability * range.solMin);
       }
       minVolumePerMinute +=
         (range.solMin * 60) /
@@ -309,6 +322,8 @@ export default function VolumeBotStartPage() {
     const suggestedFunding =
       Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100;
     const minutes = targetDurationSeconds / 60;
+    const tradesPerMinute =
+      avgIntervalWeighted > 0 ? (60 / avgIntervalWeighted) * totalWallets : 0;
     return {
       netSolDirection,
       avgIntervalWeighted,
@@ -322,6 +337,14 @@ export default function VolumeBotStartPage() {
       totalVolume: {
         min: minVolumePerMinute * minutes,
         max: maxVolumePerMinute * minutes,
+      },
+      netSolRangePerMinute: {
+        min: minNetSolPerTrade * tradesPerMinute,
+        max: maxNetSolPerTrade * tradesPerMinute,
+      },
+      netSolRangeTotal: {
+        min: minNetSolPerTrade * tradesPerMinute * minutes,
+        max: maxNetSolPerTrade * tradesPerMinute * minutes,
       },
     };
   }, [ranges, totalWallets, targetDurationSeconds]);
@@ -1064,6 +1087,40 @@ export default function VolumeBotStartPage() {
                 </div>
                 <div className="text-lg font-semibold">
                   {formatNumber(effectivePreflight?.avgTradeSizeWeighted)} SOL
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Net Δ SOL per minute
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(
+                    selectionSummary?.netSolRangePerMinute?.min ??
+                      localPreflight?.netSolRangePerMinute?.min
+                  )}
+                  —
+                  {formatNumber(
+                    selectionSummary?.netSolRangePerMinute?.max ??
+                      localPreflight?.netSolRangePerMinute?.max
+                  )}{" "}
+                  SOL
+                </div>
+              </div>
+              <div>
+                <div className="text-xs text-muted-foreground">
+                  Total net Δ SOL (at end)
+                </div>
+                <div className="text-lg font-semibold">
+                  {formatNumber(
+                    selectionSummary?.netSolRangeTotal?.min ??
+                      localPreflight?.netSolRangeTotal?.min
+                  )}
+                  —
+                  {formatNumber(
+                    selectionSummary?.netSolRangeTotal?.max ??
+                      localPreflight?.netSolRangeTotal?.max
+                  )}{" "}
+                  SOL
                 </div>
               </div>
             </div>

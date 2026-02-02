@@ -653,7 +653,44 @@ export const volumeBotService = {
 
     const { wallets, ...session } = sessionWithWallets;
     const totalPnlSol = Number(session.totalPnlSol ?? 0) || 0;
-    return { session: { ...session, totalPnlSol }, wallets };
+    const runtimeSeconds = session.runtimeSeconds || 0;
+    const runtimeMinutes = runtimeSeconds / 60;
+    const netDeltaSolPerMinute =
+      runtimeMinutes > 0 ? totalPnlSol / runtimeMinutes : 0;
+
+    const config = session.config as VolumeBotConfigInput | undefined;
+    const ranges = config?.ranges ?? [];
+    const rangeMetrics = ranges.map((range, index) => {
+      const avgAmount = getAverageRangeAmount(range);
+      const avgInterval = getAverageRangeInterval(range);
+      let expectedNetDeltaPerTrade = 0;
+      if (range.direction === "buy") {
+        expectedNetDeltaPerTrade = avgAmount;
+      } else if (range.direction === "sell") {
+        expectedNetDeltaPerTrade = -avgAmount;
+      } else {
+        const buyProbability = range.buyProbability ?? 0;
+        expectedNetDeltaPerTrade = avgAmount * (2 * buyProbability - 1);
+      }
+      const tradesPerMinute = avgInterval > 0 ? 60 / avgInterval : 0;
+      const expectedNetDeltaPerMinute =
+        expectedNetDeltaPerTrade * tradesPerMinute * range.probability;
+      const totalWalletCount = wallets.length || 1;
+      const expectedNetDeltaPerMinuteTotal =
+        expectedNetDeltaPerMinute * totalWalletCount;
+
+      return {
+        rangeIndex: index,
+        expectedNetDeltaSolPerTrade: expectedNetDeltaPerTrade,
+        expectedNetDeltaSolPerMinute: expectedNetDeltaPerMinuteTotal,
+      };
+    });
+
+    return {
+      session: { ...session, totalPnlSol, netDeltaSolPerMinute },
+      wallets,
+      rangeMetrics,
+    };
   },
 
   async stopSession(sessionId: string, userId: string) {
