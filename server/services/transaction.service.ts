@@ -115,7 +115,10 @@ function resolveAccountKey(
   return null;
 }
 
-function getSystemSolDiff(tx: ParsedTransactionWithMeta, walletPublicKey: string) {
+function getSystemSolDiff(
+  tx: ParsedTransactionWithMeta,
+  walletPublicKey: string
+) {
   const accountIndex = tx.transaction.message.accountKeys.findIndex(
     (key) => resolveAccountKey(key) === walletPublicKey
   );
@@ -251,13 +254,13 @@ function parseTransactionForToken(
     return {
       walletPublicKey,
       transactionType: isCreate ? "CREATE" : "BUY",
-      status: tx.meta.err ? "FAILED" : "CONFIRMED",
+      status: tx.meta?.err ? "FAILED" : "CONFIRMED",
       transactionSignature: signature,
       solAmount,
       tokenAmount,
       pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
       slippageBps: 0,
-      feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+      feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
       blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
     };
   }
@@ -267,13 +270,13 @@ function parseTransactionForToken(
   return {
     walletPublicKey,
     transactionType: "SELL",
-    status: tx.meta.err ? "FAILED" : "CONFIRMED",
+    status: tx.meta?.err ? "FAILED" : "CONFIRMED",
     transactionSignature: signature,
     solAmount,
     tokenAmount,
     pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
     slippageBps: 0,
-    feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+    feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
     blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
   };
 }
@@ -332,13 +335,13 @@ function parseTransactionForTokenOwners(
       results.push({
         walletPublicKey: owner,
         transactionType: isCreate ? "CREATE" : "BUY",
-        status: tx.meta.err ? "FAILED" : "CONFIRMED",
+        status: tx.meta?.err ? "FAILED" : "CONFIRMED",
         transactionSignature: signature,
         solAmount,
         tokenAmount,
         pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
         slippageBps: 0,
-        feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+        feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
         blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
       });
       return;
@@ -349,13 +352,13 @@ function parseTransactionForTokenOwners(
     results.push({
       walletPublicKey: owner,
       transactionType: "SELL",
-      status: tx.meta.err ? "FAILED" : "CONFIRMED",
+      status: tx.meta?.err ? "FAILED" : "CONFIRMED",
       transactionSignature: signature,
       solAmount,
       tokenAmount,
       pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
       slippageBps: 0,
-      feeAmount: (tx.meta.fee ?? 0) / LAMPORTS_PER_SOL,
+      feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
       blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
     });
   });
@@ -507,9 +510,7 @@ export const transactionService = {
     });
     const uniqueSignatures = Array.from(
       new Set(
-        Array.from(parsedByKey.values()).map(
-          (tx) => tx.transactionSignature
-        )
+        Array.from(parsedByKey.values()).map((tx) => tx.transactionSignature)
       )
     );
 
@@ -564,7 +565,9 @@ export const transactionService = {
         };
       })
       .filter(
-        (update): update is {
+        (
+          update
+        ): update is {
           id: string;
           data: {
             solAmount: number;
@@ -675,7 +678,8 @@ export const transactionService = {
         token.publicKey
       );
       parsedEntries.forEach((transaction) => {
-        const walletType = ownedWallets.get(transaction.walletPublicKey) ?? null;
+        const walletType =
+          ownedWallets.get(transaction.walletPublicKey) ?? null;
         entries.push({
           ...transaction,
           isOwned: Boolean(walletType),
