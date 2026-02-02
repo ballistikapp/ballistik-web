@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { useMemo, useState } from "react";
-import { useQueryState } from "nuqs";
+import { useParams } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../../dashboard/dashboard-loading";
@@ -35,7 +34,7 @@ function truncateSignature(value: string) {
 }
 
 export default function LiveTransactionsPage() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const [filter, setFilter] = useState<FilterMode>("all");
 
   const {
@@ -89,7 +88,9 @@ export default function LiveTransactionsPage() {
     return <TokenNotFound error={error} onRetry={() => refetch()} />;
   }
 
-  const listHref = tokenPublicKey ? `/transactions?token=${tokenPublicKey}` : "/transactions";
+  const listHref = tokenPublicKey
+    ? `/${tokenPublicKey}/transactions`
+    : "/transactions";
 
   return (
     <div className="flex flex-col gap-6">
@@ -124,7 +125,9 @@ export default function LiveTransactionsPage() {
         <Separator />
         <CardContent className="grid gap-4 md:grid-cols-2">
           <div>
-            <div className="text-xs text-muted-foreground">Total liquidity (SOL)</div>
+            <div className="text-xs text-muted-foreground">
+              Total liquidity (SOL)
+            </div>
             <div className="text-sm font-semibold">
               {totals.totalLiquiditySol.toFixed(3)}
             </div>
@@ -182,9 +185,10 @@ export default function LiveTransactionsPage() {
 
           {filteredTransactions.map((tx) => {
             const timeLabel = formatRelativeTime(tx.blockTime ?? tx.seenAt);
-            const typeLabel = typeLabels[tx.transactionType] ?? tx.transactionType;
+            const typeLabel =
+              typeLabels[tx.transactionType] ?? tx.transactionType;
             const walletLink = tokenPublicKey
-              ? `/wallets/${tx.walletPublicKey}?token=${tokenPublicKey}`
+              ? `/${tokenPublicKey}/wallets/${tx.walletPublicKey}`
               : `/wallets/${tx.walletPublicKey}`;
             return (
               <div

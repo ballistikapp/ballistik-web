@@ -207,7 +207,7 @@ export function getColumns({
       cell: ({ row }) => {
         const runToken = tokenPublicKey ?? row.original.tokenPublicKey;
         const href = runToken
-          ? `/volume-bot/${row.original.id}?token=${runToken}`
+          ? `/${runToken}/volume-bot/${row.original.id}`
           : `/volume-bot/${row.original.id}`;
         return (
           <div className="flex justify-end">

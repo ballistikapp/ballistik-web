@@ -118,7 +118,9 @@ export function LaunchProgressDialog({
       } else {
         toast.success("SOL returned to main wallet", {
           id: toastId,
-          description: `${returnedCount} wallet${returnedCount === 1 ? "" : "s"}`,
+          description: `${returnedCount} wallet${
+            returnedCount === 1 ? "" : "s"
+          }`,
           icon: null,
         });
       }
@@ -168,7 +170,7 @@ export function LaunchProgressDialog({
               <div className="flex justify-end">
                 {hasTokenLink ? (
                   <Button asChild size="sm">
-                    <Link href={`/dashboard?token=${tokenPublicKey}`}>
+                    <Link href={`/${tokenPublicKey}/dashboard`}>
                       Go to token
                     </Link>
                   </Button>

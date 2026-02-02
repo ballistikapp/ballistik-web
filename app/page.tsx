@@ -10,5 +10,5 @@ export default async function Page() {
     return redirect("/launch");
   }
 
-  return redirect(`/dashboard?token=${tokens[0].publicKey}`);
+  return redirect(`/${tokens[0].publicKey}/dashboard`);
 }

@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { useMemo } from "react";
-import { useQueryState } from "nuqs";
-import { tokenQueryParser } from "@/lib/utils/token-query";
+import { useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
@@ -17,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { getColumns } from "./columns";
 
 export default function VolumeBotPage() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
 
   const {
     data: tokenData,
@@ -29,13 +28,11 @@ export default function VolumeBotPage() {
     { enabled: !!tokenPublicKey }
   );
 
-  const {
-    data: sessionsData,
-    isLoading: sessionsLoading,
-  } = trpc.volumeBot.listSessions.useQuery(
-    { tokenPublicKey: tokenPublicKey || undefined, limit: 50 },
-    { enabled: !!tokenPublicKey && !!tokenData }
-  );
+  const { data: sessionsData, isLoading: sessionsLoading } =
+    trpc.volumeBot.listSessions.useQuery(
+      { tokenPublicKey: tokenPublicKey || undefined, limit: 50 },
+      { enabled: !!tokenPublicKey && !!tokenData }
+    );
 
   const columns = useMemo(
     () => getColumns({ tokenPublicKey }),
@@ -43,7 +40,7 @@ export default function VolumeBotPage() {
   );
   const sessions = sessionsData ?? [];
   const newRunHref = tokenPublicKey
-    ? `/volume-bot/new?token=${tokenPublicKey}`
+    ? `/${tokenPublicKey}/volume-bot/new`
     : "/volume-bot/new";
 
   if (isLoading) {

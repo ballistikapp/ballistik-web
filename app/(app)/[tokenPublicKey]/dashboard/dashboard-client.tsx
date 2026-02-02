@@ -10,14 +10,13 @@ import data from "./data.json";
 import { GalleryVerticalEnd, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import Link from "next/link";
-import { useQueryState } from "nuqs";
-import { tokenQueryParser } from "@/lib/utils/token-query";
+import { useParams } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "./dashboard-loading";
 
 export function DashboardClient() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
 
   const {
     data: tokenData,

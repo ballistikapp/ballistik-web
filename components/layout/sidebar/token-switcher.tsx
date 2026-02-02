@@ -8,8 +8,7 @@ import {
   Plus,
   Settings,
 } from "lucide-react";
-import { usePathname, useRouter } from "next/navigation";
-import { useQueryState } from "nuqs";
+import { useRouter } from "next/navigation";
 
 import {
   Popover,
@@ -30,36 +29,17 @@ import { UserTokensOutput } from "@/server/services/token.service";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { Button } from "@/components/ui/button";
-
-const TOKEN_SPECIFIC_ROUTES = ["dashboard", "token"];
-const SELECTED_TOKEN_KEY = "selected-token-public-key";
+import { useSelectedToken } from "@/hooks/use-selected-token";
 
 export const TokenSwitcher = React.memo(function TokenSwitcher({
   tokens,
 }: {
   tokens: UserTokensOutput;
 }) {
-  const pathname = usePathname();
   const router = useRouter();
-  const [currentTokenPublicKey, setToken] = useQueryState(
-    "token",
-    tokenQueryParser
-  );
-
-  const [storedTokenPublicKey] = React.useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(SELECTED_TOKEN_KEY);
-    }
-    return null;
-  });
-
-  React.useEffect(() => {
-    if (currentTokenPublicKey) {
-      localStorage.setItem(SELECTED_TOKEN_KEY, currentTokenPublicKey);
-    }
-  }, [currentTokenPublicKey]);
+  const { selectedTokenPublicKey, setSelectedTokenPublicKey } =
+    useSelectedToken();
 
   const tokenMap = React.useMemo(() => {
     const map = new Map<string, (typeof tokens)[0]>();
@@ -70,35 +50,22 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   }, [tokens]);
 
   const selectedToken = React.useMemo(() => {
-    if (currentTokenPublicKey && tokenMap.has(currentTokenPublicKey)) {
-      return tokenMap.get(currentTokenPublicKey);
+    if (selectedTokenPublicKey && tokenMap.has(selectedTokenPublicKey)) {
+      return tokenMap.get(selectedTokenPublicKey);
     }
-    if (storedTokenPublicKey && tokenMap.has(storedTokenPublicKey)) {
-      return tokenMap.get(storedTokenPublicKey);
+    // If stored token is invalid or missing, clear it and use first available
+    if (selectedTokenPublicKey && !tokenMap.has(selectedTokenPublicKey)) {
+      setSelectedTokenPublicKey(null);
     }
     return tokens[0];
-  }, [tokenMap, currentTokenPublicKey, storedTokenPublicKey, tokens]);
+  }, [tokenMap, selectedTokenPublicKey, tokens, setSelectedTokenPublicKey]);
 
   const handleTokenSelect = React.useCallback(
-    async (newTokenPublicKey: string) => {
-      localStorage.setItem(SELECTED_TOKEN_KEY, newTokenPublicKey);
-
-      const pathSegments = pathname.split("/").filter(Boolean);
-      const currentPage = pathSegments[pathSegments.length - 1] || "dashboard";
-
-      const isTokenSpecificRoute =
-        TOKEN_SPECIFIC_ROUTES.includes(currentPage) ||
-        ["dashboard", "holdings", "transactions", "wallets"].includes(
-          currentPage
-        );
-
-      if (isTokenSpecificRoute) {
-        await setToken(newTokenPublicKey);
-      } else {
-        router.push(`/dashboard?token=${newTokenPublicKey}`);
-      }
+    (newTokenPublicKey: string) => {
+      setSelectedTokenPublicKey(newTokenPublicKey);
+      router.push(`/${newTokenPublicKey}/dashboard`);
     },
-    [pathname, router, setToken]
+    [router, setSelectedTokenPublicKey]
   );
 
   const [open, setOpen] = React.useState(false);

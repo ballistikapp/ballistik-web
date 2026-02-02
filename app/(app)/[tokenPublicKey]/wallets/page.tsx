@@ -1,11 +1,10 @@
 "use client";
 
-import { useQueryState } from "nuqs";
+import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
 import Link from "next/link";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -25,7 +24,7 @@ import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialo
 import { Spinner } from "@/components/ui/spinner";
 
 export default function Page() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -359,7 +358,7 @@ export default function Page() {
               {devWallet && tokenPublicKey && (
                 <Button variant="outline" size="sm" asChild>
                   <Link
-                    href={`/wallets/${devWallet.publicKey}?token=${tokenPublicKey}`}
+                    href={`/${tokenPublicKey}/wallets/${devWallet.publicKey}`}
                   >
                     View wallet
                   </Link>

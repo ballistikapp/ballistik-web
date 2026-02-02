@@ -1,12 +1,13 @@
 "use client";
 
-import { formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
+import { formatDistanceToNowStrict } from "date-fns";
 import { type ColumnDef } from "@tanstack/react-table";
-import { type TransactionItem } from "@/server/services/transaction.service";
+import { type HoldingItem } from "@/server/services/holding.service";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import {
   DropdownMenu,
@@ -36,28 +37,16 @@ const walletTypeVariants: Record<
   DISTRIBUTION: "outline",
 };
 
-const typeLabels: Record<string, string> = {
-  BUY: "Buy",
-  SELL: "Sell",
-  CREATE: "Create",
-};
-
-const statusLabels: Record<string, string> = {
-  CONFIRMED: "Confirmed",
-  PENDING: "Pending",
-  FAILED: "Failed",
-};
+function truncateSignature(signature: string) {
+  if (signature.length <= 12) return signature;
+  return `${signature.slice(0, 6)}...${signature.slice(-4)}`;
+}
 
 function formatRelativeTime(dateValue?: Date | string | null) {
   if (!dateValue) return "Never";
   const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;
   if (Number.isNaN(date.getTime())) return "Never";
   return `${formatDistanceToNowStrict(date)} ago`;
-}
-
-function truncateSignature(signature: string) {
-  if (signature.length <= 12) return signature;
-  return `${signature.slice(0, 6)}...${signature.slice(-4)}`;
 }
 
 type ColumnOptions = {
@@ -68,8 +57,36 @@ type ColumnOptions = {
 export function getColumns({
   tokenPublicKey,
   tokenSymbol,
-}: ColumnOptions): ColumnDef<TransactionItem>[] {
+}: ColumnOptions): ColumnDef<HoldingItem>[] {
   return [
+    {
+      id: "select",
+      header: ({ table }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={
+              table.getIsAllPageRowsSelected() ||
+              (table.getIsSomePageRowsSelected() && "indeterminate")
+            }
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
+            aria-label="Select all"
+          />
+        </div>
+      ),
+      cell: ({ row }) => (
+        <div className="flex items-center justify-center">
+          <Checkbox
+            checked={row.getIsSelected()}
+            onCheckedChange={(value) => row.toggleSelected(!!value)}
+            aria-label="Select row"
+          />
+        </div>
+      ),
+      enableSorting: false,
+      enableHiding: false,
+    },
     {
       id: "walletPublicKey",
       accessorKey: "wallet.publicKey",
@@ -78,7 +95,7 @@ export function getColumns({
       ),
       cell: ({ row }) => (
         <Link
-          href={`/wallets/${row.original.wallet.publicKey}?token=${tokenPublicKey}`}
+          href={`/${tokenPublicKey}/wallets/${row.original.wallet.publicKey}`}
           className="text-sm font-mono hover:underline"
         >
           {truncateSignature(row.original.wallet.publicKey)}
@@ -107,47 +124,17 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "transactionType",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Action" />
-      ),
-      cell: ({ row }) => (
-        <Badge variant="outline">
-          {typeLabels[row.original.transactionType]}
-        </Badge>
-      ),
-      filterFn: "textArray",
-      meta: {
-        filter: { filterType: "text" },
-        searchable: true,
-      },
-    },
-    {
-      accessorKey: "status",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Status" />
-      ),
-      cell: ({ row }) => (
-        <Badge variant="secondary">{statusLabels[row.original.status]}</Badge>
-      ),
-      filterFn: "textArray",
-      meta: {
-        filter: { filterType: "text" },
-        searchable: true,
-      },
-    },
-    {
-      accessorKey: "solAmount",
+      accessorKey: "tokenBalance",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title="SOL"
+          title={`Balance (${tokenSymbol})`}
           className="justify-end"
         />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono">
-          {Number(row.original.solAmount).toFixed(4)}
+          {Number(row.original.tokenBalance).toFixed(4)}
         </div>
       ),
       filterFn: "numberRange",
@@ -156,17 +143,17 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "tokenAmount",
+      accessorKey: "totalBuyAmount",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title={tokenSymbol}
+          title="Total Buy (SOL)"
           className="justify-end"
         />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono">
-          {Number(row.original.tokenAmount).toFixed(4)}
+          {Number(row.original.totalBuyAmount).toFixed(4)}
         </div>
       ),
       filterFn: "numberRange",
@@ -175,17 +162,17 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "pricePerToken",
+      accessorKey: "totalSellAmount",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title="Price"
+          title="Total Sell (SOL)"
           className="justify-end"
         />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono">
-          {Number(row.original.pricePerToken).toFixed(6)}
+          {Number(row.original.totalSellAmount).toFixed(4)}
         </div>
       ),
       filterFn: "numberRange",
@@ -194,13 +181,32 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "blockTime",
+      accessorKey: "averageBuyPrice",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Time" />
+        <DataTableColumnHeader
+          column={column}
+          title="Avg Buy Price"
+          className="justify-end"
+        />
+      ),
+      cell: ({ row }) => (
+        <div className="text-right font-mono">
+          {Number(row.original.averageBuyPrice).toFixed(6)}
+        </div>
+      ),
+      filterFn: "numberRange",
+      meta: {
+        filter: { filterType: "number" },
+      },
+    },
+    {
+      accessorKey: "lastUpdated",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Last Updated" />
       ),
       cell: ({ row }) => (
         <div className="text-muted-foreground text-sm">
-          {formatRelativeTime(row.original.blockTime ?? row.original.createdAt)}
+          {formatRelativeTime(row.original.lastUpdated)}
         </div>
       ),
       meta: {
@@ -210,7 +216,8 @@ export function getColumns({
     {
       id: "actions",
       cell: ({ row }) => {
-        const signature = row.original.transactionSignature;
+        const holding = row.original;
+        const signature = holding.lastTransactionSignature;
 
         return (
           <DropdownMenu>
@@ -226,20 +233,31 @@ export function getColumns({
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
               <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(signature)}
+                onClick={() =>
+                  navigator.clipboard.writeText(holding.wallet.publicKey)
+                }
               >
-                Copy signature
+                Copy wallet
               </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a
-                  href={`https://solscan.io/tx/${signature}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View on Solscan
-                </a>
-              </DropdownMenuItem>
+              {signature && (
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => navigator.clipboard.writeText(signature)}
+                  >
+                    Copy signature
+                  </DropdownMenuItem>
+                  <DropdownMenuItem asChild>
+                    <a
+                      href={`https://solscan.io/tx/${signature}`}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      View on Solscan
+                    </a>
+                  </DropdownMenuItem>
+                </>
+              )}
             </DropdownMenuContent>
           </DropdownMenu>
         );

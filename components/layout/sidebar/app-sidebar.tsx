@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { useQueryState } from "nuqs";
 import {
   IconListDetails,
   IconBolt,
@@ -19,7 +18,7 @@ import {
 } from "@/components/ui/sidebar";
 import { TokenSwitcher } from "./token-switcher";
 import { UserTokensOutput } from "@/server/services/token.service";
-import { tokenQueryParser } from "@/lib/utils/token-query";
+import { useSelectedToken } from "@/hooks/use-selected-token";
 
 const data = {
   tokenSpecificRoutes: [
@@ -62,22 +61,8 @@ type Props = React.ComponentProps<typeof Sidebar> & {
   tokens: UserTokensOutput;
 };
 
-const SELECTED_TOKEN_KEY = "selected-token-public-key";
-
 export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
-  const [currentTokenPublicKey] = useQueryState("token", tokenQueryParser);
-
-  const [storedTokenPublicKey] = React.useState<string | null>(() => {
-    if (typeof window !== "undefined") {
-      return localStorage.getItem(SELECTED_TOKEN_KEY);
-    }
-    return null;
-  });
-
-  const effectiveToken = React.useMemo(
-    () => currentTokenPublicKey || storedTokenPublicKey || undefined,
-    [currentTokenPublicKey, storedTokenPublicKey]
-  );
+  const { selectedTokenPublicKey } = useSelectedToken();
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -87,7 +72,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
       <SidebarContent>
         <NavMain
           items={data.tokenSpecificRoutes}
-          currentToken={effectiveToken}
+          currentToken={selectedTokenPublicKey || undefined}
         />
         <NavSecondary items={data.navSecondary} className="mt-auto" />
       </SidebarContent>

@@ -1,11 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { useEffect, useMemo, useState } from "react";
-import { useQueryState } from "nuqs";
 import { toast } from "sonner";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -90,7 +88,7 @@ const clampNumber = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
 export default function VolumeBotStartPage() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const router = useRouter();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [walletsExpanded, setWalletsExpanded] = useState(false);
@@ -101,7 +99,8 @@ export default function VolumeBotStartPage() {
   const [selectedWalletPublicKeys, setSelectedWalletPublicKeys] = useState<
     string[]
   >([]);
-  const [fundingPerGeneratedWallet, setFundingPerGeneratedWallet] = useState(0.5);
+  const [fundingPerGeneratedWallet, setFundingPerGeneratedWallet] =
+    useState(0.5);
   const [topUpAmount, setTopUpAmount] = useState(0.01);
   const [slippageBps, setSlippageBps] = useState(1000);
   const [sellFallbackRatio, setSellFallbackRatio] = useState(0.5);
@@ -141,7 +140,10 @@ export default function VolumeBotStartPage() {
     { enabled: Boolean(tokenPublicKey && tokenData) }
   );
 
-  const presetsQuery = trpc.volumeBot.listPresets.useQuery({}, { retry: false });
+  const presetsQuery = trpc.volumeBot.listPresets.useQuery(
+    {},
+    { retry: false }
+  );
 
   const savePresetMutation = trpc.volumeBot.savePreset.useMutation({
     onSuccess: (preset) => {
@@ -184,7 +186,8 @@ export default function VolumeBotStartPage() {
           range.increment !== null && range.increment > 0
             ? range.increment
             : null,
-        buyProbability: range.direction === "both" ? range.buyProbability : undefined,
+        buyProbability:
+          range.direction === "both" ? range.buyProbability : undefined,
       })),
       walletConfig: {
         generatedWalletCount,
@@ -264,7 +267,11 @@ export default function VolumeBotStartPage() {
   );
 
   const localPreflight = useMemo(() => {
-    if (ranges.length === 0 || totalWallets <= 0 || targetDurationSeconds <= 0) {
+    if (
+      ranges.length === 0 ||
+      totalWallets <= 0 ||
+      targetDurationSeconds <= 0
+    ) {
       return null;
     }
     let netSolDirection = 0;
@@ -300,13 +307,11 @@ export default function VolumeBotStartPage() {
           (buyProbability * range.solMax - sellProbability * range.solMin);
       }
       minVolumePerMinute +=
-        (range.solMin * 60) /
-        range.intervalMax *
+        ((range.solMin * 60) / range.intervalMax) *
         range.probability *
         totalWallets;
       maxVolumePerMinute +=
-        (range.solMax * 60) /
-        range.intervalMin *
+        ((range.solMax * 60) / range.intervalMin) *
         range.probability *
         totalWallets;
     }
@@ -353,7 +358,11 @@ export default function VolumeBotStartPage() {
   const effectivePreflight = selectionSummary ?? localPreflight;
   const netSolDirection = effectivePreflight?.netSolDirection ?? 0;
   const netDirectionLabel =
-    netSolDirection > 0 ? "Net buy" : netSolDirection < 0 ? "Net sell" : "Neutral";
+    netSolDirection > 0
+      ? "Net buy"
+      : netSolDirection < 0
+      ? "Net sell"
+      : "Neutral";
   const suggestedFunding =
     selectionSummary?.suggestedFundingPerGeneratedWallet ??
     localPreflight?.suggestedFunding;
@@ -394,7 +403,9 @@ export default function VolumeBotStartPage() {
   };
 
   const removeRange = (index: number) => {
-    setRanges((current) => current.filter((_, rangeIndex) => rangeIndex !== index));
+    setRanges((current) =>
+      current.filter((_, rangeIndex) => rangeIndex !== index)
+    );
   };
 
   const toggleWallet = (walletPublicKey: string) => {
@@ -424,14 +435,16 @@ export default function VolumeBotStartPage() {
             ? range.increment
             : null,
         buyProbability:
-          range.direction === "both"
-            ? range.buyProbability ?? 0.5
-            : undefined,
+          range.direction === "both" ? range.buyProbability ?? 0.5 : undefined,
       }))
     );
     setGeneratedWalletCount(presetConfig.walletConfig.generatedWalletCount);
-    setSelectedWalletPublicKeys(presetConfig.walletConfig.selectedWalletPublicKeys);
-    setFundingPerGeneratedWallet(presetConfig.walletConfig.fundingPerGeneratedWallet);
+    setSelectedWalletPublicKeys(
+      presetConfig.walletConfig.selectedWalletPublicKeys
+    );
+    setFundingPerGeneratedWallet(
+      presetConfig.walletConfig.fundingPerGeneratedWallet
+    );
     setTopUpAmount(presetConfig.walletConfig.topUpAmount);
     setSlippageBps(presetConfig.behaviorConfig.slippageBps);
     setSellFallbackRatio(presetConfig.behaviorConfig.sellFallbackRatio);
@@ -486,7 +499,8 @@ export default function VolumeBotStartPage() {
     const missingBuyProbability = ranges.some(
       (range) =>
         range.direction === "both" &&
-        (range.buyProbability === undefined || Number.isNaN(range.buyProbability))
+        (range.buyProbability === undefined ||
+          Number.isNaN(range.buyProbability))
     );
     if (missingBuyProbability) {
       toast.error("Set buy probability for ranges with direction both");
@@ -518,7 +532,7 @@ export default function VolumeBotStartPage() {
     });
     toast.success("Volume bot started");
     setConfirmOpen(false);
-    router.push(`/volume-bot/${result.sessionId}?token=${tokenPublicKey}`);
+    router.push(`/${tokenPublicKey}/volume-bot/${result.sessionId}`);
   };
 
   if (isLoading) {
@@ -534,7 +548,9 @@ export default function VolumeBotStartPage() {
       <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
         <div className="flex flex-col gap-3">
           <Link
-            href={`/volume-bot${tokenPublicKey ? `?token=${tokenPublicKey}` : ""}`}
+            href={
+              tokenPublicKey ? `/${tokenPublicKey}/volume-bot` : "/volume-bot"
+            }
             className="text-sm text-muted-foreground hover:underline"
           >
             Back to runs
@@ -568,7 +584,7 @@ export default function VolumeBotStartPage() {
               <div className="text-sm font-semibold">{session.status}</div>
             </div>
             <Button asChild variant="outline">
-              <Link href={`/volume-bot/${session.id}?token=${tokenPublicKey}`}>
+              <Link href={`/${tokenPublicKey}/volume-bot/${session.id}`}>
                 View run
               </Link>
             </Button>
@@ -648,7 +664,12 @@ export default function VolumeBotStartPage() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-primary text-xl">Ranges</CardTitle>
-            <Button type="button" variant="outline" size="sm" onClick={addRange}>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={addRange}
+            >
               Add range
             </Button>
           </CardHeader>
@@ -766,7 +787,10 @@ export default function VolumeBotStartPage() {
                       onValueChange={(value) => {
                         const nextDirection = value as RangeInput["direction"];
                         updateRange(index, "direction", nextDirection);
-                        if (nextDirection === "both" && range.buyProbability === undefined) {
+                        if (
+                          nextDirection === "both" &&
+                          range.buyProbability === undefined
+                        ) {
                           updateRange(index, "buyProbability", 0.5);
                         }
                         if (nextDirection !== "both") {
@@ -916,7 +940,9 @@ export default function VolumeBotStartPage() {
 
         <Card>
           <CardHeader>
-            <CardTitle className="text-primary text-xl">Configuration</CardTitle>
+            <CardTitle className="text-primary text-xl">
+              Configuration
+            </CardTitle>
           </CardHeader>
           <Separator />
           <CardContent className="space-y-6">
@@ -952,7 +978,9 @@ export default function VolumeBotStartPage() {
                   min={0}
                   step={0.01}
                   value={topUpAmount}
-                  onChange={(event) => setTopUpAmount(Number(event.target.value))}
+                  onChange={(event) =>
+                    setTopUpAmount(Number(event.target.value))
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -988,7 +1016,9 @@ export default function VolumeBotStartPage() {
                   type="number"
                   min={0}
                   value={slippageBps}
-                  onChange={(event) => setSlippageBps(Number(event.target.value))}
+                  onChange={(event) =>
+                    setSlippageBps(Number(event.target.value))
+                  }
                 />
               </div>
               <div className="space-y-2">
@@ -1036,11 +1066,15 @@ export default function VolumeBotStartPage() {
           <CardContent className="space-y-4">
             <div className="grid gap-4 md:grid-cols-3">
               <div>
-                <div className="text-xs text-muted-foreground">Total wallets</div>
+                <div className="text-xs text-muted-foreground">
+                  Total wallets
+                </div>
                 <div className="text-lg font-semibold">{totalWallets}</div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Net direction</div>
+                <div className="text-xs text-muted-foreground">
+                  Net direction
+                </div>
                 <div className="text-lg font-semibold">{netDirectionLabel}</div>
               </div>
               <div>
@@ -1059,7 +1093,9 @@ export default function VolumeBotStartPage() {
                 </div>
               </div>
               <div>
-                <div className="text-xs text-muted-foreground">Total volume</div>
+                <div className="text-xs text-muted-foreground">
+                  Total volume
+                </div>
                 <div className="text-lg font-semibold">
                   {formatNumber(effectivePreflight?.totalVolume?.min)}-
                   {formatNumber(effectivePreflight?.totalVolume?.max)} SOL
@@ -1070,7 +1106,9 @@ export default function VolumeBotStartPage() {
                   Suggested funding
                 </div>
                 <div className="text-lg font-semibold">
-                  {suggestedFunding ? `${suggestedFunding.toFixed(2)} SOL` : "—"}
+                  {suggestedFunding
+                    ? `${suggestedFunding.toFixed(2)} SOL`
+                    : "—"}
                 </div>
               </div>
               <div>

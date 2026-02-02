@@ -2,10 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
-import { useQueryState } from "nuqs";
+import { useParams } from "next/navigation";
 import { IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -22,7 +21,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
 
 export default function TransactionsPage() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
 
   const {
     data: tokenData,
@@ -141,11 +140,16 @@ export default function TransactionsPage() {
               )}
               Refresh
             </Button>
-            <Button asChild variant="outline" size="sm" disabled={!tokenPublicKey}>
+            <Button
+              asChild
+              variant="outline"
+              size="sm"
+              disabled={!tokenPublicKey}
+            >
               <Link
                 href={
                   tokenPublicKey
-                    ? `/transactions/live?token=${tokenPublicKey}`
+                    ? `/${tokenPublicKey}/transactions/live`
                     : "/transactions/live"
                 }
               >

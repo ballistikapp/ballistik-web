@@ -3,10 +3,8 @@
 import Link from "next/link";
 import { useParams } from "next/navigation";
 import { useEffect, useState } from "react";
-import { useQueryState } from "nuqs";
 import { formatDistanceToNowStrict } from "date-fns";
 import { toast } from "sonner";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -16,9 +14,9 @@ import { Separator } from "@/components/ui/separator";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 
 export default function VolumeBotRunPage() {
-  const params = useParams();
-  const sessionId = params?.sessionId as string;
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const params = useParams<{ tokenPublicKey: string; sessionId: string }>();
+  const tokenPublicKey = params?.tokenPublicKey;
+  const sessionId = params?.sessionId;
 
   const {
     data: statusData,
@@ -78,7 +76,7 @@ export default function VolumeBotRunPage() {
   const rangeMetrics = statusData?.rangeMetrics ?? [];
   const logs = logsQuery.data ?? [];
   const backToken = tokenPublicKey || session?.tokenPublicKey;
-  const backHref = backToken ? `/volume-bot?token=${backToken}` : "/volume-bot";
+  const backHref = backToken ? `/${backToken}/volume-bot` : "/volume-bot";
   const config = session?.config as VolumeBotConfigInput | undefined;
   const ranges = config?.ranges ?? [];
   const netSolDirection = ranges.reduce((sum, range) => {
@@ -93,7 +91,11 @@ export default function VolumeBotRunPage() {
     return sum + range.probability * avgAmount * (2 * buyProbability - 1);
   }, 0);
   const netDirectionLabel =
-    netSolDirection > 0 ? "Net buy" : netSolDirection < 0 ? "Net sell" : "Neutral";
+    netSolDirection > 0
+      ? "Net buy"
+      : netSolDirection < 0
+      ? "Net sell"
+      : "Neutral";
   const netSol = Number(session?.totalPnlSol ?? 0);
   const netSolPerMinute = Number(session?.netDeltaSolPerMinute ?? 0);
   const [runtimeSeconds, setRuntimeSeconds] = useState(
@@ -225,7 +227,9 @@ export default function VolumeBotRunPage() {
               <div className="text-sm font-semibold">{netDirectionLabel}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Net SOL (total)</div>
+              <div className="text-xs text-muted-foreground">
+                Net SOL (total)
+              </div>
               <div className="text-sm font-semibold">{netSol.toFixed(3)}</div>
             </div>
             <div>
@@ -241,7 +245,9 @@ export default function VolumeBotRunPage() {
               <div className="text-sm font-semibold">{ranges.length}</div>
             </div>
             <div>
-              <div className="text-xs text-muted-foreground">Duration (sec)</div>
+              <div className="text-xs text-muted-foreground">
+                Duration (sec)
+              </div>
               <div className="text-sm font-semibold">
                 {config?.targetDurationSeconds ?? "—"}
               </div>

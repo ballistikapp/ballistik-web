@@ -1,10 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQueryState } from "nuqs";
+import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -23,7 +22,7 @@ import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
 
 export default function Page() {
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);

@@ -1,14 +1,15 @@
 "use client";
 
+import { type ColumnDef } from "@tanstack/react-table";
+import { IconDotsVertical } from "@tabler/icons-react";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
-import { type ColumnDef } from "@tanstack/react-table";
-import { type HoldingItem } from "@/server/services/holding.service";
+import { type WalletItem } from "@/server/services/wallet.service";
 import { type WalletType } from "@/lib/generated/prisma/enums";
+
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
-import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -16,7 +17,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { IconDotsVertical } from "@tabler/icons-react";
+import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
+import "@/components/data-table/types";
 
 const walletTypeLabels: Record<WalletType, string> = {
   MAIN_WALLET: "Main",
@@ -37,9 +39,9 @@ const walletTypeVariants: Record<
   DISTRIBUTION: "outline",
 };
 
-function truncateSignature(signature: string) {
-  if (signature.length <= 12) return signature;
-  return `${signature.slice(0, 6)}...${signature.slice(-4)}`;
+function truncatePublicKey(key: string) {
+  if (key.length <= 12) return key;
+  return `${key.slice(0, 6)}...${key.slice(-4)}`;
 }
 
 function formatRelativeTime(dateValue?: Date | string | null) {
@@ -49,15 +51,19 @@ function formatRelativeTime(dateValue?: Date | string | null) {
   return `${formatDistanceToNowStrict(date)} ago`;
 }
 
-type ColumnOptions = {
+type WalletColumnHandlers = {
   tokenPublicKey: string;
-  tokenSymbol: string;
+  onRefresh: (walletPublicKey: string) => void;
+  onSend: (walletPublicKey: string) => void;
+  onReturn: (walletPublicKey: string) => void;
 };
 
 export function getColumns({
   tokenPublicKey,
-  tokenSymbol,
-}: ColumnOptions): ColumnDef<HoldingItem>[] {
+  onRefresh,
+  onSend,
+  onReturn,
+}: WalletColumnHandlers): ColumnDef<WalletItem>[] {
   return [
     {
       id: "select",
@@ -68,7 +74,9 @@ export function getColumns({
               table.getIsAllPageRowsSelected() ||
               (table.getIsSomePageRowsSelected() && "indeterminate")
             }
-            onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+            onCheckedChange={(value) =>
+              table.toggleAllPageRowsSelected(!!value)
+            }
             aria-label="Select all"
           />
         </div>
@@ -86,17 +94,16 @@ export function getColumns({
       enableHiding: false,
     },
     {
-      id: "walletPublicKey",
-      accessorKey: "wallet.publicKey",
+      accessorKey: "publicKey",
       header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Wallet" />
+        <DataTableColumnHeader column={column} title="Public Key" />
       ),
       cell: ({ row }) => (
         <Link
-          href={`/wallets/${row.original.wallet.publicKey}?token=${tokenPublicKey}`}
+          href={`/${tokenPublicKey}/wallets/${row.original.publicKey}`}
           className="text-sm font-mono hover:underline"
         >
-          {truncateSignature(row.original.wallet.publicKey)}
+          {truncatePublicKey(row.original.publicKey)}
         </Link>
       ),
       enableHiding: false,
@@ -105,14 +112,13 @@ export function getColumns({
       },
     },
     {
-      id: "walletType",
-      accessorKey: "wallet.type",
+      accessorKey: "type",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Type" />
       ),
       cell: ({ row }) => (
-        <Badge variant={walletTypeVariants[row.original.wallet.type]}>
-          {walletTypeLabels[row.original.wallet.type]}
+        <Badge variant={walletTypeVariants[row.original.type]}>
+          {walletTypeLabels[row.original.type]}
         </Badge>
       ),
       filterFn: "textArray",
@@ -122,17 +128,17 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "tokenBalance",
+      accessorKey: "balanceSol",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title={`Balance (${tokenSymbol})`}
+          title="SOL"
           className="justify-end"
         />
       ),
       cell: ({ row }) => (
         <div className="text-right font-mono">
-          {Number(row.original.tokenBalance).toFixed(4)}
+          {Number(row.original.balanceSol).toFixed(4)} SOL
         </div>
       ),
       filterFn: "numberRange",
@@ -141,70 +147,13 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "totalBuyAmount",
+      accessorKey: "balanceRefreshedAt",
       header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Total Buy (SOL)"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.totalBuyAmount).toFixed(4)}
-        </div>
-      ),
-      filterFn: "numberRange",
-      meta: {
-        filter: { filterType: "number" },
-      },
-    },
-    {
-      accessorKey: "totalSellAmount",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Total Sell (SOL)"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.totalSellAmount).toFixed(4)}
-        </div>
-      ),
-      filterFn: "numberRange",
-      meta: {
-        filter: { filterType: "number" },
-      },
-    },
-    {
-      accessorKey: "averageBuyPrice",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Avg Buy Price"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.averageBuyPrice).toFixed(6)}
-        </div>
-      ),
-      filterFn: "numberRange",
-      meta: {
-        filter: { filterType: "number" },
-      },
-    },
-    {
-      accessorKey: "lastUpdated",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Last Updated" />
+        <DataTableColumnHeader column={column} title="Last Refresh" />
       ),
       cell: ({ row }) => (
         <div className="text-muted-foreground text-sm">
-          {formatRelativeTime(row.original.lastUpdated)}
+          {formatRelativeTime(row.original.balanceRefreshedAt)}
         </div>
       ),
       meta: {
@@ -212,10 +161,24 @@ export function getColumns({
       },
     },
     {
+      accessorKey: "createdAt",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Created" />
+      ),
+      cell: ({ row }) => (
+        <div className="text-muted-foreground text-sm">
+          {new Date(row.original.createdAt).toLocaleDateString()}
+        </div>
+      ),
+      filterFn: "dateRange",
+      meta: {
+        filter: { filterType: "date" },
+      },
+    },
+    {
       id: "actions",
       cell: ({ row }) => {
-        const holding = row.original;
-        const signature = holding.lastTransactionSignature;
+        const wallet = row.original;
 
         return (
           <DropdownMenu>
@@ -230,32 +193,36 @@ export function getColumns({
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(holding.wallet.publicKey)
-                }
-              >
-                Copy wallet
+              <DropdownMenuItem asChild>
+                <Link href={`/${tokenPublicKey}/wallets/${wallet.publicKey}`}>
+                  View wallet
+                </Link>
               </DropdownMenuItem>
-              {signature && (
-                <>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    onClick={() => navigator.clipboard.writeText(signature)}
-                  >
-                    Copy signature
-                  </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <a
-                      href={`https://solscan.io/tx/${signature}`}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      View on Solscan
-                    </a>
-                  </DropdownMenuItem>
-                </>
-              )}
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={() => navigator.clipboard.writeText(wallet.publicKey)}
+              >
+                Copy address
+              </DropdownMenuItem>
+              <DropdownMenuItem asChild>
+                <a
+                  href={`https://solscan.io/account/${wallet.publicKey}`}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  View on Solscan
+                </a>
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem onClick={() => onRefresh(wallet.publicKey)}>
+                Refresh balance
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onSend(wallet.publicKey)}>
+                Send SOL
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onReturn(wallet.publicKey)}>
+                Return SOL
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         );

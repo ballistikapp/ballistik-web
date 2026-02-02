@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { IconCirclePlusFilled, type Icon } from "@tabler/icons-react";
+import { type Icon } from "@tabler/icons-react";
 
 import {
   SidebarGroup,
@@ -29,20 +29,29 @@ export const NavMain = React.memo(function NavMain({
         <SidebarMenu className="gap-1 pt-6">
           {items.map((item) => {
             const href = currentToken
-              ? `${item.url}?token=${currentToken}`
+              ? `/${currentToken}${item.url}`
               : item.url;
+            const isDisabled = !currentToken;
 
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
                   className="text-base py-2 h-auto text-muted-foreground"
-                  asChild
+                  asChild={!isDisabled}
                   tooltip={item.title}
+                  disabled={isDisabled}
                 >
-                  <Link href={href}>
-                    {item.icon && <item.icon className="size-10" />}
-                    <span>{item.title}</span>
-                  </Link>
+                  {isDisabled ? (
+                    <div>
+                      {item.icon && <item.icon className="size-10" />}
+                      <span>{item.title}</span>
+                    </div>
+                  ) : (
+                    <Link href={href}>
+                      {item.icon && <item.icon className="size-10" />}
+                      <span>{item.title}</span>
+                    </Link>
+                  )}
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );

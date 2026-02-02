@@ -2,10 +2,8 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useQueryState } from "nuqs";
 import { useState } from "react";
 import { toast } from "sonner";
-import { tokenQueryParser } from "@/lib/utils/token-query";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -28,9 +26,12 @@ import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialo
 import { Spinner } from "@/components/ui/spinner";
 
 export default function WalletPage() {
-  const params = useParams();
-  const walletPublicKey = params?.walletPublicKey as string;
-  const [tokenPublicKey] = useQueryState("token", tokenQueryParser);
+  const params = useParams<{
+    tokenPublicKey: string;
+    walletPublicKey: string;
+  }>();
+  const tokenPublicKey = params?.tokenPublicKey;
+  const walletPublicKey = params?.walletPublicKey;
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
   const [privateKeyDialogOpen, setPrivateKeyDialogOpen] = useState(false);
@@ -140,7 +141,7 @@ export default function WalletPage() {
         <div className="flex flex-col gap-2">
           <div className="flex items-center gap-2">
             <Link
-              href={`/wallets?token=${token.publicKey}`}
+              href={`/${token.publicKey}/wallets`}
               className="text-sm text-muted-foreground hover:underline"
             >
               Back to wallets
@@ -208,7 +209,7 @@ export default function WalletPage() {
                   {token.name} ({token.symbol})
                 </span>
                 <Link
-                  href={`/launch?token=${token.publicKey}`}
+                  href={`/${token.publicKey}/dashboard`}
                   className="text-sm text-muted-foreground hover:underline"
                 >
                   View token
