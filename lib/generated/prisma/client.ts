@@ -124,3 +124,8 @@ export type Transaction = Prisma.TransactionModel
  * 
  */
 export type RefreshCache = Prisma.RefreshCacheModel
+/**
+ * Model ShyftCallback
+ * 
+ */
+export type ShyftCallback = Prisma.ShyftCallbackModel

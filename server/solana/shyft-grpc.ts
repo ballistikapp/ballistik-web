@@ -1,71 +1,16 @@
-import bs58 from "bs58";
 import { getEnv } from "@/lib/config/env";
 import { getDefaultShyftGrpcUrl } from "@/lib/config/rpc.config";
+import {
+  isRecord,
+  extractSignatureFromUpdate,
+  loadGrpcClient,
+} from "./grpc-utils";
 
 type GrpcWaitInput = {
   signatures: string[];
   accountKeys: string[];
   timeoutMs: number;
 };
-
-type GrpcClientCtor = new (
-  url: string,
-  apiKey: string,
-  options: object
-) => { subscribe: () => Promise<unknown> };
-
-async function loadGrpcClient() {
-  try {
-    const grpcModule = (await import("@triton-one/yellowstone-grpc")) as {
-      default?: GrpcClientCtor;
-    };
-    return grpcModule.default ?? null;
-  } catch {
-    return null;
-  }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null;
-}
-
-function normalizeSignature(value: unknown) {
-  if (typeof value === "string") return value;
-  if (value instanceof Uint8Array) return bs58.encode(value);
-  if (Array.isArray(value) && value.every((item) => typeof item === "number")) {
-    return bs58.encode(Uint8Array.from(value));
-  }
-  if (typeof Buffer !== "undefined" && Buffer.isBuffer(value)) {
-    return bs58.encode(value);
-  }
-  if (isRecord(value) && Array.isArray(value.data)) {
-    const data = value.data;
-    if (data.every((item) => typeof item === "number")) {
-      return bs58.encode(Uint8Array.from(data));
-    }
-  }
-  return null;
-}
-
-function extractSignature(update: unknown) {
-  if (!isRecord(update)) return null;
-  const transaction = update.transaction;
-  if (isRecord(transaction)) {
-    const direct = normalizeSignature(transaction.signature);
-    if (direct) return direct;
-    const inner = transaction.transaction;
-    if (isRecord(inner)) {
-      const innerSignature = normalizeSignature(inner.signature);
-      if (innerSignature) return innerSignature;
-      const signatures = inner.signatures;
-      if (Array.isArray(signatures) && signatures.length > 0) {
-        const first = normalizeSignature(signatures[0]);
-        if (first) return first;
-      }
-    }
-  }
-  return null;
-}
 
 export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
   const { SHYFT_API_KEY } = getEnv();
@@ -122,7 +67,7 @@ export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
     };
 
     const onData = (data?: unknown) => {
-      const signature = extractSignature(data);
+      const signature = extractSignatureFromUpdate(data);
       if (!signature || !targetSignatures.has(signature)) return;
       confirmed.add(signature);
       if (signature === input.signatures[0]) {

@@ -390,3 +390,13 @@ model RefreshCache {
   @@unique([userId, tokenPublicKey, scope])
   @@map("RefreshCache")
 }
+
+model ShyftCallback {
+  id String @id @default(cuid())
+  callbackId String @unique
+  type String
+  address String
+  projectId String?
+  createdAt DateTime @default(now())
+  @@map("ShyftCallback")
+}

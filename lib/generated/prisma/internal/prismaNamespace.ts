@@ -400,7 +400,8 @@ export const ModelName = {
   VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction',
-  RefreshCache: 'RefreshCache'
+  RefreshCache: 'RefreshCache',
+  ShyftCallback: 'ShyftCallback'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -416,7 +417,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache" | "shyftCallback"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1678,6 +1679,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    ShyftCallback: {
+      payload: Prisma.$ShyftCallbackPayload<ExtArgs>
+      fields: Prisma.ShyftCallbackFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ShyftCallbackFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ShyftCallbackFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        findFirst: {
+          args: Prisma.ShyftCallbackFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ShyftCallbackFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        findMany: {
+          args: Prisma.ShyftCallbackFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>[]
+        }
+        create: {
+          args: Prisma.ShyftCallbackCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        createMany: {
+          args: Prisma.ShyftCallbackCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ShyftCallbackCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>[]
+        }
+        delete: {
+          args: Prisma.ShyftCallbackDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        update: {
+          args: Prisma.ShyftCallbackUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        deleteMany: {
+          args: Prisma.ShyftCallbackDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ShyftCallbackUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ShyftCallbackUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>[]
+        }
+        upsert: {
+          args: Prisma.ShyftCallbackUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ShyftCallbackPayload>
+        }
+        aggregate: {
+          args: Prisma.ShyftCallbackAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateShyftCallback>
+        }
+        groupBy: {
+          args: Prisma.ShyftCallbackGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ShyftCallbackGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ShyftCallbackCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ShyftCallbackCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -1984,6 +2059,18 @@ export const RefreshCacheScalarFieldEnum = {
 } as const
 
 export type RefreshCacheScalarFieldEnum = (typeof RefreshCacheScalarFieldEnum)[keyof typeof RefreshCacheScalarFieldEnum]
+
+
+export const ShyftCallbackScalarFieldEnum = {
+  id: 'id',
+  callbackId: 'callbackId',
+  type: 'type',
+  address: 'address',
+  projectId: 'projectId',
+  createdAt: 'createdAt'
+} as const
+
+export type ShyftCallbackScalarFieldEnum = (typeof ShyftCallbackScalarFieldEnum)[keyof typeof ShyftCallbackScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -2410,6 +2497,7 @@ export type GlobalOmitConfig = {
   holding?: Prisma.HoldingOmit
   transaction?: Prisma.TransactionOmit
   refreshCache?: Prisma.RefreshCacheOmit
+  shyftCallback?: Prisma.ShyftCallbackOmit
 }
 
 /* Types for Logging */

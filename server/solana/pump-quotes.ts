@@ -2,6 +2,7 @@ import { BN } from "@coral-xyz/anchor";
 import type { Keypair, PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { cacheConfig } from "@/lib/config/cache.config";
 
 type PumpQuoteState = {
   virtualTokenReserves: bigint;
@@ -13,6 +14,32 @@ type PumpQuoteState = {
 const ZERO = BigInt(0);
 const ONE = BigInt(1);
 const MAX_BPS = BigInt(10_000);
+
+type CacheEntry = {
+  state: PumpQuoteState;
+  cachedAt: number;
+};
+
+const bondingCurveCache = new Map<string, CacheEntry>();
+
+function getCachedState(mintKey: string): PumpQuoteState | null {
+  const entry = bondingCurveCache.get(mintKey);
+  if (!entry) return null;
+  const ttl = cacheConfig.ttlMs?.bondingCurve ?? 5_000;
+  if (Date.now() - entry.cachedAt > ttl) {
+    bondingCurveCache.delete(mintKey);
+    return null;
+  }
+  return entry.state;
+}
+
+function setCachedState(mintKey: string, state: PumpQuoteState) {
+  bondingCurveCache.set(mintKey, { state, cachedAt: Date.now() });
+  if (bondingCurveCache.size > 500) {
+    const oldestKey = bondingCurveCache.keys().next().value;
+    if (oldestKey) bondingCurveCache.delete(oldestKey);
+  }
+}
 
 const DISCRIMINATOR_SIZE = 8;
 
@@ -72,6 +99,12 @@ export const fetchPumpQuoteState = async (
   mint: PublicKey,
   _payer: Keypair
 ): Promise<PumpQuoteState> => {
+  const mintKey = mint.toBase58();
+  const cached = getCachedState(mintKey);
+  if (cached) {
+    return cached;
+  }
+
   const connection = getSolanaConnection();
   const { bondingCurve, global } = derivePumpAddresses(mint);
   const [bondingInfo, globalInfo] = await connection.getMultipleAccountsInfo(
@@ -89,12 +122,16 @@ export const fetchPumpQuoteState = async (
   const bondingCurveData = decodeBondingCurve(bondingInfo.data as Buffer);
   const globalData = decodeGlobal(globalInfo.data as Buffer);
 
-  return {
+  const state: PumpQuoteState = {
     virtualTokenReserves: bondingCurveData.virtualTokenReserves,
     virtualSolReserves: bondingCurveData.virtualSolReserves,
     protocolFeeBps: globalData.feeBasisPoints,
     creatorFeeBps: globalData.creatorFeeBasisPoints,
   };
+
+  setCachedState(mintKey, state);
+
+  return state;
 };
 
 export const computeBuyQuote = (

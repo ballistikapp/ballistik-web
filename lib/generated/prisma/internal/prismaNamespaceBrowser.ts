@@ -67,7 +67,8 @@ export const ModelName = {
   VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction',
-  RefreshCache: 'RefreshCache'
+  RefreshCache: 'RefreshCache',
+  ShyftCallback: 'ShyftCallback'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -353,6 +354,18 @@ export const RefreshCacheScalarFieldEnum = {
 } as const
 
 export type RefreshCacheScalarFieldEnum = (typeof RefreshCacheScalarFieldEnum)[keyof typeof RefreshCacheScalarFieldEnum]
+
+
+export const ShyftCallbackScalarFieldEnum = {
+  id: 'id',
+  callbackId: 'callbackId',
+  type: 'type',
+  address: 'address',
+  projectId: 'projectId',
+  createdAt: 'createdAt'
+} as const
+
+export type ShyftCallbackScalarFieldEnum = (typeof ShyftCallbackScalarFieldEnum)[keyof typeof ShyftCallbackScalarFieldEnum]
 
 
 export const SortOrder = {

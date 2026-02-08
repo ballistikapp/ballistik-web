@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
+import { shyftApiService } from "@/server/services/shyft-api.service";
+import { getEnv } from "@/lib/config/env";
 import { tokenTransactionsGrpc } from "@/server/solana/token-transactions-grpc";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import {
@@ -401,27 +403,66 @@ export const transactionService = {
     );
 
     const connection = getSolanaConnection();
+    const { SHYFT_API_KEY } = getEnv();
     const signatureWallets = new Map<string, Set<string>>();
     const walletPublicKeys = wallets.map((wallet) => wallet.publicKey);
     const signatureLimit = 100;
 
-    for (const wallet of wallets) {
-      const walletPublicKey = new PublicKey(wallet.publicKey);
-      const signatures = await connection.getSignaturesForAddress(
-        walletPublicKey,
-        { limit: signatureLimit }
-      );
-      signatures.forEach((signatureInfo) => {
-        const existing = signatureWallets.get(signatureInfo.signature);
-        if (existing) {
-          existing.add(wallet.publicKey);
-        } else {
-          signatureWallets.set(
-            signatureInfo.signature,
-            new Set([wallet.publicKey])
+    if (SHYFT_API_KEY) {
+      for (const wallet of wallets) {
+        try {
+          const history = await shyftApiService.getTransactionHistory(
+            wallet.publicKey,
+            { txNum: signatureLimit }
           );
+          history.forEach((tx) => {
+            const sig = tx.signatures?.[0];
+            if (!sig) return;
+            const existing = signatureWallets.get(sig);
+            if (existing) {
+              existing.add(wallet.publicKey);
+            } else {
+              signatureWallets.set(sig, new Set([wallet.publicKey]));
+            }
+          });
+        } catch {
+          const walletPublicKey = new PublicKey(wallet.publicKey);
+          const signatures = await connection.getSignaturesForAddress(
+            walletPublicKey,
+            { limit: signatureLimit }
+          );
+          signatures.forEach((signatureInfo) => {
+            const existing = signatureWallets.get(signatureInfo.signature);
+            if (existing) {
+              existing.add(wallet.publicKey);
+            } else {
+              signatureWallets.set(
+                signatureInfo.signature,
+                new Set([wallet.publicKey])
+              );
+            }
+          });
         }
-      });
+      }
+    } else {
+      for (const wallet of wallets) {
+        const walletPublicKey = new PublicKey(wallet.publicKey);
+        const signatures = await connection.getSignaturesForAddress(
+          walletPublicKey,
+          { limit: signatureLimit }
+        );
+        signatures.forEach((signatureInfo) => {
+          const existing = signatureWallets.get(signatureInfo.signature);
+          if (existing) {
+            existing.add(wallet.publicKey);
+          } else {
+            signatureWallets.set(
+              signatureInfo.signature,
+              new Set([wallet.publicKey])
+            );
+          }
+        });
+      }
     }
 
     const staleTransactions = await prisma.transaction.findMany({

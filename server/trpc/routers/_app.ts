@@ -8,6 +8,7 @@ import { holdingRouter } from "./holding.router";
 import { transactionRouter } from "./transaction.router";
 import { refreshCacheRouter } from "./refresh-cache.router";
 import { volumeBotRouter } from "./volume-bot.router";
+import { subscriptionRouter } from "./subscription.router";
 
 export const appRouter = router({
   test: testRouter,
@@ -19,6 +20,7 @@ export const appRouter = router({
   transaction: transactionRouter,
   refreshCache: refreshCacheRouter,
   volumeBot: volumeBotRouter,
+  subscription: subscriptionRouter,
 });
 
 export type AppRouter = typeof appRouter;

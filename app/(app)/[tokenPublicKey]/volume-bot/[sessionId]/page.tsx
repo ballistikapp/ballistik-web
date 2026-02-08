@@ -27,8 +27,8 @@ export default function VolumeBotRunPage() {
     { sessionId: sessionId || "" },
     {
       enabled: Boolean(sessionId),
-      refetchInterval: 2500,
-      staleTime: 5000,
+      refetchInterval: 5000,
+      staleTime: 3000,
       retry: false,
     }
   );
@@ -37,8 +37,8 @@ export default function VolumeBotRunPage() {
     { sessionId: sessionId || "" },
     {
       enabled: Boolean(sessionId),
-      refetchInterval: 2500,
-      staleTime: 2000,
+      refetchInterval: 5000,
+      staleTime: 3000,
       retry: false,
     }
   );

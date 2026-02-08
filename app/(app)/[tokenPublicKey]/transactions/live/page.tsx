@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import { formatDistanceToNowStrict } from "date-fns";
 import { trpc } from "@/lib/trpc/client";
@@ -36,6 +36,7 @@ function truncateSignature(value: string) {
 export default function LiveTransactionsPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const [filter, setFilter] = useState<FilterMode>("all");
+  const [useSubscription, setUseSubscription] = useState(true);
 
   const {
     data: tokenData,
@@ -51,9 +52,24 @@ export default function LiveTransactionsPage() {
     { tokenPublicKey: tokenPublicKey || "", limit: 80 },
     {
       enabled: !!tokenPublicKey && !!tokenData,
-      refetchInterval: 2000,
-      staleTime: 1000,
+      refetchInterval: useSubscription ? 30_000 : 2000,
+      staleTime: useSubscription ? 10_000 : 1000,
       retry: false,
+    }
+  );
+
+  const handleNewTransaction = useCallback(() => {
+    liveQuery.refetch();
+  }, [liveQuery]);
+
+  trpc.subscription.onNewTransaction.useSubscription(
+    { tokenPublicKey: tokenPublicKey || "" },
+    {
+      enabled: !!tokenPublicKey && !!tokenData && useSubscription,
+      onData: handleNewTransaction,
+      onError: () => {
+        setUseSubscription(false);
+      },
     }
   );
 
@@ -109,7 +125,9 @@ export default function LiveTransactionsPage() {
         </div>
         <div className="text-right text-muted-foreground">
           <p className="leading-tight font-light">
-            Live updates refresh every few seconds.
+            {useSubscription
+              ? "Live updates via real-time stream."
+              : "Live updates refresh every few seconds."}
             <br />
             Foreign wallets stay highlighted.
           </p>

@@ -2,6 +2,8 @@ import { prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
+import { shyftApiService } from "@/server/services/shyft-api.service";
+import { getEnv } from "@/lib/config/env";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
@@ -209,46 +211,83 @@ export const holdingService = {
       input.walletPublicKeys
     );
 
-    const connection = getSolanaConnection();
-    const mintPublicKey = new PublicKey(token.publicKey);
-    const mintInfo = await connection.getParsedAccountInfo(mintPublicKey);
-    const mintDecimals =
-      (mintInfo.value?.data as { parsed?: { info?: { decimals?: number } } })
-        ?.parsed?.info?.decimals ?? 9;
+    const { SHYFT_API_KEY } = getEnv();
+    let mintDecimals = 9;
+    let balanceResults: {
+      wallet: WalletRecord;
+      tokenBalance: number;
+      ataExists: boolean;
+    }[];
 
-    const atas = await Promise.all(
-      wallets.map(async (wallet) => ({
-        wallet,
-        ata: await getAssociatedTokenAddress(
-          mintPublicKey,
-          new PublicKey(wallet.publicKey)
-        ),
-      }))
-    );
-
-    type ParsedAccountInfoItem = Awaited<
-      ReturnType<Connection["getMultipleParsedAccounts"]>
-    >["value"][number];
-    const ataAddresses = atas.map((a) => a.ata);
-    const accountInfos: ParsedAccountInfoItem[] = [];
-    for (let i = 0; i < ataAddresses.length; i += 100) {
-      const batch = ataAddresses.slice(i, i + 100);
-      const batchInfos = await connection.getMultipleParsedAccounts(batch);
-      accountInfos.push(...batchInfos.value);
-    }
-
-    const balanceResults = atas.map(({ wallet, ata }, index) => {
-      const accountInfo = accountInfos[index];
-      const ataExists = Boolean(accountInfo?.data);
-      let tokenBalance = 0;
-      if (accountInfo?.data && "parsed" in accountInfo.data) {
-        const parsed = accountInfo.data.parsed as {
-          info?: { tokenAmount?: { uiAmount?: number } };
+    if (SHYFT_API_KEY) {
+      const results = await Promise.allSettled(
+        wallets.map(async (wallet) => {
+          try {
+            const { balance, decimals } =
+              await shyftApiService.getTokenBalance(
+                wallet.publicKey,
+                token.publicKey
+              );
+            mintDecimals = decimals;
+            return { wallet, tokenBalance: balance, ataExists: balance > 0 };
+          } catch {
+            return { wallet, tokenBalance: 0, ataExists: false };
+          }
+        })
+      );
+      balanceResults = results.map((result) => {
+        if (result.status === "fulfilled") return result.value;
+        return {
+          wallet: wallets[0],
+          tokenBalance: 0,
+          ataExists: false,
         };
-        tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
+      });
+    } else {
+      const connection = getSolanaConnection();
+      const mintPublicKey = new PublicKey(token.publicKey);
+      const mintInfo = await connection.getParsedAccountInfo(mintPublicKey);
+      mintDecimals =
+        (
+          mintInfo.value?.data as {
+            parsed?: { info?: { decimals?: number } };
+          }
+        )?.parsed?.info?.decimals ?? 9;
+
+      const atas = await Promise.all(
+        wallets.map(async (wallet) => ({
+          wallet,
+          ata: await getAssociatedTokenAddress(
+            mintPublicKey,
+            new PublicKey(wallet.publicKey)
+          ),
+        }))
+      );
+
+      type ParsedAccountInfoItem = Awaited<
+        ReturnType<Connection["getMultipleParsedAccounts"]>
+      >["value"][number];
+      const ataAddresses = atas.map((a) => a.ata);
+      const accountInfos: ParsedAccountInfoItem[] = [];
+      for (let i = 0; i < ataAddresses.length; i += 100) {
+        const batch = ataAddresses.slice(i, i + 100);
+        const batchInfos = await connection.getMultipleParsedAccounts(batch);
+        accountInfos.push(...batchInfos.value);
       }
-      return { wallet, tokenBalance, ataExists };
-    });
+
+      balanceResults = atas.map(({ wallet }, index) => {
+        const accountInfo = accountInfos[index];
+        const ataExists = Boolean(accountInfo?.data);
+        let tokenBalance = 0;
+        if (accountInfo?.data && "parsed" in accountInfo.data) {
+          const parsed = accountInfo.data.parsed as {
+            info?: { tokenAmount?: { uiAmount?: number } };
+          };
+          tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
+        }
+        return { wallet, tokenBalance, ataExists };
+      });
+    }
 
     const walletPublicKeys = balanceResults.map((r) => r.wallet.publicKey);
 
