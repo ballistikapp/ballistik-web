@@ -11,15 +11,20 @@ sollabs-web is the modern successor to sollabv0. It reimplements core launch, wa
 - Solana RPC integrations for balance refresh and transactions
 - Transaction tracking and token holdings
 - Holdings and transactions refresh flows mirror wallet balance refresh behavior
+- Real-time streaming via Shyft gRPC (RabbitStream / Yellowstone) with tRPC subscriptions
+- Shyft REST APIs for enriched wallet, token, and transaction data
+- Shyft Callback webhooks for passive event monitoring
 
 ## Architecture
 
 - Next.js App Router for pages and layouts
-- tRPC for API layer
+- tRPC for API layer (HTTP batch + SSE subscriptions)
 - Prisma + PostgreSQL for data layer
 - Service layer for business logic
 - Zod schemas for validation
-- React Query for client data caching
+- React Query for client data caching (5 min default staleTime)
+- Shyft gRPC manager for real-time on-chain streaming
+- Shyft REST/DeFi/Callback APIs for enriched data
 
 ## Directory Structure
 
@@ -27,19 +32,25 @@ sollabs-web is the modern successor to sollabv0. It reimplements core launch, wa
 app/
   (app)/
   api/
+    trpc/          # tRPC HTTP + SSE handler
+    webhooks/      # Shyft callback webhook endpoint
 components/
   ui/
   wallets/
 data/
 docs/
 lib/
-  solana/
+  config/          # env, rpc, cache, launch configs
+  solana/          # Solana connection singleton
+  trpc/            # tRPC client + provider with splitLink
   utils/
 prisma/
 server/
   schemas/
-  services/
+  services/        # Business logic + Shyft API/callback/DeFi services
+  solana/          # gRPC manager, gRPC utils, pump quotes, volume bot gRPC
   trpc/
+    routers/       # Feature routers + subscription router
 ```
 
 ## Conventions
@@ -53,8 +64,11 @@ server/
 
 ## Environment Variables
 
-- `DATABASE_URL`
-- `SOLANA_RPC_URL`
+- `DATABASE_URL` — Prisma connection string
+- `SOLANA_RPC_URL` — required, Solana RPC endpoint
+- `SHYFT_API_KEY` — optional, enables Shyft gRPC streaming and REST APIs
+- `SHYFT_CALLBACK_SECRET` — optional, validates incoming Shyft webhook requests
+- `APP_URL` — optional, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
 - `NEXT_PUBLIC_*` as needed for client-only configuration
 
 ## Deployment and Build

@@ -10,3 +10,4 @@ export * from "./holding.schema";
 export * from "./transaction.schema";
 export * from "./refresh-cache.schema";
 export * from "./volume-bot.schema";
+export * from "./dashboard.schema";

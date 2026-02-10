@@ -14,6 +14,7 @@ POSTGRES_PASSWORD=sollabs
 POSTGRES_DB=sollabs
 SOLANA_RPC_URL=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+APP_URL=http://localhost:3000
 ENV_FILE=.env.development
 ```
 
@@ -22,6 +23,7 @@ ENV_FILE=.env.development
 DATABASE_URL=<railway_test_database_url>
 SOLANA_RPC_URL=
 NEXT_PUBLIC_APP_URL=http://localhost:3000
+APP_URL=http://localhost:3000
 ENV_FILE=.env.development
 ```
 

@@ -53,6 +53,8 @@ Service rules:
 - All Solana RPC calls are server-side only
 - RPC URL and credentials are never exposed to the client
 - Balance refresh is initiated from the UI but executed on the server
+- When `SHYFT_API_KEY` is set, balance refresh uses Shyft Wallet API (`GET /sol/v1/wallet/balance`) instead of raw `getMultipleAccountsInfo` RPC calls
+- Falls back to raw RPC if Shyft API is unavailable
 
 ## Data Fetch Patterns
 
@@ -77,8 +79,9 @@ Wallet detail page:
 
 - DB stores `balanceSol`, `balanceRefreshedAt`.
 - Refresh is on-demand only; no background auto-refresh.
-- Server enforces a 15-second debounce per wallet.
+- Server enforces a 10-second debounce per wallet (30s when subscriptions are active).
 - `RefreshCache` stores the last full refresh time per token to drive staleness checks.
+- tRPC subscription `subscription.onBalanceUpdate` pushes real-time balance changes via gRPC stream, reducing the need for manual refresh.
 
 ## Migrations
 

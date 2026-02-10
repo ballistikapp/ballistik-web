@@ -28,6 +28,7 @@ import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { walletService } from "@/server/services/wallet.service";
+import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 
 type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
@@ -810,6 +811,14 @@ export const reclaimVolumeBotSession = async (sessionId: string) => {
       data: { signatures: reclaimResults.map((result) => result.signature) },
     },
   });
+
+  for (const publicKey of walletPublicKeys) {
+    try {
+      await shyftCallbackService.removeCallbacksByAddress(publicKey);
+    } catch {
+      // best-effort cleanup
+    }
+  }
 };
 
 export const closeVolumeBotAccounts = async (sessionId: string) => {

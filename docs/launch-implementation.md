@@ -89,12 +89,14 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
 2. **Validate**: enforce min buy thresholds and bundle wallet limit.
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
-4. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
-5. **Metadata + Mint**: resolve image, build metadata, consume vanity mint if requested (fails if none available).
-6. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
-7. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
-8. **Persist**: create Token, link wallets, link vanity mint to token, link distribution wallets.
-9. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
+4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
+5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
+6. **Metadata + Mint**: resolve image, build metadata, consume vanity mint if requested (fails if none available).
+7. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
+8. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
+9. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
+10. **Persist**: create Token, link wallets, link vanity mint to token, link distribution wallets.
+11. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
 

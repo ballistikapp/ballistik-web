@@ -223,22 +223,30 @@ export const holdingService = {
       const results = await Promise.allSettled(
         wallets.map(async (wallet) => {
           try {
-            const { balance, decimals } =
-              await shyftApiService.getTokenBalance(
-                wallet.publicKey,
-                token.publicKey
-              );
-            mintDecimals = decimals;
-            return { wallet, tokenBalance: balance, ataExists: balance > 0 };
+            const allTokens = await shyftApiService.getAllTokens(
+              wallet.publicKey
+            );
+            const entry = allTokens.find(
+              (t) => t.address === token.publicKey
+            );
+            if (entry) {
+              mintDecimals = entry.info.decimals;
+              return {
+                wallet,
+                tokenBalance: entry.balance,
+                ataExists: true,
+              };
+            }
+            return { wallet, tokenBalance: 0, ataExists: false };
           } catch {
             return { wallet, tokenBalance: 0, ataExists: false };
           }
         })
       );
-      balanceResults = results.map((result) => {
+      balanceResults = results.map((result, index) => {
         if (result.status === "fulfilled") return result.value;
         return {
-          wallet: wallets[0],
+          wallet: wallets[index] ?? wallets[0],
           tokenBalance: 0,
           ataExists: false,
         };

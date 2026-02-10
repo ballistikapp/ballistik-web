@@ -7,7 +7,7 @@ Holdings show per-wallet token balances, aggregated buy/sell totals, and last ac
 ## tRPC Procedures
 
 - `holding.listByToken` fetches holdings for a token (optionally filtered by wallet).
-- `holding.refreshByToken` refreshes holdings via RPC balance scans.
+- `holding.refreshByToken` refreshes holdings via Shyft `getAllTokens()` per wallet (bulk fetch with metadata), filtering for the target mint. Falls back to batched RPC `getMultipleParsedAccounts` when `SHYFT_API_KEY` is not set.
 - `holding.sellByToken` submits sell transactions for selected wallets at a percentage of on-chain token balances.
 
 ## Access Rules
@@ -31,3 +31,4 @@ Holdings show per-wallet token balances, aggregated buy/sell totals, and last ac
 - Manual refresh is available; auto refresh uses `RefreshCache` staleness.
 - Zero-balance rows appear when the wallet has an open ATA for the token.
 - Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells).
+- tRPC subscription `subscription.onTokenBalanceUpdate` pushes real-time token balance changes when available.

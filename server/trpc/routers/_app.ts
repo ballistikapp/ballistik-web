@@ -9,6 +9,7 @@ import { transactionRouter } from "./transaction.router";
 import { refreshCacheRouter } from "./refresh-cache.router";
 import { volumeBotRouter } from "./volume-bot.router";
 import { subscriptionRouter } from "./subscription.router";
+import { dashboardRouter } from "./dashboard.router";
 
 export const appRouter = router({
   test: testRouter,
@@ -21,6 +22,7 @@ export const appRouter = router({
   refreshCache: refreshCacheRouter,
   volumeBot: volumeBotRouter,
   subscription: subscriptionRouter,
+  dashboard: dashboardRouter,
 });
 
 export type AppRouter = typeof appRouter;

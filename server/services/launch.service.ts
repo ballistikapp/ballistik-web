@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import type { LaunchTokenInput } from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
+import { getEnv } from "@/lib/config/env";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
@@ -28,6 +29,8 @@ import {
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
 } from "@/server/solana/pump-transaction-builders";
+import { grpcManager } from "@/server/solana/grpc-manager";
+import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -532,7 +535,7 @@ async function setStep(
   await appendLog(launchId, "STEP", message, step);
 }
 
-async function waitForMintAccount(mintPublicKey: string) {
+async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
   const {
     mintConfirmTimeoutMs: MINT_CONFIRM_TIMEOUT_MS,
     mintConfirmIntervalMs: MINT_CONFIRM_INTERVAL_MS,
@@ -540,29 +543,76 @@ async function waitForMintAccount(mintPublicKey: string) {
   const connection = getSolanaConnection();
   const mintKey = new PublicKey(mintPublicKey);
   const startedAt = Date.now();
-  let attempts = 0;
+  const subscriptionId = launchId ? `launch:${launchId}` : `launch:${mintPublicKey}`;
 
-  while (Date.now() - startedAt < MINT_CONFIRM_TIMEOUT_MS) {
-    attempts += 1;
-    const account = await connection.getAccountInfo(mintKey, "confirmed");
-    if (account) {
-      return {
-        attempts,
-        durationMs: Date.now() - startedAt,
-        owner: account.owner.toBase58(),
-        lamports: account.lamports,
-        dataLength: account.data.length,
-      };
+  type MintResult = {
+    source: "grpc" | "rpc";
+    attempts: number;
+    durationMs: number;
+    owner: string;
+    lamports: number;
+    dataLength: number;
+  };
+
+  const grpcPromise = new Promise<MintResult>((resolve) => {
+    if (!grpcManager.isConnected()) {
+      return;
     }
-    await new Promise((resolve) =>
-      setTimeout(resolve, MINT_CONFIRM_INTERVAL_MS)
-    );
-  }
 
-  throw new AppError(
-    "Token mint not found on chain. The create transaction may have failed or the RPC cluster does not match pump.fun.",
-    500
-  );
+    grpcManager.subscribe(subscriptionId, [mintPublicKey]).catch(() => {});
+
+    const removeListener = grpcManager.onAccountUpdate((update) => {
+      if (update.pubkey === mintPublicKey && update.lamports > 0) {
+        removeListener();
+        resolve({
+          source: "grpc",
+          attempts: 0,
+          durationMs: Date.now() - startedAt,
+          owner: update.owner ?? "unknown",
+          lamports: update.lamports,
+          dataLength: 0,
+        });
+      }
+    });
+
+    setTimeout(() => {
+      removeListener();
+    }, MINT_CONFIRM_TIMEOUT_MS);
+  });
+
+  const rpcPromise = (async (): Promise<MintResult> => {
+    let attempts = 0;
+    while (Date.now() - startedAt < MINT_CONFIRM_TIMEOUT_MS) {
+      attempts += 1;
+      const account = await connection.getAccountInfo(mintKey, "confirmed");
+      if (account) {
+        return {
+          source: "rpc",
+          attempts,
+          durationMs: Date.now() - startedAt,
+          owner: account.owner.toBase58(),
+          lamports: account.lamports,
+          dataLength: account.data.length,
+        };
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, MINT_CONFIRM_INTERVAL_MS)
+      );
+    }
+    throw new AppError(
+      "Token mint not found on chain. The create transaction may have failed or the RPC cluster does not match pump.fun.",
+      500
+    );
+  })();
+
+  try {
+    const result = await Promise.race([grpcPromise, rpcPromise]);
+    grpcManager.unsubscribe(subscriptionId);
+    return result;
+  } catch (error) {
+    grpcManager.unsubscribe(subscriptionId);
+    throw error;
+  }
 }
 
 function keypairFromPrivateKey(privateKey: string) {
@@ -1675,6 +1725,29 @@ export const launchService = {
       );
       await setLaunchRecovery(launchId, recoveryData);
 
+      const { SHYFT_API_KEY, APP_URL } = getEnv();
+      if (SHYFT_API_KEY && APP_URL) {
+        const callbackUrl = `${APP_URL}/api/webhooks/shyft`;
+        const walletAddresses = [
+          ...bundlerWalletKeypairs.map((w) => w.publicKey.toBase58()),
+          ...distributionWallets.map((w) => w.wallet.publicKey.toBase58()),
+        ];
+        if (devWalletPublicKey !== user.mainWallet.publicKey) {
+          walletAddresses.push(devWalletPublicKey);
+        }
+        for (const address of walletAddresses) {
+          try {
+            await shyftCallbackService.createTransactionCallback({
+              address,
+              callbackUrl,
+              events: ["SWAP", "TOKEN_TRANSFER", "SOL_TRANSFER"],
+            });
+          } catch {
+            // best-effort, don't block launch
+          }
+        }
+      }
+
       if (await cancelLaunchIfRequested(launchId)) {
         return;
       }
@@ -1895,7 +1968,7 @@ export const launchService = {
       const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
 
       await setStep(launchId, 55, "confirm", "Confirming token on-chain");
-      const confirmation = await waitForMintAccount(mintPublicKey);
+      const confirmation = await waitForMintAccount(mintPublicKey, launchId);
       await appendLog(launchId, "INFO", "Token confirmed", "confirm", {
         createSignature,
         bundleId,
