@@ -5,12 +5,15 @@ alwaysApply: true
 
 # Workspace Rules
 
-## Multi-Workspace Context
+## Documentation Discipline (CRITICAL)
 
-- **sollabs-web** and **sollabv0** are in the same workspace
-- When working on sollabs-web, reference sollabv0 for feature requirements
-- When working on sollabv0, note improvements for sollabs-web migration
-- Keep both projects' dependencies and versions in sync where possible (e.g., Solana libraries)
+**Documentation is not optional. It is a core part of the development process.**
+
+- Read `docs/implementation/` before making any non-trivial changes
+- Update documentation BEFORE implementing changes to data models, flows, or APIs
+- Documentation must stay in sync with code at all times
+- Treat outdated documentation as a critical bug
+- See `docs-discipline.mdc` for detailed requirements
 
 ## Environment Variables
 
@@ -24,9 +27,9 @@ alwaysApply: true
 
 - Use descriptive commit messages following conventional commits format
 - Keep commits focused on a single feature or fix
-- Reference sollabv0 features when migrating: `feat: migrate wallet creation from v0`
 - Create feature branches for significant changes
 - Keep main/master branch deployable at all times
+- Include documentation updates in the same commit as code changes
 
 ## Development Workflow
 
@@ -107,9 +110,9 @@ alwaysApply: true
 
 ## When in Doubt
 
+- **Read the documentation first** — check `docs/implementation/` for existing patterns
 - Prefer type safety over convenience
 - Keep business logic in services, not in routers or components
 - Use existing patterns from the codebase
-- Reference sollabv0 for feature requirements, not implementation details
-- Improve upon v0 implementation with better error handling and type safety
 - Ask for clarification rather than making assumptions
+- Update documentation when you discover gaps or outdated information

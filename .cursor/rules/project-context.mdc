@@ -1,24 +1,23 @@
 ---
-description: "Project context, tech stack, and key differences"
+description: "Project context, tech stack, and architecture principles"
 alwaysApply: true
 ---
 
 # Project Context
 
-**sollabs-web** is the successor of **sollabv0**. The goal is to implement features from v0 more robustly and cleanly in sollabs-web.
+**sollabs-web** is a modern Solana token launch and management platform built with a clean, type-safe architecture.
 
-## Architecture Overview
-
-- **sollabs-web**: Modern Next.js 16 app with tRPC, Prisma, PostgreSQL, React 19
-- **sollabv0**: Legacy Next.js 14 app with REST APIs, Supabase, React 18
+## Architecture Principles
 
 When implementing features:
 
-1. Reference sollabv0 for feature requirements and business logic
-2. Reimplement in sollabs-web using the modern architecture patterns
-3. Improve code quality, error handling, and type safety
+1. **Documentation First**: Read and update `docs/implementation/` before coding
+2. **Type Safety**: End-to-end type safety via tRPC and Zod
+3. **Layered Design**: Clear separation between schemas, services, routers, and UI
+4. **Error Handling**: Explicit error handling with custom AppError system
+5. **Code Quality**: Maintainable, testable, and well-structured code
 
-## Tech Stack (sollabs-web)
+## Tech Stack
 
 - **Framework**: Next.js 16.1.1 (App Router)
 - **Language**: TypeScript (strict mode)
@@ -29,11 +28,11 @@ When implementing features:
 - **State**: TanStack Query (React Query)
 - **Blockchain**: Solana (@solana/web3.js)
 
-## Key Differences from sollabv0
+## Core Architecture
 
-- **API**: tRPC instead of REST endpoints
-- **Database**: Prisma + PostgreSQL instead of Supabase
-- **Validation**: Centralized Zod schemas instead of inline validation
-- **Error Handling**: Custom AppError system instead of generic errors
-- **Architecture**: Clear service layer separation
-- **Type Safety**: End-to-end type safety with tRPC
+- **API**: tRPC for end-to-end type safety
+- **Database**: Prisma ORM with PostgreSQL
+- **Validation**: Centralized Zod schemas shared across layers
+- **Error Handling**: Custom AppError system for user-facing errors
+- **Layering**: Services contain business logic, routers handle API endpoints
+- **Type Safety**: Infer types from Zod schemas, avoid manual type definitions

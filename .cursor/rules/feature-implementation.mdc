@@ -1,17 +1,27 @@
 ---
-description: "Migration guidelines and feature implementation patterns"
+description: "Feature implementation guidelines and patterns"
 alwaysApply: true
 ---
 
-# Migration Guidelines
+# Feature Implementation Guidelines
 
-When porting features from sollabv0 to sollabs-web:
+## Documentation-First Workflow (CRITICAL)
 
-1. **Analyze the feature** in sollabv0:
+Before writing any code:
 
-   - Understand the business logic
-   - Identify database operations
+1. **Read existing docs** in `docs/implementation/` related to the feature
+2. **Update documentation** with planned changes (data models, flows, endpoints)
+3. **Get clarification** if requirements are unclear
+4. **Then implement** following the documented design
+
+## Implementation Process
+
+1. **Analyze the feature requirements**:
+
+   - Understand the business logic and user flows
+   - Identify database operations and data models
    - Note API endpoints and their behavior
+   - Document findings in `docs/implementation/`
 
 2. **Design the implementation**:
 
@@ -19,6 +29,7 @@ When porting features from sollabv0 to sollabs-web:
    - Define Zod schemas for validation
    - Plan service layer functions
    - Design tRPC router endpoints
+   - Update implementation docs with design decisions
 
 3. **Implement in layers**:
 
@@ -27,13 +38,15 @@ When porting features from sollabv0 to sollabs-web:
    - Implement service functions
    - Create tRPC router
    - Build UI components
+   - Update docs with any implementation changes
 
-4. **Improve over v0**:
+4. **Maintain quality standards**:
 
-   - Better error handling
+   - Comprehensive error handling
    - Type safety throughout
-   - Cleaner separation of concerns
-   - More robust validation
+   - Clear separation of concerns
+   - Robust validation
+   - Keep documentation current
 
 ## Common Patterns
 

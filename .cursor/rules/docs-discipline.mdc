@@ -1,12 +1,80 @@
 ---
-description: "Documentation discipline for non-trivial changes"
+description: "Documentation discipline for all changes (CRITICAL)"
 alwaysApply: true
 ---
 
 # Docs Discipline
 
-- Always refer to relevant files in the `docs/` directory before making changes, except for small insignificant or UI-only tweaks
-- Add or update a `docs/` file only when a change affects behavior, data models, system flows, or tRPC endpoints
-- Use a docs-first checklist for non-trivial changes: read existing docs, update docs with behavior changes, then implement
-- When modifying Prisma schema, update `docs/` to reflect data model and relationship changes
-- When adding or modifying tRPC procedures, update the relevant `docs/` entries with new endpoints and behavior
+## CRITICAL: Documentation is Mandatory
+
+**Documentation is not optional. It is THE foundation of this codebase.**
+
+Treating documentation as secondary or skipping it entirely is **unacceptable**. Code without documentation creates technical debt, confusion, and bugs.
+
+## Documentation Structure
+
+- **`docs/implementation/`** — detailed implementation documentation for features (data models, services, flows, tRPC endpoints)
+- **`docs/backlog/`** — planned work and future tasks
+  - `backlog/index.md` — simple tasks and quick items
+  - Individual files for detailed plans and complex features
+
+## Mandatory Rules
+
+### Before Writing Code
+
+1. **Read relevant implementation docs** in `docs/implementation/` 
+2. **Understand existing patterns** and architectural decisions
+3. **Identify what needs to change** in the documentation
+
+### While Writing Code
+
+4. **Update documentation FIRST** before implementing changes
+5. **Document all design decisions** (why, not just what)
+6. **Keep documentation and code in sync** — treat them as one unit
+
+### When to Update Implementation Docs
+
+You **MUST** update `docs/implementation/` when changes affect:
+
+- **Data models** (Prisma schema changes)
+- **API endpoints** (new or modified tRPC procedures)
+- **Business logic flows** (service layer behavior)
+- **System architecture** (new patterns or infrastructure)
+- **External integrations** (third-party services, blockchain)
+
+### Small Changes Exception
+
+Skip documentation updates ONLY for:
+- Minor UI-only tweaks (styling, layout)
+- Trivial bug fixes that don't change behavior
+- Refactoring that maintains exact same behavior
+
+When in doubt, **update the docs**.
+
+## Documentation-First Checklist
+
+For every non-trivial change:
+
+- [ ] Read existing implementation docs
+- [ ] Update docs with planned changes
+- [ ] Review design decisions with team if needed
+- [ ] Implement the code
+- [ ] Verify docs still match implementation
+- [ ] Commit docs and code together
+
+## Backlog Management
+
+- Add **simple tasks** to `docs/backlog/index.md`
+- Create **separate files** in `docs/backlog/` for:
+  - Complex features requiring exploration
+  - Detailed technical plans
+  - Architecture changes with trade-offs
+
+## Treating Documentation Seriously
+
+- **Outdated docs are bugs** — fix them immediately when discovered
+- **Missing docs block progress** — don't start implementation without them
+- **Poor docs create debt** — invest time in clear, accurate documentation
+- **Good docs save time** — they prevent confusion, bugs, and rework
+
+Documentation discipline is what keeps this codebase maintainable, scalable, and understandable. Take it seriously.
