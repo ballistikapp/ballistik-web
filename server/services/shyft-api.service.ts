@@ -147,7 +147,7 @@ export const shyftApiService = {
   async getTokenBalance(
     walletAddress: string,
     tokenAddress: string
-  ): Promise<{ balance: number; decimals: number }> {
+  ): Promise<{ balance: number; decimals: number; associatedAccount: string }> {
     const result = await shyftGet<{ balance: number; decimals: number; associated_account: string }>(
       "/wallet/token_balance",
       {
@@ -155,7 +155,7 @@ export const shyftApiService = {
         token: tokenAddress,
       }
     );
-    return { balance: result.balance, decimals: result.decimals };
+    return { balance: result.balance, decimals: result.decimals, associatedAccount: result.associated_account };
   },
 
   async getTransactionHistory(

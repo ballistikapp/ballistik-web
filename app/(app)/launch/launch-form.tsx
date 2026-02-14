@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { Separator } from "@/components/ui/separator";
 import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog";
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
+import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 
 const formSchema = z.object({
@@ -171,6 +172,8 @@ function calculateLaunchTotals(values: {
 }
 
 export function LaunchForm() {
+  const router = useRouter();
+  const utils = trpc.useUtils();
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = React.useState<string | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = React.useState(false);
@@ -256,6 +259,8 @@ export function LaunchForm() {
         description: `Token ${launch.tokenPublicKey} is live.`,
       });
       setLaunchNotified(true);
+      utils.wallet.getMain.invalidate();
+      router.refresh();
     }
 
     if (launch.status === "FAILED" && !launchNotified) {
@@ -696,9 +701,10 @@ export function LaunchForm() {
                         File size and type
                       </p>
                       <p>
-                        Image - max 15MB. ".jpg", ".gif" or ".png" recommended
+                        Image - max 15MB. &quot;.jpg&quot;, &quot;.gif&quot; or
+                        &quot;.png&quot; recommended
                       </p>
-                      <p>Video - max 30MB. ".mp4" recommended</p>
+                      <p>Video - max 30MB. &quot;.mp4&quot; recommended</p>
                       <p className="pt-2 font-medium text-foreground">
                         Resolution and aspect ratio
                       </p>
@@ -763,7 +769,8 @@ export function LaunchForm() {
                         File size and type
                       </p>
                       <p>
-                        Image - max 4.3MB. ".jpg", ".gif" or ".png" recommended
+                        Image - max 4.3MB. &quot;.jpg&quot;, &quot;.gif&quot; or
+                        &quot;.png&quot; recommended
                       </p>
                       <p className="pt-2 font-medium text-foreground">
                         Resolution and aspect ratio

@@ -39,7 +39,6 @@ type RangeInput = {
   solMin: number;
   solMax: number;
   increment: number | null;
-  probability: number;
   intervalMin: number;
   intervalMax: number;
   direction: "buy" | "sell" | "both";
@@ -50,7 +49,6 @@ const defaultRange: RangeInput = {
   solMin: 0.01,
   solMax: 0.03,
   increment: 0.01,
-  probability: 1,
   intervalMin: 180,
   intervalMax: 600,
   direction: "both",
@@ -87,9 +85,53 @@ const formatNumber = (value?: number | null, fallback = "—") => {
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
 
+const isRangeInputValid = (range: RangeInput) => {
+  if (
+    !Number.isFinite(range.solMin) ||
+    !Number.isFinite(range.solMax) ||
+    !Number.isFinite(range.intervalMin) ||
+    !Number.isFinite(range.intervalMax)
+  ) {
+    return false;
+  }
+  if (range.solMin < 0.001 || range.solMax > 10 || range.solMin > range.solMax) {
+    return false;
+  }
+  if (
+    range.intervalMin < 1 ||
+    range.intervalMax < 1 ||
+    range.intervalMax > 3600 ||
+    range.intervalMin > range.intervalMax
+  ) {
+    return false;
+  }
+  if (range.direction === "both") {
+    const buyProbability = range.buyProbability;
+    if (
+      !Number.isFinite(buyProbability ?? Number.NaN) ||
+      (buyProbability ?? 0) < 0 ||
+      (buyProbability ?? 0) > 1
+    ) {
+      return false;
+    }
+  }
+  if (range.increment !== null && range.increment !== undefined) {
+    if (!Number.isFinite(range.increment) || range.increment <= 0) {
+      return false;
+    }
+    const steps =
+      Math.floor((range.solMax - range.solMin) / range.increment + 1e-9) + 1;
+    if (steps < 2) {
+      return false;
+    }
+  }
+  return true;
+};
+
 export default function VolumeBotStartPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const router = useRouter();
+  const utils = trpc.useUtils();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [walletsExpanded, setWalletsExpanded] = useState(false);
   const [isRefreshingWallets, setIsRefreshingWallets] = useState(false);
@@ -170,10 +212,9 @@ export default function VolumeBotStartPage() {
   });
 
   const totalWallets = selectedWalletPublicKeys.length + generatedWalletCount;
-  const probabilitySum = useMemo(
-    () => ranges.reduce((sum, range) => sum + range.probability, 0),
-    [ranges]
-  );
+  const isConfigValid = useMemo(() => {
+    return ranges.every((range) => isRangeInputValid(range));
+  }, [ranges]);
   const selectedPreset = useMemo(() => {
     return presetsQuery.data?.find((preset) => preset.id === selectedPresetId);
   }, [presetsQuery.data, selectedPresetId]);
@@ -217,18 +258,19 @@ export default function VolumeBotStartPage() {
     ]
   );
 
+  const selectionSummaryEnabled =
+    Boolean(tokenPublicKey && tokenData) &&
+    ranges.length > 0 &&
+    totalWallets > 0 &&
+    targetDurationSeconds > 0 &&
+    isConfigValid;
   const selectionSummaryQuery = trpc.volumeBot.selectionSummary.useQuery(
     {
       tokenPublicKey: tokenPublicKey || "",
       config: configInput,
     },
     {
-      enabled:
-        Boolean(tokenPublicKey && tokenData) &&
-        ranges.length > 0 &&
-        totalWallets > 0 &&
-        targetDurationSeconds > 0 &&
-        Math.abs(probabilitySum - 1) < 0.001,
+      enabled: selectionSummaryEnabled,
       retry: false,
     }
   );
@@ -270,65 +312,69 @@ export default function VolumeBotStartPage() {
     if (
       ranges.length === 0 ||
       totalWallets <= 0 ||
-      targetDurationSeconds <= 0
+      targetDurationSeconds <= 0 ||
+      !isConfigValid
     ) {
       return null;
     }
     let netSolDirection = 0;
-    let avgIntervalWeighted = 0;
-    let avgTradeSizeWeighted = 0;
+    let estimatedTradesPerWallet = 0;
+    let totalVolumePerWallet = 0;
     let minVolumePerMinute = 0;
     let maxVolumePerMinute = 0;
-    let minNetSolPerTrade = 0;
-    let maxNetSolPerTrade = 0;
+    let minNetSolPerMinute = 0;
+    let maxNetSolPerMinute = 0;
     for (const range of ranges) {
       const avgAmount = (range.solMin + range.solMax) / 2;
       const avgInterval = (range.intervalMin + range.intervalMax) / 2;
-      avgIntervalWeighted += range.probability * avgInterval;
-      avgTradeSizeWeighted += range.probability * avgAmount;
+      if (avgInterval > 0) {
+        const tradesFromRange = targetDurationSeconds / avgInterval;
+        estimatedTradesPerWallet += tradesFromRange;
+        totalVolumePerWallet += tradesFromRange * avgAmount;
+      }
+      const tradesPerMinute =
+        avgInterval > 0 ? (60 / avgInterval) * totalWallets : 0;
       if (range.direction === "buy") {
-        netSolDirection += range.probability * avgAmount;
-        minNetSolPerTrade += range.probability * range.solMin;
-        maxNetSolPerTrade += range.probability * range.solMax;
+        netSolDirection += avgAmount;
+        minNetSolPerMinute += range.solMin * tradesPerMinute;
+        maxNetSolPerMinute += range.solMax * tradesPerMinute;
       } else if (range.direction === "sell") {
-        netSolDirection -= range.probability * avgAmount;
-        minNetSolPerTrade -= range.probability * range.solMax;
-        maxNetSolPerTrade -= range.probability * range.solMin;
+        netSolDirection -= avgAmount;
+        minNetSolPerMinute -= range.solMax * tradesPerMinute;
+        maxNetSolPerMinute -= range.solMin * tradesPerMinute;
       } else {
         const buyProbability = range.buyProbability ?? 0;
         const sellProbability = 1 - buyProbability;
-        netSolDirection +=
-          range.probability * avgAmount * (2 * buyProbability - 1);
-        minNetSolPerTrade +=
-          range.probability *
-          (buyProbability * range.solMin - sellProbability * range.solMax);
-        maxNetSolPerTrade +=
-          range.probability *
-          (buyProbability * range.solMax - sellProbability * range.solMin);
+        netSolDirection += avgAmount * (2 * buyProbability - 1);
+        minNetSolPerMinute +=
+          (buyProbability * range.solMin - sellProbability * range.solMax) *
+          tradesPerMinute;
+        maxNetSolPerMinute +=
+          (buyProbability * range.solMax - sellProbability * range.solMin) *
+          tradesPerMinute;
       }
       minVolumePerMinute +=
-        ((range.solMin * 60) / range.intervalMax) *
-        range.probability *
-        totalWallets;
+        ((range.solMin * 60) / range.intervalMax) * totalWallets;
       maxVolumePerMinute +=
-        ((range.solMax * 60) / range.intervalMin) *
-        range.probability *
-        totalWallets;
+        ((range.solMax * 60) / range.intervalMin) * totalWallets;
     }
-    const estimatedTradesPerWallet =
-      avgIntervalWeighted > 0 ? targetDurationSeconds / avgIntervalWeighted : 0;
-    const totalExpectedVolume =
-      estimatedTradesPerWallet * avgTradeSizeWeighted * totalWallets;
+    const avgIntervalWeighted =
+      estimatedTradesPerWallet > 0
+        ? targetDurationSeconds / estimatedTradesPerWallet
+        : 0;
+    const avgTradeSizeWeighted =
+      estimatedTradesPerWallet > 0
+        ? totalVolumePerWallet / estimatedTradesPerWallet
+        : 0;
+    const totalExpectedVolume = totalVolumePerWallet * totalWallets;
     const bufferMultiplier =
       netSolDirection > 0 && totalExpectedVolume > 0
         ? clampNumber(1 + netSolDirection / totalExpectedVolume, 1, 2)
         : 1;
-    const baseFunding = estimatedTradesPerWallet * avgTradeSizeWeighted;
+    const baseFunding = totalVolumePerWallet;
     const suggestedFunding =
       Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100;
     const minutes = targetDurationSeconds / 60;
-    const tradesPerMinute =
-      avgIntervalWeighted > 0 ? (60 / avgIntervalWeighted) * totalWallets : 0;
     return {
       netSolDirection,
       avgIntervalWeighted,
@@ -344,15 +390,15 @@ export default function VolumeBotStartPage() {
         max: maxVolumePerMinute * minutes,
       },
       netSolRangePerMinute: {
-        min: minNetSolPerTrade * tradesPerMinute,
-        max: maxNetSolPerTrade * tradesPerMinute,
+        min: minNetSolPerMinute,
+        max: maxNetSolPerMinute,
       },
       netSolRangeTotal: {
-        min: minNetSolPerTrade * tradesPerMinute * minutes,
-        max: maxNetSolPerTrade * tradesPerMinute * minutes,
+        min: minNetSolPerMinute * minutes,
+        max: maxNetSolPerMinute * minutes,
       },
     };
-  }, [ranges, totalWallets, targetDurationSeconds]);
+  }, [isConfigValid, ranges, targetDurationSeconds, totalWallets]);
 
   const selectionSummary = selectionSummaryQuery.data;
   const effectivePreflight = selectionSummary ?? localPreflight;
@@ -399,7 +445,7 @@ export default function VolumeBotStartPage() {
       toast.error("Max 5 ranges allowed");
       return;
     }
-    setRanges((current) => [...current, { ...defaultRange, probability: 0 }]);
+    setRanges((current) => [...current, { ...defaultRange }]);
   };
 
   const removeRange = (index: number) => {
@@ -484,10 +530,6 @@ export default function VolumeBotStartPage() {
       toast.error("Add at least one range");
       return;
     }
-    if (Math.abs(probabilitySum - 1) >= 0.001) {
-      toast.error("Range probabilities must sum to 1.0");
-      return;
-    }
     if (totalWallets < 1 || totalWallets > 50) {
       toast.error("Total wallets must be between 1 and 50");
       return;
@@ -532,6 +574,7 @@ export default function VolumeBotStartPage() {
     });
     toast.success("Volume bot started");
     setConfirmOpen(false);
+    utils.wallet.getMain.invalidate();
     router.push(`/${tokenPublicKey}/volume-bot/${result.sessionId}`);
   };
 
@@ -734,23 +777,6 @@ export default function VolumeBotStartPage() {
                     />
                   </div>
                   <div className="space-y-2">
-                    <Label>Probability (0-1)</Label>
-                    <Input
-                      type="number"
-                      min={0}
-                      max={1}
-                      step={0.01}
-                      value={range.probability}
-                      onChange={(event) =>
-                        updateRange(
-                          index,
-                          "probability",
-                          Number(event.target.value)
-                        )
-                      }
-                    />
-                  </div>
-                  <div className="space-y-2">
                     <Label>Interval min (sec)</Label>
                     <Input
                       type="number"
@@ -830,9 +856,6 @@ export default function VolumeBotStartPage() {
                 </div>
               </div>
             ))}
-            <div className="text-xs text-muted-foreground">
-              Probability sum: {probabilitySum.toFixed(3)} (must be 1.000)
-            </div>
           </CardContent>
         </Card>
 
@@ -864,7 +887,9 @@ export default function VolumeBotStartPage() {
                 try {
                   await Promise.all([
                     eligibleWalletsQuery.refetch(),
-                    selectionSummaryQuery.refetch(),
+                    selectionSummaryEnabled
+                      ? selectionSummaryQuery.refetch()
+                      : Promise.resolve(),
                   ]);
                 } finally {
                   setIsRefreshingWallets(false);

@@ -27,12 +27,21 @@ Transactions track per-wallet buy, sell, and create activity for a token. Each r
 
 ## Refresh Behavior
 
-- Refresh scans each allowed wallet independently, fetching a limited batch of recent signatures.
-- When `SHYFT_API_KEY` is set, uses Shyft Transaction History API (`GET /transaction/history`) instead of `getSignaturesForAddress` for pre-parsed results. Falls back to raw RPC on failure.
-- Existing rows with zero SOL or price are queued for backfill by signature.
-- Parsed transactions are batched to reduce RPC calls.
-- New transactions are inserted and stale rows are updated when recalculated values are available.
-- `RefreshCache` is updated on each refresh to support client staleness checks.
+The `refreshByToken` service is optimized for speed:
+
+1. Signature fetching and stale transaction query run **in parallel**:
+   - **Signatures**: Shyft `getTransactionHistory()` or RPC `getSignaturesForAddress()` per wallet, with concurrency limit of 5 (via `mapWithConcurrency`). Shyft calls fall back to RPC on failure.
+   - **Stale query**: Fetches existing rows with zero SOL/price for backfill, runs concurrently with signature fetching.
+2. Parsed transaction fetching uses `getParsedTransactions()` in batches of 10, with 3 concurrent batches via `mapWithConcurrency`.
+3. New transactions are bulk-inserted via `createMany()`. Stale row updates are batched in a single `$transaction()`.
+4. `RefreshCache` is updated on each refresh to support client staleness checks.
+5. UI invalidates the `listByToken` query cache after mutation, triggering a background refetch without blocking.
+
+### Database Indexes
+
+The `Transaction` table has composite indexes to support refresh queries:
+- `@@index([walletPublicKey, tokenPublicKey, createdAt])` for aggregation and stale lookups.
+- `@@index([tokenPublicKey, transactionSignature, walletPublicKey])` for existing transaction deduplication.
 
 ## Access Rules
 

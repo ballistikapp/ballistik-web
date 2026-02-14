@@ -22,6 +22,7 @@ This directory contains detailed implementation documentation for all features i
 
 ### Automation
 - [Volume Bot Implementation](./volume-bot-implementation.md) — volume bot sessions and wallet management
+- [Dashboard Monitoring](./dashboard-monitoring.md) — dashboard monitoring mode, subscriptions, and polling behavior
 
 ## Infrastructure
 

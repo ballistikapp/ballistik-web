@@ -22,6 +22,7 @@ export const tokenService = {
       }
       return await prisma.token.findMany({
         where: { userId: _userId },
+        orderBy: { createdAt: "desc" },
       });
     } catch (error) {
       throw new AppError("Failed to fetch user tokens", 500, { error });

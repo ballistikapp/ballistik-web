@@ -29,6 +29,7 @@ import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { walletService } from "@/server/services/wallet.service";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
+import { dashboardEvents } from "@/server/events/dashboard-events";
 
 type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
@@ -213,11 +214,6 @@ export const processVolumeBotWalletRange = async (
 
   const nextTickAt = computeNextTickAt(range);
 
-  if (Math.random() > range.probability) {
-    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Skipping execution (probability check failed)`);
-    return nextTickAt;
-  }
-
   if (inFlightTrades.has(walletId)) {
     console.log(`[Worker] ${walletPk} range ${rangeIndex}: Skipping, trade already in flight`);
     return nextTickAt;
@@ -343,7 +339,7 @@ export const processVolumeBotWalletRange = async (
   }
 
   let solBalanceLamports = eligibility.solBalanceLamports;
-  let tokenBalance = eligibility.tokenBalance;
+  const tokenBalance = eligibility.tokenBalance;
   let signature: string | null = null;
   let tokenAmount = BigInt(0);
   let sellMode: string | null = null;
@@ -678,6 +674,12 @@ export const processVolumeBotWalletRange = async (
         },
       },
     });
+
+    dashboardEvents.emitTradeComplete({
+      tokenPublicKey: session.tokenPublicKey,
+      sessionId: session.id,
+    });
+
     return nextTickAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);

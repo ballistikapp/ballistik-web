@@ -12,6 +12,7 @@ import {
   PublicKey,
 } from "@solana/web3.js";
 import { type WalletType } from "@/lib/generated/prisma/enums";
+import { mapWithConcurrency } from "@/lib/utils/async";
 import type {
   ListTransactionsByTokenInput,
   LiveTransactionsByTokenInput,
@@ -368,6 +369,57 @@ function parseTransactionForTokenOwners(
   return results;
 }
 
+async function fetchWalletSignatures(
+  wallets: WalletRecord[],
+  connection: ReturnType<typeof getSolanaConnection>,
+  shyftApiKey: string | undefined,
+  signatureLimit: number
+): Promise<Map<string, Set<string>>> {
+  const signatureWallets = new Map<string, Set<string>>();
+
+  function addSignature(sig: string, walletPk: string) {
+    const existing = signatureWallets.get(sig);
+    if (existing) {
+      existing.add(walletPk);
+    } else {
+      signatureWallets.set(sig, new Set([walletPk]));
+    }
+  }
+
+  if (shyftApiKey) {
+    await mapWithConcurrency(wallets, 5, async (wallet) => {
+      try {
+        const history = await shyftApiService.getTransactionHistory(
+          wallet.publicKey,
+          { txNum: signatureLimit }
+        );
+        history.forEach((tx) => {
+          const sig = tx.signatures?.[0];
+          if (sig) addSignature(sig, wallet.publicKey);
+        });
+      } catch {
+        const walletPubkey = new PublicKey(wallet.publicKey);
+        const signatures = await connection.getSignaturesForAddress(
+          walletPubkey,
+          { limit: signatureLimit }
+        );
+        signatures.forEach((info) => addSignature(info.signature, wallet.publicKey));
+      }
+    });
+  } else {
+    await mapWithConcurrency(wallets, 5, async (wallet) => {
+      const walletPubkey = new PublicKey(wallet.publicKey);
+      const signatures = await connection.getSignaturesForAddress(
+        walletPubkey,
+        { limit: signatureLimit }
+      );
+      signatures.forEach((info) => addSignature(info.signature, wallet.publicKey));
+    });
+  }
+
+  return signatureWallets;
+}
+
 export const transactionService = {
   async listByToken(input: ListTransactionsByTokenInput, userId: string) {
     const token = await prisma.token.findFirst({
@@ -404,77 +456,24 @@ export const transactionService = {
 
     const connection = getSolanaConnection();
     const { SHYFT_API_KEY } = getEnv();
-    const signatureWallets = new Map<string, Set<string>>();
     const walletPublicKeys = wallets.map((wallet) => wallet.publicKey);
     const signatureLimit = 100;
 
-    if (SHYFT_API_KEY) {
-      for (const wallet of wallets) {
-        try {
-          const history = await shyftApiService.getTransactionHistory(
-            wallet.publicKey,
-            { txNum: signatureLimit }
-          );
-          history.forEach((tx) => {
-            const sig = tx.signatures?.[0];
-            if (!sig) return;
-            const existing = signatureWallets.get(sig);
-            if (existing) {
-              existing.add(wallet.publicKey);
-            } else {
-              signatureWallets.set(sig, new Set([wallet.publicKey]));
-            }
-          });
-        } catch {
-          const walletPublicKey = new PublicKey(wallet.publicKey);
-          const signatures = await connection.getSignaturesForAddress(
-            walletPublicKey,
-            { limit: signatureLimit }
-          );
-          signatures.forEach((signatureInfo) => {
-            const existing = signatureWallets.get(signatureInfo.signature);
-            if (existing) {
-              existing.add(wallet.publicKey);
-            } else {
-              signatureWallets.set(
-                signatureInfo.signature,
-                new Set([wallet.publicKey])
-              );
-            }
-          });
-        }
-      }
-    } else {
-      for (const wallet of wallets) {
-        const walletPublicKey = new PublicKey(wallet.publicKey);
-        const signatures = await connection.getSignaturesForAddress(
-          walletPublicKey,
-          { limit: signatureLimit }
-        );
-        signatures.forEach((signatureInfo) => {
-          const existing = signatureWallets.get(signatureInfo.signature);
-          if (existing) {
-            existing.add(wallet.publicKey);
-          } else {
-            signatureWallets.set(
-              signatureInfo.signature,
-              new Set([wallet.publicKey])
-            );
-          }
-        });
-      }
-    }
+    const [walletSignatures, staleTransactions] = await Promise.all([
+      fetchWalletSignatures(wallets, connection, SHYFT_API_KEY, signatureLimit),
+      prisma.transaction.findMany({
+        where: {
+          tokenPublicKey: token.publicKey,
+          walletPublicKey: { in: walletPublicKeys },
+          OR: [{ pricePerToken: 0 }, { solAmount: 0 }],
+        },
+        select: { transactionSignature: true, walletPublicKey: true },
+        orderBy: { updatedAt: "desc" },
+        take: 200,
+      }),
+    ]);
 
-    const staleTransactions = await prisma.transaction.findMany({
-      where: {
-        tokenPublicKey: token.publicKey,
-        walletPublicKey: { in: walletPublicKeys },
-        OR: [{ pricePerToken: 0 }, { solAmount: 0 }],
-      },
-      select: { transactionSignature: true, walletPublicKey: true },
-      orderBy: { updatedAt: "desc" },
-      take: 200,
-    });
+    const signatureWallets = walletSignatures;
 
     staleTransactions.forEach((transaction) => {
       const existing = signatureWallets.get(transaction.transactionSignature);
@@ -502,19 +501,26 @@ export const transactionService = {
       string,
       ParsedTransactionWithMeta | null
     >();
-    const batchSize = 20;
+    const batchSize = 10;
+    const batches: string[][] = [];
     for (let i = 0; i < signatures.length; i += batchSize) {
-      const batch = signatures.slice(i, i + batchSize);
-      const parsedBatch = await connection.getParsedTransactions(batch, {
+      batches.push(signatures.slice(i, i + batchSize));
+    }
+    const batchResults = await mapWithConcurrency(batches, 3, async (batch) => {
+      return connection.getParsedTransactions(batch, {
         maxSupportedTransactionVersion: 0,
       });
+    });
+    batches.forEach((batch, batchIndex) => {
+      const parsedBatch = batchResults[batchIndex];
+      if (!parsedBatch) return;
       parsedBatch.forEach((parsed, index) => {
         const signature = batch[index];
         if (signature) {
           parsedBySignature.set(signature, parsed);
         }
       });
-    }
+    });
 
     const parsedTransactions: ParsedTransactionResult[] = [];
     signatureWallets.forEach((walletSet, signature) => {
@@ -559,7 +565,7 @@ export const transactionService = {
       where: {
         tokenPublicKey: token.publicKey,
         transactionSignature: { in: uniqueSignatures },
-        walletPublicKey: { in: wallets.map((wallet) => wallet.publicKey) },
+        walletPublicKey: { in: walletPublicKeys },
       },
       select: {
         id: true,
@@ -697,16 +703,19 @@ export const transactionService = {
 
     if (missingSignatures.length > 0) {
       const connection = getSolanaConnection();
-      const parsedBatch = await connection.getParsedTransactions(
-        missingSignatures,
-        { maxSupportedTransactionVersion: 0 }
-      );
-      parsedBatch.forEach((parsed, index) => {
-        const signature = missingSignatures[index];
-        if (signature) {
-          state.parsedBySignature.set(signature, parsed ?? null);
-        }
-      });
+      const liveBatchSize = 10;
+      for (let i = 0; i < missingSignatures.length; i += liveBatchSize) {
+        const batch = missingSignatures.slice(i, i + liveBatchSize);
+        const parsedBatch = await connection.getParsedTransactions(batch, {
+          maxSupportedTransactionVersion: 0,
+        });
+        parsedBatch.forEach((parsed, index) => {
+          const signature = batch[index];
+          if (signature) {
+            state.parsedBySignature.set(signature, parsed ?? null);
+          }
+        });
+      }
     }
 
     const entries: LiveTransactionItem[] = [];

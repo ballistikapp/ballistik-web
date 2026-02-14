@@ -52,11 +52,13 @@ function formatRelativeTime(dateValue?: Date | string | null) {
 type ColumnOptions = {
   tokenPublicKey: string;
   tokenSymbol: string;
+  tokenSupply?: number | null;
 };
 
 export function getColumns({
   tokenPublicKey,
   tokenSymbol,
+  tokenSupply,
 }: ColumnOptions): ColumnDef<HoldingItem>[] {
   return [
     {
@@ -143,57 +145,29 @@ export function getColumns({
       },
     },
     {
-      accessorKey: "totalBuyAmount",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Total Buy (SOL)"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.totalBuyAmount).toFixed(4)}
-        </div>
-      ),
-      filterFn: "numberRange",
-      meta: {
-        filter: { filterType: "number" },
+      id: "holdingPercentage",
+      accessorFn: (row) => {
+        const balance = Number(row.tokenBalance);
+        if (!Number.isFinite(balance) || !tokenSupply || tokenSupply <= 0) return -1;
+        return (balance / tokenSupply) * 100;
       },
-    },
-    {
-      accessorKey: "totalSellAmount",
       header: ({ column }) => (
         <DataTableColumnHeader
           column={column}
-          title="Total Sell (SOL)"
+          title="Holding %"
           className="justify-end"
         />
       ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.totalSellAmount).toFixed(4)}
-        </div>
-      ),
-      filterFn: "numberRange",
-      meta: {
-        filter: { filterType: "number" },
+      cell: ({ row }) => {
+        const balance = Number(row.original.tokenBalance);
+        if (!Number.isFinite(balance) || !tokenSupply || tokenSupply <= 0) {
+          return <div className="text-right font-mono">--</div>;
+        }
+        const percentage = (balance / tokenSupply) * 100;
+        return (
+          <div className="text-right font-mono">{percentage.toFixed(4)}%</div>
+        );
       },
-    },
-    {
-      accessorKey: "averageBuyPrice",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Avg Buy Price"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => (
-        <div className="text-right font-mono">
-          {Number(row.original.averageBuyPrice).toFixed(6)}
-        </div>
-      ),
       filterFn: "numberRange",
       meta: {
         filter: { filterType: "number" },

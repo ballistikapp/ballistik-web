@@ -263,7 +263,6 @@ async function analyzeRecentSession() {
         solMin: number;
         solMax: number;
         direction: string;
-        probability: number;
         buyProbability?: number;
       }>;
     } | null;
@@ -273,7 +272,7 @@ async function analyzeRecentSession() {
       for (let i = 0; i < config.ranges.length; i++) {
         const r = config.ranges[i];
         console.log(
-          `  Range ${i + 1}: ${r.solMin}-${r.solMax} SOL, ${r.direction}, prob=${r.probability}${r.buyProbability !== undefined ? `, buyProb=${r.buyProbability}` : ""}`
+          `  Range ${i + 1}: ${r.solMin}-${r.solMax} SOL, ${r.direction}${r.buyProbability !== undefined ? `, buyProb=${r.buyProbability}` : ""}`
         );
       }
 
@@ -297,14 +296,9 @@ async function analyzeRecentSession() {
       const totalTrades = tradeLogs.length;
       for (let i = 0; i < config.ranges.length; i++) {
         const count = tradesByRange[i];
-        const actualProb = count / totalTrades;
-        const expectedProb = config.ranges[i].probability;
-        const diff = (
-          ((actualProb - expectedProb) / expectedProb) *
-          100
-        ).toFixed(0);
+        const actualPct = totalTrades > 0 ? (count / totalTrades) * 100 : 0;
         console.log(
-          `  Range ${i + 1}: ${count}/${totalTrades} trades (${(actualProb * 100).toFixed(1)}%) - expected ${(expectedProb * 100).toFixed(1)}% (${diff}% deviation)`
+          `  Range ${i + 1}: ${count}/${totalTrades} trades (${actualPct.toFixed(1)}%)`
         );
       }
 

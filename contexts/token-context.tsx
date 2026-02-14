@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState } from "react";
+import React, { createContext, useContext, useState } from "react";
 
 const SELECTED_TOKEN_KEY = "selected-token-public-key";
 
@@ -14,16 +14,12 @@ const TokenContext = createContext<TokenContextValue | null>(null);
 export function TokenProvider({ children }: { children: React.ReactNode }) {
   const [selectedTokenPublicKey, setSelectedTokenPublicKeyState] = useState<
     string | null
-  >(null);
-
-  useEffect(() => {
-    if (typeof window !== "undefined") {
-      const stored = localStorage.getItem(SELECTED_TOKEN_KEY);
-      if (stored) {
-        setSelectedTokenPublicKeyState(stored);
-      }
+  >(() => {
+    if (typeof window === "undefined") {
+      return null;
     }
-  }, []);
+    return localStorage.getItem(SELECTED_TOKEN_KEY);
+  });
 
   const setSelectedTokenPublicKey = (tokenPublicKey: string | null) => {
     setSelectedTokenPublicKeyState(tokenPublicKey);

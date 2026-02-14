@@ -53,38 +53,14 @@ const computeNetSolDirection = (ranges: VolumeBotConfigInput["ranges"]) => {
   return ranges.reduce((sum, range) => {
     const avgAmount = getAverageRangeAmount(range);
     if (range.direction === "buy") {
-      return sum + range.probability * avgAmount;
+      return sum + avgAmount;
     }
     if (range.direction === "sell") {
-      return sum - range.probability * avgAmount;
+      return sum - avgAmount;
     }
     const buyProbability = range.buyProbability ?? 0;
-    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+    return sum + avgAmount * (2 * buyProbability - 1);
   }, 0);
-};
-
-const computeNetSolRangePerTrade = (ranges: VolumeBotConfigInput["ranges"]) => {
-  let minNetSol = 0;
-  let maxNetSol = 0;
-  for (const range of ranges) {
-    if (range.direction === "buy") {
-      minNetSol += range.probability * range.solMin;
-      maxNetSol += range.probability * range.solMax;
-    } else if (range.direction === "sell") {
-      minNetSol -= range.probability * range.solMax;
-      maxNetSol -= range.probability * range.solMin;
-    } else {
-      const buyProbability = range.buyProbability ?? 0;
-      const sellProbability = 1 - buyProbability;
-      minNetSol +=
-        range.probability *
-        (buyProbability * range.solMin - sellProbability * range.solMax);
-      maxNetSol +=
-        range.probability *
-        (buyProbability * range.solMax - sellProbability * range.solMin);
-    }
-  }
-  return { min: minNetSol, max: maxNetSol };
 };
 
 const computeNetSolRanges = (
@@ -92,50 +68,34 @@ const computeNetSolRanges = (
   totalWalletCount: number,
   targetDurationSeconds: number
 ) => {
-  const netSolPerTrade = computeNetSolRangePerTrade(ranges);
-  const avgInterval = computeWeightedInterval(ranges);
-  if (!Number.isFinite(avgInterval) || avgInterval <= 0) {
-    return {
-      perMinute: { min: 0, max: 0 },
-      total: { min: 0, max: 0 },
-    };
+  let minPerMinute = 0;
+  let maxPerMinute = 0;
+  for (const range of ranges) {
+    const avgInterval = getAverageRangeInterval(range);
+    if (avgInterval <= 0) continue;
+    const tradesPerMinute = (60 / avgInterval) * totalWalletCount;
+    if (range.direction === "buy") {
+      minPerMinute += range.solMin * tradesPerMinute;
+      maxPerMinute += range.solMax * tradesPerMinute;
+    } else if (range.direction === "sell") {
+      minPerMinute -= range.solMax * tradesPerMinute;
+      maxPerMinute -= range.solMin * tradesPerMinute;
+    } else {
+      const buyProbability = range.buyProbability ?? 0;
+      const sellProbability = 1 - buyProbability;
+      minPerMinute +=
+        (buyProbability * range.solMin - sellProbability * range.solMax) *
+        tradesPerMinute;
+      maxPerMinute +=
+        (buyProbability * range.solMax - sellProbability * range.solMin) *
+        tradesPerMinute;
+    }
   }
-  const tradesPerMinutePerWallet = 60 / avgInterval;
-  const tradesPerMinute = tradesPerMinutePerWallet * totalWalletCount;
   const minutes = targetDurationSeconds / 60;
   return {
-    perMinute: {
-      min: netSolPerTrade.min * tradesPerMinute,
-      max: netSolPerTrade.max * tradesPerMinute,
-    },
-    total: {
-      min: netSolPerTrade.min * tradesPerMinute * minutes,
-      max: netSolPerTrade.max * tradesPerMinute * minutes,
-    },
+    perMinute: { min: minPerMinute, max: maxPerMinute },
+    total: { min: minPerMinute * minutes, max: maxPerMinute * minutes },
   };
-};
-
-const computeWeightedInterval = (ranges: VolumeBotConfigInput["ranges"]) =>
-  ranges.reduce(
-    (sum, range) => sum + range.probability * getAverageRangeInterval(range),
-    0
-  );
-
-const computeWeightedTradeSize = (ranges: VolumeBotConfigInput["ranges"]) =>
-  ranges.reduce(
-    (sum, range) => sum + range.probability * getAverageRangeAmount(range),
-    0
-  );
-
-const computeEstimatedTradesPerWallet = (
-  ranges: VolumeBotConfigInput["ranges"],
-  targetDurationSeconds: number
-) => {
-  const avgIntervalWeighted = computeWeightedInterval(ranges);
-  if (!Number.isFinite(avgIntervalWeighted) || avgIntervalWeighted <= 0) {
-    return 0;
-  }
-  return targetDurationSeconds / avgIntervalWeighted;
 };
 
 const computeVolumeEstimates = (
@@ -147,13 +107,9 @@ const computeVolumeEstimates = (
   let maxPerMinute = 0;
   for (const range of ranges) {
     minPerMinute +=
-      ((range.solMin * 60) / range.intervalMax) *
-      range.probability *
-      totalWalletCount;
+      ((range.solMin * 60) / range.intervalMax) * totalWalletCount;
     maxPerMinute +=
-      ((range.solMax * 60) / range.intervalMin) *
-      range.probability *
-      totalWalletCount;
+      ((range.solMax * 60) / range.intervalMin) * totalWalletCount;
   }
   const minutes = targetDurationSeconds / 60;
   return {
@@ -167,20 +123,32 @@ const computeSuggestedFunding = (
   totalWalletCount: number,
   targetDurationSeconds: number
 ) => {
-  const avgIntervalWeighted = computeWeightedInterval(ranges);
-  const estimatedTradesPerWallet = computeEstimatedTradesPerWallet(
-    ranges,
-    targetDurationSeconds
-  );
-  const avgTradeSizeWeighted = computeWeightedTradeSize(ranges);
+  let estimatedTradesPerWallet = 0;
+  let totalVolumePerWallet = 0;
+  for (const range of ranges) {
+    const avgInterval = getAverageRangeInterval(range);
+    const avgAmount = getAverageRangeAmount(range);
+    if (avgInterval > 0) {
+      const tradesFromRange = targetDurationSeconds / avgInterval;
+      estimatedTradesPerWallet += tradesFromRange;
+      totalVolumePerWallet += tradesFromRange * avgAmount;
+    }
+  }
+  const avgIntervalWeighted =
+    estimatedTradesPerWallet > 0
+      ? targetDurationSeconds / estimatedTradesPerWallet
+      : 0;
+  const avgTradeSizeWeighted =
+    estimatedTradesPerWallet > 0
+      ? totalVolumePerWallet / estimatedTradesPerWallet
+      : 0;
   const netSolDirection = computeNetSolDirection(ranges);
-  const totalExpectedVolume =
-    estimatedTradesPerWallet * avgTradeSizeWeighted * totalWalletCount;
+  const totalExpectedVolume = totalVolumePerWallet * totalWalletCount;
   const bufferMultiplier =
     netSolDirection > 0 && totalExpectedVolume > 0
       ? clampNumber(1 + netSolDirection / totalExpectedVolume, 1, 2)
       : 1;
-  const baseFunding = estimatedTradesPerWallet * avgTradeSizeWeighted;
+  const baseFunding = totalVolumePerWallet;
   const suggestedFunding =
     Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100;
   return {
@@ -200,11 +168,20 @@ const computeEstimatedSellVolume = (
   estimatedTradesPerWallet: number,
   totalWalletCount: number
 ) => {
-  const sellVolumePerTrade = ranges.reduce((sum, range) => {
+  let totalRate = 0;
+  let sellVolumeRate = 0;
+  for (const range of ranges) {
+    const avgInterval = getAverageRangeInterval(range);
     const avgAmount = getAverageRangeAmount(range);
     const sellProbability = getRangeSellProbability(range);
-    return sum + range.probability * sellProbability * avgAmount;
-  }, 0);
+    if (avgInterval > 0) {
+      const rate = 1 / avgInterval;
+      totalRate += rate;
+      sellVolumeRate += rate * sellProbability * avgAmount;
+    }
+  }
+  if (totalRate <= 0) return 0;
+  const sellVolumePerTrade = sellVolumeRate / totalRate;
   return sellVolumePerTrade * estimatedTradesPerWallet * totalWalletCount;
 };
 
@@ -674,7 +651,7 @@ export const volumeBotService = {
       }
       const tradesPerMinute = avgInterval > 0 ? 60 / avgInterval : 0;
       const expectedNetDeltaPerMinute =
-        expectedNetDeltaPerTrade * tradesPerMinute * range.probability;
+        expectedNetDeltaPerTrade * tradesPerMinute;
       const totalWalletCount = wallets.length || 1;
       const expectedNetDeltaPerMinuteTotal =
         expectedNetDeltaPerMinute * totalWalletCount;

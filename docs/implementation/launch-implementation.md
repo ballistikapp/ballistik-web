@@ -23,6 +23,8 @@
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
+- `launch.recoveryWallets` (query): returns wallets eligible for SOL recovery after launch runs.
+- `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet.
 
 ## Database Models
 
@@ -52,6 +54,7 @@ Structured log entries per launch.
 Pool of pre-generated vanity mints (consume-on-lock, no release).
 
 - `usedAt`: set immediately when a mint is locked for a launch (never released)
+- `reservedAt`: optional reservation timestamp before final mint consumption
 - `tokenPublicKey`: linked when token creation succeeds
 - `userId`: user who consumed the mint
 - If vanity is requested and no mint is available, launch fails with an error
@@ -123,13 +126,14 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `server/solana/bundle-transaction-builder.ts`
 - `server/solana/pump-transaction-builders.ts`
 - `app/(app)/launch/launch-progress-dialog.tsx`
+- `app/(app)/launch/launch-overview-dialog.tsx`
 - `app/(app)/launch/launch-form.tsx`
 
 ## Environment Requirements
 
 - `SOLANA_RPC_URL` must be set for on-chain operations.
-- Jito block engine URLs are defined in `src/lib/config/jito.config.ts`.
-- `SHYFT_API_KEY` is required for gRPC confirmation.
+- Jito block engine URLs are defined in `lib/config/jito.config.ts`.
+- `SHYFT_API_KEY` is optional but recommended for faster gRPC-assisted confirmation; launch confirmation still has RPC polling fallback.
 
 ## Bundle Launch
 

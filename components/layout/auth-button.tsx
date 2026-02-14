@@ -22,6 +22,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { trpc } from "@/lib/trpc/client";
+import { cacheConfig } from "@/lib/config/cache.config";
 import { copyToClipboard } from "@/lib/utils";
 import {
   Tooltip,
@@ -36,6 +37,7 @@ export function AuthButton() {
   const isLoggedIn = currentUser !== null && currentUser !== undefined;
   const mainWalletQuery = trpc.wallet.getMain.useQuery({}, {
     enabled: isLoggedIn,
+    staleTime: cacheConfig.staleMs.wallets,
   });
   const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation({
     onSuccess: () => {

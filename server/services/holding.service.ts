@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
@@ -20,7 +21,6 @@ import {
 } from "@solana/spl-token";
 import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
-import { rpcConfig } from "@/lib/config/rpc.config";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
 import { getPumpProgram } from "@/server/solana/pump-idl";
@@ -177,6 +177,161 @@ async function getTokenBalanceForWallet(
   }
 }
 
+type BalanceResult = {
+  wallet: WalletRecord;
+  tokenBalance: number;
+  ataExists: boolean;
+  isResolved: boolean;
+};
+
+function formatUiAmount(amount: bigint, decimals: number) {
+  const divisor = 10 ** decimals;
+  return Number(amount) / divisor;
+}
+
+async function fetchSingleWalletBalanceFromRpc(
+  connection: Connection,
+  mintPubkey: PublicKey,
+  wallet: WalletRecord,
+  mintDecimals: number
+): Promise<BalanceResult> {
+  try {
+    const ata = await getAssociatedTokenAddress(
+      mintPubkey,
+      new PublicKey(wallet.publicKey)
+    );
+    const account = await getAccount(connection, ata);
+    return {
+      wallet,
+      tokenBalance: formatUiAmount(account.amount, mintDecimals),
+      ataExists: true,
+      isResolved: true,
+    };
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Account does not exist") ||
+        error.message.includes("could not find account") ||
+        error.name === "TokenAccountNotFoundError")
+    ) {
+      return { wallet, tokenBalance: 0, ataExists: false, isResolved: true };
+    }
+    return { wallet, tokenBalance: 0, ataExists: false, isResolved: false };
+  }
+}
+
+async function fetchBalances(
+  wallets: WalletRecord[],
+  tokenPublicKey: string,
+  shyftApiKey: string | undefined
+): Promise<{ results: BalanceResult[]; mintDecimals: number }> {
+  let mintDecimals = 9;
+
+  if (shyftApiKey) {
+    let rpcContext:
+      | { connection: Connection; mintPubkey: PublicKey; decimals: number }
+      | null = null;
+    const ensureRpcContext = async () => {
+      if (rpcContext) return rpcContext;
+      const connection = getSolanaConnection();
+      const mintPubkey = new PublicKey(tokenPublicKey);
+      const mintInfo = await connection.getParsedAccountInfo(mintPubkey);
+      const decimals =
+        (
+          mintInfo.value?.data as {
+            parsed?: { info?: { decimals?: number } };
+          }
+        )?.parsed?.info?.decimals ?? 9;
+      rpcContext = { connection, mintPubkey, decimals };
+      return rpcContext;
+    };
+
+    const results = await mapWithConcurrency(wallets, 5, async (wallet) => {
+      try {
+        const { balance, decimals, associatedAccount } =
+          await shyftApiService.getTokenBalance(
+            wallet.publicKey,
+            tokenPublicKey
+          );
+        if (Number.isFinite(decimals)) {
+          mintDecimals = decimals;
+        }
+        return {
+          wallet,
+          tokenBalance: balance,
+          ataExists: Boolean(associatedAccount),
+          isResolved: true,
+        };
+      } catch {
+        try {
+          const rpc = await ensureRpcContext();
+          if (Number.isFinite(rpc.decimals)) {
+            mintDecimals = rpc.decimals;
+          }
+          return await fetchSingleWalletBalanceFromRpc(
+            rpc.connection,
+            rpc.mintPubkey,
+            wallet,
+            rpc.decimals
+          );
+        } catch {
+          return { wallet, tokenBalance: 0, ataExists: false, isResolved: false };
+        }
+      }
+    });
+    return { results, mintDecimals };
+  }
+
+  const connection = getSolanaConnection();
+  const mintPubkey = new PublicKey(tokenPublicKey);
+  const mintInfo = await connection.getParsedAccountInfo(mintPubkey);
+  mintDecimals =
+    (
+      mintInfo.value?.data as {
+        parsed?: { info?: { decimals?: number } };
+      }
+    )?.parsed?.info?.decimals ?? 9;
+
+  const atas = await Promise.all(
+    wallets.map(async (wallet) => ({
+      wallet,
+      ata: await getAssociatedTokenAddress(
+        mintPubkey,
+        new PublicKey(wallet.publicKey)
+      ),
+    }))
+  );
+
+  type ParsedAccountInfoItem = Awaited<
+    ReturnType<Connection["getMultipleParsedAccounts"]>
+  >["value"][number];
+  const ataAddresses = atas.map((a) => a.ata);
+  const accountInfos: ParsedAccountInfoItem[] = [];
+  for (let i = 0; i < ataAddresses.length; i += 100) {
+    const batch = ataAddresses.slice(i, i + 100);
+    const batchInfos = await connection.getMultipleParsedAccounts(batch);
+    accountInfos.push(...batchInfos.value);
+  }
+
+  const results = atas.map(({ wallet }, index) => {
+    const accountInfo = accountInfos[index];
+    const ataExists = Boolean(accountInfo?.data);
+    let tokenBalance = 0;
+    if (accountInfo?.data && "parsed" in accountInfo.data) {
+      const parsed = accountInfo.data.parsed as {
+        info?: { tokenAmount?: { uiAmount?: number } };
+      };
+      tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
+    }
+    return { wallet, tokenBalance, ataExists };
+  });
+
+  return {
+    results: results.map((result) => ({ ...result, isResolved: true })),
+    mintDecimals,
+  };
+}
+
 export const holdingService = {
   async listByToken(input: ListHoldingsByTokenInput, userId: string) {
     const token = await prisma.token.findFirst({
@@ -188,20 +343,34 @@ export const holdingService = {
       throw new AppError("Token not found", 404);
     }
 
-    return await prisma.holding.findMany({
-      where: {
-        tokenPublicKey: input.tokenPublicKey,
-        ...(input.walletPublicKey
-          ? { walletPublicKey: input.walletPublicKey }
-          : {}),
-      },
-      include: {
-        wallet: {
-          select: { publicKey: true, type: true },
+    const [holdings, totalSupply] = await Promise.all([
+      prisma.holding.findMany({
+        where: {
+          tokenPublicKey: input.tokenPublicKey,
+          ...(input.walletPublicKey
+            ? { walletPublicKey: input.walletPublicKey }
+            : {}),
         },
-      },
-      orderBy: { lastUpdated: "desc" },
-    });
+        include: {
+          wallet: {
+            select: { publicKey: true, type: true },
+          },
+        },
+        orderBy: { lastUpdated: "desc" },
+      }),
+      (async () => {
+        try {
+          const connection = getSolanaConnection();
+          const mint = new PublicKey(input.tokenPublicKey);
+          const supply = await connection.getTokenSupply(mint);
+          return Number(supply.value.uiAmountString ?? "0");
+        } catch {
+          return null;
+        }
+      })(),
+    ]);
+
+    return { holdings, totalSupply };
   },
 
   async refreshByToken(input: RefreshHoldingsByTokenInput, userId: string) {
@@ -211,141 +380,33 @@ export const holdingService = {
       input.walletPublicKeys
     );
 
+    const walletPublicKeys = wallets.map((w) => w.publicKey);
     const { SHYFT_API_KEY } = getEnv();
-    let mintDecimals = 9;
-    let balanceResults: {
-      wallet: WalletRecord;
-      tokenBalance: number;
-      ataExists: boolean;
-    }[];
 
-    if (SHYFT_API_KEY) {
-      const results = await Promise.allSettled(
-        wallets.map(async (wallet) => {
-          try {
-            const allTokens = await shyftApiService.getAllTokens(
-              wallet.publicKey
-            );
-            const entry = allTokens.find(
-              (t) => t.address === token.publicKey
-            );
-            if (entry) {
-              mintDecimals = entry.info.decimals;
-              return {
-                wallet,
-                tokenBalance: entry.balance,
-                ataExists: true,
-              };
-            }
-            return { wallet, tokenBalance: 0, ataExists: false };
-          } catch {
-            return { wallet, tokenBalance: 0, ataExists: false };
-          }
-        })
-      );
-      balanceResults = results.map((result, index) => {
-        if (result.status === "fulfilled") return result.value;
-        return {
-          wallet: wallets[index] ?? wallets[0],
-          tokenBalance: 0,
-          ataExists: false,
-        };
-      });
-    } else {
-      const connection = getSolanaConnection();
-      const mintPublicKey = new PublicKey(token.publicKey);
-      const mintInfo = await connection.getParsedAccountInfo(mintPublicKey);
-      mintDecimals =
-        (
-          mintInfo.value?.data as {
-            parsed?: { info?: { decimals?: number } };
-          }
-        )?.parsed?.info?.decimals ?? 9;
-
-      const atas = await Promise.all(
-        wallets.map(async (wallet) => ({
-          wallet,
-          ata: await getAssociatedTokenAddress(
-            mintPublicKey,
-            new PublicKey(wallet.publicKey)
-          ),
-        }))
-      );
-
-      type ParsedAccountInfoItem = Awaited<
-        ReturnType<Connection["getMultipleParsedAccounts"]>
-      >["value"][number];
-      const ataAddresses = atas.map((a) => a.ata);
-      const accountInfos: ParsedAccountInfoItem[] = [];
-      for (let i = 0; i < ataAddresses.length; i += 100) {
-        const batch = ataAddresses.slice(i, i + 100);
-        const batchInfos = await connection.getMultipleParsedAccounts(batch);
-        accountInfos.push(...batchInfos.value);
-      }
-
-      balanceResults = atas.map(({ wallet }, index) => {
-        const accountInfo = accountInfos[index];
-        const ataExists = Boolean(accountInfo?.data);
-        let tokenBalance = 0;
-        if (accountInfo?.data && "parsed" in accountInfo.data) {
-          const parsed = accountInfo.data.parsed as {
-            info?: { tokenAmount?: { uiAmount?: number } };
-          };
-          tokenBalance = parsed?.info?.tokenAmount?.uiAmount ?? 0;
-        }
-        return { wallet, tokenBalance, ataExists };
-      });
-    }
-
-    const walletPublicKeys = balanceResults.map((r) => r.wallet.publicKey);
-
-    const [transactionAggregates, lastTransactions, existingHoldings] =
+    const [balanceResults, [lastTransactions, existingHoldings]] =
       await Promise.all([
-        prisma.transaction.groupBy({
-          by: ["walletPublicKey", "transactionType"],
-          where: {
-            walletPublicKey: { in: walletPublicKeys },
-            tokenPublicKey: token.publicKey,
-          },
-          _sum: { solAmount: true, tokenAmount: true },
-        }),
-        prisma.$queryRaw<
-          Array<{ walletPublicKey: string; transactionSignature: string }>
-        >`
-          SELECT DISTINCT ON ("walletPublicKey") 
-            "walletPublicKey", 
-            "transactionSignature"
-          FROM "Transaction"
-          WHERE "walletPublicKey" = ANY(${walletPublicKeys})
-            AND "tokenPublicKey" = ${token.publicKey}
-          ORDER BY "walletPublicKey", "createdAt" DESC
-        `,
-        prisma.holding.findMany({
-          where: {
-            walletPublicKey: { in: walletPublicKeys },
-            tokenPublicKey: token.publicKey,
-          },
-          select: { id: true, walletPublicKey: true },
-        }),
+        fetchBalances(wallets, token.publicKey, SHYFT_API_KEY),
+        Promise.all([
+          prisma.$queryRaw<
+            Array<{ walletPublicKey: string; transactionSignature: string }>
+          >`
+              SELECT DISTINCT ON ("walletPublicKey") 
+                "walletPublicKey", 
+                "transactionSignature"
+              FROM "Transaction"
+              WHERE "walletPublicKey" = ANY(${walletPublicKeys})
+                AND "tokenPublicKey" = ${token.publicKey}
+              ORDER BY "walletPublicKey", "createdAt" DESC
+            `,
+          prisma.holding.findMany({
+            where: {
+              walletPublicKey: { in: walletPublicKeys },
+              tokenPublicKey: token.publicKey,
+            },
+            select: { id: true, walletPublicKey: true },
+          }),
+        ]),
       ]);
-
-    const aggregateMap = new Map<
-      string,
-      { buy: { sol: number; tokens: number }; sell: { sol: number } }
-    >();
-    for (const agg of transactionAggregates) {
-      const existing = aggregateMap.get(agg.walletPublicKey) ?? {
-        buy: { sol: 0, tokens: 0 },
-        sell: { sol: 0 },
-      };
-      if (agg.transactionType === "BUY") {
-        existing.buy.sol = Number(agg._sum.solAmount ?? 0);
-        existing.buy.tokens = Number(agg._sum.tokenAmount ?? 0);
-      } else if (agg.transactionType === "SELL") {
-        existing.sell.sol = Number(agg._sum.solAmount ?? 0);
-      }
-      aggregateMap.set(agg.walletPublicKey, existing);
-    }
 
     const lastTxMap = new Map<string, string>();
     for (const tx of lastTransactions) {
@@ -357,77 +418,65 @@ export const holdingService = {
       existingHoldingMap.set(holding.walletPublicKey, holding.id);
     }
 
+    const mintDecimals = balanceResults.mintDecimals;
     const now = new Date();
-    const updateResults = await Promise.all(
-      balanceResults.map(async ({ wallet, tokenBalance, ataExists }) => {
-        const agg = aggregateMap.get(wallet.publicKey) ?? {
-          buy: { sol: 0, tokens: 0 },
-          sell: { sol: 0 },
-        };
-        const totalBuyAmount = agg.buy.sol;
-        const totalSellAmount = agg.sell.sol;
-        const totalBuyTokens = agg.buy.tokens;
-        const averageBuyPrice =
-          totalBuyTokens > 0 ? totalBuyAmount / totalBuyTokens : 0;
-        const lastTxSignature = lastTxMap.get(wallet.publicKey) ?? "";
-        const existingId = existingHoldingMap.get(wallet.publicKey);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const operations: Prisma.PrismaPromise<any>[] = [];
 
-        if (tokenBalance > 0 || ataExists) {
-          if (existingId) {
-            return prisma.holding.update({
-              where: { id: existingId },
-              data: {
-                tokenBalance,
-                totalBuyAmount,
-                totalSellAmount,
-                averageBuyPrice,
-                lastTransactionSignature: lastTxSignature,
-                lastUpdated: now,
-                mintAddress: token.publicKey,
-                tokenName: token.name,
-                tokenSymbol: token.symbol,
-                tokenImageUrl: token.imageUrl ?? "",
-                tokenDecimals: mintDecimals,
-              },
-            });
-          }
+    for (const { wallet, tokenBalance, ataExists, isResolved } of balanceResults.results) {
+      if (!isResolved) {
+        continue;
+      }
+      const lastTxSignature = lastTxMap.get(wallet.publicKey) ?? "";
+      const existingId = existingHoldingMap.get(wallet.publicKey);
 
-          return prisma.holding.create({
-            data: {
-              walletPublicKey: wallet.publicKey,
-              tokenPublicKey: token.publicKey,
-              tokenBalance,
-              totalBuyAmount,
-              totalSellAmount,
-              averageBuyPrice,
-              lastTransactionSignature: lastTxSignature,
-              lastUpdated: now,
-              mintAddress: token.publicKey,
-              tokenName: token.name,
-              tokenSymbol: token.symbol,
-              tokenImageUrl: token.imageUrl ?? "",
-              tokenDecimals: mintDecimals,
-            },
-          });
-        }
+      const holdingData = {
+        tokenBalance,
+        totalBuyAmount: 0,
+        totalSellAmount: 0,
+        averageBuyPrice: 0,
+        lastTransactionSignature: lastTxSignature,
+        lastUpdated: now,
+        mintAddress: token.publicKey,
+        tokenName: token.name,
+        tokenSymbol: token.symbol,
+        tokenImageUrl: token.imageUrl ?? "",
+        tokenDecimals: mintDecimals,
+      };
 
+      if (tokenBalance > 0 || ataExists) {
         if (existingId) {
-          await prisma.holding.delete({ where: { id: existingId } });
+          operations.push(
+            prisma.holding.update({
+              where: { id: existingId },
+              data: holdingData,
+            })
+          );
+        } else {
+          operations.push(
+            prisma.holding.create({
+              data: {
+                walletPublicKey: wallet.publicKey,
+                tokenPublicKey: token.publicKey,
+                ...holdingData,
+              },
+            })
+          );
         }
+      } else if (existingId) {
+        operations.push(prisma.holding.delete({ where: { id: existingId } }));
+      }
+    }
 
-        return null;
-      })
-    );
-
-    const refreshed = updateResults.filter(Boolean);
+    if (operations.length > 0) {
+      await prisma.$transaction(operations);
+    }
 
     await refreshCacheService.touch({
       userId,
       tokenPublicKey: token.publicKey,
       scope: "HOLDINGS",
     });
-
-    return refreshed;
   },
 
   async sellByToken(input: SellHoldingsByTokenInput, userId: string) {
@@ -635,4 +684,4 @@ export const holdingService = {
 
 export type HoldingItem = Awaited<
   ReturnType<typeof holdingService.listByToken>
->[number];
+>["holdings"][number];

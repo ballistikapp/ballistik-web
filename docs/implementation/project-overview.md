@@ -12,6 +12,7 @@ sollabs-web is the modern successor to sollabv0. It reimplements core launch, wa
 - Transaction tracking and token holdings
 - Holdings and transactions refresh flows mirror wallet balance refresh behavior
 - Real-time streaming via Shyft gRPC (RabbitStream / Yellowstone) with tRPC subscriptions
+- Dashboard trade updates via `subscription.onVolumeBotUpdate` (in-memory EventEmitter bridge)
 - Shyft REST APIs for enriched wallet, token, and transaction data
 - Shyft Callback webhooks for passive event monitoring
 
@@ -35,9 +36,9 @@ app/
     trpc/          # tRPC HTTP + SSE handler
     webhooks/      # Shyft callback webhook endpoint
 components/
+  dashboard/
   ui/
   wallets/
-data/
 docs/
 lib/
   config/          # env, rpc, cache, launch configs
@@ -46,6 +47,7 @@ lib/
   utils/
 prisma/
 server/
+  events/
   schemas/
   services/        # Business logic + Shyft API/callback/DeFi services
   solana/          # gRPC manager, gRPC utils, pump quotes, volume bot gRPC

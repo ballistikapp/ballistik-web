@@ -44,6 +44,7 @@ export function WalletTransferDialog({
   wallets,
   onSuccess,
 }: WalletTransferDialogProps) {
+  const utils = trpc.useUtils();
   const [amount, setAmount] = useState("");
   const [returnOption, setReturnOption] = useState<"amount" | "max">("amount");
   const sendMutation = trpc.wallet.sendSol.useMutation();
@@ -128,6 +129,9 @@ export function WalletTransferDialog({
       setAmount("");
       setReturnOption("amount");
       onOpenChange(false);
+      utils.wallet.getMain.invalidate();
+      utils.wallet.getOperationalByToken.invalidate();
+      utils.wallet.getDevByToken.invalidate();
       onSuccess?.();
     } catch (error) {
       const message =

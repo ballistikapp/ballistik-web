@@ -59,13 +59,13 @@ const resolveNetDirection = (config?: VolumeBotConfigInput) => {
   const netSolDirection = ranges.reduce((sum, range) => {
     const avgAmount = (range.solMin + range.solMax) / 2;
     if (range.direction === "buy") {
-      return sum + range.probability * avgAmount;
+      return sum + avgAmount;
     }
     if (range.direction === "sell") {
-      return sum - range.probability * avgAmount;
+      return sum - avgAmount;
     }
     const buyProbability = range.buyProbability ?? 0;
-    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+    return sum + avgAmount * (2 * buyProbability - 1);
   }, 0);
   if (netSolDirection > 0) return "net buy";
   if (netSolDirection < 0) return "net sell";

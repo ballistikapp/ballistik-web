@@ -7,27 +7,25 @@
 - Persist sessions, wallets, and trade logs for recovery and UI status.
 - Support scheduled start, scheduled stop, reclaim, and close-accounts actions.
 
-## Recent Changes: Independent Range Intervals
+## Recent Changes: Removed Execution Probability
 
-**Date**: 2026-01-29
+**Date**: 2026-02-11
 
 ### What Changed
 
-Previously, the volume bot selected one range per wallet tick using weighted probabilities, and that range's interval determined when the next tick would occur.
-
-Now, **each range runs on its own independent timer**. For a session with 10 wallets and 3 ranges, there are 30 concurrent timers (10 × 3).
+Previously, each range had a `probability` field (0-1) that acted as an execution gate — when a range's timer fired, it would randomly skip the trade based on probability. This has been removed because the same effect can be achieved by adjusting the interval range, which is simpler and easier to reason about.
 
 ### Key Differences
 
-1. **Probability Semantics**: `probability` now means "execution probability when this range's timer fires" instead of "selection weight"
-2. **No Probability Sum Requirement**: Ranges no longer need to sum to 1.0 since they're independent
-3. **Concurrent Execution**: All ranges fire on their own schedules simultaneously
-4. **In-Flight Protection**: Wallets can't execute multiple trades concurrently; if one range is trading, others skip
-5. **Volume Calculation**: Sum across all ranges since they run in parallel
+1. **No `probability` field**: Ranges no longer have an execution probability — every tick executes a trade
+2. **Interval controls frequency**: Users control trade frequency purely through `intervalMin` / `intervalMax`
+3. **Simpler mental model**: If a range fires, it trades. No hidden skip chance.
+4. **Independent timers**: Each range still runs on its own independent timer per wallet
+5. **In-Flight Protection**: Wallets can't execute multiple trades concurrently; if one range is trading, others skip
 
 ### Why This Change
 
-This provides more predictable and consistent behavior - a range with 1-5 second interval will actually fire every 1-5 seconds regardless of other ranges, making volume patterns more reliable and easier to reason about.
+The `probability` field was redundant with interval control. A range with interval 10-20s and probability 0.5 behaves nearly identically to interval 20-40s with probability 1.0. Removing probability simplifies configuration, estimation formulas, and the user's mental model.
 
 ## Architecture Summary
 
@@ -100,42 +98,28 @@ Indexes are defined for efficient queries:
 
 ## Config (volumeBot.start)
 
-### Probability Format (0-1 decimals)
-
-- All probabilities are stored and used as decimals in the range `[0, 1]`.
-- Example: 60% = `0.6`, not `60`.
-
 ### Range Configuration
 
 Each range defines a trade size pattern and timing. **Ranges run independently** - each range has its own interval timer per wallet:
 
 - `solMin` / `solMax`: minimum and maximum trade size in SOL
 - `increment`: step size for round numbers; if set, build steps from `solMin` to `solMax` and pick uniformly
-- `probability`: execution probability (0-1); probability that a trade executes when the range's interval fires
 - `intervalMin` / `intervalMax`: seconds between consecutive ticks for **this specific range** (independent of other ranges)
 - `direction`: `buy` | `sell` | `both`
 - `buyProbability`: required when `direction = both` (0-1)
 
-**Important**: Unlike the old behavior where ranges were selected by probability at each tick, **each range now runs on its own independent timer**. The `probability` field now controls whether a trade executes when the range's timer fires, not the selection frequency.
+Each range runs on its own independent timer. When the timer fires, a trade **always executes** (no probability gate). Users control trade frequency purely through the interval range.
 
 **Trade Amount Selection**:
 
 - If `increment > 0`: build steps `[solMin, solMin + increment, ...]` up to `solMax`, then select a step uniformly.
 - If `increment` is null/0/undefined: generate uniform random `solMin..solMax`.
 
-**Execution Probability Check**:
-
-- When a range's timer fires, generate `R1 = Math.random()` in `[0, 1)`.
-- If `R1 > range.probability`, skip trade execution and reschedule for the next interval.
-- This allows ranges to fire regularly but execute trades only with a certain probability.
-
 **Direction Selection**:
 
 - If `direction = buy`: return buy.
 - If `direction = sell`: return sell.
-- If `direction = both`: generate independent `R2 = Math.random()` and compare with `buyProbability`.
-
-CRITICAL: Random values are generated independently for probability check (`R1`) and direction selection (`R2`).
+- If `direction = both`: generate `R = Math.random()` and compare with `buyProbability`.
 
 ### Wallet Configuration
 
@@ -150,6 +134,9 @@ CRITICAL: Random values are generated independently for probability check (`R1`)
 - `sellFallbackRatio`: fraction of token balance to sell when target sell cannot be met
 - `pauseOnHighSlippage`: pause wallet when repeated high slippage occurs
 - `maxSlippageFailures`: consecutive slippage failures before pausing
+- `priorityFeeMicroLamports`: optional priority fee override for bot trades
+- `computeUnitLimit`: optional compute unit limit override for trade transactions
+- `maxRetries`: retry count for recoverable send failures (e.g. block height exceeded)
 
 ### Timing Configuration
 
@@ -159,15 +146,14 @@ CRITICAL: Random values are generated independently for probability check (`R1`)
 
 ### Validation Rules
 
-1. Each `range.probability` must be in range `[0, 1]`. **Note**: Probability sum validation is removed since ranges run independently.
-2. Each range: `solMin <= solMax`, `intervalMin <= intervalMax`.
-3. `solMin >= 0.001`, `solMax <= 10`, `intervalMin >= 1`, `intervalMax <= 3600`.
-4. `totalWalletCount = generated + selected` must be `1-50`.
-5. `targetDurationSeconds` must be `1-604800`.
-6. If `scheduledStartAt` is set, it must be in the future and within 30 days.
-7. If `direction = both`, `buyProbability` is required (0-1).
-8. If `increment` is defined, it must be `> 0` and yield at least 2 steps.
-9. Net sell sessions require selected wallets with tokens (block if none).
+1. Each range: `solMin <= solMax`, `intervalMin <= intervalMax`.
+2. `solMin >= 0.001`, `solMax <= 10`, `intervalMin >= 1`, `intervalMax <= 3600`.
+3. `totalWalletCount = generated + selected` must be `1-50`.
+4. `targetDurationSeconds` must be `1-604800`.
+5. If `scheduledStartAt` is set, it must be in the future and within 30 days.
+6. If `direction = both`, `buyProbability` is required (0-1).
+7. If `increment` is defined, it must be `> 0` and yield at least 2 steps.
+8. Net sell sessions require selected wallets with tokens (block if none).
 
 ## Preflight Validation & Estimates
 
@@ -175,9 +161,9 @@ CRITICAL: Random values are generated independently for probability check (`R1`)
 
 For each range:
 
-- `direction = buy`: contribution = `+probability * avgAmount`
-- `direction = sell`: contribution = `-probability * avgAmount`
-- `direction = both`: contribution = `probability * avgAmount * (2 * buyProbability - 1)`
+- `direction = buy`: contribution = `+avgAmount`
+- `direction = sell`: contribution = `-avgAmount`
+- `direction = both`: contribution = `avgAmount * (2 * buyProbability - 1)`
 
 `netSolDirection = sum(contributions)`
 
@@ -189,66 +175,61 @@ Validation behavior:
 
 ### Volume Estimation
 
-**With independent range intervals**, each range fires on its own schedule and probability controls execution:
+Each range fires on its own schedule. Every tick executes a trade (no probability gate).
 
 For each range:
 
 - `avgAmount = (solMin + solMax) / 2`
 - `avgInterval = (intervalMin + intervalMax) / 2`
-- `ticksPerMinute = 60 / avgInterval`
-- `executionsPerMinute = ticksPerMinute * probability * totalWalletCount`
-- `volumePerMinute = avgAmount * executionsPerMinute`
-- `minVolumePerMinute = solMin * (60 / intervalMax) * probability * totalWalletCount`
-- `maxVolumePerMinute = solMax * (60 / intervalMin) * probability * totalWalletCount`
+- `tradesPerMinute = (60 / avgInterval) * totalWalletCount`
+- `volumePerMinute = avgAmount * tradesPerMinute`
+- `minVolumePerMinute = solMin * (60 / intervalMax) * totalWalletCount`
+- `maxVolumePerMinute = solMax * (60 / intervalMin) * totalWalletCount`
 
 Sum across **all ranges** (they run concurrently) and multiply by `(targetDurationSeconds / 60)` for session totals.
 Display: `X-Y SOL/min, A-B SOL total session`.
 
 **Example**: 3 ranges with 10 wallets each:
-- Range 0: interval 10-20s, probability 0.5 → ~1.5 trades/min (10 wallets × 60/15 × 0.5)
-- Range 1: interval 5-10s, probability 0.3 → ~2.4 trades/min (10 wallets × 60/7.5 × 0.3)
-- Range 2: interval 30-60s, probability 1.0 → ~1.3 trades/min (10 wallets × 60/45 × 1.0)
-- **Total**: ~5.2 trades/min across all ranges
+- Range 0: interval 10-20s → ~4 trades/min (10 wallets × 60/15)
+- Range 1: interval 5-10s → ~8 trades/min (10 wallets × 60/7.5)
+- Range 2: interval 30-60s → ~1.3 trades/min (10 wallets × 60/45)
+- **Total**: ~13.3 trades/min across all ranges
 
 ### Net Delta SOL Estimation
 
-Shows the min and max expected net SOL change (profit/loss) for the session. This helps users understand the expected P&L before starting the bot.
+Shows the min and max expected net SOL change (profit/loss) for the session.
 
-**Per-trade net delta calculation** for each range:
+**Per-range net delta per minute** (computed independently for each range):
 
-- `direction = buy`: `minNetDelta = +probability * solMin`, `maxNetDelta = +probability * solMax`
-- `direction = sell`: `minNetDelta = -probability * solMax`, `maxNetDelta = -probability * solMin`
-- `direction = both`: 
-  - `minNetDelta = probability * (buyProbability * solMin - sellProbability * solMax)`
-  - `maxNetDelta = probability * (buyProbability * solMax - sellProbability * solMin)`
+For each range, `tradesPerMinute = (60 / avgInterval) * totalWalletCount`:
 
-**Per-minute and total calculation**:
+- `direction = buy`: `minNetPerMin = +solMin * tradesPerMinute`, `maxNetPerMin = +solMax * tradesPerMinute`
+- `direction = sell`: `minNetPerMin = -solMax * tradesPerMinute`, `maxNetPerMin = -solMin * tradesPerMinute`
+- `direction = both`:
+  - `minNetPerMin = (buyProbability * solMin - sellProbability * solMax) * tradesPerMinute`
+  - `maxNetPerMin = (buyProbability * solMax - sellProbability * solMin) * tradesPerMinute`
 
-- `netSolPerTrade = { min: sum(minNetDelta), max: sum(maxNetDelta) }` across all ranges
-- `tradesPerMinute = (60 / avgIntervalWeighted) * totalWalletCount`
-- `netSolPerMinute = { min: netSolPerTrade.min * tradesPerMinute, max: netSolPerTrade.max * tradesPerMinute }`
-- `netSolTotal = { min: netSolPerMinute.min * minutes, max: netSolPerMinute.max * minutes }`
+Sum across all ranges for totals. Multiply by `(targetDurationSeconds / 60)` for session totals.
 
 **Display on Start Volume Bot page** (preflight section):
 
 - **Net Δ SOL per minute**: `X—Y SOL` (min to max range)
 - **Total net Δ SOL (at end)**: `A—B SOL` (min to max range for full session)
 
-These metrics appear alongside volume estimates and help users understand:
-- Whether the session will be net profitable or net cost
-- The range of possible outcomes based on configuration
-- Expected SOL balance change at session end
-
 ### Funding Calculation (Suggested)
 
-1. `avgIntervalWeighted = Σ(probability * (intervalMin + intervalMax)/2)`
-2. `estimatedTradesPerWallet = targetDurationSeconds / avgIntervalWeighted`
-3. `avgTradeSizeWeighted = Σ(probability * (solMin + solMax)/2)`
-4. Compute `netSolDirection` using the formula above
-5. `totalExpectedVolume = estimatedTradesPerWallet * avgTradeSizeWeighted * totalWalletCount`
-6. `bufferMultiplier = netSolDirection > 0 ? clamp(1 + netSolDirection/totalExpectedVolume, 1.0, 2.0) : 1.0`
-7. `baseFunding = estimatedTradesPerWallet * avgTradeSizeWeighted`
-8. `suggestedFunding = Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100`
+For each range independently:
+1. `tradesFromRange = targetDurationSeconds / avgInterval`
+2. `volumeFromRange = tradesFromRange * avgAmount`
+
+Then:
+3. `estimatedTradesPerWallet = sum(tradesFromRange)` across all ranges
+4. `totalVolumePerWallet = sum(volumeFromRange)` across all ranges
+5. Compute `netSolDirection` using the formula above
+6. `totalExpectedVolume = totalVolumePerWallet * totalWalletCount`
+7. `bufferMultiplier = netSolDirection > 0 ? clamp(1 + netSolDirection/totalExpectedVolume, 1.0, 2.0) : 1.0`
+8. `baseFunding = totalVolumePerWallet`
+9. `suggestedFunding = Math.ceil(baseFunding * bufferMultiplier * 1.1 * 100) / 100`
 
 The UI pre-fills `fundingPerGeneratedWallet` with `suggestedFunding` and warns if the user sets a lower value.
 
@@ -275,8 +256,7 @@ The UI pre-fills `fundingPerGeneratedWallet` with `suggestedFunding` and warns i
 
 1. Validate session status = RUNNING and wallet status = ACTIVE.
 2. Check `scheduledStopAt` or duration exceeded and stop if needed.
-3. **Check execution probability**: `Math.random() > range.probability` → skip and reschedule.
-4. **Check if wallet has trade in-flight**: if yes, skip and reschedule (prevents concurrent trades).
+3. **Check if wallet has trade in-flight**: if yes, skip and reschedule (prevents concurrent trades).
 5. Select trade amount from this specific range.
 6. Select direction using independent random `R2` if `direction = both`.
 7. Fetch balances from chain (SOL and tokens) using gRPC cache or RPC fallback.
@@ -393,12 +373,10 @@ After each trade:
 - `minFundingPerWalletSol`: 0.001
 - `minTradeAmountSol`: 0.001
 - `maxTradeAmountSol`: 10
-- `minIntervalSeconds`: 10
+- `minIntervalSeconds`: 1
 - `maxIntervalSeconds`: 3600 (1 hour)
 - `minRanges`: 1
 - `maxRanges`: 5
-- `minRangeProbability`: 0.01
-- `maxRangeProbability`: 1.0
 - `slippageBps`: 1000 (10% default)
 - `maxConcurrentTicks`: 6
 - `tickStaleMs`: 600,000 ms (10 minutes, stale tick threshold)
@@ -449,7 +427,7 @@ The session page (`/volume-bot/[sessionId]`) displays:
 
 **Per-Range Metrics:**
 - For each range, display expected net delta SOL per minute
-- Calculated based on range configuration (direction, probability, interval, amount)
+- Calculated based on range configuration (direction, interval, amount)
 - Accounts for all wallets in the session
 
 ## Initialization

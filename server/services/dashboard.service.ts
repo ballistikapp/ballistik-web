@@ -27,15 +27,17 @@ export const dashboardService = {
     const [
       walletAgg,
       devWalletAgg,
-      holdingAgg,
       transactionCount,
       recentTransactions,
       runningVolumeBots,
       volumeBotSessions,
       transactionHistory,
       currentPrice,
-      userHoldings,
       topHolders,
+      successfulLaunch,
+      operationalWalletKeys,
+      devWalletKeys,
+      mainWalletUser,
     ] = await Promise.all([
       prisma.wallet.aggregate({
         where: {
@@ -53,16 +55,6 @@ export const dashboardService = {
         JOIN "Wallet" w ON w."publicKey" = tdw."walletPublicKey"
         WHERE tdw."tokenPublicKey" = ${tokenPublicKey}
       `,
-
-      prisma.holding.aggregate({
-        where: { tokenPublicKey },
-        _sum: {
-          tokenBalance: true,
-          totalBuyAmount: true,
-          totalSellAmount: true,
-        },
-        _count: { id: true },
-      }),
 
       prisma.transaction.count({
         where: { tokenPublicKey },
@@ -123,6 +115,49 @@ export const dashboardService = {
 
       priceService.getCurrentPrice(tokenPublicKey),
 
+      holdersService.getTopHolders(tokenPublicKey),
+
+      prisma.launch.findFirst({
+        where: { tokenPublicKey, status: "SUCCEEDED" },
+        select: { completedAt: true },
+        orderBy: { completedAt: "desc" },
+      }),
+
+      prisma.wallet.findMany({
+        where: {
+          tokenPublicKey,
+          type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+        },
+        select: { publicKey: true },
+      }),
+
+      prisma.tokenDevWallet.findMany({
+        where: { tokenPublicKey },
+        select: { walletPublicKey: true },
+      }),
+
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { mainWalletPublicKey: true },
+      }),
+    ]);
+
+    const userWalletPubkeys = new Set<string>();
+    for (const w of operationalWalletKeys) userWalletPubkeys.add(w.publicKey);
+    for (const dw of devWalletKeys) userWalletPubkeys.add(dw.walletPublicKey);
+    if (mainWalletUser?.mainWalletPublicKey) userWalletPubkeys.add(mainWalletUser.mainWalletPublicKey);
+
+    const [holdingAgg, userHoldings] = await Promise.all([
+      prisma.holding.aggregate({
+        where: { tokenPublicKey },
+        _sum: {
+          tokenBalance: true,
+          totalBuyAmount: true,
+          totalSellAmount: true,
+        },
+        _count: { id: true },
+      }),
+
       prisma.holding.findMany({
         where: { tokenPublicKey },
         include: {
@@ -131,8 +166,6 @@ export const dashboardService = {
           },
         },
       }),
-
-      holdersService.getTopHolders(tokenPublicKey),
     ]);
 
     const operationalSol = Number(walletAgg._sum.balanceSol ?? 0);
@@ -151,10 +184,9 @@ export const dashboardService = {
     const holdingsValue = round4(totalTokenHoldings * priceSol);
     const pnl = round4(totalSellVolume + holdingsValue - totalBuyVolume);
 
-    // Aggregate transactions into 5-minute OHLC candles
-    const CANDLE_INTERVAL = 5 * 60; // 5 minutes in seconds
+    const CANDLE_INTERVAL = 5 * 60;
     const candleMap = new Map<number, { open: number; high: number; low: number; close: number; lastTime: number }>();
-    
+
     for (const tx of transactionHistory) {
       const solAmt = Number(tx.solAmount);
       const tokenAmt = Number(tx.tokenAmount);
@@ -166,7 +198,7 @@ export const dashboardService = {
         const price = solAmt / tokenAmt;
         const timestamp = Math.floor(tx.createdAt.getTime() / 1000);
         const bucketTime = Math.floor(timestamp / CANDLE_INTERVAL) * CANDLE_INTERVAL;
-        
+
         const existing = candleMap.get(bucketTime);
         if (!existing) {
           candleMap.set(bucketTime, {
@@ -200,10 +232,6 @@ export const dashboardService = {
     const tokenTotalSupply = currentPrice?.tokenTotalSupply ?? 0;
     const bondingCurveTokens = currentPrice?.realTokenReserves ?? 0;
     const circulatingSupply = tokenTotalSupply - bondingCurveTokens;
-
-    const userWalletPubkeys = new Set(
-      userHoldings.map((h) => h.wallet.publicKey)
-    );
 
     let bondingCurvePda: string | null = null;
     try {
@@ -271,6 +299,7 @@ export const dashboardService = {
         marketCapSol: round4(priceSol * tokenTotalSupply),
         isComplete: currentPrice?.isComplete ?? false,
         realSolReserves: currentPrice?.realSolReserves ?? 0,
+        launchCompletedAt: successfulLaunch?.completedAt ?? null,
       },
       metrics: {
         treasury: {

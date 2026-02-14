@@ -25,6 +25,7 @@ import { Spinner } from "@/components/ui/spinner";
 
 export default function Page() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
+  const utils = trpc.useUtils();
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
   const [returnDialogOpen, setReturnDialogOpen] = useState(false);
@@ -44,30 +45,29 @@ export default function Page() {
   const {
     data: operationalWalletsData,
     isLoading: operationalWalletsLoading,
-    refetch: refetchOperationalWallets,
   } = trpc.wallet.getOperationalByToken.useQuery(
     { tokenPublicKey: tokenPublicKey || "" },
-    { enabled: !!tokenPublicKey && !!tokenData }
+    { enabled: !!tokenPublicKey && !!tokenData, staleTime: cacheConfig.staleMs.wallets }
   );
 
   const {
     data: devWallet,
     isLoading: devWalletLoading,
-    refetch: refetchDevWallet,
   } = trpc.wallet.getDevByToken.useQuery(
     { tokenPublicKey: tokenPublicKey || "" },
-    { enabled: !!tokenPublicKey && !!tokenData }
+    { enabled: !!tokenPublicKey && !!tokenData, staleTime: cacheConfig.staleMs.wallets }
   );
 
   const {
     data: mainWallet,
     isLoading: mainWalletLoading,
-    refetch: refetchMainWallet,
-  } = trpc.wallet.getMain.useQuery({}, { enabled: !!tokenData });
+  } = trpc.wallet.getMain.useQuery(
+    {},
+    { enabled: !!tokenData, staleTime: cacheConfig.staleMs.wallets }
+  );
 
   const {
     data: refreshCache,
-    refetch: refetchRefreshCache,
     isLoading: refreshCacheLoading,
   } = trpc.refreshCache.getByScope.useQuery(
     {
@@ -135,10 +135,10 @@ export default function Page() {
           walletPublicKeys,
         });
         await Promise.all([
-          refetchOperationalWallets(),
-          refetchDevWallet(),
-          refetchMainWallet(),
-          refetchRefreshCache(),
+          utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
+          utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
+          utils.wallet.getMain.invalidate(),
+          utils.refreshCache.getByScope.invalidate({ tokenPublicKey, scope: "WALLETS" }),
         ]);
         if (toastId) {
           if (result.length === 0) {
@@ -163,10 +163,7 @@ export default function Page() {
       }
     },
     [
-      refetchOperationalWallets,
-      refetchDevWallet,
-      refetchMainWallet,
-      refetchRefreshCache,
+      utils,
       getCooldownMessage,
       refreshBalances,
       tokenPublicKey,

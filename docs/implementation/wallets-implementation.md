@@ -31,7 +31,7 @@ tRPC procedures:
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.
 - `wallet.getPrivateKey` fetches a wallet private key on-demand after access checks.
-- `wallet.refreshBalances` refreshes balances via server-side RPC with a 15s debounce.
+- `wallet.refreshBalances` refreshes balances via server-side RPC with a 10s debounce.
 - `wallet.sendSol` sends SOL from main wallet to selected token wallets.
 - `wallet.returnSol` returns SOL from selected token wallets to main wallet.
 
@@ -82,6 +82,20 @@ Wallet detail page:
 - Server enforces a 10-second debounce per wallet (30s when subscriptions are active).
 - `RefreshCache` stores the last full refresh time per token to drive staleness checks.
 - tRPC subscription `subscription.onBalanceUpdate` pushes real-time balance changes via gRPC stream, reducing the need for manual refresh.
+
+## Cache Invalidation
+
+Wallet balance queries use `utils.[router].[procedure].invalidate()` (via `trpc.useUtils()`) so that all mounted consumers of the same query auto-refetch without manual `refetch()` wiring.
+
+Invalidation triggers:
+
+- **Launch success**: `wallet.getMain` is invalidated when the launch status transitions to `SUCCEEDED` (main wallet funds dev/bundler wallets).
+- **Volume bot start**: `wallet.getMain` is invalidated after `volumeBot.start` succeeds (main wallet funds session wallets).
+- **Volume bot reclaim**: `wallet.getMain` is invalidated after `volumeBot.reclaim` succeeds (session wallets return SOL to main wallet).
+- **Holdings sell**: `wallet.getMain` is invalidated after `holding.sellByToken` succeeds (main wallet may be the fee payer).
+- **Send/Return SOL**: `wallet.getMain`, `wallet.getOperationalByToken`, and `wallet.getDevByToken` are invalidated directly inside `WalletTransferDialog` after successful transfers. The parent `onSuccess` callback remains for non-cache concerns (e.g. `RefreshCache` timestamp updates, toasts).
+
+Wallet queries override the global 5-minute `staleTime` with `cacheConfig.staleMs.wallets` (60s) so that navigating to a page with stale cached data triggers a background refetch as a safety net.
 
 ## Migrations
 

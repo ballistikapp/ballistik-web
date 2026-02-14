@@ -22,20 +22,22 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 - `holding.startExit` starts an exit run and returns an `exitId`
 - `holding.exitStatus` returns the exit record with logs
 - `holding.getActiveExit` returns the running exit for a token (PENDING/RUNNING), or null
+- `holding.cancelExit` requests cancellation for an active exit run
 
 ## Exit Flow
 
 1. **Prepare**: load allowed wallets (main, dev, operational), fetch on-chain balances, sort descending.
 2. **Chunk**: split into groups of 13 wallets.
-3. **Bundle**: for each chunk:
+3. **Funding**: top up underfunded wallets before bundle processing to reduce failed transfers/sells.
+4. **Bundle**: for each chunk:
    - biggest holder is the seller
    - send tokens to seller in groups of 3 wallets per transaction
    - sell instruction is in a separate final transaction (no transfers combined)
    - submit as a Jito bundle
-4. **Cleanup**:
+5. **Cleanup**:
    - close empty ATAs for wallets involved in the exit
    - transfer remaining SOL to the main wallet
-5. **Finalize**:
+6. **Finalize**:
    - persist `result` summary
    - mark status `SUCCEEDED` or `FAILED`
 
@@ -87,14 +89,6 @@ const WALLETS_PER_CHUNK = 13;    // Max wallets per exit bundle iteration
 - Plus instruction data, signatures, and transaction metadata
 - Combining with transfers caused the "transaction too large" error
 
-## Legacy Reference (Dump)
-
-The legacy app uses a bundled dump flow that groups wallet positions, sends a `bundleDumpPercentage` request, and runs a consolidated sell path when requested. Key files:
-
-- UI entry point: `components/positions/dump-dialog.tsx`
-- API: `app/api/pump/bundleDumpPercentage/route.ts`
-- Aggregated sell builder: `app/api/pump/txAggregation.ts`
-
 ## Progress Tracking
 
 Progress is updated in the `HoldingExit` record:
@@ -110,4 +104,4 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 - Exit dialog opens on demand or automatically when a running exit exists
 - Activity logs are shown in real time
 - Summary is shown after success with totals (wallets, bundles, tokens, ATAs closed, SOL recovered)
-- No abort or cancel actions are available
+- Users can cancel an active exit via `holding.cancelExit`

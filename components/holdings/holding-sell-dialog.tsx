@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -43,12 +43,6 @@ export function HoldingSellDialog({
   const canCloseAta =
     Number.isFinite(parsedPercentage) && parsedPercentage === 100;
 
-  useEffect(() => {
-    if (!canCloseAta && closeAta) {
-      setCloseAta(false);
-    }
-  }, [canCloseAta, closeAta]);
-
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setPercentage("100");
@@ -81,7 +75,7 @@ export function HoldingSellDialog({
       toast.error("Select at least one holding");
       return;
     }
-    await onConfirm(parsedPercentage, closeAta);
+    await onConfirm(parsedPercentage, canCloseAta && closeAta);
   };
 
   return (
@@ -115,7 +109,13 @@ export function HoldingSellDialog({
               max="100"
               step="1"
               value={percentage}
-              onChange={(event) => setPercentage(event.target.value)}
+              onChange={(event) => {
+                const nextPercentage = event.target.value;
+                setPercentage(nextPercentage);
+                if (Number.parseFloat(nextPercentage) !== 100) {
+                  setCloseAta(false);
+                }
+              }}
             />
           </div>
           <div className="flex items-start gap-3 rounded-md border p-3">

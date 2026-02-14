@@ -45,11 +45,12 @@ Common functions extracted from previously duplicated code:
 
 ## tRPC Subscriptions (`server/trpc/routers/subscription.router.ts`)
 
-Three SSE-based subscription endpoints push real-time data from gRPC streams to the client:
+Four SSE-based subscription endpoints expose real-time updates to the client:
 
 - `subscription.onBalanceUpdate` — streams SOL balance changes for a set of wallet addresses
 - `subscription.onTokenBalanceUpdate` — streams token balance changes for wallets holding a specific token
 - `subscription.onNewTransaction` — streams new transaction signatures for a token (mint + bonding curve accounts)
+- `subscription.onVolumeBotUpdate` — streams volume bot trade-complete events from `dashboardEvents` (in-memory EventEmitter)
 
 ### Client Setup
 
@@ -73,7 +74,7 @@ Centralized client for Shyft REST endpoints at `https://api.shyft.to/sol/v1`:
 ### Usage in Services
 
 - `wallet.service.ts` — uses `getWalletBalance()` for balance refresh (RPC fallback)
-- `holding.service.ts` — uses `getAllTokens()` per wallet for bulk token balance refresh, filtering for the target mint (RPC fallback). This replaces the previous per-wallet `getTokenBalance()` approach.
+- `holding.service.ts` — uses per-wallet `getTokenBalance(wallet, token)` for target-token refresh (RPC fallback when needed).
 - `transaction.service.ts` — uses `getTransactionHistory()` for signature fetching (RPC fallback)
 
 ## Shyft Callbacks (`server/services/shyft-callback.service.ts`)

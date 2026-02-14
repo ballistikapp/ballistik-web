@@ -8,7 +8,6 @@ export const volumeBotRangeSchema = z
     solMin: z.number().min(0),
     solMax: z.number().min(0),
     increment: z.number().nullable().optional(),
-    probability: z.number().min(0).max(1),
     intervalMin: z.number().int().min(1),
     intervalMax: z.number().int().min(1),
     direction: volumeBotRangeDirectionSchema,
@@ -117,24 +116,6 @@ export const volumeBotConfigSchema = z
         message: `No more than ${limits.maxRanges} ranges allowed`,
         path: ["ranges"],
       });
-    }
-    for (const range of config.ranges) {
-      if (range.probability < limits.minRangeProbability) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Range probability must be >= ${limits.minRangeProbability}`,
-          path: ["ranges"],
-        });
-        break;
-      }
-      if (range.probability > limits.maxRangeProbability) {
-        ctx.addIssue({
-          code: z.ZodIssueCode.custom,
-          message: `Range probability must be <= ${limits.maxRangeProbability}`,
-          path: ["ranges"],
-        });
-        break;
-      }
     }
     if (config.walletConfig.fundingPerGeneratedWallet < limits.minFundingPerWalletSol) {
       ctx.addIssue({

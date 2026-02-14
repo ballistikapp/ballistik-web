@@ -10,7 +10,8 @@
 - `lib/config/launch.config.ts` exposes launch-specific settings derived from `env`
 - `lib/config/rpc.config.ts` stores RPC tuning, gRPC region defaults, and RabbitStream endpoints
 - `lib/config/cache.config.ts` stores refresh staleness, cooldown thresholds, and TTL values
-- `src/lib/config/jito.config.ts` stores Jito block engine URL defaults
+- `lib/config/jito.config.ts` stores Jito block engine URL defaults
+- `lib/config/volume-bot.config.ts` stores volume bot limits and runtime defaults
 
 ## Usage
 - Call `getEnv()` when you need raw environment values
@@ -24,7 +25,8 @@
 - `SHYFT_CALLBACK_SECRET` is optional and used to validate incoming Shyft webhook requests
 - `APP_URL` is optional (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`). Required for automatic callback registration on token and wallet creation.
 - `DATABASE_URL` is used for Prisma connections when set
-- `DEV_STORAGE_POSTGRES_URL` / `PROD_STORAGE_POSTGRES_URL` are optional fallbacks for local and hosted Postgres
+- `getDatabaseUrl()` currently reads only `DATABASE_URL`
+- `DEV_STORAGE_POSTGRES_URL` / `PROD_STORAGE_POSTGRES_URL` may still appear in legacy error messaging, but are not part of `env.ts` parsing today
 
 ## Logging
 - `LOG_LEVEL` is optional and defaults to `info`

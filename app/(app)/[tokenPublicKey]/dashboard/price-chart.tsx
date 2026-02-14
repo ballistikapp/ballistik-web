@@ -56,20 +56,23 @@ function formatPriceSol(price: number): string {
 }
 
 function useIsDarkMode(): boolean {
-  const ref = useRef(false);
+  const [isDark, setIsDark] = useState(() => {
+    if (typeof window === "undefined") {
+      return false;
+    }
+    return window.matchMedia("(prefers-color-scheme: dark)").matches;
+  });
 
   useEffect(() => {
     const mql = window.matchMedia("(prefers-color-scheme: dark)");
-    ref.current = mql.matches;
-
     const handler = (e: MediaQueryListEvent) => {
-      ref.current = e.matches;
+      setIsDark(e.matches);
     };
     mql.addEventListener("change", handler);
     return () => mql.removeEventListener("change", handler);
   }, []);
 
-  return ref.current;
+  return isDark;
 }
 
 export function PriceChart({ priceHistory, currentPrice }: PriceChartProps) {
@@ -77,7 +80,7 @@ export function PriceChart({ priceHistory, currentPrice }: PriceChartProps) {
   const chartRef = useRef<IChartApi | null>(null);
   const seriesRef = useRef<ISeriesApi<"Candlestick", Time> | null>(null);
   const [interval, setInterval] = useState<Interval>("5m");
-  const isDark = useIsDarkMode();
+  useIsDarkMode();
 
   const getChartColors = useCallback(() => {
     const dark = window.matchMedia("(prefers-color-scheme: dark)").matches;

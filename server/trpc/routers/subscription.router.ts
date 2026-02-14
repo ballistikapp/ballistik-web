@@ -9,6 +9,10 @@ import {
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import { PublicKey } from "@solana/web3.js";
 import { prisma } from "@/lib/prisma";
+import {
+  dashboardEvents,
+  type TradeCompleteEvent,
+} from "@/server/events/dashboard-events";
 
 type BalanceUpdateEvent = {
   pubkey: string;
@@ -214,6 +218,40 @@ export const subscriptionRouter = router({
       } finally {
         removeListener();
         grpcManager.unsubscribe(subscriptionId);
+      }
+    }),
+
+  onVolumeBotUpdate: protectedProcedure
+    .input(
+      z.object({
+        tokenPublicKey: z.string().min(1),
+      })
+    )
+    .subscription(async function* ({ input }) {
+      const queue: TradeCompleteEvent[] = [];
+      let resolve: (() => void) | null = null;
+
+      const removeListener = dashboardEvents.onTradeComplete(
+        (event: TradeCompleteEvent) => {
+          if (event.tokenPublicKey !== input.tokenPublicKey) return;
+          queue.push(event);
+          resolve?.();
+        }
+      );
+
+      try {
+        while (true) {
+          if (queue.length === 0) {
+            await new Promise<void>((r) => {
+              resolve = r;
+            });
+          }
+          while (queue.length > 0) {
+            yield queue.shift()!;
+          }
+        }
+      } finally {
+        removeListener();
       }
     }),
 });

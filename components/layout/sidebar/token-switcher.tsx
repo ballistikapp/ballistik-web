@@ -29,6 +29,7 @@ import { UserTokensOutput } from "@/server/services/token.service";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useSelectedToken } from "@/hooks/use-selected-token";
 
@@ -53,7 +54,6 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
     if (selectedTokenPublicKey && tokenMap.has(selectedTokenPublicKey)) {
       return tokenMap.get(selectedTokenPublicKey);
     }
-    // If stored token is invalid or missing, clear it and use first available
     if (selectedTokenPublicKey && !tokenMap.has(selectedTokenPublicKey)) {
       setSelectedTokenPublicKey(null);
     }
@@ -83,27 +83,29 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
       <PopoverTrigger asChild>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground"
+          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-6"
         >
-          <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden shrink-0">
+          <div className="flex aspect-square size-10 items-center justify-center rounded-xl overflow-hidden shrink-0 bg-sidebar-primary text-sidebar-primary-foreground">
             {selectedToken?.imageUrl ? (
               <Image
                 src={selectedToken.imageUrl}
                 alt={selectedToken.name || "Token"}
                 className="h-full w-full object-cover"
-                width={32}
-                height={32}
+                width={40}
+                height={40}
                 loading="lazy"
               />
             ) : (
-              <GalleryVerticalEnd className="size-4" />
+              <GalleryVerticalEnd className="size-5" />
             )}
           </div>
-          <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
-            <span className="font-medium truncate">{selectedToken?.name}</span>
-            <span className="text-muted-foreground truncate">
-              {selectedToken?.symbol}
+          <div className="flex flex-col gap-1 leading-none min-w-0 flex-1">
+            <span className="font-semibold text-sm truncate">
+              {selectedToken?.name}
             </span>
+            <Badge variant="secondary" className="text-xs font-mono w-fit">
+              ${selectedToken?.symbol}
+            </Badge>
           </div>
           <ChevronsUpDown className="ml-auto shrink-0 opacity-50" />
         </SidebarMenuButton>
@@ -127,7 +129,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                   }}
                   className="gap-2 py-3"
                 >
-                  <div className="bg-sidebar-primary text-sidebar-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden shrink-0">
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden shrink-0 bg-sidebar-primary text-sidebar-primary-foreground">
                     {token.imageUrl ? (
                       <Image
                         src={token.imageUrl}
@@ -143,8 +145,8 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                   </div>
                   <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
                     <span className="font-medium truncate">{token.name}</span>
-                    <span className="text-muted-foreground text-xs truncate">
-                      {token.symbol}
+                    <span className="text-muted-foreground text-xs font-mono truncate">
+                      ${token.symbol}
                     </span>
                   </div>
                   <Check
@@ -159,42 +161,40 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                 </CommandItem>
               ))}
             </CommandGroup>
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                value="launch new token"
-                onSelect={() => {
-                  router.push("/launch");
-                  setOpen(false);
-                }}
-                className="gap-2 opacity-80 hover:opacity-100"
-              >
-                <div className="text-primary bg-muted flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
-                  <Plus className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
-                  <span className="font-medium truncate ">
-                    Launch New Token
-                  </span>
-                </div>
-              </CommandItem>
-              <CommandItem
-                value="manage tokens"
-                onSelect={() => {
-                  router.push("/tokens");
-                  setOpen(false);
-                }}
-                className="gap-2 opacity-80 hover:opacity-100"
-              >
-                <div className="bg-muted text-muted-foreground flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
-                  <Settings className="size-4" />
-                </div>
-                <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
-                  <span className="font-medium truncate">Manage Tokens</span>
-                </div>
-              </CommandItem>
-            </CommandGroup>
           </CommandList>
+          <CommandSeparator />
+          <div className="p-1">
+            <CommandItem
+              value="launch new token"
+              onSelect={() => {
+                router.push("/launch");
+                setOpen(false);
+              }}
+              className="gap-2 opacity-80 hover:opacity-100"
+            >
+              <div className="text-primary bg-muted flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
+                <Plus className="size-4" />
+              </div>
+              <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
+                <span className="font-medium truncate">Launch New Token</span>
+              </div>
+            </CommandItem>
+            <CommandItem
+              value="manage tokens"
+              onSelect={() => {
+                router.push("/tokens");
+                setOpen(false);
+              }}
+              className="gap-2 opacity-80 hover:opacity-100"
+            >
+              <div className="bg-muted text-muted-foreground flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
+                <Settings className="size-4" />
+              </div>
+              <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
+                <span className="font-medium truncate">Manage Tokens</span>
+              </div>
+            </CommandItem>
+          </div>
         </Command>
       </PopoverContent>
     </Popover>

@@ -22,6 +22,7 @@ import { getColumns } from "./columns";
 
 export default function TransactionsPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
+  const utils = trpc.useUtils();
 
   const {
     data: tokenData,
@@ -36,7 +37,6 @@ export default function TransactionsPage() {
   const {
     data: transactionsData,
     isLoading: transactionsLoading,
-    refetch: refetchTransactions,
   } = trpc.transaction.listByToken.useQuery(
     { tokenPublicKey: tokenPublicKey || "" },
     { enabled: !!tokenPublicKey && !!tokenData }
@@ -79,7 +79,8 @@ export default function TransactionsPage() {
       : null;
     try {
       await refreshTransactions({ tokenPublicKey });
-      await Promise.all([refetchTransactions(), refetchRefreshCache()]);
+      void utils.transaction.listByToken.invalidate({ tokenPublicKey });
+      await refetchRefreshCache();
       if (toastId) {
         toast.success("Transactions refreshed", { id: toastId, icon: null });
       }

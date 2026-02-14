@@ -1,5 +1,9 @@
 # To Implement
 
+- fee'ler ve paid feature'lar belirlenecek
+
+---
+
 ## Deployment
 
 - Set up S3 bucket in Railway for image storage
@@ -12,8 +16,6 @@
   - Add token statuses: `awaiting_launch`, `launched`, `graduated`, `dumped`
 - Fix bundle size: Change from 11 to 10
 - Post-launch improvements:
-  - Update token selector when "Go to token" is clicked
-  - Refresh wallet data after launch completes
   - Redirect to volume bot after completion
 - PumpFun banner integration (IDL issue, currently not working)
 - Failed & previous launch dialog:
@@ -34,7 +36,7 @@
 
 ## Dashboard
 
-- Implement on-demand real-time updates
+- ~~Implement on-demand real-time updates~~ (Done: Monitoring Mode with SSE + polling, see `docs/implementation/dashboard-monitoring.md`)
 
 ## Buy & Sell (Exit Flow)
 

@@ -17,6 +17,7 @@ export default function VolumeBotRunPage() {
   const params = useParams<{ tokenPublicKey: string; sessionId: string }>();
   const tokenPublicKey = params?.tokenPublicKey;
   const sessionId = params?.sessionId;
+  const utils = trpc.useUtils();
 
   const {
     data: statusData,
@@ -56,6 +57,7 @@ export default function VolumeBotRunPage() {
   const reclaimMutation = trpc.volumeBot.reclaim.useMutation({
     onSuccess: () => {
       toast.success("Reclaim requested");
+      utils.wallet.getMain.invalidate();
     },
     onError: (error) => {
       toast.error(error.message || "Failed to reclaim funds");
@@ -82,13 +84,13 @@ export default function VolumeBotRunPage() {
   const netSolDirection = ranges.reduce((sum, range) => {
     const avgAmount = (range.solMin + range.solMax) / 2;
     if (range.direction === "buy") {
-      return sum + range.probability * avgAmount;
+      return sum + avgAmount;
     }
     if (range.direction === "sell") {
-      return sum - range.probability * avgAmount;
+      return sum - avgAmount;
     }
     const buyProbability = range.buyProbability ?? 0;
-    return sum + range.probability * avgAmount * (2 * buyProbability - 1);
+    return sum + avgAmount * (2 * buyProbability - 1);
   }, 0);
   const netDirectionLabel =
     netSolDirection > 0
@@ -129,7 +131,6 @@ export default function VolumeBotRunPage() {
     }
     const baseRuntime = session.runtimeSeconds ?? 0;
     const startedAt = Date.now();
-    setRuntimeSeconds(baseRuntime);
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       setRuntimeSeconds(baseRuntime + elapsed);
@@ -282,8 +283,8 @@ export default function VolumeBotRunPage() {
                     {range.solMax.toFixed(3)} SOL
                   </div>
                   <div className="text-xs text-muted-foreground text-right">
-                    prob {range.probability.toFixed(2)} · interval{" "}
-                    {range.intervalMin}-{range.intervalMax}s · {range.direction}
+                    interval {range.intervalMin}-{range.intervalMax}s ·{" "}
+                    {range.direction}
                     {range.direction === "both" &&
                       ` (${(range.buyProbability ?? 0).toFixed(2)} buy)`}
                   </div>

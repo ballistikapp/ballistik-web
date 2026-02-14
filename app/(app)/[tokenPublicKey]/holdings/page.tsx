@@ -23,6 +23,7 @@ import { getColumns } from "./columns";
 
 export default function Page() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
+  const utils = trpc.useUtils();
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
   const [sellDialogOpen, setSellDialogOpen] = useState(false);
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
@@ -39,14 +40,11 @@ export default function Page() {
     { enabled: !!tokenPublicKey }
   );
 
-  const {
-    data: holdingsData,
-    isLoading: holdingsLoading,
-    refetch: refetchHoldings,
-  } = trpc.holding.listByToken.useQuery(
-    { tokenPublicKey: tokenPublicKey || "" },
-    { enabled: !!tokenPublicKey && !!tokenData }
-  );
+  const { data: holdingsData, isLoading: holdingsLoading } =
+    trpc.holding.listByToken.useQuery(
+      { tokenPublicKey: tokenPublicKey || "" },
+      { enabled: !!tokenPublicKey && !!tokenData }
+    );
 
   const {
     data: refreshCache,
@@ -90,10 +88,11 @@ export default function Page() {
     return getColumns({
       tokenPublicKey,
       tokenSymbol: tokenData.symbol,
+      tokenSupply: holdingsData?.totalSupply ?? null,
     });
-  }, [tokenData, tokenPublicKey]);
+  }, [holdingsData?.totalSupply, tokenData, tokenPublicKey]);
 
-  const holdings = holdingsData ?? [];
+  const holdings = holdingsData?.holdings ?? [];
   const totalBalance = useMemo(
     () =>
       holdings.reduce(
@@ -123,7 +122,8 @@ export default function Page() {
       : null;
     try {
       await refreshHoldings({ tokenPublicKey });
-      await Promise.all([refetchHoldings(), refetchRefreshCache()]);
+      void utils.holding.listByToken.invalidate({ tokenPublicKey });
+      await refetchRefreshCache();
       if (toastId) {
         toast.success("Holdings refreshed", { id: toastId, icon: null });
       }
@@ -161,7 +161,8 @@ export default function Page() {
         id: toastId,
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
-      await refetchHoldings();
+      void utils.holding.listByToken.invalidate({ tokenPublicKey });
+      utils.wallet.getMain.invalidate();
       setSellDialogOpen(false);
     } catch (error) {
       const message =

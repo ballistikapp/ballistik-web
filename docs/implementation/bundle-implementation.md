@@ -48,4 +48,5 @@ Transaction packing layout (max buyers):
 - `server/solana/bundle-transaction-builder.ts`
 - `server/solana/pump-transaction-builders.ts`
 - `server/solana/jito-bundle.ts`
+- `server/solana/jito-client.ts`
 
