@@ -21,6 +21,13 @@ import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
 
+function formatCompact(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    notation: "compact",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
 export default function Page() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const utils = trpc.useUtils();
@@ -114,6 +121,37 @@ export default function Page() {
       ).length,
     [holdings]
   );
+  const totalSupply = holdingsData?.totalSupply ?? null;
+  const totalSupplyShare =
+    totalSupply && totalSupply > 0 ? (totalBalance / totalSupply) * 100 : null;
+  const metricCards = useMemo(
+    () => [
+      {
+        label: "Active Wallets",
+        value: formatCompact(walletsWithBalance),
+      },
+      {
+        label: `Total ${tokenData?.symbol ?? "Token"}`,
+        value: formatCompact(totalBalance),
+      },
+      {
+        label: "Supply Share",
+        value:
+          totalSupplyShare === null ? "--" : `${totalSupplyShare.toFixed(2)}%`,
+      },
+      {
+        label: "ATAs Tracked",
+        value: formatCompact(holdings.length),
+      },
+    ],
+    [
+      holdings.length,
+      tokenData?.symbol,
+      totalBalance,
+      totalSupplyShare,
+      walletsWithBalance,
+    ]
+  );
   const selectedHoldings = useMemo(
     () => holdings.filter((holding) => rowSelection[holding.walletPublicKey]),
     [holdings, rowSelection]
@@ -172,7 +210,9 @@ export default function Page() {
         }
       }
       if (returnSolToMainWallet && result.solRecovery) {
-        summaryParts.push(`${result.solRecovery.recovered} wallet SOL returned`);
+        summaryParts.push(
+          `${result.solRecovery.recovered} wallet SOL returned`
+        );
         if (result.solRecovery.failed > 0) {
           summaryParts.push(`${result.solRecovery.failed} SOL return failed`);
         }
@@ -283,10 +323,10 @@ export default function Page() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <div>
+      <div className="-m-6 px-6 py-10 border-b">
+        <div className="flex items-center justify-between gap-4">
           <h1 className="text-4xl">Holdings</h1>
-          <div className="mt-3 flex items-center gap-3">
+          <div className="flex flex-col items-end gap-1">
             <Button
               variant="outline"
               size="sm"
@@ -305,16 +345,24 @@ export default function Page() {
             </p>
           </div>
         </div>
-        <p className="leading-tight font-light text-right text-muted-foreground">
-          View token holdings across wallets.
-          <br />
-          Holdings refresh mirrors wallet balance updates.
-          <br />
-          Includes wallets with open token accounts (ATAs).
-        </p>
       </div>
+      <div />
 
-      <div className="pt-6" />
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {metricCards.map((metric) => (
+          <div
+            key={metric.label}
+            className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm"
+          >
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              {metric.label}
+            </p>
+            <p className="mt-1 text-xl font-semibold tabular-nums">
+              {metric.value}
+            </p>
+          </div>
+        ))}
+      </div>
 
       <DataTable
         columns={columns}

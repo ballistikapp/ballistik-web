@@ -44,3 +44,11 @@ The `refreshByToken` service is optimized for speed and incremental updates:
 
 - Token-wide list includes owned and external wallets.
 - Owned rows are marked using wallet metadata when a matching local wallet exists.
+
+## Transactions Header Metrics
+
+The transactions page header shows metrics for currently loaded table rows with owned vs external splits:
+- Buys (count)
+- Sells (count)
+- Volume (SOL)
+- Unique traders

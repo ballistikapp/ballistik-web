@@ -48,6 +48,8 @@ The `refreshByToken` service is optimized for speed:
 
 - Bulk sell action operates on selected holdings rows.
 - Manual refresh is available; auto refresh uses `RefreshCache` staleness.
+- Header layout keeps title on the left and refresh controls on the right.
+- Metrics cards are shown under the header and summarize currently loaded holdings rows.
 - Holding percentage uses `tokenBalance / totalMintSupply * 100`.
 - Mint supply is fetched by `holding.listByToken` from RPC (`getTokenSupply`) and returned with the list payload.
 - If supply is temporarily unavailable, the table shows `--` instead of `0.0000%`.
