@@ -27,28 +27,63 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 ## Exit Flow
 
 1. **Prepare**: load allowed wallets (main, dev, operational), fetch on-chain balances, sort descending.
-2. **Chunk**: split into groups of 13 wallets.
+2. **Chunk**: split into groups of 20 wallets.
 3. **Funding**: top up underfunded wallets before bundle processing to reduce failed transfers/sells.
-4. **Bundle**: for each chunk:
+4. **Bundle (parallel, concurrency=2)**: for each chunk:
    - biggest holder is the seller
-   - send tokens to seller in groups of 3 wallets per transaction
+   - send tokens to seller in groups of 5 wallets per transaction
    - sell instruction is in a separate final transaction (no transfers combined)
    - submit as a Jito bundle
 5. **Cleanup**:
    - close empty ATAs for wallets involved in the exit
-   - transfer remaining SOL to the main wallet
+   - optionally transfer remaining spendable SOL to the main wallet when `returnSolToMainWallet` is enabled
 6. **Finalize**:
    - persist `result` summary
    - mark status `SUCCEEDED` or `FAILED`
+   - include total Jito tip paid in summary (`totalJitoTipSol`)
+
+### Processing Model
+
+- Chunk jobs are processed with controlled concurrency (`2` in flight).
+- One chunk waiting on bundle confirmation does not block all remaining chunks.
+- Chunk outcomes are tracked individually (`successfulChunks`, `failedChunks`).
+- Cleanup (ATA close + SOL recovery) runs only after all chunk jobs settle.
+- Cleanup wallet work runs with bounded concurrency (wallet-level parallelism) and aggregates results after all wallet tasks settle.
+
+### Future: Fast Mode (Optional)
+
+If faster exits are needed later, add a configurable "fast mode" profile:
+
+- Increase chunk concurrency from `2` to `3` (or `4`) for higher throughput.
+- Keep default mode as the safer baseline; fast mode is opt-in.
+- Add explicit telemetry/logging for:
+  - bundle submission latency,
+  - per-chunk success/failure rate,
+  - RPC/Jito rate-limit frequency.
+- Add guardrails:
+  - automatic fallback to baseline concurrency on repeated rate limits,
+  - cap in-flight chunks to avoid overloading RPC/Jito,
+  - preserve the same cleanup/finalization semantics.
+
+Suggested configuration shape:
+
+```typescript
+type ExitSpeedMode = "balanced" | "fast";
+
+type ExitRuntimeConfig = {
+  speedMode: ExitSpeedMode;
+  chunkConcurrency: number;
+};
+```
 
 ## Bundle Structure
 
-For a full 13-wallet chunk (1 seller + 12 senders):
+For a full 20-wallet chunk (1 seller + 19 senders):
 
-1. TX1: 3 transfers to seller
-2. TX2: 3 transfers to seller
-3. TX3: 3 transfers to seller
-4. TX4: 3 transfers to seller
+1. TX1: 5 transfers to seller
+2. TX2: 5 transfers to seller
+3. TX3: 5 transfers to seller
+4. TX4: 4 transfers to seller
 5. TX5: sell all tokens from seller (no transfers)
 
 Smaller chunks are packed using the same grouping pattern.
@@ -69,20 +104,15 @@ The pump.fun sell instruction is large (14 accounts, ~700-900 bytes). Combining 
 **Key constants:**
 ```typescript
 const MAX_BUNDLE_TXS = 5;        // Jito bundle limit
-const TRANSFERS_PER_GROUP = 3;   // Max transfers per transaction
-const WALLETS_PER_CHUNK = 13;    // Max wallets per exit bundle iteration
+const TRANSFERS_PER_GROUP = 5;   // Max transfers per transaction
+const WALLETS_PER_CHUNK = 20;    // Max wallets per exit bundle iteration
 ```
 
 **Calculation:**
 - 1 transaction reserved for sell instruction
 - 4 transactions available for transfers
-- 4 × 3 = 12 transfers maximum
-- 12 transfers + 1 seller = 13 wallets per chunk
-
-**Why 3 transfers per transaction (not 5)?**
-- Each `transferChecked` instruction adds ~100 bytes (accounts + data)
-- Each transfer adds a signer (~64 bytes for signature)
-- 3 transfers keeps transaction at ~600-800 bytes, leaving room for metadata
+- 4 × 5 = 20 transfers capacity in transfer transactions
+- Practical chunk cap is 20 wallets (1 seller + up to 19 senders)
 
 **Why sell is separate?**
 - The sell instruction has 14 accounts (~450 bytes just for account keys)
@@ -94,7 +124,7 @@ const WALLETS_PER_CHUNK = 13;    // Max wallets per exit bundle iteration
 Progress is updated in the `HoldingExit` record:
 
 - Preparing and chunking updates
-- Per-chunk processing steps
+- Per-chunk processing steps with completed chunk counts
 - Cleanup steps (ATA close + SOL recovery)
 
 The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `RUNNING`.
@@ -102,6 +132,9 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 ## UI Behavior
 
 - Exit dialog opens on demand or automatically when a running exit exists
+- Dialog shows a detailed pre-flight description of each exit step
+- Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
+- Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior
 - Activity logs are shown in real time
-- Summary is shown after success with totals (wallets, bundles, tokens, ATAs closed, SOL recovered)
+- Summary shows totals including chunk outcomes (total/successful/failed chunks), wallets, bundles, tokens, ATAs closed, SOL recovered, and total Jito tip
 - Users can cancel an active exit via `holding.cancelExit`

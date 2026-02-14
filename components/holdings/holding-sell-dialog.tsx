@@ -26,7 +26,11 @@ type HoldingSellDialogProps = {
   holdings: HoldingSummary[];
   tokenSymbol: string;
   isSubmitting?: boolean;
-  onConfirm: (sellPercentage: number, closeAta: boolean) => Promise<void>;
+  onConfirm: (
+    sellPercentage: number,
+    closeAta: boolean,
+    returnSolToMainWallet: boolean
+  ) => Promise<void>;
 };
 
 export function HoldingSellDialog({
@@ -39,6 +43,7 @@ export function HoldingSellDialog({
 }: HoldingSellDialogProps) {
   const [percentage, setPercentage] = useState("100");
   const [closeAta, setCloseAta] = useState(false);
+  const [returnSolToMainWallet, setReturnSolToMainWallet] = useState(false);
   const parsedPercentage = Number.parseFloat(percentage);
   const canCloseAta =
     Number.isFinite(parsedPercentage) && parsedPercentage === 100;
@@ -47,6 +52,7 @@ export function HoldingSellDialog({
     if (!nextOpen) {
       setPercentage("100");
       setCloseAta(false);
+      setReturnSolToMainWallet(false);
     }
     onOpenChange(nextOpen);
   };
@@ -75,7 +81,11 @@ export function HoldingSellDialog({
       toast.error("Select at least one holding");
       return;
     }
-    await onConfirm(parsedPercentage, canCloseAta && closeAta);
+    await onConfirm(
+      parsedPercentage,
+      canCloseAta && closeAta,
+      returnSolToMainWallet
+    );
   };
 
   return (
@@ -130,6 +140,22 @@ export function HoldingSellDialog({
               <p className="text-xs text-muted-foreground">
                 Closes associated token accounts when the balance is zero.
                 {!canCloseAta ? " Requires 100% sell." : ""}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-start gap-3 rounded-md border p-3">
+            <Checkbox
+              id="returnSolToMainWallet"
+              checked={returnSolToMainWallet}
+              onCheckedChange={(value) => setReturnSolToMainWallet(Boolean(value))}
+            />
+            <div className="grid gap-1">
+              <Label htmlFor="returnSolToMainWallet">
+                Return SOL to main wallet
+              </Label>
+              <p className="text-xs text-muted-foreground">
+                After processing selected wallets, send each processed wallet's
+                spendable SOL balance back to the main wallet.
               </p>
             </div>
           </div>

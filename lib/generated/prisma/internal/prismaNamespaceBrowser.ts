@@ -67,6 +67,7 @@ export const ModelName = {
   VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction',
+  TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
   ShyftCallback: 'ShyftCallback'
 } as const
@@ -341,6 +342,29 @@ export const TransactionScalarFieldEnum = {
 } as const
 
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const TokenTransactionScalarFieldEnum = {
+  id: 'id',
+  walletPublicKey: 'walletPublicKey',
+  walletRefPublicKey: 'walletRefPublicKey',
+  tokenPublicKey: 'tokenPublicKey',
+  walletType: 'walletType',
+  isOwned: 'isOwned',
+  transactionType: 'transactionType',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  solAmount: 'solAmount',
+  tokenAmount: 'tokenAmount',
+  pricePerToken: 'pricePerToken',
+  slippageBps: 'slippageBps',
+  feeAmount: 'feeAmount',
+  blockTime: 'blockTime',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TokenTransactionScalarFieldEnum = (typeof TokenTransactionScalarFieldEnum)[keyof typeof TokenTransactionScalarFieldEnum]
 
 
 export const RefreshCacheScalarFieldEnum = {

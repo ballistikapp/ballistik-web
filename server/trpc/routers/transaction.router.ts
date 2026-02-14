@@ -2,7 +2,6 @@ import { router, protectedProcedure } from "../trpc";
 import { transactionService } from "@/server/services/transaction.service";
 import {
   listTransactionsByTokenSchema,
-  liveTransactionsByTokenSchema,
   refreshTransactionsByTokenSchema,
 } from "@/server/schemas/transaction.schema";
 
@@ -16,10 +15,5 @@ export const transactionRouter = router({
     .input(refreshTransactionsByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await transactionService.refreshByToken(input, ctx.user.id);
-    }),
-  liveByToken: protectedProcedure
-    .input(liveTransactionsByTokenSchema)
-    .query(async ({ input, ctx }) => {
-      return await transactionService.liveByToken(input, ctx.user.id);
     }),
 });

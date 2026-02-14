@@ -49,6 +49,7 @@ model Wallet {
   isImported Boolean @default(false)
   holdings Holding[] @relation("WalletHoldings")
   transactions Transaction[] @relation("WalletTransactions")
+  tokenTransactions TokenTransaction[] @relation("WalletTokenTransactions")
   devWalletTokens TokenDevWallet[] @relation("DevWalletTokens")
   volumeBotWallets VolumeBotWallet[] @relation("VolumeBotWallets")
   @@map("Wallet")
@@ -80,6 +81,7 @@ model Token {
   devWallets TokenDevWallet[] @relation("TokenDevWallets")
   holdings Holding[] @relation("TokenHoldings")
   transactions Transaction[] @relation("TokenTransactions")
+  tokenTransactions TokenTransaction[] @relation("TokenTokenTransactions")
   refreshCaches RefreshCache[]
   launches Launch[] @relation("LaunchToken")
   holdingExits HoldingExit[] @relation("HoldingExitToken")
@@ -377,6 +379,32 @@ model Transaction {
   @@index([walletPublicKey, tokenPublicKey, createdAt])
   @@index([tokenPublicKey, transactionSignature, walletPublicKey])
   @@map("Transaction")
+}
+
+model TokenTransaction {
+  id String @id @default(cuid())
+  walletPublicKey String
+  walletRefPublicKey String?
+  walletRef Wallet? @relation("WalletTokenTransactions", fields: [walletRefPublicKey], references: [publicKey])
+  tokenPublicKey String
+  token Token @relation("TokenTokenTransactions", fields: [tokenPublicKey], references: [publicKey])
+  walletType WalletType?
+  isOwned Boolean @default(false)
+  transactionType TransactionType
+  status TransactionStatus
+  transactionSignature String
+  solAmount Decimal
+  tokenAmount Decimal
+  pricePerToken Decimal
+  slippageBps Int
+  feeAmount Decimal
+  blockTime DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([tokenPublicKey, transactionSignature, walletPublicKey, transactionType])
+  @@index([tokenPublicKey, createdAt])
+  @@index([walletPublicKey, tokenPublicKey, createdAt])
+  @@map("TokenTransaction")
 }
 
 model RefreshCache {

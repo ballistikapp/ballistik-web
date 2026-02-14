@@ -66,6 +66,18 @@ export const tokenService = {
             callbackUrl,
             projectId: publicKey,
           });
+          await shyftCallbackService.createTransactionCallback({
+            address: publicKey,
+            callbackUrl,
+            projectId: publicKey,
+            events: ["SWAP", "TOKEN_TRANSFER", "SOL_TRANSFER"],
+          });
+          await shyftCallbackService.createTransactionCallback({
+            address: bondingCurve.toBase58(),
+            callbackUrl,
+            projectId: publicKey,
+            events: ["SWAP", "TOKEN_TRANSFER", "SOL_TRANSFER"],
+          });
         } catch (error) {
           logger.warn("Failed to register Shyft callbacks for token", {
             tokenPublicKey: publicKey,

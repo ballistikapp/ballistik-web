@@ -21,21 +21,28 @@ Holdings show per-wallet token balances, holding percentage vs mint supply, and 
 The `refreshByToken` service is optimized for speed:
 
 1. `getAllowedWallets()` resolves the token and its associated wallets.
-2. Balance fetching and supporting DB reads run **in parallel**:
-   - **Balances**: Shyft `getTokenBalance()` calls with concurrency limit of 5 (via `mapWithConcurrency`), or batched RPC `getMultipleParsedAccounts` as fallback.
-   - **Safety on provider failure**: if a wallet-level Shyft call fails, refresh attempts wallet-level RPC fallback before writing. Wallets that cannot be resolved are skipped (no destructive delete) for that refresh run.
-   - **DB queries**: last transaction per wallet (`DISTINCT ON`) and existing holdings run concurrently.
-3. All holding creates, updates, and deletes are batched into a single `prisma.$transaction()` call.
-4. The mutation updates holdings server-side and touches refresh cache state. The client invalidates `holding.listByToken` and refetches.
+2. Balance fetching uses an **adaptive strategy**:
+   - Small/medium wallet sets use Shyft `getTokenBalance()` per wallet with bounded concurrency and retry/backoff on transient errors.
+   - Large wallet sets use direct batched RPC (`getMultipleParsedAccounts`) for faster aggregate fetch throughput.
+   - Safety on provider failure is preserved: unresolved wallets are skipped and never destructively deleted in that run.
+3. Existing holdings are fetched, then refresh computes a **diff**:
+   - `create` when a row should exist and is missing
+   - `update` only when persisted fields actually changed
+   - `delete` when no balance/no ATA and a row exists
+   - `lastUpdated` changes only for rows that were created/updated
+4. Last transaction lookup (`DISTINCT ON`) is narrowed to wallets that are actually being created/updated (instead of all wallets in scope).
+5. Persistence runs in a single atomic write phase with batched delete (`deleteMany`) plus grouped create/update operations.
+6. The mutation touches refresh cache state; client invalidates `holding.listByToken` and refetches.
 
 ## Sell Flow
 
 1. User selects holdings rows and opens the Sell dialog.
-2. Client sends `holding.sellByToken` with token public key, wallet public keys, and sell percentage.
+2. Client sends `holding.sellByToken` with token public key, wallet public keys, sell percentage, and optional toggles (`closeAta`, `returnSolToMainWallet`).
 3. Service fetches on-chain token balances, computes sell amounts, and submits RPC sell transactions per wallet.
 4. Sell transactions can use the main wallet as fee payer when available.
 5. If close ATA is enabled, the service closes empty associated token accounts after selling.
-6. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
+6. If return SOL is enabled, the service transfers spendable SOL from processed wallets to the main wallet.
+7. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
 
 ## UI Behavior
 
@@ -46,5 +53,6 @@ The `refreshByToken` service is optimized for speed:
 - If supply is temporarily unavailable, the table shows `--` instead of `0.0000%`.
 - Zero-balance rows appear when the wallet has an open ATA for the token.
 - Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells).
+- Sell dialog includes a "Return SOL to main wallet" toggle with a clear description that it sweeps spendable SOL from processed wallets back to the main wallet.
 - Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.

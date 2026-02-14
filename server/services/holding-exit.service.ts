@@ -1,7 +1,6 @@
 import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { rpcConfig } from "@/lib/config/rpc.config";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { getPumpProgram } from "@/server/solana/pump-idl";
@@ -57,6 +56,8 @@ type WalletBalance = {
 type ExitSummary = {
   totalWallets: number;
   totalChunks: number;
+  successfulChunks: number;
+  failedChunks: number;
   totalTokensRaw: string;
   totalTokensUi: number;
   tokenDecimals: number;
@@ -66,10 +67,16 @@ type ExitSummary = {
   atasClosed: number;
   solRecoveredLamports: number;
   solRecoveredSol: number;
+  cleanupFailedWallets: number;
+  totalJitoTipLamports: number;
+  totalJitoTipSol: number;
 };
 
 const DEFAULT_JITO_TIP_SOL = 0.005;
 const MAX_BUNDLE_TXS = 5;
+const TRANSFERS_PER_GROUP = 5;
+const WALLETS_PER_CHUNK = 20;
+const CLEANUP_WALLET_CONCURRENCY = 3;
 const MIN_RENT_LAMPORTS = 2_100_000;
 const FUND_AMOUNT_LAMPORTS = 5_000_000;
 
@@ -360,9 +367,7 @@ async function buildExitBundleTransactions({
   }
 
   const senders = chunk.slice(1);
-  // Reduced from 5 to 3 transfers per group to stay under tx size limit
-  // Each transfer adds ~100 bytes (accounts + instruction data)
-  const senderGroups = chunkWallets(senders, 3);
+  const senderGroups = chunkWallets(senders, TRANSFERS_PER_GROUP);
   const transactions: Transaction[] = [];
   const signerGroups: Keypair[][] = [];
 
@@ -459,109 +464,180 @@ async function closeAtasAndRecoverSol({
   wallets,
   mint,
   mainWallet,
+  returnSolToMainWallet,
+  exitId,
+  isCancelled,
 }: {
   wallets: WalletRecord[];
   mint: PublicKey;
   mainWallet: Keypair;
+  returnSolToMainWallet: boolean;
+  exitId: string;
+  isCancelled: () => boolean;
 }) {
   const connection = getSolanaConnection();
-  const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-  let atasClosed = 0;
-  let solRecoveredLamports = 0;
+  const cleanupWallets = wallets.filter(
+    (wallet) => wallet.publicKey !== mainWallet.publicKey.toBase58()
+  );
 
-  for (const wallet of wallets) {
-    if (wallet.publicKey === mainWallet.publicKey.toBase58()) {
-      continue;
-    }
+  await appendExitLog(exitId, "INFO", "Cleanup started", "cleanup", {
+    wallets: cleanupWallets.length,
+    concurrency: CLEANUP_WALLET_CONCURRENCY,
+    returnSolToMainWallet,
+  });
 
-    const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-    const ata = await getAssociatedTokenAddress(mint, owner.publicKey);
-
-    let accountBalance = BigInt(0);
-    let ataExists = true;
-    try {
-      const account = await getAccount(connection, ata);
-      accountBalance = account.amount;
-    } catch (error) {
-      if (
-        error instanceof Error &&
-        (error.message.includes("Account does not exist") ||
-          error.message.includes("could not find account") ||
-          error.name === "TokenAccountNotFoundError")
-      ) {
-        accountBalance = BigInt(0);
-        ataExists = false;
-      } else {
-        throw error;
+  const results = await mapWithConcurrency(
+    cleanupWallets,
+    CLEANUP_WALLET_CONCURRENCY,
+    async (wallet) => {
+      if (isCancelled()) {
+        throw new Error("Exit cancelled by user");
       }
-    }
 
-    if (ataExists && accountBalance === BigInt(0)) {
+      const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+      const ata = await getAssociatedTokenAddress(mint, owner.publicKey);
+      let ataClosed = false;
+      let solRecoveredLamports = 0;
+      const errors: string[] = [];
+
       try {
-        const closeTx = new Transaction().add(
-          createCloseAccountInstruction(
-            ata,
-            mainWallet.publicKey,
-            owner.publicKey
-          )
-        );
-        closeTx.recentBlockhash = latestBlockhash.blockhash;
-        closeTx.feePayer = mainWallet.publicKey;
-        await sendAndConfirmTransaction(connection, closeTx, [
-          mainWallet,
-          owner,
-        ]);
-        atasClosed += 1;
+        let accountBalance = BigInt(0);
+        let ataExists = true;
+        try {
+          const account = await getAccount(connection, ata);
+          accountBalance = account.amount;
+        } catch (error) {
+          if (
+            error instanceof Error &&
+            (error.message.includes("Account does not exist") ||
+              error.message.includes("could not find account") ||
+              error.name === "TokenAccountNotFoundError")
+          ) {
+            accountBalance = BigInt(0);
+            ataExists = false;
+          } else {
+            throw error;
+          }
+        }
+
+        if (ataExists && accountBalance === BigInt(0)) {
+          if (isCancelled()) {
+            throw new Error("Exit cancelled by user");
+          }
+          try {
+            const closeTx = new Transaction().add(
+              createCloseAccountInstruction(
+                ata,
+                mainWallet.publicKey,
+                owner.publicKey
+              )
+            );
+            const latestBlockhash = await connection.getLatestBlockhash(
+              "confirmed"
+            );
+            closeTx.recentBlockhash = latestBlockhash.blockhash;
+            closeTx.feePayer = mainWallet.publicKey;
+            await sendAndConfirmTransaction(connection, closeTx, [
+              mainWallet,
+              owner,
+            ]);
+            ataClosed = true;
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            errors.push(`closeAta: ${message}`);
+            logger.warn("Failed to close ATA", {
+              wallet: wallet.publicKey,
+              error: message,
+            });
+          }
+        }
+
+        if (returnSolToMainWallet) {
+          if (isCancelled()) {
+            throw new Error("Exit cancelled by user");
+          }
+          try {
+            const balanceLamports = await connection.getBalance(owner.publicKey);
+            const feeTransaction = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: owner.publicKey,
+                toPubkey: mainWallet.publicKey,
+                lamports: 1,
+              })
+            );
+            const latestBlockhash = await connection.getLatestBlockhash(
+              "confirmed"
+            );
+            feeTransaction.recentBlockhash = latestBlockhash.blockhash;
+            feeTransaction.feePayer = owner.publicKey;
+            const fee = await connection.getFeeForMessage(
+              feeTransaction.compileMessage(),
+              "confirmed"
+            );
+            const feeLamports = fee.value ?? 5000;
+            const lamports = balanceLamports - feeLamports;
+            if (lamports > 0) {
+              const transferTx = new Transaction().add(
+                SystemProgram.transfer({
+                  fromPubkey: owner.publicKey,
+                  toPubkey: mainWallet.publicKey,
+                  lamports,
+                })
+              );
+              transferTx.recentBlockhash = latestBlockhash.blockhash;
+              transferTx.feePayer = owner.publicKey;
+              await sendAndConfirmTransaction(connection, transferTx, [owner], {
+                commitment: "confirmed",
+              });
+              solRecoveredLamports = lamports;
+            }
+          } catch (error) {
+            const message =
+              error instanceof Error ? error.message : String(error);
+            errors.push(`recoverSol: ${message}`);
+            logger.warn("Failed to recover SOL", {
+              wallet: wallet.publicKey,
+              error: message,
+            });
+          }
+        }
       } catch (error) {
-        logger.warn("Failed to close ATA", {
-          wallet: wallet.publicKey,
-          error: error instanceof Error ? error.message : String(error),
-        });
+        const message = error instanceof Error ? error.message : String(error);
+        errors.push(`walletCleanup: ${message}`);
       }
-    }
 
-    try {
-      const balanceLamports = await connection.getBalance(owner.publicKey);
-      const feeTransaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: owner.publicKey,
-          toPubkey: mainWallet.publicKey,
-          lamports: 1,
-        })
-      );
-      feeTransaction.recentBlockhash = latestBlockhash.blockhash;
-      feeTransaction.feePayer = owner.publicKey;
-      const fee = await connection.getFeeForMessage(
-        feeTransaction.compileMessage(),
-        "confirmed"
-      );
-      const feeLamports = fee.value ?? 5000;
-      const lamports = balanceLamports - feeLamports;
-      if (lamports <= 0) {
-        continue;
-      }
-      const transferTx = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: owner.publicKey,
-          toPubkey: mainWallet.publicKey,
-          lamports,
-        })
-      );
-      transferTx.recentBlockhash = latestBlockhash.blockhash;
-      transferTx.feePayer = owner.publicKey;
-      await sendAndConfirmTransaction(connection, transferTx, [owner], {
-        commitment: "confirmed",
-      });
-      solRecoveredLamports += lamports;
-    } catch (error) {
-      logger.warn("Failed to recover SOL", {
-        wallet: wallet.publicKey,
-        error: error instanceof Error ? error.message : String(error),
-      });
+      return {
+        walletPublicKey: wallet.publicKey,
+        status: errors.length > 0 ? ("FAILED" as const) : ("OK" as const),
+        ataClosed,
+        solRecoveredLamports,
+        errors,
+      };
     }
-  }
+  );
 
-  return { atasClosed, solRecoveredLamports };
+  const atasClosed = results.filter((result) => result.ataClosed).length;
+  const solRecoveredLamports = results.reduce(
+    (sum, result) => sum + result.solRecoveredLamports,
+    0
+  );
+  const failedWallets = results.filter((result) => result.status === "FAILED");
+
+  await appendExitLog(
+    exitId,
+    failedWallets.length > 0 ? "WARN" : "INFO",
+    "Cleanup completed",
+    "cleanup",
+    {
+      wallets: cleanupWallets.length,
+      atasClosed,
+      solRecoveredLamports,
+      failedWallets: failedWallets.length,
+    }
+  );
+
+  return { atasClosed, solRecoveredLamports, failedWallets: failedWallets.length };
 }
 
 async function runExitFlow(exitId: string) {
@@ -616,10 +692,9 @@ async function runExitFlow(exitId: string) {
       return;
     }
 
-    // Reduced from 24 to 13 to stay within bundle tx limit
-    // With 3 transfers per tx and max 5 txs per bundle (1 for sell):
-    // 4 transfer txs * 3 transfers each = 12 transfers + 1 seller = 13 wallets
-    const chunks = chunkWallets(nonZeroBalances, 13);
+    // With max 5 txs per bundle and 1 tx reserved for sell:
+    // 4 transfer txs * 5 transfers each = 20 wallets per chunk (1 seller + 19 senders).
+    const chunks = chunkWallets(nonZeroBalances, WALLETS_PER_CHUNK);
     const totalTokens = nonZeroBalances.reduce(
       (total, entry) => total + entry.balance,
       BigInt(0)
@@ -628,6 +703,13 @@ async function runExitFlow(exitId: string) {
       typeof exit.input === "object" && exit.input
         ? Number((exit.input as { jitoTipSol?: number }).jitoTipSol ?? 0)
         : DEFAULT_JITO_TIP_SOL;
+    const returnSolToMainWallet =
+      typeof exit.input === "object" && exit.input
+        ? Boolean(
+            (exit.input as { returnSolToMainWallet?: boolean })
+              .returnSolToMainWallet
+          )
+        : false;
     const tipLamports = Math.max(0, Math.floor(jitoTipSol * 1_000_000_000));
 
     await appendExitLog(exitId, "INFO", "Exit chunks prepared", "chunking", {
@@ -652,59 +734,122 @@ async function runExitFlow(exitId: string) {
 
     checkCancelled();
 
-    let bundlesProcessed = 0;
-    for (let index = 0; index < chunks.length; index += 1) {
-      checkCancelled();
+    let completedChunks = 0;
+    const chunkResults = await mapWithConcurrency(
+      chunks.map((chunk, index) => ({ chunk, index })),
+      2,
+      async ({ chunk, index }) => {
+        checkCancelled();
 
-      const chunk = chunks[index];
-      const seller = chunk[0]?.wallet;
-      if (!seller) {
-        continue;
+        const seller = chunk[0]?.wallet;
+        if (!seller) {
+          return {
+            chunkIndex: index + 1,
+            status: "FAILED" as const,
+            error: "No seller wallet in chunk",
+          };
+        }
+
+        const chunkTotal = chunk.reduce(
+          (total, entry) => total + entry.balance,
+          BigInt(0)
+        );
+
+        await appendExitLog(
+          exitId,
+          "STEP",
+          `Chunk ${index + 1}/${chunks.length} submit started`,
+          "bundle",
+          { seller: seller.publicKey }
+        );
+
+        try {
+          checkCancelled();
+          const { transactions, signerGroups } = await buildExitBundleTransactions({
+            chunk,
+            mint,
+            decimals,
+            mainWallet: mainKeypair,
+            seller,
+            totalAmount: chunkTotal,
+          });
+
+          checkCancelled();
+          const bundleResult = await sendJitoBundle(
+            transactions,
+            signerGroups,
+            mainKeypair,
+            tipLamports
+          );
+          await appendExitLog(
+            exitId,
+            "INFO",
+            `Chunk ${index + 1}/${chunks.length} bundle submitted`,
+            "bundle",
+            {
+              seller: seller.publicKey,
+              bundleId: bundleResult.bundleId,
+              signatures: bundleResult.signatures,
+            }
+          );
+          return {
+            chunkIndex: index + 1,
+            status: "SUCCEEDED" as const,
+            sellerPublicKey: seller.publicKey,
+            bundleId: bundleResult.bundleId,
+            signatures: bundleResult.signatures,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (message === "Exit cancelled by user") {
+            throw error;
+          }
+          await appendExitLog(
+            exitId,
+            "ERROR",
+            `Chunk ${index + 1}/${chunks.length} failed`,
+            "bundle",
+            { seller: seller.publicKey, message }
+          );
+          return {
+            chunkIndex: index + 1,
+            status: "FAILED" as const,
+            sellerPublicKey: seller.publicKey,
+            error: message,
+          };
+        } finally {
+          completedChunks += 1;
+          const progress = Math.min(
+            90,
+            15 + Math.floor((completedChunks / chunks.length) * 75)
+          );
+          await updateExit(exitId, {
+            progress,
+            currentStep: `Processed ${completedChunks}/${chunks.length} chunks`,
+          });
+        }
       }
-      const chunkTotal = chunk.reduce(
-        (total, entry) => total + entry.balance,
-        BigInt(0)
-      );
-      const progress = Math.min(
-        90,
-        15 + Math.floor(((index + 1) / chunks.length) * 75)
-      );
-      await updateExit(exitId, {
-        progress,
-        currentStep: `Processing chunk ${index + 1}/${chunks.length}`,
-      });
+    );
+
+    checkCancelled();
+    const successfulChunks = chunkResults.filter(
+      (result) => result.status === "SUCCEEDED"
+    );
+    const failedChunks = chunkResults.filter(
+      (result) => result.status === "FAILED"
+    );
+    const bundlesProcessed = successfulChunks.length;
+
+    if (failedChunks.length > 0) {
       await appendExitLog(
         exitId,
-        "STEP",
-        `Processing chunk ${index + 1}/${chunks.length}`,
+        "WARN",
+        `${failedChunks.length} chunk(s) failed`,
         "bundle",
-        { seller: seller.publicKey }
+        {
+          failedChunkIndexes: failedChunks.map((result) => result.chunkIndex),
+        }
       );
-
-      checkCancelled();
-
-      const { transactions, signerGroups } = await buildExitBundleTransactions({
-        chunk,
-        mint,
-        decimals,
-        mainWallet: mainKeypair,
-        seller,
-        totalAmount: chunkTotal,
-      });
-
-      checkCancelled();
-
-      const bundleResult = await sendJitoBundle(
-        transactions,
-        signerGroups,
-        mainKeypair,
-        tipLamports
-      );
-      bundlesProcessed += 1;
-      await appendExitLog(exitId, "INFO", "Bundle submitted", "bundle", {
-        bundleId: bundleResult.bundleId,
-        signatures: bundleResult.signatures,
-      });
     }
 
     await updateExit(exitId, {
@@ -713,23 +858,33 @@ async function runExitFlow(exitId: string) {
     });
     await appendExitLog(exitId, "STEP", "Closing ATAs", "cleanup");
 
-    const { atasClosed, solRecoveredLamports } = await closeAtasAndRecoverSol({
+    const { atasClosed, solRecoveredLamports, failedWallets } =
+      await closeAtasAndRecoverSol({
       wallets: nonZeroBalances.map((entry) => entry.wallet),
       mint,
       mainWallet: mainKeypair,
+      returnSolToMainWallet,
+      exitId,
+      isCancelled: () => isExitCancelled(exitId),
     });
 
     await updateExit(exitId, {
       progress: 98,
-      currentStep: "Recovering SOL",
+      currentStep: returnSolToMainWallet ? "Recovering SOL" : "Finalize",
     });
-    await appendExitLog(exitId, "STEP", "Recovering SOL", "cleanup", {
-      solRecoveredLamports,
-    });
+    await appendExitLog(
+      exitId,
+      "STEP",
+      returnSolToMainWallet ? "Recovering SOL" : "Skipping SOL recovery",
+      "cleanup",
+      { solRecoveredLamports }
+    );
 
     const summary: ExitSummary = {
       totalWallets: nonZeroBalances.length,
       totalChunks: chunks.length,
+      successfulChunks: successfulChunks.length,
+      failedChunks: failedChunks.length,
       totalTokensRaw: totalTokens.toString(),
       totalTokensUi: formatTokens(totalTokens, decimals),
       tokenDecimals: decimals,
@@ -739,16 +894,31 @@ async function runExitFlow(exitId: string) {
       atasClosed,
       solRecoveredLamports,
       solRecoveredSol: solRecoveredLamports / 1_000_000_000,
+      cleanupFailedWallets: failedWallets,
+      totalJitoTipLamports: bundlesProcessed * tipLamports,
+      totalJitoTipSol: (bundlesProcessed * tipLamports) / 1_000_000_000,
     };
 
+    const finalStatus = failedChunks.length > 0 ? "FAILED" : "SUCCEEDED";
+    const finalError =
+      failedChunks.length > 0
+        ? `${failedChunks.length} chunk(s) failed during bundle submission`
+        : null;
     await updateExit(exitId, {
-      status: "SUCCEEDED",
+      status: finalStatus,
       progress: 100,
       currentStep: "Complete",
       completedAt: new Date(),
       result: summary,
+      errorMessage: finalError,
     });
-    await appendExitLog(exitId, "INFO", "Exit completed", "complete", summary);
+    await appendExitLog(
+      exitId,
+      failedChunks.length > 0 ? "WARN" : "INFO",
+      failedChunks.length > 0 ? "Exit completed with failures" : "Exit completed",
+      "complete",
+      summary
+    );
 
     await refreshCacheService.touch({
       userId: exit.userId,

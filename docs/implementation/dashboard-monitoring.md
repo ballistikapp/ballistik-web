@@ -70,3 +70,8 @@ Volume Bot Worker (trade events) ───┤    (tRPC)                 (debounc
 ## Dashboard Stats: `launchCompletedAt`
 
 Added to the `header` section of the `dashboard.getStats` response. Queried from the `Launch` model where `tokenPublicKey` matches and `status` is `SUCCEEDED`.
+
+## Note: Transactions Source Migration
+
+Transactions page data is being migrated to `TokenTransaction` (token-wide, per-action rows).
+Dashboard metrics currently continue to read from legacy `Transaction` until a follow-up migration aligns dashboard aggregation with `TokenTransaction`.

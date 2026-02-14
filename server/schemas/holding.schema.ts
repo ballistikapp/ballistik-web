@@ -23,6 +23,7 @@ export const sellHoldingsByTokenSchema = z.object({
   walletPublicKeys: z.array(z.string().min(1)).min(1),
   sellPercentage: z.number().min(1).max(100),
   closeAta: z.boolean().optional().default(false),
+  returnSolToMainWallet: z.boolean().optional().default(false),
 });
 
 export type SellHoldingsByTokenInput = z.infer<
@@ -32,6 +33,7 @@ export type SellHoldingsByTokenInput = z.infer<
 export const startExitSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   jitoTipSol: z.number().min(0).max(1).default(0.005),
+  returnSolToMainWallet: z.boolean().optional().default(false),
 });
 
 export type StartExitInput = z.infer<typeof startExitSchema>;

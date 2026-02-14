@@ -105,6 +105,15 @@ export default function Page() {
       ),
     [holdings]
   );
+  const walletsWithBalance = useMemo(
+    () =>
+      holdings.filter(
+        (holding) =>
+          Number.isFinite(Number(holding.tokenBalance)) &&
+          Number(holding.tokenBalance) > 0
+      ).length,
+    [holdings]
+  );
   const selectedHoldings = useMemo(
     () => holdings.filter((holding) => rowSelection[holding.walletPublicKey]),
     [holdings, rowSelection]
@@ -134,7 +143,11 @@ export default function Page() {
     }
   };
 
-  const handleSell = async (sellPercentage: number, closeAta: boolean) => {
+  const handleSell = async (
+    sellPercentage: number,
+    closeAta: boolean,
+    returnSolToMainWallet: boolean
+  ) => {
     if (!tokenPublicKey || selectedHoldings.length === 0) return;
     const walletPublicKeys = selectedHoldings.map(
       (holding) => holding.wallet.publicKey
@@ -146,6 +159,7 @@ export default function Page() {
         walletPublicKeys,
         sellPercentage,
         closeAta,
+        returnSolToMainWallet,
       });
       const summaryParts = [
         `${result.submitted} submitted`,
@@ -155,6 +169,12 @@ export default function Page() {
         summaryParts.push(`${result.ataClose.closed} ATA closed`);
         if (result.ataClose.failed > 0) {
           summaryParts.push(`${result.ataClose.failed} close failed`);
+        }
+      }
+      if (returnSolToMainWallet && result.solRecovery) {
+        summaryParts.push(`${result.solRecovery.recovered} wallet SOL returned`);
+        if (result.solRecovery.failed > 0) {
+          summaryParts.push(`${result.solRecovery.failed} SOL return failed`);
         }
       }
       toast.success(`Sell submitted: ${summaryParts.join(", ")}`, {
@@ -171,13 +191,17 @@ export default function Page() {
     }
   };
 
-  const handleExit = async (jitoTipSol: number) => {
+  const handleExit = async (
+    jitoTipSol: number,
+    returnSolToMainWallet: boolean
+  ) => {
     if (!tokenPublicKey) return;
     const toastId = toast.loading("Starting exit...");
     try {
       const result = await startExitMutation.mutateAsync({
         tokenPublicKey,
         jitoTipSol,
+        returnSolToMainWallet,
       });
       setLocalExitId(result.exitId);
       setManualExitDialogOpen(true);
@@ -352,6 +376,7 @@ export default function Page() {
         exit={exitData}
         tokenSymbol={tokenData.symbol}
         totalWallets={holdings.length}
+        walletsWithBalance={walletsWithBalance}
         totalBalance={totalBalance}
         isSubmitting={startExitMutation.isPending}
         isCancelling={cancelExitMutation.isPending}

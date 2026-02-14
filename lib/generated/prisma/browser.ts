@@ -98,6 +98,11 @@ export type Holding = Prisma.HoldingModel
  */
 export type Transaction = Prisma.TransactionModel
 /**
+ * Model TokenTransaction
+ * 
+ */
+export type TokenTransaction = Prisma.TokenTransactionModel
+/**
  * Model RefreshCache
  * 
  */

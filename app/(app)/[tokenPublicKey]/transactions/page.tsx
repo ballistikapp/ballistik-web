@@ -1,6 +1,4 @@
 "use client";
-
-import Link from "next/link";
 import { useEffect, useMemo, useRef } from "react";
 import { useParams } from "next/navigation";
 import { IconRefresh } from "@tabler/icons-react";
@@ -141,22 +139,6 @@ export default function TransactionsPage() {
               )}
               Refresh
             </Button>
-            <Button
-              asChild
-              variant="outline"
-              size="sm"
-              disabled={!tokenPublicKey}
-            >
-              <Link
-                href={
-                  tokenPublicKey
-                    ? `/${tokenPublicKey}/transactions/live`
-                    : "/transactions/live"
-                }
-              >
-                Live monitor
-              </Link>
-            </Button>
             <p className="text-sm text-muted-foreground">
               Last refresh: {formatRefreshTime(refreshTimestamp)}
             </p>
@@ -174,6 +156,7 @@ export default function TransactionsPage() {
         columns={columns}
         data={transactions}
         isLoading={transactionsLoading}
+        initialColumnVisibility={{ status: false }}
         enableUrlState
         urlStatePrefix="transactions"
         searchableColumns={["walletPublicKey", "walletType"]}

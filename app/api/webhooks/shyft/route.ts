@@ -4,6 +4,7 @@ import { grpcManager } from "@/server/solana/grpc-manager";
 import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
+import { transactionService } from "@/server/services/transaction.service";
 import type { RefreshScope } from "@/lib/generated/prisma/enums";
 
 type ShyftCallbackPayload = {
@@ -78,29 +79,29 @@ async function invalidateCaches(
   tokenAddresses: Set<string>,
   scopes: RefreshScope[]
 ) {
-  if (walletAddresses.size === 0) return 0;
+  const tokenPubkeys = new Set<string>(tokenAddresses);
+  const walletList = walletAddresses.size
+    ? await prisma.wallet.findMany({
+        where: { publicKey: { in: Array.from(walletAddresses) } },
+        select: { publicKey: true, userId: true, tokenPublicKey: true },
+      })
+    : [];
 
-  const wallets = await prisma.wallet.findMany({
-    where: { publicKey: { in: Array.from(walletAddresses) } },
-    select: { publicKey: true, userId: true, tokenPublicKey: true },
-  });
-
-  if (wallets.length === 0) return 0;
-
-  const tokenPubkeys = new Set<string>();
-  for (const w of wallets) {
+  for (const w of walletList) {
     if (w.tokenPublicKey) tokenPubkeys.add(w.tokenPublicKey);
   }
-  for (const t of tokenAddresses) {
-    tokenPubkeys.add(t);
-  }
+
+  const tokenList = tokenPubkeys.size
+    ? await prisma.token.findMany({
+        where: { publicKey: { in: Array.from(tokenPubkeys) } },
+        select: { publicKey: true, userId: true },
+      })
+    : [];
 
   let touchCount = 0;
-  for (const wallet of wallets) {
-    if (!wallet.userId) continue;
-    const tokensToTouch = wallet.tokenPublicKey
-      ? [wallet.tokenPublicKey]
-      : Array.from(tokenPubkeys);
+  for (const wallet of walletList) {
+    if (!wallet.userId || !wallet.tokenPublicKey) continue;
+    const tokensToTouch = [wallet.tokenPublicKey];
 
     for (const tokenPublicKey of tokensToTouch) {
       for (const scope of scopes) {
@@ -118,7 +119,44 @@ async function invalidateCaches(
     }
   }
 
+  for (const token of tokenList) {
+    for (const scope of scopes) {
+      try {
+        await refreshCacheService.touch({
+          userId: token.userId,
+          tokenPublicKey: token.publicKey,
+          scope,
+        });
+        touchCount += 1;
+      } catch {
+        // best-effort
+      }
+    }
+  }
+
   return touchCount;
+}
+
+async function resolveTokenPublicKeys(payload: ShyftCallbackPayload) {
+  const tokenPublicKeys = extractTokenAddresses(payload);
+  const callbackAddresses = payload.accounts ?? [];
+  if (callbackAddresses.length === 0) {
+    return tokenPublicKeys;
+  }
+
+  const callbacks = await prisma.shyftCallback.findMany({
+    where: {
+      address: { in: callbackAddresses },
+      projectId: { not: null },
+    },
+    select: { projectId: true },
+  });
+
+  callbacks.forEach((callback) => {
+    if (callback.projectId) tokenPublicKeys.add(callback.projectId);
+  });
+
+  return tokenPublicKeys;
 }
 
 export async function POST(request: Request) {
@@ -136,14 +174,35 @@ export async function POST(request: Request) {
 
     const payload = (await request.json()) as ShyftCallbackPayload;
     const walletAddresses = extractAffectedAddresses(payload);
-    const tokenAddresses = extractTokenAddresses(payload);
+    const tokenAddresses = await resolveTokenPublicKeys(payload);
+    const signatures = Array.from(new Set(payload.signatures ?? []));
     const scopes = resolveScopes(payload);
 
-    if (walletAddresses.size > 0) {
+    if (signatures.length > 0 && tokenAddresses.size > 0) {
+      await Promise.all(
+        Array.from(tokenAddresses).map(async (tokenPublicKey) => {
+          try {
+            await transactionService.ingestTokenSignatures({
+              tokenPublicKey,
+              signatures,
+            });
+          } catch (error) {
+            logger.warn("Shyft callback: transaction ingest failed", {
+              tokenPublicKey,
+              errorMessage:
+                error instanceof Error ? error.message : String(error),
+            });
+          }
+        })
+      );
+    }
+
+    if (walletAddresses.size > 0 || tokenAddresses.size > 0) {
       const touchCount = await invalidateCaches(walletAddresses, tokenAddresses, scopes);
       logger.info("Shyft callback: cache invalidated", {
         type: payload.type,
         accountCount: walletAddresses.size,
+        tokenCount: tokenAddresses.size,
         scopes,
         touchCount,
       });

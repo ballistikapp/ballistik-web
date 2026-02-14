@@ -6,6 +6,7 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Dialog,
   DialogContent,
@@ -32,12 +33,15 @@ type HoldingExitDialogProps = {
   exit: ExitData;
   tokenSymbol: string;
   totalWallets: number;
+  walletsWithBalance: number;
   totalBalance: number;
   isSubmitting?: boolean;
   isCancelling?: boolean;
-  onConfirm: (jitoTipSol: number) => Promise<void>;
+  onConfirm: (jitoTipSol: number, returnSolToMainWallet: boolean) => Promise<void>;
   onCancel?: () => Promise<void>;
 };
+
+const EXIT_CHUNK_SIZE = 20;
 
 const statusVariantMap: Record<
   string,
@@ -62,6 +66,7 @@ export function HoldingExitDialog({
   exit,
   tokenSymbol,
   totalWallets,
+  walletsWithBalance,
   totalBalance,
   isSubmitting = false,
   isCancelling = false,
@@ -69,10 +74,12 @@ export function HoldingExitDialog({
   onCancel,
 }: HoldingExitDialogProps) {
   const [tip, setTip] = React.useState("0.005");
+  const [returnSolToMainWallet, setReturnSolToMainWallet] = React.useState(false);
 
   React.useEffect(() => {
     if (!open) {
       setTip("0.005");
+      setReturnSolToMainWallet(false);
     }
   }, [open]);
 
@@ -82,11 +89,11 @@ export function HoldingExitDialog({
       toast.error("Enter a tip between 0 and 1 SOL");
       return;
     }
-    if (totalWallets === 0) {
+    if (walletsWithBalance === 0) {
       toast.error("No wallets with balances available");
       return;
     }
-    await onConfirm(parsed);
+    await onConfirm(parsed, returnSolToMainWallet);
   };
 
   const status = exit?.status ?? "PENDING";
@@ -99,6 +106,8 @@ export function HoldingExitDialog({
     | {
         totalWallets?: number;
         totalChunks?: number;
+        successfulChunks?: number;
+        failedChunks?: number;
         totalTokensUi?: number;
         tokenDecimals?: number;
         bundlesProcessed?: number;
@@ -106,8 +115,24 @@ export function HoldingExitDialog({
         fundingLamports?: number;
         atasClosed?: number;
         solRecoveredSol?: number;
+        totalJitoTipSol?: number;
       }
     | undefined;
+  const exitInput = exit?.input as
+    | { jitoTipSol?: number; returnSolToMainWallet?: boolean }
+    | undefined;
+  const parsedTip = Number.parseFloat(tip);
+  const localTipSol =
+    Number.isFinite(parsedTip) && parsedTip >= 0 ? parsedTip : 0;
+  const activeTipSol =
+    typeof exitInput?.jitoTipSol === "number" ? exitInput.jitoTipSol : localTipSol;
+  const activeReturnSolToMainWallet =
+    typeof exitInput?.returnSolToMainWallet === "boolean"
+      ? exitInput.returnSolToMainWallet
+      : returnSolToMainWallet;
+  const estimatedBundles =
+    walletsWithBalance > 0 ? Math.ceil(walletsWithBalance / EXIT_CHUNK_SIZE) : 0;
+  const estimatedTotalTipSol = activeTipSol * estimatedBundles;
 
   const showProgress = Boolean(exit);
   const showSummary = status === "SUCCEEDED" && summary;
@@ -144,6 +169,10 @@ export function HoldingExitDialog({
                   {totalBalance.toFixed(4)} {tokenSymbol}
                 </span>
               </div>
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
+                <span>Wallets with balance</span>
+                <span className="font-mono">{walletsWithBalance}</span>
+              </div>
             </div>
             <div className="grid gap-2">
               <Label htmlFor="exitTip">Jito tip (SOL)</Label>
@@ -156,6 +185,38 @@ export function HoldingExitDialog({
                 value={tip}
                 onChange={(event) => setTip(event.target.value)}
               />
+            </div>
+            <div className="flex items-start gap-3 rounded-md border p-3">
+              <Checkbox
+                id="exitReturnSolToMainWallet"
+                checked={returnSolToMainWallet}
+                onCheckedChange={(value) => setReturnSolToMainWallet(Boolean(value))}
+              />
+              <div className="grid gap-1">
+                <Label htmlFor="exitReturnSolToMainWallet">
+                  Return SOL to main wallet
+                </Label>
+                <p className="text-xs text-muted-foreground">
+                  After exit processing, transfer spendable SOL from processed
+                  wallets to your main wallet.
+                </p>
+              </div>
+            </div>
+            <div className="rounded-md border p-3 space-y-2 text-xs text-muted-foreground">
+              <div className="font-medium text-foreground">What exit does</div>
+              <p>1) Collects token balances from all managed wallets with tokens.</p>
+              <p>2) Bundles transfers + sell instructions and submits through Jito.</p>
+              <p>3) Closes empty token accounts.</p>
+              <p>
+                4) {returnSolToMainWallet ? "Returns" : "Optionally returns"} SOL from
+                processed wallets to main wallet.
+              </p>
+              <p>
+                Jito tip is paid per bundle. Estimated bundles:{" "}
+                <span className="font-mono">{estimatedBundles}</span>, estimated total
+                tip:{" "}
+                <span className="font-mono">{estimatedTotalTipSol.toFixed(4)} SOL</span>.
+              </p>
             </div>
           </div>
         )}
@@ -180,6 +241,13 @@ export function HoldingExitDialog({
                     <span>Bundles processed</span>
                     <span className="font-mono">
                       {summary?.bundlesProcessed ?? "-"}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span>Chunk outcomes</span>
+                    <span className="font-mono">
+                      {summary?.successfulChunks ?? "-"} ok /{" "}
+                      {summary?.failedChunks ?? "-"} failed
                     </span>
                   </div>
                   {(summary?.walletsFunded ?? 0) > 0 && (
@@ -210,6 +278,12 @@ export function HoldingExitDialog({
                       {summary?.solRecoveredSol?.toFixed?.(4) ?? "-"} SOL
                     </span>
                   </div>
+                  <div className="flex items-center justify-between">
+                    <span>Total Jito tip</span>
+                    <span className="font-mono">
+                      {summary?.totalJitoTipSol?.toFixed?.(4) ?? "-"} SOL
+                    </span>
+                  </div>
                 </div>
               </div>
             )}
@@ -218,6 +292,15 @@ export function HoldingExitDialog({
                 {exit?.errorMessage}
               </div>
             )}
+            <div className="rounded-md border p-3 text-xs text-muted-foreground">
+              Tip per bundle:{" "}
+              <span className="font-mono">{activeTipSol.toFixed(4)} SOL</span>
+              <span className="mx-2">|</span>
+              SOL return to main wallet:{" "}
+              <span className="font-mono">
+                {activeReturnSolToMainWallet ? "Enabled" : "Disabled"}
+              </span>
+            </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">Activity</div>
               <div className="max-h-72 overflow-y-auto rounded-md border p-3 space-y-2">

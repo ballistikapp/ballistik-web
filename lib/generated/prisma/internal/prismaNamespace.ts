@@ -400,6 +400,7 @@ export const ModelName = {
   VanityMint: 'VanityMint',
   Holding: 'Holding',
   Transaction: 'Transaction',
+  TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
   ShyftCallback: 'ShyftCallback'
 } as const
@@ -417,7 +418,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "refreshCache" | "shyftCallback"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1605,6 +1606,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    TokenTransaction: {
+      payload: Prisma.$TokenTransactionPayload<ExtArgs>
+      fields: Prisma.TokenTransactionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.TokenTransactionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.TokenTransactionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        findFirst: {
+          args: Prisma.TokenTransactionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.TokenTransactionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        findMany: {
+          args: Prisma.TokenTransactionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>[]
+        }
+        create: {
+          args: Prisma.TokenTransactionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        createMany: {
+          args: Prisma.TokenTransactionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.TokenTransactionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>[]
+        }
+        delete: {
+          args: Prisma.TokenTransactionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        update: {
+          args: Prisma.TokenTransactionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        deleteMany: {
+          args: Prisma.TokenTransactionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.TokenTransactionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.TokenTransactionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>[]
+        }
+        upsert: {
+          args: Prisma.TokenTransactionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$TokenTransactionPayload>
+        }
+        aggregate: {
+          args: Prisma.TokenTransactionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateTokenTransaction>
+        }
+        groupBy: {
+          args: Prisma.TokenTransactionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TokenTransactionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.TokenTransactionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.TokenTransactionCountAggregateOutputType> | number
+        }
+      }
+    }
     RefreshCache: {
       payload: Prisma.$RefreshCachePayload<ExtArgs>
       fields: Prisma.RefreshCacheFieldRefs
@@ -2046,6 +2121,29 @@ export const TransactionScalarFieldEnum = {
 } as const
 
 export type TransactionScalarFieldEnum = (typeof TransactionScalarFieldEnum)[keyof typeof TransactionScalarFieldEnum]
+
+
+export const TokenTransactionScalarFieldEnum = {
+  id: 'id',
+  walletPublicKey: 'walletPublicKey',
+  walletRefPublicKey: 'walletRefPublicKey',
+  tokenPublicKey: 'tokenPublicKey',
+  walletType: 'walletType',
+  isOwned: 'isOwned',
+  transactionType: 'transactionType',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  solAmount: 'solAmount',
+  tokenAmount: 'tokenAmount',
+  pricePerToken: 'pricePerToken',
+  slippageBps: 'slippageBps',
+  feeAmount: 'feeAmount',
+  blockTime: 'blockTime',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type TokenTransactionScalarFieldEnum = (typeof TokenTransactionScalarFieldEnum)[keyof typeof TokenTransactionScalarFieldEnum]
 
 
 export const RefreshCacheScalarFieldEnum = {
@@ -2496,6 +2594,7 @@ export type GlobalOmitConfig = {
   vanityMint?: Prisma.VanityMintOmit
   holding?: Prisma.HoldingOmit
   transaction?: Prisma.TransactionOmit
+  tokenTransaction?: Prisma.TokenTransactionOmit
   refreshCache?: Prisma.RefreshCacheOmit
   shyftCallback?: Prisma.ShyftCallbackOmit
 }

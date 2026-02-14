@@ -243,6 +243,7 @@ export type TokenWhereInput = {
   devWallets?: Prisma.TokenDevWalletListRelationFilter
   holdings?: Prisma.HoldingListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
+  tokenTransactions?: Prisma.TokenTransactionListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
   holdingExits?: Prisma.HoldingExitListRelationFilter
@@ -268,6 +269,7 @@ export type TokenOrderByWithRelationInput = {
   devWallets?: Prisma.TokenDevWalletOrderByRelationAggregateInput
   holdings?: Prisma.HoldingOrderByRelationAggregateInput
   transactions?: Prisma.TransactionOrderByRelationAggregateInput
+  tokenTransactions?: Prisma.TokenTransactionOrderByRelationAggregateInput
   refreshCaches?: Prisma.RefreshCacheOrderByRelationAggregateInput
   launches?: Prisma.LaunchOrderByRelationAggregateInput
   holdingExits?: Prisma.HoldingExitOrderByRelationAggregateInput
@@ -296,6 +298,7 @@ export type TokenWhereUniqueInput = Prisma.AtLeast<{
   devWallets?: Prisma.TokenDevWalletListRelationFilter
   holdings?: Prisma.HoldingListRelationFilter
   transactions?: Prisma.TransactionListRelationFilter
+  tokenTransactions?: Prisma.TokenTransactionListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
   holdingExits?: Prisma.HoldingExitListRelationFilter
@@ -356,6 +359,7 @@ export type TokenCreateInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -380,6 +384,7 @@ export type TokenUncheckedCreateInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -404,6 +409,7 @@ export type TokenUpdateInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -428,6 +434,7 @@ export type TokenUncheckedUpdateInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -704,6 +711,20 @@ export type TokenUpdateOneRequiredWithoutTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.TokenUpdateToOneWithWhereWithoutTransactionsInput, Prisma.TokenUpdateWithoutTransactionsInput>, Prisma.TokenUncheckedUpdateWithoutTransactionsInput>
 }
 
+export type TokenCreateNestedOneWithoutTokenTransactionsInput = {
+  create?: Prisma.XOR<Prisma.TokenCreateWithoutTokenTransactionsInput, Prisma.TokenUncheckedCreateWithoutTokenTransactionsInput>
+  connectOrCreate?: Prisma.TokenCreateOrConnectWithoutTokenTransactionsInput
+  connect?: Prisma.TokenWhereUniqueInput
+}
+
+export type TokenUpdateOneRequiredWithoutTokenTransactionsNestedInput = {
+  create?: Prisma.XOR<Prisma.TokenCreateWithoutTokenTransactionsInput, Prisma.TokenUncheckedCreateWithoutTokenTransactionsInput>
+  connectOrCreate?: Prisma.TokenCreateOrConnectWithoutTokenTransactionsInput
+  upsert?: Prisma.TokenUpsertWithoutTokenTransactionsInput
+  connect?: Prisma.TokenWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.TokenUpdateToOneWithWhereWithoutTokenTransactionsInput, Prisma.TokenUpdateWithoutTokenTransactionsInput>, Prisma.TokenUncheckedUpdateWithoutTokenTransactionsInput>
+}
+
 export type TokenCreateNestedOneWithoutRefreshCachesInput = {
   create?: Prisma.XOR<Prisma.TokenCreateWithoutRefreshCachesInput, Prisma.TokenUncheckedCreateWithoutRefreshCachesInput>
   connectOrCreate?: Prisma.TokenCreateOrConnectWithoutRefreshCachesInput
@@ -736,6 +757,7 @@ export type TokenCreateWithoutUserInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -759,6 +781,7 @@ export type TokenUncheckedCreateWithoutUserInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -826,6 +849,7 @@ export type TokenCreateWithoutOperationalWalletsInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -849,6 +873,7 @@ export type TokenUncheckedCreateWithoutOperationalWalletsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -888,6 +913,7 @@ export type TokenUpdateWithoutOperationalWalletsInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -911,6 +937,7 @@ export type TokenUncheckedUpdateWithoutOperationalWalletsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -934,6 +961,7 @@ export type TokenCreateWithoutDevWalletsInput = {
   operationalWallets?: Prisma.WalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -957,6 +985,7 @@ export type TokenUncheckedCreateWithoutDevWalletsInput = {
   operationalWallets?: Prisma.WalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -996,6 +1025,7 @@ export type TokenUpdateWithoutDevWalletsInput = {
   operationalWallets?: Prisma.WalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1019,6 +1049,7 @@ export type TokenUncheckedUpdateWithoutDevWalletsInput = {
   operationalWallets?: Prisma.WalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1043,6 +1074,7 @@ export type TokenCreateWithoutLaunchesInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutTokenInput
@@ -1066,6 +1098,7 @@ export type TokenUncheckedCreateWithoutLaunchesInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutTokenInput
@@ -1105,6 +1138,7 @@ export type TokenUpdateWithoutLaunchesInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutTokenNestedInput
@@ -1128,6 +1162,7 @@ export type TokenUncheckedUpdateWithoutLaunchesInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutTokenNestedInput
@@ -1151,6 +1186,7 @@ export type TokenCreateWithoutHoldingExitsInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutTokenInput
@@ -1174,6 +1210,7 @@ export type TokenUncheckedCreateWithoutHoldingExitsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutTokenInput
@@ -1213,6 +1250,7 @@ export type TokenUpdateWithoutHoldingExitsInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutTokenNestedInput
@@ -1236,6 +1274,7 @@ export type TokenUncheckedUpdateWithoutHoldingExitsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutTokenNestedInput
@@ -1259,6 +1298,7 @@ export type TokenCreateWithoutVolumeBotSessionsInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -1282,6 +1322,7 @@ export type TokenUncheckedCreateWithoutVolumeBotSessionsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -1321,6 +1362,7 @@ export type TokenUpdateWithoutVolumeBotSessionsInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1344,6 +1386,7 @@ export type TokenUncheckedUpdateWithoutVolumeBotSessionsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1367,6 +1410,7 @@ export type TokenCreateWithoutVanityMintsInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -1390,6 +1434,7 @@ export type TokenUncheckedCreateWithoutVanityMintsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -1429,6 +1474,7 @@ export type TokenUpdateWithoutVanityMintsInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1452,6 +1498,7 @@ export type TokenUncheckedUpdateWithoutVanityMintsInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1474,6 +1521,7 @@ export type TokenCreateWithoutHoldingsInput = {
   operationalWallets?: Prisma.WalletCreateNestedManyWithoutTokenInput
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -1497,6 +1545,7 @@ export type TokenUncheckedCreateWithoutHoldingsInput = {
   operationalWallets?: Prisma.WalletUncheckedCreateNestedManyWithoutTokenInput
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -1536,6 +1585,7 @@ export type TokenUpdateWithoutHoldingsInput = {
   operationalWallets?: Prisma.WalletUpdateManyWithoutTokenNestedInput
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1559,6 +1609,7 @@ export type TokenUncheckedUpdateWithoutHoldingsInput = {
   operationalWallets?: Prisma.WalletUncheckedUpdateManyWithoutTokenNestedInput
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1582,6 +1633,7 @@ export type TokenCreateWithoutTransactionsInput = {
   operationalWallets?: Prisma.WalletCreateNestedManyWithoutTokenInput
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
@@ -1605,6 +1657,7 @@ export type TokenUncheckedCreateWithoutTransactionsInput = {
   operationalWallets?: Prisma.WalletUncheckedCreateNestedManyWithoutTokenInput
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
@@ -1644,6 +1697,7 @@ export type TokenUpdateWithoutTransactionsInput = {
   operationalWallets?: Prisma.WalletUpdateManyWithoutTokenNestedInput
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1667,6 +1721,119 @@ export type TokenUncheckedUpdateWithoutTransactionsInput = {
   operationalWallets?: Prisma.WalletUncheckedUpdateManyWithoutTokenNestedInput
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutTokenNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutTokenNestedInput
+}
+
+export type TokenCreateWithoutTokenTransactionsInput = {
+  publicKey: string
+  privateKey: string
+  name: string
+  symbol: string
+  description?: string | null
+  imageUrl?: string | null
+  websiteUrl?: string | null
+  twitterUrl?: string | null
+  telegramUrl?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutTokensInput
+  operationalWallets?: Prisma.WalletCreateNestedManyWithoutTokenInput
+  devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
+  holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutTokenInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutTokenInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutTokenInput
+}
+
+export type TokenUncheckedCreateWithoutTokenTransactionsInput = {
+  publicKey: string
+  privateKey: string
+  name: string
+  symbol: string
+  description?: string | null
+  imageUrl?: string | null
+  websiteUrl?: string | null
+  twitterUrl?: string | null
+  telegramUrl?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  userId: string
+  operationalWallets?: Prisma.WalletUncheckedCreateNestedManyWithoutTokenInput
+  devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
+  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutTokenInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutTokenInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutTokenInput
+}
+
+export type TokenCreateOrConnectWithoutTokenTransactionsInput = {
+  where: Prisma.TokenWhereUniqueInput
+  create: Prisma.XOR<Prisma.TokenCreateWithoutTokenTransactionsInput, Prisma.TokenUncheckedCreateWithoutTokenTransactionsInput>
+}
+
+export type TokenUpsertWithoutTokenTransactionsInput = {
+  update: Prisma.XOR<Prisma.TokenUpdateWithoutTokenTransactionsInput, Prisma.TokenUncheckedUpdateWithoutTokenTransactionsInput>
+  create: Prisma.XOR<Prisma.TokenCreateWithoutTokenTransactionsInput, Prisma.TokenUncheckedCreateWithoutTokenTransactionsInput>
+  where?: Prisma.TokenWhereInput
+}
+
+export type TokenUpdateToOneWithWhereWithoutTokenTransactionsInput = {
+  where?: Prisma.TokenWhereInput
+  data: Prisma.XOR<Prisma.TokenUpdateWithoutTokenTransactionsInput, Prisma.TokenUncheckedUpdateWithoutTokenTransactionsInput>
+}
+
+export type TokenUpdateWithoutTokenTransactionsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  imageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  twitterUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutTokensNestedInput
+  operationalWallets?: Prisma.WalletUpdateManyWithoutTokenNestedInput
+  devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
+  holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutTokenNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutTokenNestedInput
+}
+
+export type TokenUncheckedUpdateWithoutTokenTransactionsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  symbol?: Prisma.StringFieldUpdateOperationsInput | string
+  description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  imageUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  websiteUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  twitterUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  telegramUrl?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  operationalWallets?: Prisma.WalletUncheckedUpdateManyWithoutTokenNestedInput
+  devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
+  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1691,6 +1858,7 @@ export type TokenCreateWithoutRefreshCachesInput = {
   devWallets?: Prisma.TokenDevWalletCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutTokenInput
@@ -1714,6 +1882,7 @@ export type TokenUncheckedCreateWithoutRefreshCachesInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutTokenInput
   holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutTokenInput
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutTokenInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutTokenInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutTokenInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutTokenInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutTokenInput
@@ -1753,6 +1922,7 @@ export type TokenUpdateWithoutRefreshCachesInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutTokenNestedInput
@@ -1776,6 +1946,7 @@ export type TokenUncheckedUpdateWithoutRefreshCachesInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutTokenNestedInput
@@ -1812,6 +1983,7 @@ export type TokenUpdateWithoutUserInput = {
   devWallets?: Prisma.TokenDevWalletUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutTokenNestedInput
@@ -1835,6 +2007,7 @@ export type TokenUncheckedUpdateWithoutUserInput = {
   devWallets?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutTokenNestedInput
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutTokenNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutTokenNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutTokenNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutTokenNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutTokenNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutTokenNestedInput
@@ -1866,6 +2039,7 @@ export type TokenCountOutputType = {
   devWallets: number
   holdings: number
   transactions: number
+  tokenTransactions: number
   refreshCaches: number
   launches: number
   holdingExits: number
@@ -1878,6 +2052,7 @@ export type TokenCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.
   devWallets?: boolean | TokenCountOutputTypeCountDevWalletsArgs
   holdings?: boolean | TokenCountOutputTypeCountHoldingsArgs
   transactions?: boolean | TokenCountOutputTypeCountTransactionsArgs
+  tokenTransactions?: boolean | TokenCountOutputTypeCountTokenTransactionsArgs
   refreshCaches?: boolean | TokenCountOutputTypeCountRefreshCachesArgs
   launches?: boolean | TokenCountOutputTypeCountLaunchesArgs
   holdingExits?: boolean | TokenCountOutputTypeCountHoldingExitsArgs
@@ -1921,6 +2096,13 @@ export type TokenCountOutputTypeCountHoldingsArgs<ExtArgs extends runtime.Types.
  */
 export type TokenCountOutputTypeCountTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.TransactionWhereInput
+}
+
+/**
+ * TokenCountOutputType without action
+ */
+export type TokenCountOutputTypeCountTokenTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.TokenTransactionWhereInput
 }
 
 /**
@@ -1977,6 +2159,7 @@ export type TokenSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   devWallets?: boolean | Prisma.Token$devWalletsArgs<ExtArgs>
   holdings?: boolean | Prisma.Token$holdingsArgs<ExtArgs>
   transactions?: boolean | Prisma.Token$transactionsArgs<ExtArgs>
+  tokenTransactions?: boolean | Prisma.Token$tokenTransactionsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.Token$refreshCachesArgs<ExtArgs>
   launches?: boolean | Prisma.Token$launchesArgs<ExtArgs>
   holdingExits?: boolean | Prisma.Token$holdingExitsArgs<ExtArgs>
@@ -2039,6 +2222,7 @@ export type TokenInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   devWallets?: boolean | Prisma.Token$devWalletsArgs<ExtArgs>
   holdings?: boolean | Prisma.Token$holdingsArgs<ExtArgs>
   transactions?: boolean | Prisma.Token$transactionsArgs<ExtArgs>
+  tokenTransactions?: boolean | Prisma.Token$tokenTransactionsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.Token$refreshCachesArgs<ExtArgs>
   launches?: boolean | Prisma.Token$launchesArgs<ExtArgs>
   holdingExits?: boolean | Prisma.Token$holdingExitsArgs<ExtArgs>
@@ -2061,6 +2245,7 @@ export type $TokenPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     devWallets: Prisma.$TokenDevWalletPayload<ExtArgs>[]
     holdings: Prisma.$HoldingPayload<ExtArgs>[]
     transactions: Prisma.$TransactionPayload<ExtArgs>[]
+    tokenTransactions: Prisma.$TokenTransactionPayload<ExtArgs>[]
     refreshCaches: Prisma.$RefreshCachePayload<ExtArgs>[]
     launches: Prisma.$LaunchPayload<ExtArgs>[]
     holdingExits: Prisma.$HoldingExitPayload<ExtArgs>[]
@@ -2479,6 +2664,7 @@ export interface Prisma__TokenClient<T, Null = never, ExtArgs extends runtime.Ty
   devWallets<T extends Prisma.Token$devWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$devWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenDevWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   holdings<T extends Prisma.Token$holdingsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$holdingsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   transactions<T extends Prisma.Token$transactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$transactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  tokenTransactions<T extends Prisma.Token$tokenTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$tokenTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshCaches<T extends Prisma.Token$refreshCachesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$refreshCachesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshCachePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   launches<T extends Prisma.Token$launchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$launchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   holdingExits<T extends Prisma.Token$holdingExitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Token$holdingExitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingExitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -3014,6 +3200,30 @@ export type Token$transactionsArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.TransactionScalarFieldEnum | Prisma.TransactionScalarFieldEnum[]
+}
+
+/**
+ * Token.tokenTransactions
+ */
+export type Token$tokenTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the TokenTransaction
+   */
+  select?: Prisma.TokenTransactionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the TokenTransaction
+   */
+  omit?: Prisma.TokenTransactionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.TokenTransactionInclude<ExtArgs> | null
+  where?: Prisma.TokenTransactionWhereInput
+  orderBy?: Prisma.TokenTransactionOrderByWithRelationInput | Prisma.TokenTransactionOrderByWithRelationInput[]
+  cursor?: Prisma.TokenTransactionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.TokenTransactionScalarFieldEnum | Prisma.TokenTransactionScalarFieldEnum[]
 }
 
 /**
