@@ -14,6 +14,7 @@ import {
 } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
 import { getColumns } from "./columns";
+import { PlusIcon } from "lucide-react";
 
 export default function VolumeBotPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
@@ -61,8 +62,11 @@ export default function VolumeBotPage() {
           </p>
         </div>
         <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
-          <Button asChild size="sm">
-            <Link href={newRunHref}>Start new run</Link>
+          <Button asChild size="lg">
+            <Link href={newRunHref}>
+              <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
+              <span className="font-semibold">New Session</span>
+            </Link>
           </Button>
         </div>
       </div>

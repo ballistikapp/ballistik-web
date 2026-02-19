@@ -31,9 +31,21 @@ tRPC procedures:
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.
 - `wallet.getPrivateKey` fetches a wallet private key on-demand after access checks.
-- `wallet.refreshBalances` refreshes balances via server-side RPC with a 10s debounce.
+- `wallet.refreshBalances` refreshes balances via server-side RPC with a 5s debounce.
+- `wallet.refreshBalances` accepts optional `force` to bypass debounce for immediate post-transaction refreshes.
+- `wallet.refreshBalances` returns structured outcomes for manual UX:
+  - `refreshed`
+  - `skippedCooldown`
+  - `skippedNotAllowed`
+  - `requestedCount`
+  - `targeted`
 - `wallet.sendSol` sends SOL from main wallet to selected token wallets.
 - `wallet.returnSol` returns SOL from selected token wallets to main wallet.
+- `wallet.sendSol` and `wallet.returnSol` return structured transfer outcomes:
+  - `submittedCount`
+  - `failedCount`
+  - `skippedCount`
+  - `results: [{ publicKey, status, signature?, error? }]`
 
 Service rules:
 
@@ -74,18 +86,51 @@ Wallet detail page:
 
 - Non-main wallets allow send and return actions.
 - Private keys are fetched on demand from a dialog in the wallet detail view.
+- Wallet detail includes holdings and transactions tables scoped to the current wallet.
+- Wallet detail tables reuse:
+  - `holding.listByToken({ tokenPublicKey, walletPublicKey })`
+  - `transaction.listByToken({ tokenPublicKey, walletPublicKey, groupBySignature: false })`
+- Sorting and pagination remain client-side in DataTable because datasets are already constrained by `walletPublicKey`.
+- Wallet detail transactions are action-level rows (not signature-grouped).
 
 ## Balance Strategy
 
 - DB stores `balanceSol`, `balanceRefreshedAt`.
 - Refresh is on-demand only; no background auto-refresh.
-- Server enforces a 10-second debounce per wallet (30s when subscriptions are active).
-- `RefreshCache` stores the last full refresh time per token to drive staleness checks.
+- Server enforces a 5-second debounce per wallet by default.
+- `force: true` bypasses debounce and is reserved for post-transaction refreshes.
+- `RefreshCache` stores the last successful wallet refresh timestamp per token/scope (including targeted refreshes) to drive staleness checks.
 - tRPC subscription `subscription.onBalanceUpdate` pushes real-time balance changes via gRPC stream, reducing the need for manual refresh.
+
+## Post-Tx Targeted Refresh Policy
+
+After SOL-moving transactions, the app performs targeted refreshes for affected wallets instead of relying only on broad invalidation:
+
+- Source wallet(s) and destination wallet(s) are refreshed together.
+- Main wallet is included whenever it sends or receives SOL.
+- Post-tx refresh calls use `wallet.refreshBalances` with `force: true` to avoid debounce delays.
+- Post-tx refresh source-of-truth is the service layer (`walletService.sendSolFromMainWallet` and `walletService.returnSolToMainWallet`).
+- Client dialogs consume transfer outcomes and invalidate query caches for mounted consumers, but do not trigger a second forced refresh.
+- Manual refresh actions continue to use default debounce behavior (`force` omitted).
 
 ## Cache Invalidation
 
-Wallet balance queries use `utils.[router].[procedure].invalidate()` (via `trpc.useUtils()`) so that all mounted consumers of the same query auto-refetch without manual `refetch()` wiring.
+Wallet balance queries use targeted `wallet.refreshBalances` for post-tx and manual updates. Manual targeted refreshes patch query caches first (`setData`) and only fall back to invalidate when needed.
+
+## Manual Refresh Behavior
+
+- **Refresh all**: requests all allowed wallets for the token scope and keeps broad invalidation behavior.
+- **Refresh selected / single wallet**: uses targeted wallet keys, applies structured outcome toasts, and patches wallet caches directly.
+- **Cooldown feedback**: uses `skippedCooldown` from server output for accurate partial-result messaging.
+- **Access feedback**: requested wallets outside token access are surfaced via `skippedNotAllowed`.
+- **Detail/list consistency**: detail-page refresh also patches list query caches for the refreshed wallet.
+
+## Transfer UX Behavior
+
+- Send and return execute in best-effort mode per wallet for bulk selections.
+- Users receive summary feedback for partial success (`submitted/failed/skipped`).
+- Failed wallet outcomes include per-wallet error text when available.
+- Send mode shows total outflow preview: `amountPerWallet * selectedWalletCount`.
 
 Invalidation triggers:
 
@@ -96,6 +141,36 @@ Invalidation triggers:
 - **Send/Return SOL**: `wallet.getMain`, `wallet.getOperationalByToken`, and `wallet.getDevByToken` are invalidated directly inside `WalletTransferDialog` after successful transfers. The parent `onSuccess` callback remains for non-cache concerns (e.g. `RefreshCache` timestamp updates, toasts).
 
 Wallet queries override the global 5-minute `staleTime` with `cacheConfig.staleMs.wallets` (60s) so that navigating to a page with stale cached data triggers a background refetch as a safety net.
+
+## Account Page (User-Scoped Main Wallet)
+
+Route: `/account` — top-level, not token-scoped.
+
+The account page is the user's "My Account" view combined with the main wallet detail. It lives outside the `[tokenPublicKey]` scope because the main wallet is user-scoped.
+
+### Sections
+
+1. **Account Info**: display name (editable inline), account creation date.
+2. **Main Wallet**: SOL balance with refresh, public key (copyable), private key (on-demand dialog), View on Solscan link, Send SOL action.
+
+### Backend Procedures
+
+- `auth.updateName` — `protectedProcedure` mutation. Updates `User.name`.
+- `wallet.getMainPrivateKey` — `protectedProcedure` mutation. Returns the main wallet private key by user ownership (no token context needed).
+
+### Send SOL Flow
+
+The account page uses `AccountSendDialog` to send SOL from the main wallet to token-scoped wallets:
+
+1. User selects a token from a dropdown (`token.getUserTokens`).
+2. Wallets for the selected token are loaded (`wallet.getOperationalByToken` + `wallet.getDevByToken`).
+3. User selects wallet(s) via checkboxes, enters amount per wallet.
+4. Submit calls existing `wallet.sendSol` with the selected `tokenPublicKey` and `walletPublicKeys`.
+
+### Cache Invalidation
+
+- `auth.updateName` success invalidates `auth.me`.
+- Send SOL success invalidates `wallet.getMain`, `wallet.getOperationalByToken`, and `wallet.getDevByToken` (same pattern as `WalletTransferDialog`).
 
 ## Migrations
 

@@ -3,6 +3,7 @@ import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { mapWithConcurrency } from "@/lib/utils/async";
+import { walletService } from "@/server/services/wallet.service";
 import { getPumpProgram } from "@/server/solana/pump-idl";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
@@ -867,6 +868,23 @@ async function runExitFlow(exitId: string) {
       exitId,
       isCancelled: () => isExitCancelled(exitId),
     });
+
+    const refreshWalletPublicKeys = Array.from(
+      new Set([
+        mainKeypair.publicKey.toBase58(),
+        ...nonZeroBalances.map((entry) => entry.wallet.publicKey),
+      ])
+    );
+    if (refreshWalletPublicKeys.length > 0) {
+      try {
+        await walletService.refreshWalletBalances(
+          exit.tokenPublicKey,
+          exit.userId,
+          refreshWalletPublicKeys,
+          true
+        );
+      } catch {}
+    }
 
     await updateExit(exitId, {
       progress: 98,

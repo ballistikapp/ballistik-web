@@ -5,7 +5,7 @@ export const cacheConfig = {
     wallets: 60_000,
   },
   cooldownMs: {
-    walletBalances: 10_000,
+    walletBalances: 5_000,
     walletBalancesWithSubscription: 30_000,
     holdingRefresh: 15_000,
     holdingRefreshWithSubscription: 60_000,

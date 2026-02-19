@@ -20,7 +20,7 @@ export const registerSchema = z
       message:
         "Either provide a private key or request wallet generation, not both",
       path: ["privateKey"],
-    },
+    }
   );
 
 export const loginWithPrivateKeySchema = z.object({
@@ -50,3 +50,9 @@ export type ContextUser = {
   name: string;
   mainWalletPublicKey: string;
 };
+
+export const updateNameSchema = z.object({
+  name: z.string().min(1, "Name is required").max(50, "Name is too long"),
+});
+
+export type UpdateNameInput = z.infer<typeof updateNameSchema>;

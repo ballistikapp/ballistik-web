@@ -1,24 +1,73 @@
 "use client";
 
-import Link from "next/link";
 import { useParams } from "next/navigation";
-import { useEffect, useState } from "react";
-import { formatDistanceToNowStrict } from "date-fns";
+import { useEffect, useMemo, useState } from "react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../../dashboard/dashboard-loading";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
+  DataTable,
+  DataTablePagination,
+  DataTableSearch,
+  DataTableViewOptions,
+} from "@/components/data-table";
+import {
+  TrendingDownIcon,
+  TrendingUpIcon,
+  MinusIcon,
+  PlayIcon,
+  SquareIcon,
+  ClockIcon,
+  PauseIcon,
+  CircleAlertIcon,
+  LoaderIcon,
+  WalletIcon,
+} from "lucide-react";
+import {
+  getTransactionsColumns,
+  type VolumeBotLogRow,
+} from "./transactions-columns";
+import {
+  getWalletColumns,
+  type SessionWalletRow,
+} from "./wallet-columns";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
+
+type RangeConfig = VolumeBotConfigInput["ranges"][number];
+
+function formatDuration(seconds: number) {
+  if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  const totalMinutes = Math.floor(seconds / 60);
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  if (hours > 0 && minutes > 0) return `${hours}h ${minutes}m`;
+  if (hours > 0) return `${hours}h`;
+  return `${minutes}m`;
+}
+
+function formatDirection(range: RangeConfig) {
+  if (range.direction === "both") {
+    return `Both (${((range.buyProbability ?? 0) * 100).toFixed(0)}% buy)`;
+  }
+  return range.direction === "buy" ? "Buy" : "Sell";
+}
 
 export default function VolumeBotRunPage() {
   const params = useParams<{ tokenPublicKey: string; sessionId: string }>();
   const tokenPublicKey = params?.tokenPublicKey;
   const sessionId = params?.sessionId;
-  const utils = trpc.useUtils();
-
   const {
     data: statusData,
     isLoading,
@@ -54,52 +103,59 @@ export default function VolumeBotRunPage() {
     },
   });
 
-  const reclaimMutation = trpc.volumeBot.reclaim.useMutation({
-    onSuccess: () => {
-      toast.success("Reclaim requested");
-      utils.wallet.getMain.invalidate();
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to reclaim funds");
-    },
-  });
-
-  const closeAccountsMutation = trpc.volumeBot.closeAccounts.useMutation({
-    onSuccess: () => {
-      toast.success("Close accounts requested");
-    },
-    onError: (error) => {
-      toast.error(error.message || "Failed to close accounts");
-    },
-  });
-
   const session = statusData?.session;
   const wallets = statusData?.wallets ?? [];
   const rangeMetrics = statusData?.rangeMetrics ?? [];
   const logs = logsQuery.data ?? [];
-  const backToken = tokenPublicKey || session?.tokenPublicKey;
-  const backHref = backToken ? `/${backToken}/volume-bot` : "/volume-bot";
-  const config = session?.config as VolumeBotConfigInput | undefined;
-  const ranges = config?.ranges ?? [];
-  const netSolDirection = ranges.reduce((sum, range) => {
-    const avgAmount = (range.solMin + range.solMax) / 2;
-    if (range.direction === "buy") {
-      return sum + avgAmount;
-    }
-    if (range.direction === "sell") {
-      return sum - avgAmount;
-    }
-    const buyProbability = range.buyProbability ?? 0;
-    return sum + avgAmount * (2 * buyProbability - 1);
-  }, 0);
-  const netDirectionLabel =
-    netSolDirection > 0
-      ? "Net buy"
-      : netSolDirection < 0
-      ? "Net sell"
-      : "Neutral";
   const netSol = Number(session?.totalPnlSol ?? 0);
   const netSolPerMinute = Number(session?.netDeltaSolPerMinute ?? 0);
+  const config = session?.config as VolumeBotConfigInput | undefined;
+  const ranges = config?.ranges ?? [];
+  const behaviorConfig = config?.behaviorConfig;
+  const [detailsDialogOpen, setDetailsDialogOpen] = useState(false);
+
+  const transactionColumns = useMemo(
+    () => getTransactionsColumns(tokenPublicKey || ""),
+    [tokenPublicKey]
+  );
+  const walletColumns = useMemo(
+    () => getWalletColumns(tokenPublicKey || ""),
+    [tokenPublicKey]
+  );
+  const walletRows: SessionWalletRow[] = useMemo(
+    () =>
+      wallets.map((w) => ({
+        id: w.id,
+        walletPublicKey: w.walletPublicKey,
+        walletType: (w as unknown as { wallet: { type: string } }).wallet?.type ?? "VOLUME",
+        status: w.status,
+        solBalance: Number(w.solBalance),
+        tradesExecuted: w.tradesExecuted,
+        pnlSol: Number(w.pnlSol),
+        lastTradeAt: w.lastTradeAt ? new Date(w.lastTradeAt) : null,
+      })),
+    [wallets]
+  );
+  const logRows: VolumeBotLogRow[] = useMemo(
+    () =>
+      logs
+        .filter((log) => {
+          const type = log.type.toLowerCase();
+          const message = log.message.toLowerCase();
+          return !type.includes("eligibility") && !message.includes("eligibility");
+        })
+        .map((log) => ({
+          id: log.id,
+          level: log.level,
+          type: log.type,
+          message: log.message,
+          data: log.data as VolumeBotLogRow["data"],
+          walletPublicKey: log.walletPublicKey,
+          signature: log.signature ?? null,
+          createdAt: new Date(log.createdAt),
+        })),
+    [logs]
+  );
   const [runtimeSeconds, setRuntimeSeconds] = useState(
     session?.runtimeSeconds ?? 0
   );
@@ -111,32 +167,27 @@ export default function VolumeBotRunPage() {
     await stopMutation.mutateAsync({ sessionId: session.id });
   };
 
-  const handleReclaim = async () => {
-    if (!session) {
-      return;
-    }
-    await reclaimMutation.mutateAsync({ sessionId: session.id });
-  };
-
-  const handleCloseAccounts = async () => {
-    if (!session) {
-      return;
-    }
-    await closeAccountsMutation.mutateAsync({ sessionId: session.id });
-  };
+  const isActive =
+    session?.status === "RUNNING" ||
+    session?.status === "STOP_REQUESTED" ||
+    session?.status === "STOPPING";
 
   useEffect(() => {
     if (!session) {
       return;
     }
     const baseRuntime = session.runtimeSeconds ?? 0;
+    setRuntimeSeconds(baseRuntime);
+    if (!isActive) {
+      return;
+    }
     const startedAt = Date.now();
     const interval = setInterval(() => {
       const elapsed = Math.floor((Date.now() - startedAt) / 1000);
       setRuntimeSeconds(baseRuntime + elapsed);
     }, 1000);
     return () => clearInterval(interval);
-  }, [session?.runtimeSeconds, session?.status, session?.id]);
+  }, [session?.runtimeSeconds, session?.status, session?.id, isActive]);
 
   if (isLoading) {
     return <DashboardLoading />;
@@ -147,54 +198,43 @@ export default function VolumeBotRunPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <div className="flex flex-col gap-3">
-          <Link
-            href={backHref}
-            className="text-sm text-muted-foreground hover:underline"
+    <section className="pb-8">
+      <div className="flex justify-between items-center gap-2 -mx-6 px-6 pt-6 pb-10 border-b">
+        <h1 className="text-4xl">Volume Bot Session</h1>
+        <div className="flex items-center gap-3">
+          <span
+            className={`inline-flex items-center gap-3 rounded-lg px-3 py-1.5 text-xl font-semibold ${
+              session.status === "RUNNING"
+                ? "bg-emerald-500/15 text-emerald-500"
+                : session.status === "STOPPED"
+                  ? "bg-muted text-muted-foreground"
+                  : session.status === "FAILED"
+                    ? "bg-red-500/15 text-red-500"
+                    : session.status === "SCHEDULED"
+                      ? "bg-amber-500/15 text-amber-500"
+                      : session.status === "STOP_REQUESTED" ||
+                          session.status === "STOPPING"
+                        ? "bg-orange-500/15 text-orange-500"
+                        : "bg-muted text-muted-foreground"
+            }`}
           >
-            Back to runs
-          </Link>
-          <h1 className="text-4xl">Volume Bot Run</h1>
-          <div className="text-sm text-muted-foreground font-mono">
-            {session.id}
-          </div>
-        </div>
-        <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
-          <p className="leading-tight font-light">
-            Live session activity and wallet health.
-            <br />
-            Status updates refresh every few seconds.
-          </p>
-        </div>
-      </div>
-
-      <div />
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-primary text-xl">Status</CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="space-y-6">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleReclaim}
-              disabled={reclaimMutation.isPending}
-            >
-              Reclaim
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleCloseAccounts}
-              disabled={closeAccountsMutation.isPending}
-            >
-              Close accounts
-            </Button>
+            {session.status === "RUNNING" ? (
+              <PlayIcon className="size-4 fill-current" />
+            ) : session.status === "STOPPED" ? (
+              <SquareIcon className="size-4 fill-current" />
+            ) : session.status === "FAILED" ? (
+              <CircleAlertIcon className="size-4" />
+            ) : session.status === "SCHEDULED" ? (
+              <ClockIcon className="size-4" />
+            ) : session.status === "STOP_REQUESTED" ||
+              session.status === "STOPPING" ? (
+              <LoaderIcon className="size-4 animate-spin" />
+            ) : (
+              <PauseIcon className="size-4" />
+            )}
+            {session.status}
+          </span>
+          {isActive && (
             <Button
               variant="destructive"
               size="sm"
@@ -203,175 +243,301 @@ export default function VolumeBotRunPage() {
             >
               Stop
             </Button>
-          </div>
-          <div className="grid gap-3 md:grid-cols-4">
-            <div>
-              <div className="text-xs text-muted-foreground">Status</div>
-              <div className="text-sm font-semibold">{session.status}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Trades</div>
-              <div className="text-sm font-semibold">{session.totalTrades}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Volume (USD)</div>
-              <div className="text-sm font-semibold">
-                {Number(session.totalVolumeUsd).toFixed(2)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Runtime (sec)</div>
-              <div className="text-sm font-semibold">{runtimeSeconds}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Net direction</div>
-              <div className="text-sm font-semibold">{netDirectionLabel}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                Net SOL (total)
-              </div>
-              <div className="text-sm font-semibold">{netSol.toFixed(3)}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                Net SOL per min
-              </div>
-              <div className="text-sm font-semibold">
-                {netSolPerMinute.toFixed(4)}
-              </div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">Ranges</div>
-              <div className="text-sm font-semibold">{ranges.length}</div>
-            </div>
-            <div>
-              <div className="text-xs text-muted-foreground">
-                Duration (sec)
-              </div>
-              <div className="text-sm font-semibold">
-                {config?.targetDurationSeconds ?? "—"}
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-primary text-xl">Ranges</CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="space-y-2">
-          {ranges.length === 0 && (
-            <div className="text-sm text-muted-foreground">
-              No ranges configured.
-            </div>
           )}
-          {ranges.map((range, index) => {
-            const metric = rangeMetrics[index];
-            const expectedNetDeltaPerMinute =
-              metric?.expectedNetDeltaSolPerMinute ?? 0;
-            return (
-              <div
-                key={`${range.solMin}-${range.solMax}-${index}`}
-                className="flex flex-col gap-1 rounded border px-3 py-2 text-sm"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    Range {index + 1}: {range.solMin.toFixed(3)}-
-                    {range.solMax.toFixed(3)} SOL
-                  </div>
-                  <div className="text-xs text-muted-foreground text-right">
-                    interval {range.intervalMin}-{range.intervalMax}s ·{" "}
-                    {range.direction}
-                    {range.direction === "both" &&
-                      ` (${(range.buyProbability ?? 0).toFixed(2)} buy)`}
-                  </div>
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  Expected net Δ SOL/min: {expectedNetDeltaPerMinute.toFixed(4)}
-                </div>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+        </div>
+      </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-primary text-xl">Wallets</CardTitle>
-        </CardHeader>
-        <Separator />
-        <CardContent className="space-y-2">
-          {wallets.slice(0, 10).map((wallet) => (
-            <div
-              key={wallet.id}
-              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-8">
+        <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Volume
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {Number(session.totalVolumeUsd).toFixed(2)} SOL
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/90">
+            {session.totalTrades} transaction
+            {session.totalTrades !== 1 ? "s" : ""}
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Net SOL
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums flex items-center gap-1.5">
+            {netSol > 0 ? (
+              <TrendingUpIcon className="size-4 text-green-400" />
+            ) : netSol < 0 ? (
+              <TrendingDownIcon className="size-4 text-red-400" />
+            ) : (
+              <MinusIcon className="size-4 text-muted-foreground" />
+            )}
+            <span
+              className={
+                netSol > 0 ? "text-green-400" : netSol < 0 ? "text-red-400" : ""
+              }
             >
-              <div className="font-mono">
-                {wallet.walletPublicKey.slice(0, 8)}...
-                {wallet.walletPublicKey.slice(-6)}
-              </div>
-              <div className="text-muted-foreground">{wallet.status}</div>
-              <div>{Number(wallet.solBalance).toFixed(4)} SOL</div>
-            </div>
-          ))}
-          {wallets.length > 10 && (
-            <div className="text-xs text-muted-foreground">
-              +{wallets.length - 10} more wallets
-            </div>
-          )}
-        </CardContent>
-      </Card>
+              {netSol >= 0 ? "+" : ""}
+              {netSol.toFixed(4)} SOL
+            </span>
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/90">
+            {netSolPerMinute >= 0 ? "+" : ""}
+            {netSolPerMinute.toFixed(4)} SOL / min
+          </p>
+        </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-primary text-xl">Live feed</CardTitle>
-        </CardHeader>
+        <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Net Token
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums text-muted-foreground">
+            —
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/90">
+            Not tracked yet
+          </p>
+        </div>
+
+        <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
+          <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+            Timing
+          </p>
+          <p className="mt-1 text-xl font-semibold tabular-nums">
+            {Math.floor(runtimeSeconds / 3600) > 0
+              ? `${Math.floor(runtimeSeconds / 3600)}h ${Math.floor((runtimeSeconds % 3600) / 60)}m`
+              : `${Math.floor(runtimeSeconds / 60)}m ${runtimeSeconds % 60}s`}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground/90 space-y-0.5">
+            {session.startedAt && (
+              <span className="block">
+                Started {format(new Date(session.startedAt), "MMM d, HH:mm")}
+              </span>
+            )}
+            {session.scheduledStartAt && !session.startedAt && (
+              <span className="block">
+                Scheduled{" "}
+                {format(new Date(session.scheduledStartAt), "MMM d, HH:mm")}
+              </span>
+            )}
+            {!session.startedAt && !session.scheduledStartAt && (
+              <span className="block">Not started</span>
+            )}
+          </p>
+        </div>
+      </div>
+
+      <div className="-mx-6 my-14">
         <Separator />
-        <CardContent className="space-y-2">
-          {logs.length === 0 && (
-            <div className="text-sm text-muted-foreground">No trades yet.</div>
-          )}
-          {logs.map((log) => (
-            <div
-              key={log.id}
-              className="flex items-center justify-between rounded border px-3 py-2 text-sm"
-            >
-              <div className="flex flex-col">
-                <div className="font-semibold capitalize">{log.type}</div>
-                <div className="text-xs text-muted-foreground">
-                  {(() => {
-                    const data = log.data as
-                      | { tradeAmountSol?: number; netSolChangeSol?: number }
-                      | undefined;
-                    const tradeAmount =
-                      typeof data?.tradeAmountSol === "number"
-                        ? data.tradeAmountSol
-                        : null;
-                    const netSolChange =
-                      typeof data?.netSolChangeSol === "number"
-                        ? data.netSolChangeSol
-                        : null;
-                    if (tradeAmount !== null) {
-                      return `Trade ${tradeAmount.toFixed(3)} SOL${
-                        netSolChange !== null
-                          ? ` • Net ${netSolChange.toFixed(3)} SOL`
-                          : ""
-                      }`;
-                    }
-                    return log.message;
-                  })()}
-                </div>
-              </div>
-              <div className="text-xs text-muted-foreground">
-                {formatDistanceToNowStrict(new Date(log.createdAt))} ago
-              </div>
+      </div>
+
+      <div className="space-y-5">
+        <h2 className="text-2xl font-normal">Transactions</h2>
+        <DataTable
+          columns={transactionColumns}
+          data={logRows}
+          isLoading={logsQuery.isLoading}
+          initialColumnVisibility={{ message: false }}
+          searchableColumns={["walletPublicKey"]}
+          toolbar={(table) => (
+            <div className="flex items-center justify-between gap-2">
+              <DataTableSearch
+                table={table}
+                placeholder="Search wallet public keys..."
+                className="max-w-sm"
+              />
+              <DataTableViewOptions table={table} />
             </div>
-          ))}
-        </CardContent>
-      </Card>
-    </div>
+          )}
+          pagination={(table) => (
+            <DataTablePagination table={table} showSelectedCount={false} />
+          )}
+        />
+      </div>
+
+      <div className="-mx-6 my-14">
+        <Separator />
+      </div>
+
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-2xl font-normal">Details</h2>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setDetailsDialogOpen(true)}
+          >
+            <WalletIcon className="size-4 mr-1.5" />
+            Wallets ({wallets.length})
+          </Button>
+        </div>
+
+        {ranges.length > 0 && (
+          <div className="space-y-3">
+            {ranges.map((range, index) => {
+              const metric = rangeMetrics[index];
+              return (
+                <div
+                  key={index}
+                  className={cn(
+                    "rounded-lg border border-l-4 bg-card px-5 py-4",
+                    range.direction === "buy" && "border-l-green-500",
+                    range.direction === "sell" && "border-l-red-500",
+                    range.direction === "both" && "border-l-muted-foreground/40"
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <span className="text-sm font-semibold">
+                        Range {index + 1}
+                      </span>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "font-medium",
+                          range.direction === "buy" &&
+                            "border-emerald-500/30 bg-emerald-500/10 text-emerald-400",
+                          range.direction === "sell" &&
+                            "border-rose-500/30 bg-rose-500/10 text-rose-400",
+                          range.direction === "both" &&
+                            "border-border bg-muted/50 text-muted-foreground"
+                        )}
+                      >
+                        {formatDirection(range)}
+                      </Badge>
+                    </div>
+                    {metric && (
+                      <span
+                        className={cn(
+                          "text-xs font-mono",
+                          metric.expectedNetDeltaSolPerMinute > 0
+                            ? "text-green-400"
+                            : metric.expectedNetDeltaSolPerMinute < 0
+                              ? "text-red-400"
+                              : "text-muted-foreground"
+                        )}
+                      >
+                        {metric.expectedNetDeltaSolPerMinute >= 0 ? "+" : ""}
+                        {metric.expectedNetDeltaSolPerMinute.toFixed(4)} SOL/min
+                        expected
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                        Trade Size
+                      </p>
+                      <p className="text-sm font-mono">
+                        {range.solMin.toFixed(3)} – {range.solMax.toFixed(3)} SOL
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                        Interval
+                      </p>
+                      <p className="text-sm font-mono">
+                        {range.intervalMin} – {range.intervalMax}s
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                        Step
+                      </p>
+                      <p className="text-sm font-mono">
+                        {range.increment != null
+                          ? `${range.increment.toFixed(3)} SOL`
+                          : "—"}
+                      </p>
+                    </div>
+                    {range.direction === "both" && (
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
+                          Buy Probability
+                        </p>
+                        <p className="text-sm font-mono">
+                          {((range.buyProbability ?? 0) * 100).toFixed(0)}%
+                        </p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-3">
+          <div className="rounded-lg border bg-card/50 px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Scheduling
+            </p>
+            <p className="text-sm font-mono mt-0.5">
+              <span className="font-semibold">
+                {config ? formatDuration(config.targetDurationSeconds) : "—"}
+              </span>
+              {(session.scheduledStartAt || session.scheduledStopAt) && (
+                <>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-xs text-muted-foreground">
+                    {[
+                      session.scheduledStartAt &&
+                        `Start ${format(new Date(session.scheduledStartAt), "MMM d, HH:mm")}`,
+                      session.scheduledStopAt &&
+                        `End ${format(new Date(session.scheduledStopAt), "MMM d, HH:mm")}`,
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </span>
+                </>
+              )}
+            </p>
+          </div>
+          <div className="rounded-lg border bg-card/50 px-3 py-2.5">
+            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
+              Slippage
+            </p>
+            <p className="text-sm font-mono mt-0.5">
+              {behaviorConfig ? (
+                <>
+                  <span className="font-semibold">
+                    {(behaviorConfig.slippageBps / 100).toFixed(1)}%
+                  </span>
+                  <span className="text-muted-foreground"> · </span>
+                  <span className="text-xs text-muted-foreground">
+                    {behaviorConfig.pauseOnHighSlippage
+                      ? `Pause after ${behaviorConfig.maxSlippageFailures} failures`
+                      : "No pause"}
+                  </span>
+                </>
+              ) : (
+                "—"
+              )}
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <Dialog open={detailsDialogOpen} onOpenChange={setDetailsDialogOpen}>
+        <DialogContent className="sm:max-w-4xl max-h-[85vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <WalletIcon className="size-5" />
+              Session Wallets
+            </DialogTitle>
+          </DialogHeader>
+
+          <DataTable
+            columns={walletColumns}
+            data={walletRows}
+            pagination={(table) => (
+              <DataTablePagination table={table} showSelectedCount={false} />
+            )}
+          />
+        </DialogContent>
+      </Dialog>
+    </section>
   );
 }

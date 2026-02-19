@@ -15,6 +15,8 @@ import { cacheConfig } from "@/lib/config/cache.config";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { shyftApiService } from "@/server/services/shyft-api.service";
 import { getEnv } from "@/lib/config/env";
+import { mapWithConcurrency } from "@/lib/utils/async";
+import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
 
 export const walletService = {
   async getOperationalWalletsByToken(tokenPublicKey: string, userId: string) {
@@ -105,6 +107,31 @@ export const walletService = {
     });
 
     return user?.mainWallet ?? null;
+  },
+
+  async getMainWalletPrivateKey(userId: string) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        mainWallet: {
+          select: {
+            publicKey: true,
+            privateKey: true,
+          },
+        },
+      },
+    });
+
+    const mainWallet = user?.mainWallet;
+    if (!mainWallet) {
+      throw new AppError("Main wallet not found", 404);
+    }
+
+    if (!mainWallet.privateKey) {
+      throw new AppError("Private key not available", 404);
+    }
+
+    return { privateKey: mainWallet.privateKey };
   },
 
   async refreshMainWalletBalance(userId: string) {
@@ -329,7 +356,8 @@ export const walletService = {
   async refreshWalletBalances(
     tokenPublicKey: string,
     userId: string,
-    walletPublicKeys?: string[]
+    walletPublicKeys?: string[],
+    force = false
   ) {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
@@ -373,8 +401,15 @@ export const walletService = {
     const allowedWallets = new Map(
       availableWallets.map((wallet) => [wallet.publicKey, wallet])
     );
-    const requestedWallets = walletPublicKeys?.length
-      ? walletPublicKeys
+    const targeted = Boolean(walletPublicKeys?.length);
+    const requestedKeys = targeted
+      ? Array.from(new Set(walletPublicKeys))
+      : availableWallets.map((wallet) => wallet.publicKey);
+    const skippedNotAllowed = targeted
+      ? requestedKeys.filter((key) => !allowedWallets.has(key))
+      : [];
+    const requestedWallets = targeted
+      ? requestedKeys
           .map((key) => allowedWallets.get(key))
           .filter(
             (
@@ -388,13 +423,30 @@ export const walletService = {
 
     const now = new Date();
     const cooldownMs = cacheConfig.cooldownMs.walletBalances;
-    const targetWallets = requestedWallets.filter((wallet) => {
-      if (!wallet.balanceRefreshedAt) return true;
-      return now.getTime() - wallet.balanceRefreshedAt.getTime() >= cooldownMs;
-    });
+    const skippedCooldown = force
+      ? []
+      : requestedWallets
+          .filter((wallet) => {
+            if (!wallet.balanceRefreshedAt) return false;
+            return (
+              now.getTime() - wallet.balanceRefreshedAt.getTime() < cooldownMs
+            );
+          })
+          .map((wallet) => wallet.publicKey);
+    const targetWallets = force
+      ? requestedWallets
+      : requestedWallets.filter(
+          (wallet) => !skippedCooldown.includes(wallet.publicKey)
+        );
 
     if (targetWallets.length === 0) {
-      return [];
+      return {
+        refreshed: [],
+        skippedCooldown,
+        skippedNotAllowed,
+        requestedCount: requestedKeys.length,
+        targeted,
+      };
     }
 
     const solBalanceMap = new Map<string, number>();
@@ -414,7 +466,10 @@ export const walletService = {
         );
         results.forEach((result) => {
           if (result.status === "fulfilled") {
-            solBalanceMap.set(result.value.publicKey, result.value.balance * 1_000_000_000);
+            solBalanceMap.set(
+              result.value.publicKey,
+              result.value.balance * 1_000_000_000
+            );
           }
         });
       }
@@ -483,11 +538,17 @@ export const walletService = {
       refreshedAt: now,
     });
 
-    return balances.map((balance) => ({
-      publicKey: balance.publicKey,
-      balanceSol: balance.balanceSol,
-      balanceRefreshedAt: now,
-    }));
+    return {
+      refreshed: balances.map((balance) => ({
+        publicKey: balance.publicKey,
+        balanceSol: balance.balanceSol,
+        balanceRefreshedAt: now,
+      })),
+      skippedCooldown,
+      skippedNotAllowed,
+      requestedCount: requestedKeys.length,
+      targeted,
+    };
   },
 
   async sendSolFromMainWallet(
@@ -495,7 +556,7 @@ export const walletService = {
     userId: string,
     walletPublicKeys: string[],
     amountSol: number
-  ) {
+  ): Promise<WalletTransferResult> {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
       select: { publicKey: true },
@@ -546,46 +607,126 @@ export const walletService = {
     const sender = Keypair.fromSecretKey(bs58.decode(mainWallet.privateKey));
     const lamports = Math.floor(amountSol * 1_000_000_000);
 
-    const results = await Promise.all(
-      targets.map(async (publicKey) => {
-        const destination = new PublicKey(publicKey);
-        const sendTransfer = async () => {
-          const { blockhash, lastValidBlockHeight } =
-            await connection.getLatestBlockhash("confirmed");
-          const transaction = new Transaction().add(
-            SystemProgram.transfer({
-              fromPubkey: sender.publicKey,
-              toPubkey: destination,
-              lamports,
-            })
-          );
-          transaction.recentBlockhash = blockhash;
-          transaction.lastValidBlockHeight = lastValidBlockHeight;
-          transaction.feePayer = sender.publicKey;
-          return await sendAndConfirmTransaction(
-            connection,
-            transaction,
-            [sender],
-            {
-              commitment: "confirmed",
-            }
-          );
-        };
-
+    const transferConcurrency = 5;
+    const results = await mapWithConcurrency(
+      targets,
+      transferConcurrency,
+      async (publicKey) => {
         try {
-          const signature = await sendTransfer();
-          return { publicKey, signature };
-        } catch (error) {
-          if (error instanceof TransactionExpiredBlockheightExceededError) {
+          const destination = new PublicKey(publicKey);
+          const sendTransfer = async () => {
+            const { blockhash, lastValidBlockHeight } =
+              await connection.getLatestBlockhash("confirmed");
+            const transaction = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: sender.publicKey,
+                toPubkey: destination,
+                lamports,
+              })
+            );
+            transaction.recentBlockhash = blockhash;
+            transaction.lastValidBlockHeight = lastValidBlockHeight;
+            transaction.feePayer = sender.publicKey;
+            return await sendAndConfirmTransaction(
+              connection,
+              transaction,
+              [sender],
+              {
+                commitment: "confirmed",
+              }
+            );
+          };
+
+          try {
             const signature = await sendTransfer();
-            return { publicKey, signature };
+            return {
+              publicKey,
+              status: "SUBMITTED" as const,
+              signature,
+            };
+          } catch (error) {
+            if (error instanceof TransactionExpiredBlockheightExceededError) {
+              try {
+                const signature = await sendTransfer();
+                return {
+                  publicKey,
+                  status: "SUBMITTED" as const,
+                  signature,
+                };
+              } catch (retryError) {
+                const message =
+                  retryError instanceof Error
+                    ? retryError.message
+                    : String(retryError);
+                console.error("[WalletService] Retry transfer failed", message);
+                return {
+                  publicKey,
+                  status: "FAILED" as const,
+                  signature: null,
+                  error: message,
+                };
+              }
+            }
+            const message =
+              error instanceof Error ? error.message : String(error);
+            console.error("[WalletService] Transfer failed", message);
+            return {
+              publicKey,
+              status: "FAILED" as const,
+              signature: null,
+              error: message,
+            };
           }
-          throw error;
+        } catch (error) {
+          const message =
+            error instanceof Error ? error.message : String(error);
+          return {
+            publicKey,
+            status: "FAILED" as const,
+            signature: null,
+            error: message,
+          };
         }
-      })
+      }
     );
 
-    return results;
+    const refreshWalletPublicKeys = Array.from(
+      new Set([
+        mainWallet.publicKey,
+        ...results
+          .filter((result) => result.status === "SUBMITTED")
+          .map((result) => result.publicKey),
+      ])
+    );
+    try {
+      await walletService.refreshWalletBalances(
+        tokenPublicKey,
+        userId,
+        refreshWalletPublicKeys,
+        true
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.warn(
+        `[WalletService] Post-send balance refresh failed: ${message}`
+      );
+    }
+
+    const submittedCount = results.filter(
+      (result) => result.status === "SUBMITTED"
+    ).length;
+    const failedCount = results.filter(
+      (result) => result.status === "FAILED"
+    ).length;
+    const skippedCount =
+      walletPublicKeys.length - submittedCount - failedCount;
+
+    return {
+      submittedCount,
+      failedCount,
+      skippedCount,
+      results,
+    };
   },
 
   async returnSolToMainWallet(
@@ -594,7 +735,7 @@ export const walletService = {
     walletPublicKeys: string[],
     amountSol?: number,
     useMax?: boolean
-  ) {
+  ): Promise<WalletTransferResult> {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
       select: { publicKey: true },
@@ -647,9 +788,12 @@ export const walletService = {
       throw new AppError("No valid target wallets provided", 400);
     }
 
-    const results = await Promise.all(
-      targets.map(async (wallet) => {
-        const connection = getSolanaConnection();
+    const connection = getSolanaConnection();
+    const transferConcurrency = 5;
+    const results = await mapWithConcurrency(
+      targets,
+      transferConcurrency,
+      async (wallet) => {
         const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
 
         const computeLamports = async (blockhash: string) => {
@@ -706,30 +850,99 @@ export const walletService = {
 
         try {
           const signature = await sendTransfer();
-          return { publicKey: wallet.publicKey, signature };
+          if (!signature) {
+            return {
+              publicKey: wallet.publicKey,
+              status: "SKIPPED" as const,
+              signature: null,
+            };
+          }
+          return {
+            publicKey: wallet.publicKey,
+            status: "SUBMITTED" as const,
+            signature,
+          };
         } catch (error) {
           if (error instanceof TransactionExpiredBlockheightExceededError) {
             try {
               const signature = await sendTransfer();
-              return { publicKey: wallet.publicKey, signature };
+              if (!signature) {
+                return {
+                  publicKey: wallet.publicKey,
+                  status: "SKIPPED" as const,
+                  signature: null,
+                };
+              }
+              return {
+                publicKey: wallet.publicKey,
+                status: "SUBMITTED" as const,
+                signature,
+              };
             } catch (retryError) {
               const message =
                 retryError instanceof Error
                   ? retryError.message
                   : String(retryError);
               console.error("[WalletService] Retry transfer failed", message);
+              return {
+                publicKey: wallet.publicKey,
+                status: "FAILED" as const,
+                signature: null,
+                error: message,
+              };
             }
-          } else {
-            const message =
-              error instanceof Error ? error.message : String(error);
-            console.error("[WalletService] Transfer failed", message);
           }
-          return { publicKey: wallet.publicKey, signature: null };
+          const message =
+            error instanceof Error ? error.message : String(error);
+          console.error("[WalletService] Transfer failed", message);
+          return {
+            publicKey: wallet.publicKey,
+            status: "FAILED" as const,
+            signature: null,
+            error: message,
+          };
         }
-      })
+      }
     );
 
-    return results;
+    const successfulTargets = results
+      .filter((result) => result.status === "SUBMITTED")
+      .map((result) => result.publicKey);
+    const refreshWalletPublicKeys = Array.from(
+      new Set([mainWallet.publicKey, ...successfulTargets])
+    );
+    if (refreshWalletPublicKeys.length > 0) {
+      try {
+        await walletService.refreshWalletBalances(
+          tokenPublicKey,
+          userId,
+          refreshWalletPublicKeys,
+          true
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        console.warn(
+          `[WalletService] Post-return balance refresh failed: ${message}`
+        );
+      }
+    }
+
+    const submittedCount = results.filter(
+      (result) => result.status === "SUBMITTED"
+    ).length;
+    const failedCount = results.filter(
+      (result) => result.status === "FAILED"
+    ).length;
+    const skippedCount = results.filter(
+      (result) => result.status === "SKIPPED"
+    ).length;
+
+    return {
+      submittedCount,
+      failedCount,
+      skippedCount,
+      results,
+    };
   },
 };
 

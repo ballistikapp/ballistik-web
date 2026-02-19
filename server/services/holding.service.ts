@@ -4,6 +4,7 @@ import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { shyftApiService } from "@/server/services/shyft-api.service";
+import { walletService } from "@/server/services/wallet.service";
 import { getEnv } from "@/lib/config/env";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
@@ -875,6 +876,23 @@ export const holdingService = {
       shouldReturnSolToMainWallet && mainWalletKeypair
         ? await returnSolToMainWallet(connection, wallets, mainWalletKeypair)
         : null;
+
+    const refreshWalletPublicKeys = Array.from(
+      new Set([
+        ...wallets.map((wallet) => wallet.publicKey),
+        ...(mainWalletKeypair ? [mainWalletKeypair.publicKey.toBase58()] : []),
+      ])
+    );
+    if (refreshWalletPublicKeys.length > 0) {
+      try {
+        await walletService.refreshWalletBalances(
+          token.publicKey,
+          userId,
+          refreshWalletPublicKeys,
+          true
+        );
+      } catch {}
+    }
 
     const submitted = results.filter((result) => result.status === "SUBMITTED");
     const failed = results.filter((result) => result.status === "FAILED");

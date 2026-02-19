@@ -1,40 +1,10 @@
 "use client";
 
 import { format, formatDistanceToNowStrict } from "date-fns";
-import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
 import { type TransactionItem } from "@/server/services/transaction.service";
-import { type WalletType } from "@/lib/generated/prisma/enums";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { IconCopy, IconDotsVertical } from "@tabler/icons-react";
-
-const walletTypeLabels: Record<WalletType, string> = {
-  MAIN_WALLET: "Main",
-  DEV: "Dev",
-  BUNDLER: "Bundler",
-  VOLUME: "Volume",
-  DISTRIBUTION: "Distribution",
-};
-
-const walletTypeVariants: Record<
-  WalletType,
-  "default" | "secondary" | "outline"
-> = {
-  MAIN_WALLET: "default",
-  DEV: "secondary",
-  BUNDLER: "outline",
-  VOLUME: "outline",
-  DISTRIBUTION: "outline",
-};
 
 const typeLabels: Record<string, string> = {
   BUY: "Buy",
@@ -77,84 +47,14 @@ function formatReadableTokenAmount(value: number) {
   }).format(value);
 }
 
-function truncateSignature(signature: string) {
-  if (signature.length <= 12) return signature;
-  return `${signature.slice(0, 6)}...${signature.slice(-4)}`;
-}
-
 type ColumnOptions = {
-  tokenPublicKey: string;
   tokenSymbol: string;
 };
 
-export function getColumns({
-  tokenPublicKey,
+export function getTransactionsColumns({
   tokenSymbol,
 }: ColumnOptions): ColumnDef<TransactionItem>[] {
   return [
-    {
-      id: "walletPublicKey",
-      accessorKey: "wallet.publicKey",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Wallet" />
-      ),
-      cell: ({ row }) => {
-        const walletPublicKey = row.original.wallet.publicKey;
-        return (
-          <div className="flex items-center gap-1.5">
-            {row.original.isOwned ? (
-              <Link
-                href={`/${tokenPublicKey}/wallets/${walletPublicKey}`}
-                className="text-sm font-mono hover:underline"
-              >
-                {truncateSignature(walletPublicKey)}
-              </Link>
-            ) : (
-              <span className="text-sm font-mono">
-                {truncateSignature(walletPublicKey)}
-              </span>
-            )}
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              className="size-6 text-muted-foreground hover:text-foreground"
-              onClick={() => navigator.clipboard.writeText(walletPublicKey)}
-            >
-              <IconCopy className="size-3.5" />
-              <span className="sr-only">Copy wallet</span>
-            </Button>
-          </div>
-        );
-      },
-      enableHiding: false,
-      meta: {
-        searchable: true,
-      },
-    },
-    {
-      id: "walletType",
-      accessorFn: (row) => row.wallet.type ?? "External",
-      header: ({ column }) => (
-        <DataTableColumnHeader column={column} title="Type" />
-      ),
-      cell: ({ row }) => {
-        const walletType = row.original.wallet.type;
-        if (!walletType) {
-          return <Badge variant="outline">External</Badge>;
-        }
-        return (
-          <Badge variant={walletTypeVariants[walletType]}>
-            {walletTypeLabels[walletType]}
-          </Badge>
-        );
-      },
-      filterFn: "textArray",
-      meta: {
-        filter: { filterType: "text" },
-        searchable: true,
-      },
-    },
     {
       accessorKey: "transactionType",
       header: ({ column }) => (
@@ -253,6 +153,21 @@ export function getColumns({
       },
     },
     {
+      accessorKey: "transactionSignature",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="Signature" />
+      ),
+      cell: ({ row }) => (
+        <div className="font-mono text-xs text-muted-foreground">
+          {row.original.transactionSignature.slice(0, 8)}...
+          {row.original.transactionSignature.slice(-6)}
+        </div>
+      ),
+      meta: {
+        searchable: true,
+      },
+    },
+    {
       accessorKey: "blockTime",
       header: ({ column }) => (
         <DataTableColumnHeader
@@ -266,7 +181,7 @@ export function getColumns({
         return (
           <div className="text-right">
             <div className="text-sm">{formatExactTime(timeValue)}</div>
-            <div className="text-muted-foreground text-xs">
+            <div className="text-xs text-muted-foreground">
               {formatRelativeTime(timeValue)}
             </div>
           </div>
@@ -274,44 +189,6 @@ export function getColumns({
       },
       meta: {
         filter: { filterType: "date" },
-      },
-    },
-    {
-      id: "actions",
-      cell: ({ row }) => {
-        const signature = row.original.transactionSignature;
-
-        return (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                className="data-[state=open]:bg-muted text-muted-foreground flex size-8"
-                size="icon"
-              >
-                <IconDotsVertical />
-                <span className="sr-only">Open menu</span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
-              <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(signature)}
-              >
-                Copy signature
-              </DropdownMenuItem>
-              <DropdownMenuSeparator />
-              <DropdownMenuItem asChild>
-                <a
-                  href={`https://solscan.io/tx/${signature}`}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  View on Solscan
-                </a>
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        );
       },
     },
   ];

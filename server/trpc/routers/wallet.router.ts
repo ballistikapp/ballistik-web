@@ -4,6 +4,7 @@ import {
   getWalletByTokenSchema,
   getDevWalletByTokenSchema,
   getMainWalletSchema,
+  getMainWalletPrivateKeySchema,
   getOperationalWalletsByTokenSchema,
   getWalletPrivateKeySchema,
   refreshWalletBalancesSchema,
@@ -52,13 +53,19 @@ export const walletRouter = router({
         ctx.user.id
       );
     }),
+  getMainPrivateKey: protectedProcedure
+    .input(getMainWalletPrivateKeySchema)
+    .mutation(async ({ ctx }) => {
+      return await walletService.getMainWalletPrivateKey(ctx.user.id);
+    }),
   refreshBalances: protectedProcedure
     .input(refreshWalletBalancesSchema)
     .mutation(async ({ input, ctx }) => {
       return await walletService.refreshWalletBalances(
         input.tokenPublicKey,
         ctx.user.id,
-        input.walletPublicKeys
+        input.walletPublicKeys,
+        input.force
       );
     }),
   refreshMainBalance: protectedProcedure

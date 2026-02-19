@@ -3,6 +3,7 @@ import { z } from "zod";
 export const listTransactionsByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   walletPublicKey: z.string().min(1).optional(),
+  groupBySignature: z.boolean().optional(),
 });
 
 export type ListTransactionsByTokenInput = z.infer<

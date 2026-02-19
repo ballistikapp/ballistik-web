@@ -14,7 +14,6 @@ import {
   CommandInput,
   CommandItem,
   CommandList,
-  CommandSeparator,
 } from "@/components/ui/command";
 
 interface TextColumnFilterProps<TData, TValue> {
@@ -54,56 +53,70 @@ export function TextColumnFilter<TData, TValue>({
     column.setFilterValue(undefined);
   };
 
+  const hasFilter = selectedValues.size > 0;
+
   return (
-    <Command>
-      <CommandInput placeholder="Search..." />
-      <CommandList>
-        <CommandEmpty>No results found.</CommandEmpty>
-        <CommandGroup>
-          {options.map((option) => {
-            const isSelected = selectedValues.has(option.value);
-            return (
-              <CommandItem
-                key={option.value}
-                onSelect={() => handleSelect(option.value)}
-                data-checked={isSelected}
-              >
-                <div
-                  className={cn(
-                    "flex size-4 items-center justify-center rounded-sm border border-primary",
-                    isSelected
-                      ? "bg-primary text-primary-foreground"
-                      : "opacity-50 [&_svg]:invisible"
-                  )}
-                >
-                  <IconCheck className="size-3" />
-                </div>
-                <span className="flex-1 truncate">{option.value}</span>
-                <Badge
-                  variant="secondary"
-                  className="ml-auto font-mono text-xs"
-                >
-                  {option.count}
-                </Badge>
-              </CommandItem>
-            );
-          })}
-        </CommandGroup>
-        {selectedValues.size > 0 && (
-          <>
-            <CommandSeparator />
-            <CommandGroup>
-              <CommandItem
-                onSelect={handleClear}
-                className="justify-center text-center"
-              >
-                <IconX className="size-4" />
-                Clear filters
-              </CommandItem>
-            </CommandGroup>
-          </>
+    <div className="flex flex-col">
+      <div className="flex items-center justify-between px-3 pt-3 pb-2">
+        <span className="text-xs font-medium text-muted-foreground">
+          Select
+          {hasFilter && (
+            <Badge
+              variant="secondary"
+              className="ml-1.5 px-1.5 py-0 text-[10px] font-mono"
+            >
+              {selectedValues.size}
+            </Badge>
+          )}
+        </span>
+        {hasFilter && (
+          <Button
+            variant="ghost"
+            size="xs"
+            onClick={handleClear}
+            className="h-5 gap-1 px-1.5 text-muted-foreground hover:text-foreground"
+          >
+            <IconX className="size-3" />
+            Clear
+          </Button>
         )}
-      </CommandList>
-    </Command>
+      </div>
+      <Command>
+        <CommandInput placeholder="Search..." />
+        <CommandList>
+          <CommandEmpty>No results found.</CommandEmpty>
+          <CommandGroup>
+            {options.map((option) => {
+              const isSelected = selectedValues.has(option.value);
+              return (
+                <CommandItem
+                  key={option.value}
+                  onSelect={() => handleSelect(option.value)}
+                  data-checked={isSelected}
+                >
+                  <div
+                    className={cn(
+                      "flex size-4 items-center justify-center rounded-sm border border-primary",
+                      isSelected
+                        ? "bg-primary text-primary-foreground"
+                        : "opacity-50 [&_svg]:invisible"
+                    )}
+                  >
+                    <IconCheck className="size-3" />
+                  </div>
+                  <span className="flex-1 truncate">{option.value}</span>
+                  <Badge
+                    variant="secondary"
+                    className="ml-auto font-mono text-xs"
+                  >
+                    {option.count}
+                  </Badge>
+                </CommandItem>
+              );
+            })}
+          </CommandGroup>
+        </CommandList>
+      </Command>
+    </div>
   );
 }

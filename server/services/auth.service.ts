@@ -6,6 +6,7 @@ import type {
   RegisterInput,
   LoginWithPrivateKeyInput,
   AuthUserOutput,
+  UpdateNameInput,
 } from "@/server/schemas";
 import { WalletType } from "@/lib/generated/prisma/client";
 import { logger } from "@/lib/logger";
@@ -97,7 +98,7 @@ export const authService = {
   },
 
   async loginWithPrivateKey(
-    input: LoginWithPrivateKeyInput,
+    input: LoginWithPrivateKeyInput
   ): Promise<AuthUserOutput> {
     try {
       let keypair: Keypair;
@@ -145,6 +146,25 @@ export const authService = {
       logger.error("Login error", error);
       throw new AppError("Failed to login", 500, { error });
     }
+  },
+
+  async updateName(userId: string, input: UpdateNameInput) {
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true },
+    });
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { name: input.name.trim() },
+      select: { id: true, name: true, mainWalletPublicKey: true },
+    });
+
+    return updated;
   },
 
   async getUserById(id: string): Promise<AuthUserOutput | null> {

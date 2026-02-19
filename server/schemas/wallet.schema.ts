@@ -37,9 +37,12 @@ export type GetWalletPrivateKeyInput = z.infer<
 export const refreshWalletBalancesSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   walletPublicKeys: z.array(z.string().min(1)).optional(),
+  force: z.boolean().optional(),
 });
 
 export const refreshMainWalletBalanceSchema = z.object({});
+
+export const getMainWalletPrivateKeySchema = z.object({});
 
 export type RefreshWalletBalancesInput = z.infer<
   typeof refreshWalletBalancesSchema
@@ -75,3 +78,29 @@ export const returnSolSchema = z
   });
 
 export type ReturnSolInput = z.infer<typeof returnSolSchema>;
+
+export const walletTransferStatusSchema = z.enum([
+  "SUBMITTED",
+  "FAILED",
+  "SKIPPED",
+]);
+
+export const walletTransferResultItemSchema = z.object({
+  publicKey: z.string(),
+  status: walletTransferStatusSchema,
+  signature: z.string().nullable().optional(),
+  error: z.string().optional(),
+});
+
+export const walletTransferResultSchema = z.object({
+  submittedCount: z.number().int().nonnegative(),
+  failedCount: z.number().int().nonnegative(),
+  skippedCount: z.number().int().nonnegative(),
+  results: z.array(walletTransferResultItemSchema),
+});
+
+export type WalletTransferStatus = z.infer<typeof walletTransferStatusSchema>;
+export type WalletTransferResultItem = z.infer<
+  typeof walletTransferResultItemSchema
+>;
+export type WalletTransferResult = z.infer<typeof walletTransferResultSchema>;

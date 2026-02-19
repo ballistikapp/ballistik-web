@@ -60,6 +60,7 @@ export function LaunchProgressDialog({
   onCancel,
   onClose,
 }: LaunchProgressDialogProps) {
+  const utils = trpc.useUtils();
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
   const canCancel = status === "PENDING" || status === "RUNNING";
@@ -76,6 +77,8 @@ export function LaunchProgressDialog({
     { enabled: recoveryEnabled }
   );
   const recoverMutation = trpc.launch.recoverSol.useMutation();
+  const refreshWalletBalancesMutation = trpc.wallet.refreshBalances.useMutation();
+  const refreshMainWalletMutation = trpc.wallet.refreshMainBalance.useMutation();
 
   const recoveryWallets: LaunchRecoveryWallet[] =
     recoveryQuery.data?.wallets ?? [];
@@ -98,6 +101,30 @@ export function LaunchProgressDialog({
     });
     try {
       const result = await recoverMutation.mutateAsync({ launchId: launch.id });
+      const returnedWalletPublicKeys = result.results
+        .filter((item) => item.status === "returned")
+        .map((item) => item.publicKey);
+      const refreshWalletPublicKeys = Array.from(
+        new Set([result.mainWalletPublicKey, ...returnedWalletPublicKeys])
+      );
+      if (tokenPublicKey) {
+        await refreshWalletBalancesMutation.mutateAsync({
+          tokenPublicKey,
+          walletPublicKeys: refreshWalletPublicKeys,
+          force: true,
+        });
+      } else {
+        await refreshMainWalletMutation.mutateAsync({});
+      }
+      await Promise.all([
+        utils.wallet.getMain.invalidate(),
+        tokenPublicKey
+          ? utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey })
+          : Promise.resolve(),
+        tokenPublicKey
+          ? utils.wallet.getDevByToken.invalidate({ tokenPublicKey })
+          : Promise.resolve(),
+      ]);
       const returnedCount = result.results.filter(
         (item) => item.status === "returned"
       ).length;

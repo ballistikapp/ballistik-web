@@ -30,8 +30,10 @@ import { NumberColumnFilter } from "./filters/number-column-filter";
 import { DateColumnFilter } from "./filters/date-column-filter";
 import type { ColumnFilterMeta } from "./types";
 
-interface DataTableColumnHeaderProps<TData, TValue>
-  extends React.HTMLAttributes<HTMLDivElement> {
+interface DataTableColumnHeaderProps<
+  TData,
+  TValue,
+> extends React.HTMLAttributes<HTMLDivElement> {
   column: Column<TData, TValue>;
   title: string;
 }
@@ -41,7 +43,9 @@ export function DataTableColumnHeader<TData, TValue>({
   title,
   className,
 }: DataTableColumnHeaderProps<TData, TValue>) {
-  const filterMeta = column.columnDef.meta?.filter as ColumnFilterMeta | undefined;
+  const filterMeta = column.columnDef.meta?.filter as
+    | ColumnFilterMeta
+    | undefined;
   const isFiltered = column.getIsFiltered();
 
   const renderFilter = () => {
@@ -95,7 +99,9 @@ export function DataTableColumnHeader<TData, TValue>({
             {column.getCanHide() && (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={() => column.toggleVisibility(false)}>
+                <DropdownMenuItem
+                  onClick={() => column.toggleVisibility(false)}
+                >
                   <IconEyeOff className="text-muted-foreground/70 size-4" />
                   Hide
                 </DropdownMenuItem>
@@ -113,10 +119,7 @@ export function DataTableColumnHeader<TData, TValue>({
             <Button
               variant="ghost"
               size="icon-xs"
-              className={cn(
-                "size-6",
-                isFiltered && "text-primary"
-              )}
+              className={cn("size-6", isFiltered && "text-primary")}
             >
               {isFiltered ? (
                 <IconFilterFilled className="size-3.5" />
@@ -130,8 +133,8 @@ export function DataTableColumnHeader<TData, TValue>({
             className={cn(
               "p-0",
               filterMeta.filterType === "text" && "w-56",
-              filterMeta.filterType === "number" && "w-48",
-              filterMeta.filterType === "date" && "w-auto"
+              filterMeta.filterType === "number" && "w-56",
+              filterMeta.filterType === "date" && "w-64"
             )}
           >
             {renderFilter()}

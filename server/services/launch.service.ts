@@ -31,6 +31,7 @@ import {
 } from "@/server/solana/pump-transaction-builders";
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
+import { walletService } from "@/server/services/wallet.service";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -1540,6 +1541,30 @@ export const launchService = {
           publicKey: wallet.publicKey,
           status: "failed",
           error: error instanceof Error ? error.message : "Return failed",
+        });
+      }
+    }
+
+    const returnedWalletPublicKeys = results
+      .filter((result) => result.status === "returned")
+      .map((result) => result.publicKey);
+    if (launch.tokenPublicKey && returnedWalletPublicKeys.length > 0) {
+      const refreshWalletPublicKeys = Array.from(
+        new Set([mainWalletPublicKey, ...returnedWalletPublicKeys])
+      );
+      try {
+        await walletService.refreshWalletBalances(
+          launch.tokenPublicKey,
+          userId,
+          refreshWalletPublicKeys,
+          true
+        );
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        logger.warn("Launch recovery post-tx refresh failed", {
+          launchId,
+          tokenPublicKey: launch.tokenPublicKey,
+          message,
         });
       }
     }

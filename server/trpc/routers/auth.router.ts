@@ -1,6 +1,6 @@
-import { router, publicProcedure } from "../trpc";
+import { router, publicProcedure, protectedProcedure } from "../trpc";
 import { authService } from "@/server/services";
-import { registerSchema, loginWithPrivateKeySchema } from "@/server/schemas";
+import { registerSchema, loginWithPrivateKeySchema, updateNameSchema } from "@/server/schemas";
 import { signToken } from "@/lib/auth/jwt";
 import { cookies, headers } from "next/headers";
 
@@ -86,4 +86,27 @@ export const authRouter = router({
 
     return ctx.user;
   }),
+
+  updateName: protectedProcedure
+    .input(updateNameSchema)
+    .mutation(async ({ input, ctx }) => {
+      const updated = await authService.updateName(ctx.user.id, input);
+
+      const token = signToken(
+        updated.id,
+        updated.mainWalletPublicKey,
+        updated.name
+      );
+      const cookieStore = await cookies();
+      const secureCookie = await resolveCookieSecure();
+      cookieStore.set("auth-token", token, {
+        httpOnly: true,
+        secure: secureCookie,
+        sameSite: "lax",
+        maxAge: 31536000,
+        path: "/",
+      });
+
+      return updated;
+    }),
 });

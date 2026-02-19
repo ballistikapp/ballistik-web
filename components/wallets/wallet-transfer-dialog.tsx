@@ -84,6 +84,15 @@ export function WalletTransferDialog({
   const description = isSendMode
     ? "Send SOL from the main wallet to each selected wallet. Amount is per wallet."
     : "Return SOL from selected wallets back to the main wallet. Network fees are paid by each source wallet.";
+  const parsedAmount = Number.parseFloat(amount);
+  const totalOutflow =
+    isSendMode &&
+    Number.isFinite(parsedAmount) &&
+    parsedAmount > 0 &&
+    selectionCount > 0
+      ? parsedAmount * selectionCount
+      : null;
+  const actionLabel = isSendMode ? "send" : "return";
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -111,21 +120,49 @@ export function WalletTransferDialog({
     }
 
     try {
-      if (isSendMode) {
-        await sendMutation.mutateAsync({
+      const result = isSendMode
+        ? await sendMutation.mutateAsync({
           tokenPublicKey,
           walletPublicKeys,
           amountSol: parsedAmount,
-        });
-      } else {
-        await returnMutation.mutateAsync({
+        })
+        : await returnMutation.mutateAsync({
           tokenPublicKey,
           walletPublicKeys,
           amountSol: isMax ? undefined : parsedAmount ?? undefined,
           useMax: isMax,
         });
+      const failedWallets = result.results
+        .filter((entry) => entry.status === "FAILED")
+        .map((entry) => entry.publicKey);
+      const summary = `${result.submittedCount} submitted, ${result.failedCount} failed, ${result.skippedCount} skipped`;
+      const failedPreview =
+        failedWallets.length > 0
+          ? failedWallets.slice(0, 3).join(", ")
+          : null;
+      const failedSuffix =
+        failedPreview && failedWallets.length > 3
+          ? `${failedPreview}...`
+          : failedPreview;
+      if (result.failedCount === 0 && result.skippedCount === 0) {
+        toast.success(`${title} submitted`, {
+          description: `All wallets processed successfully (${summary}).`,
+        });
+      } else if (result.submittedCount > 0) {
+        toast.message(`${title} partially submitted`, {
+          description:
+            failedSuffix
+              ? `${summary}. Failed ${actionLabel} wallets: ${failedSuffix}.`
+              : summary,
+        });
+      } else {
+        toast.error(`${title} failed`, {
+          description:
+            failedSuffix
+              ? `${summary}. Failed ${actionLabel} wallets: ${failedSuffix}.`
+              : summary,
+        });
       }
-      toast.success(`${title} submitted`);
       setAmount("");
       setReturnOption("amount");
       onOpenChange(false);
@@ -225,6 +262,11 @@ export function WalletTransferDialog({
             {isReturnMode && isMax && (
               <div className="text-xs text-muted-foreground">
                 Amount input is disabled while max return is selected.
+              </div>
+            )}
+            {isSendMode && totalOutflow !== null && (
+              <div className="text-xs text-muted-foreground">
+                Total send from main wallet: {totalOutflow.toFixed(4)} SOL
               </div>
             )}
           </div>

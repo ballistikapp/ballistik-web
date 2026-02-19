@@ -3,11 +3,19 @@
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import { IconRefresh } from "@tabler/icons-react";
+import {
+  IconArrowDownRight,
+  IconArrowUpRight,
+  IconCopy,
+  IconExternalLink,
+  IconEye,
+  IconRefresh,
+} from "@tabler/icons-react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
+import { copyToClipboard } from "@/lib/utils";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
 import {
@@ -22,6 +30,17 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+
+type RefreshedWallet = {
+  publicKey: string;
+  balanceSol: number;
+  balanceRefreshedAt: Date | string;
+};
 
 export default function Page() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
@@ -42,40 +61,38 @@ export default function Page() {
     { enabled: !!tokenPublicKey }
   );
 
-  const {
-    data: operationalWalletsData,
-    isLoading: operationalWalletsLoading,
-  } = trpc.wallet.getOperationalByToken.useQuery(
-    { tokenPublicKey: tokenPublicKey || "" },
-    { enabled: !!tokenPublicKey && !!tokenData, staleTime: cacheConfig.staleMs.wallets }
-  );
+  const { data: operationalWalletsData, isLoading: operationalWalletsLoading } =
+    trpc.wallet.getOperationalByToken.useQuery(
+      { tokenPublicKey: tokenPublicKey || "" },
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        staleTime: cacheConfig.staleMs.wallets,
+      }
+    );
 
-  const {
-    data: devWallet,
-    isLoading: devWalletLoading,
-  } = trpc.wallet.getDevByToken.useQuery(
-    { tokenPublicKey: tokenPublicKey || "" },
-    { enabled: !!tokenPublicKey && !!tokenData, staleTime: cacheConfig.staleMs.wallets }
-  );
+  const { data: devWallet, isLoading: devWalletLoading } =
+    trpc.wallet.getDevByToken.useQuery(
+      { tokenPublicKey: tokenPublicKey || "" },
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        staleTime: cacheConfig.staleMs.wallets,
+      }
+    );
 
-  const {
-    data: mainWallet,
-    isLoading: mainWalletLoading,
-  } = trpc.wallet.getMain.useQuery(
-    {},
-    { enabled: !!tokenData, staleTime: cacheConfig.staleMs.wallets }
-  );
+  const { data: mainWallet, isLoading: mainWalletLoading } =
+    trpc.wallet.getMain.useQuery(
+      {},
+      { enabled: !!tokenData, staleTime: cacheConfig.staleMs.wallets }
+    );
 
-  const {
-    data: refreshCache,
-    isLoading: refreshCacheLoading,
-  } = trpc.refreshCache.getByScope.useQuery(
-    {
-      tokenPublicKey: tokenPublicKey || "",
-      scope: "WALLETS",
-    },
-    { enabled: !!tokenPublicKey }
-  );
+  const { data: refreshCache, isLoading: refreshCacheLoading } =
+    trpc.refreshCache.getByScope.useQuery(
+      {
+        tokenPublicKey: tokenPublicKey || "",
+        scope: "WALLETS",
+      },
+      { enabled: !!tokenPublicKey }
+    );
 
   const { mutateAsync: refreshBalances, isPending: isRefreshingBalances } =
     trpc.wallet.refreshBalances.useMutation();
@@ -88,6 +105,14 @@ export default function Page() {
       ...wallets,
     ],
     [devWallet, mainWallet, wallets]
+  );
+  const totalSolBalance = useMemo(
+    () =>
+      allWallets.reduce(
+        (sum, wallet) => sum + Number(wallet.balanceSol ?? 0),
+        0
+      ),
+    [allWallets]
   );
 
   const getCooldownMessage = useCallback(
@@ -119,10 +144,69 @@ export default function Page() {
     [allWallets]
   );
 
+  const applyRefreshedWalletsToCache = useCallback(
+    (refreshed: RefreshedWallet[]) => {
+      if (!tokenPublicKey || refreshed.length === 0) return 0;
+      const byPublicKey = new Map(
+        refreshed.map((wallet) => [wallet.publicKey, wallet])
+      );
+      let matchedCount = 0;
+      utils.wallet.getOperationalByToken.setData(
+        { tokenPublicKey },
+        (current) => {
+          if (!current) return current;
+          return {
+            ...current,
+            wallets: current.wallets.map((wallet) => {
+              const next = byPublicKey.get(wallet.publicKey);
+              if (!next) return wallet;
+              matchedCount += 1;
+              return {
+                ...wallet,
+                balanceSol: next.balanceSol as never,
+                balanceRefreshedAt: new Date(next.balanceRefreshedAt),
+              };
+            }),
+          };
+        }
+      );
+      utils.wallet.getDevByToken.setData({ tokenPublicKey }, (current) => {
+        if (!current) return current;
+        const next = byPublicKey.get(current.publicKey);
+        if (!next) return current;
+        matchedCount += 1;
+        return {
+          ...current,
+          balanceSol: next.balanceSol as never,
+          balanceRefreshedAt: new Date(next.balanceRefreshedAt),
+        };
+      });
+      utils.wallet.getMain.setData({}, (current) => {
+        if (!current) return current;
+        const next = byPublicKey.get(current.publicKey);
+        if (!next) return current;
+        matchedCount += 1;
+        return {
+          ...current,
+          balanceSol: next.balanceSol as never,
+          balanceRefreshedAt: new Date(next.balanceRefreshedAt),
+        };
+      });
+      return matchedCount;
+    },
+    [
+      tokenPublicKey,
+      utils.wallet.getDevByToken,
+      utils.wallet.getMain,
+      utils.wallet.getOperationalByToken,
+    ]
+  );
+
   const handleRefreshBalances = useCallback(
     async (walletPublicKeys?: string[], options?: { showToast?: boolean }) => {
       if (!tokenPublicKey) return;
       const showToast = options?.showToast !== false;
+      const targeted = Boolean(walletPublicKeys?.length);
       const toastId = showToast
         ? toast.loading("Refreshing wallet balances...", {
             icon: <Spinner className="size-4" />,
@@ -134,20 +218,61 @@ export default function Page() {
           tokenPublicKey,
           walletPublicKeys,
         });
-        await Promise.all([
-          utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
-          utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
-          utils.wallet.getMain.invalidate(),
-          utils.refreshCache.getByScope.invalidate({ tokenPublicKey, scope: "WALLETS" }),
-        ]);
+        const refreshed = result.refreshed;
+        if (targeted) {
+          const patchedCount = applyRefreshedWalletsToCache(refreshed);
+          const patchMiss = refreshed.length > 0 && patchedCount === 0;
+          if (patchMiss) {
+            await Promise.all([
+              utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
+              utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
+              utils.wallet.getMain.invalidate(),
+            ]);
+          }
+          await utils.refreshCache.getByScope.invalidate({
+            tokenPublicKey,
+            scope: "WALLETS",
+          });
+        } else {
+          await Promise.all([
+            utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
+            utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
+            utils.wallet.getMain.invalidate(),
+            utils.refreshCache.getByScope.invalidate({
+              tokenPublicKey,
+              scope: "WALLETS",
+            }),
+          ]);
+        }
         if (toastId) {
-          if (result.length === 0) {
+          if (refreshed.length > 0) {
+            const parts: string[] = [];
+            parts.push(
+              `Refreshed ${refreshed.length} wallet${refreshed.length === 1 ? "" : "s"}`
+            );
+            if (result.skippedCooldown.length > 0) {
+              parts.push(`${result.skippedCooldown.length} on cooldown`);
+            }
+            if (result.skippedNotAllowed.length > 0) {
+              parts.push(`${result.skippedNotAllowed.length} not allowed`);
+            }
+            toast.success("Wallet balances refreshed", {
+              id: toastId,
+              description: parts.join(", "),
+              icon: null,
+            });
+          } else if (result.skippedCooldown.length > 0) {
             toast.info(getCooldownMessage(walletPublicKeys), {
               id: toastId,
               icon: null,
             });
+          } else if (result.skippedNotAllowed.length > 0) {
+            toast.info("Requested wallets are not available for this token", {
+              id: toastId,
+              icon: null,
+            });
           } else {
-            toast.success("Wallet balances refreshed", {
+            toast.info("No wallets were refreshed", {
               id: toastId,
               icon: null,
             });
@@ -167,6 +292,7 @@ export default function Page() {
       getCooldownMessage,
       refreshBalances,
       tokenPublicKey,
+      applyRefreshedWalletsToCache,
     ]
   );
 
@@ -247,10 +373,23 @@ export default function Page() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <div>
-          <h1 className="text-4xl">Wallets</h1>
-          <div className="mt-3 flex items-center gap-3">
+      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-6 border-b">
+        <h1 className="text-4xl">Wallets</h1>
+
+        <div className="mt-3 flex flex-col items-end gap-4">
+          <div className="text-right">
+            <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+              TOTAL BALANCE
+            </p>
+            <p className="font-mono leading-none">
+              <span className="text-4xl">{totalSolBalance.toFixed(4)}</span>{" "}
+              <span className="text-base text-muted-foreground">SOL</span>
+            </p>
+          </div>
+          <div className="flex items-center gap-3">
+            <p className="text-sm text-muted-foreground">
+              Last refresh: {formatRefreshTime(refreshTimestamp)}
+            </p>
             <Button
               variant="outline"
               size="sm"
@@ -264,16 +403,8 @@ export default function Page() {
               )}
               Refresh
             </Button>
-            <p className="text-sm text-muted-foreground">
-              Last refresh: {formatRefreshTime(refreshTimestamp)}
-            </p>
           </div>
         </div>
-        <p className="leading-tight font-light text-right text-muted-foreground">
-          Main and dev wallets appear above for quick access.
-          <br />
-          Operational wallets are listed below for actions and monitoring.
-        </p>
       </div>
 
       <div className="grid gap-4 pt-6 md:grid-cols-2">
@@ -283,8 +414,33 @@ export default function Page() {
             <Badge variant="default">Main</Badge>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="text-sm text-muted-foreground">
-              {mainWallet?.publicKey || "Not available"}
+            <div className="flex items-center gap-1">
+              <div className="text-sm text-muted-foreground">
+                {mainWallet?.publicKey || "Not available"}
+              </div>
+              {mainWallet && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-foreground size-7"
+                      onClick={() =>
+                        void copyToClipboard(
+                          mainWallet.publicKey,
+                          "Main wallet public key"
+                        )
+                      }
+                    >
+                      <IconCopy className="size-3.5" />
+                      <span className="sr-only">
+                        Copy main wallet public key
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy public key</TooltipContent>
+                </Tooltip>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <div className="text-2xl font-mono">
@@ -295,28 +451,46 @@ export default function Page() {
                 {formatRefreshTime(mainWallet?.balanceRefreshedAt)}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  mainWallet && handleRefreshBalances([mainWallet.publicKey])
-                }
-                disabled={isRefreshingBalances || !mainWallet}
-              >
-                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
-                Refresh
-              </Button>
-              {mainWallet && (
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={`https://solscan.io/account/${mainWallet.publicKey}`}
-                    target="_blank"
-                    rel="noreferrer"
+            <div className="flex justify-end gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      mainWallet &&
+                      handleRefreshBalances([mainWallet.publicKey])
+                    }
+                    disabled={isRefreshingBalances || !mainWallet}
                   >
-                    View on Solscan
-                  </a>
-                </Button>
+                    {isRefreshingBalances ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <IconRefresh className="size-4" />
+                    )}
+                    <span className="sr-only">Refresh main wallet</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
+              {mainWallet && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" asChild>
+                      <a
+                        href={`https://solscan.io/account/${mainWallet.publicKey}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconExternalLink className="size-4" />
+                        <span className="sr-only">
+                          Open main wallet in Solscan
+                        </span>
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View on Solscan</TooltipContent>
+                </Tooltip>
               )}
             </div>
           </CardContent>
@@ -328,8 +502,33 @@ export default function Page() {
             <Badge variant="secondary">Dev</Badge>
           </CardHeader>
           <CardContent className="flex flex-col gap-4">
-            <div className="text-sm text-muted-foreground">
-              {devWallet?.publicKey || "Not available"}
+            <div className="flex items-center gap-1">
+              <div className="text-sm text-muted-foreground">
+                {devWallet?.publicKey || "Not available"}
+              </div>
+              {devWallet && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="text-muted-foreground hover:text-foreground size-7"
+                      onClick={() =>
+                        void copyToClipboard(
+                          devWallet.publicKey,
+                          "Dev wallet public key"
+                        )
+                      }
+                    >
+                      <IconCopy className="size-3.5" />
+                      <span className="sr-only">
+                        Copy dev wallet public key
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy public key</TooltipContent>
+                </Tooltip>
+              )}
             </div>
             <div className="flex flex-col gap-2">
               <div className="text-2xl font-mono">
@@ -340,55 +539,92 @@ export default function Page() {
                 {formatRefreshTime(devWallet?.balanceRefreshedAt)}
               </div>
             </div>
-            <div className="flex gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() =>
-                  devWallet && handleRefreshBalances([devWallet.publicKey])
-                }
-                disabled={isRefreshingBalances || !devWallet}
-              >
-                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
-                Refresh
-              </Button>
+            <div className="flex justify-end gap-2">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    onClick={() =>
+                      devWallet && handleRefreshBalances([devWallet.publicKey])
+                    }
+                    disabled={isRefreshingBalances || !devWallet}
+                  >
+                    {isRefreshingBalances ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <IconRefresh className="size-4" />
+                    )}
+                    <span className="sr-only">Refresh dev wallet</span>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
               {devWallet && tokenPublicKey && (
-                <Button variant="outline" size="sm" asChild>
-                  <Link
-                    href={`/${tokenPublicKey}/wallets/${devWallet.publicKey}`}
-                  >
-                    View wallet
-                  </Link>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" asChild>
+                      <Link
+                        href={`/${tokenPublicKey}/wallets/${devWallet.publicKey}`}
+                      >
+                        <IconEye className="size-4" />
+                        <span className="sr-only">View dev wallet</span>
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View wallet</TooltipContent>
+                </Tooltip>
               )}
               {devWallet && (
-                <Button variant="outline" size="sm" asChild>
-                  <a
-                    href={`https://solscan.io/account/${devWallet.publicKey}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    View on Solscan
-                  </a>
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button variant="outline" size="icon" asChild>
+                      <a
+                        href={`https://solscan.io/account/${devWallet.publicKey}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        <IconExternalLink className="size-4" />
+                        <span className="sr-only">
+                          Open dev wallet in Solscan
+                        </span>
+                      </a>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>View on Solscan</TooltipContent>
+                </Tooltip>
               )}
               {devWallet && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenSend([devWallet.publicKey])}
-                >
-                  Send SOL
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleOpenSend([devWallet.publicKey])}
+                    >
+                      <IconArrowUpRight className="size-4" />
+                      <span className="sr-only">Send SOL to dev wallet</span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Send SOL</TooltipContent>
+                </Tooltip>
               )}
               {devWallet && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleOpenReturn([devWallet.publicKey])}
-                >
-                  Return SOL
-                </Button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleOpenReturn([devWallet.publicKey])}
+                    >
+                      <IconArrowDownRight className="size-4" />
+                      <span className="sr-only">
+                        Return SOL from dev wallet
+                      </span>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Return SOL</TooltipContent>
+                </Tooltip>
               )}
             </div>
           </CardContent>
@@ -416,31 +652,42 @@ export default function Page() {
               className="max-w-sm"
             />
             <div className="flex items-center gap-2">
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleRefreshBalances()}
-                disabled={isRefreshingBalances || !tokenPublicKey}
-              >
-                {isRefreshingBalances && <Spinner className="mr-2 size-4" />}
-                Refresh all
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenSend(selectedWalletPublicKeys)}
-                disabled={selectedWalletPublicKeys.length === 0}
-              >
-                Send SOL
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => handleOpenReturn(selectedWalletPublicKeys)}
-                disabled={selectedWalletPublicKeys.length === 0}
-              >
-                Return SOL
-              </Button>
+              <p className="text-sm text-muted-foreground">
+                {selectedWalletPublicKeys.length} wallet
+                {selectedWalletPublicKeys.length === 1 ? "" : "s"} selected
+              </p>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenSend(selectedWalletPublicKeys)}
+                    disabled={selectedWalletPublicKeys.length === 0}
+                  >
+                    <IconArrowUpRight className="mr-2 size-4" />
+                    Send SOL
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Send SOL from the main wallet to selected wallets
+                </TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => handleOpenReturn(selectedWalletPublicKeys)}
+                    disabled={selectedWalletPublicKeys.length === 0}
+                  >
+                    <IconArrowDownRight className="mr-2 size-4" />
+                    Return SOL
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  Send SOL from selected wallets to the main wallet
+                </TooltipContent>
+              </Tooltip>
               <DataTableViewOptions table={table} />
             </div>
           </div>
@@ -457,7 +704,6 @@ export default function Page() {
             tokenPublicKey={tokenPublicKey}
             walletPublicKeys={sendTargets}
             wallets={transferWallets}
-            onSuccess={() => handleRefreshBalances(sendTargets)}
           />
           <WalletTransferDialog
             open={returnDialogOpen}
@@ -466,7 +712,6 @@ export default function Page() {
             tokenPublicKey={tokenPublicKey}
             walletPublicKeys={returnTargets}
             wallets={transferWallets}
-            onSuccess={() => handleRefreshBalances(returnTargets)}
           />
         </>
       )}

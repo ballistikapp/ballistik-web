@@ -1,11 +1,12 @@
 "use client";
 
 import { type ColumnDef } from "@tanstack/react-table";
-import { IconDotsVertical } from "@tabler/icons-react";
+import { IconCopy, IconDotsVertical } from "@tabler/icons-react";
 import Link from "next/link";
 import { formatDistanceToNowStrict } from "date-fns";
 import { type WalletItem } from "@/server/services/wallet.service";
 import { type WalletType } from "@/lib/generated/prisma/enums";
+import { copyToClipboard } from "@/lib/utils";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,11 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
 import "@/components/data-table/types";
 
@@ -99,12 +105,32 @@ export function getColumns({
         <DataTableColumnHeader column={column} title="Public Key" />
       ),
       cell: ({ row }) => (
-        <Link
-          href={`/${tokenPublicKey}/wallets/${row.original.publicKey}`}
-          className="text-sm font-mono hover:underline"
-        >
-          {truncatePublicKey(row.original.publicKey)}
-        </Link>
+        <div className="flex items-center gap-1">
+          <Link
+            href={`/${tokenPublicKey}/wallets/${row.original.publicKey}`}
+            className="text-sm font-mono hover:underline"
+          >
+            {truncatePublicKey(row.original.publicKey)}
+          </Link>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-foreground size-6"
+                onClick={(event) => {
+                  event.preventDefault();
+                  event.stopPropagation();
+                  void copyToClipboard(row.original.publicKey, "Wallet public key");
+                }}
+              >
+                <IconCopy className="size-3.5" />
+                <span className="sr-only">Copy wallet public key</span>
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent>Copy public key</TooltipContent>
+          </Tooltip>
+        </div>
       ),
       enableHiding: false,
       meta: {

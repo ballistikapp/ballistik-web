@@ -619,6 +619,7 @@ export const volumeBotService = {
             lastTradeAt: true,
             nextTickAt: true,
             reclaimedAt: true,
+            wallet: { select: { type: true } },
           },
         },
       },

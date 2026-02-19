@@ -69,6 +69,8 @@ export default function Page() {
     trpc.holding.refreshByToken.useMutation();
   const { mutateAsync: sellHoldings, isPending: isSelling } =
     trpc.holding.sellByToken.useMutation();
+  const { mutateAsync: refreshWalletBalances } =
+    trpc.wallet.refreshBalances.useMutation();
   const startExitMutation = trpc.holding.startExit.useMutation();
   const cancelExitMutation = trpc.holding.cancelExit.useMutation();
   const activeExitQuery = trpc.holding.getActiveExit.useQuery(
@@ -221,6 +223,11 @@ export default function Page() {
         id: toastId,
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
+      await refreshWalletBalances({
+        tokenPublicKey,
+        walletPublicKeys: returnSolToMainWallet ? undefined : walletPublicKeys,
+        force: true,
+      });
       void utils.holding.listByToken.invalidate({ tokenPublicKey });
       utils.wallet.getMain.invalidate();
       setSellDialogOpen(false);

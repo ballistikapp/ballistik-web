@@ -24,6 +24,7 @@
 
 ## Volume Bot
 
+- Restart stopped/failed sessions (see `docs/backlog/volume-bot-restart.md`)
 - Config UI improvements:
   - Show total and per-minute net SOL range for both range-based and session-based configs
   - Remove range-based probability (conflicts with time-based probability)
@@ -52,7 +53,7 @@
 ## Other Pages
 
 - Manage tokens page
-- Account page
+- ~~Account page~~ (Done: `/account` with account info, main wallet, send SOL dialog — see `docs/implementation/wallets-implementation.md`)
 - Launches page
 
 ## Technical Debt

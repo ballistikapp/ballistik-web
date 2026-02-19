@@ -218,6 +218,7 @@ export function LaunchForm() {
   });
 
   const activeLaunchQuery = trpc.launch.getActive.useQuery();
+  const refreshWalletBalancesMutation = trpc.wallet.refreshBalances.useMutation();
   const launchStatusQuery = trpc.launch.status.useQuery(
     { launchId: activeLaunchId ?? "" },
     {
@@ -259,6 +260,10 @@ export function LaunchForm() {
         description: `Token ${launch.tokenPublicKey} is live.`,
       });
       setLaunchNotified(true);
+      void refreshWalletBalancesMutation.mutateAsync({
+        tokenPublicKey: launch.tokenPublicKey,
+        force: true,
+      });
       utils.wallet.getMain.invalidate();
       router.refresh();
     }
@@ -283,7 +288,13 @@ export function LaunchForm() {
         window.localStorage.removeItem(launchStorageKey);
       }
     }
-  }, [launchNotified, launchStatusQuery.data]);
+  }, [
+    launchNotified,
+    launchStatusQuery.data,
+    refreshWalletBalancesMutation,
+    router,
+    utils.wallet.getMain,
+  ]);
 
   const clearActiveLaunch = React.useCallback(() => {
     window.localStorage.removeItem(launchStorageKey);
