@@ -23,6 +23,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+import { formatPriceSol, formatMarketCap, formatUsd } from "@/lib/utils/format";
+
 const GRADUATION_SOL_THRESHOLD = 85;
 
 interface TokenData {
@@ -37,7 +39,9 @@ interface TokenData {
 
 interface HeaderData {
   priceSol: number;
+  solPriceUsd: number;
   marketCapSol: number;
+  marketCapUsd: number;
   isComplete: boolean;
   realSolReserves: number;
 }
@@ -47,21 +51,6 @@ interface DashboardHeaderProps {
   header: HeaderData;
   onRefresh: () => void;
   isRefreshing?: boolean;
-}
-
-function formatPriceSol(price: number): string {
-  if (price === 0) return "0";
-  if (price < 0.000001) return price.toExponential(4);
-  if (price < 0.001) return price.toFixed(9);
-  if (price < 1) return price.toFixed(6);
-  return price.toFixed(4);
-}
-
-function formatMarketCap(sol: number): string {
-  if (sol >= 1_000_000) return `${(sol / 1_000_000).toFixed(2)}M`;
-  if (sol >= 1_000) return `${(sol / 1_000).toFixed(2)}K`;
-  if (sol >= 1) return sol.toFixed(2);
-  return sol.toFixed(4);
 }
 
 export function DashboardHeader({
@@ -120,18 +109,29 @@ export function DashboardHeader({
       <div className="h-6 w-px bg-border hidden @xl/main:block" />
 
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-xs text-muted-foreground">Price</span>
-        <span className="font-semibold text-base tabular-nums font-mono">
-          {formatPriceSol(header.priceSol)} SOL
-        </span>
+        <span className="text-xs text-muted-foreground">MCap</span>
+        {header.marketCapUsd > 0 ? (
+          <span className="font-bold text-lg tabular-nums font-mono">
+            {formatUsd(header.marketCapUsd)}
+          </span>
+        ) : (
+          <span className="font-bold text-lg tabular-nums font-mono">
+            {formatMarketCap(header.marketCapSol)} SOL
+          </span>
+        )}
+        {header.marketCapUsd > 0 && (
+          <span className="text-sm tabular-nums font-mono text-muted-foreground">
+            {formatMarketCap(header.marketCapSol)} SOL
+          </span>
+        )}
       </div>
 
       <div className="h-6 w-px bg-border hidden @xl/main:block" />
 
       <div className="flex items-center gap-1.5 shrink-0">
-        <span className="text-xs text-muted-foreground">MCap</span>
-        <span className="font-semibold text-base tabular-nums font-mono">
-          {formatMarketCap(header.marketCapSol)} SOL
+        <span className="text-xs text-muted-foreground">Price</span>
+        <span className="text-sm tabular-nums font-mono text-muted-foreground">
+          {formatPriceSol(header.priceSol)} SOL
         </span>
       </div>
 

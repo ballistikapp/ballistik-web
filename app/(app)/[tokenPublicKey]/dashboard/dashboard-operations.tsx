@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { IconRobot, IconArrowsExchange, IconClock, IconPlus, IconList } from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
+import { formatSol, formatRuntime, formatTimeAgo } from "@/lib/utils/format";
 
 interface BotSession {
   id: string;
@@ -22,35 +23,6 @@ interface DashboardOperationsProps {
     botSessions: BotSession[];
   };
   tokenPublicKey: string;
-}
-
-function formatRuntime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const mins = Math.floor(seconds / 60);
-  if (mins < 60) return `${mins}m`;
-  const hours = Math.floor(mins / 60);
-  const remainMins = mins % 60;
-  if (hours < 24) return `${hours}h ${remainMins}m`;
-  const days = Math.floor(hours / 24);
-  return `${days}d ${hours % 24}h`;
-}
-
-function formatSol(value: number): string {
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
-  if (Math.abs(value) < 0.0001 && value !== 0) return value.toExponential(2);
-  return value.toFixed(4);
-}
-
-function formatTimeAgo(date: string | Date | null): string {
-  if (!date) return "never";
-  const diffMs = Date.now() - new Date(date).getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  if (diffSecs < 60) return `${diffSecs}s ago`;
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  return `${Math.floor(diffHours / 24)}d ago`;
 }
 
 function BotActions({ tokenPublicKey }: { tokenPublicKey: string }) {

@@ -13,9 +13,10 @@ type GrpcWaitInput = {
 };
 
 export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
-  const { SHYFT_API_KEY } = getEnv();
-  if (!SHYFT_API_KEY) {
-    console.log("[gRPC] SHYFT_API_KEY not set, skipping gRPC");
+  const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
+  const grpcToken = SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY;
+  if (!grpcToken) {
+    console.log("[gRPC] SHYFT_GRPC_TOKEN not set, skipping gRPC");
     return null;
   }
   if (input.signatures.length === 0 || input.accountKeys.length === 0) {
@@ -34,7 +35,7 @@ export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
       console.log("[gRPC] Failed to load yellowstone-grpc client");
       return null;
     }
-    const client = new Client(url, SHYFT_API_KEY, {});
+    const client = new Client(url, grpcToken, {});
     stream = await client.subscribe();
     console.log("[gRPC] Stream connected successfully");
   } catch (error) {

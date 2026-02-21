@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "./dashboard-loading";
@@ -52,6 +53,7 @@ export function DashboardClient() {
     tokenPublicKey: string;
     enabled: boolean;
   } | null>(null);
+  const [sseError, setSseError] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -101,14 +103,31 @@ export function DashboardClient() {
       : false);
   const monitoringInitialized = Boolean(statsData && tokenPublicKey);
 
+  const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
+    enabled: false,
+  });
+
   const handleToggleMonitoring = useCallback(
-    (enabled: boolean) => {
-      if (tokenPublicKey) {
-        setUserMonitoringOverride({ tokenPublicKey, enabled });
-        setStoredMonitoringOverride(tokenPublicKey, enabled);
+    async (enabled: boolean) => {
+      if (!tokenPublicKey) return;
+
+      if (enabled) {
+        try {
+          const { data } = await grpcStatusQuery.refetch();
+          if (!data?.available) {
+            toast.error("Real-time monitoring is unavailable");
+            return;
+          }
+        } catch {
+          toast.error("Real-time monitoring is unavailable");
+          return;
+        }
       }
+
+      setUserMonitoringOverride({ tokenPublicKey, enabled });
+      setStoredMonitoringOverride(tokenPublicKey, enabled);
     },
-    [tokenPublicKey]
+    [tokenPublicKey, grpcStatusQuery]
   );
 
   const debouncedRefetch = useCallback(() => {
@@ -124,16 +143,21 @@ export function DashboardClient() {
     };
   }, []);
 
-  const handleSubscriptionEvent = useCallback(() => {
+  const handleSubscriptionData = useCallback(() => {
+    setSseError(false);
     debouncedRefetch();
   }, [debouncedRefetch]);
+
+  const handleSubscriptionError = useCallback(() => {
+    setSseError(true);
+  }, []);
 
   trpc.subscription.onNewTransaction.useSubscription(
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionEvent,
-      onError: () => {},
+      onData: handleSubscriptionData,
+      onError: handleSubscriptionError,
     }
   );
 
@@ -141,8 +165,17 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionEvent,
-      onError: () => {},
+      onData: handleSubscriptionData,
+      onError: handleSubscriptionError,
+    }
+  );
+
+  trpc.subscription.onTokenBalanceUpdate.useSubscription(
+    { tokenPublicKey: tokenPublicKey || "" },
+    {
+      enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
+      onData: handleSubscriptionData,
+      onError: handleSubscriptionError,
     }
   );
 
@@ -150,16 +183,55 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionEvent,
-      onError: () => {},
+      onData: handleSubscriptionData,
+      onError: handleSubscriptionError,
     }
   );
 
-  const handleRefresh = useCallback(() => {
+  const { mutateAsync: refreshBalances } =
+    trpc.wallet.refreshBalances.useMutation();
+  const { mutateAsync: refreshHoldings } =
+    trpc.holding.refreshByToken.useMutation();
+  const [fullRefreshing, setFullRefreshing] = useState(false);
+
+  const handleFullRefresh = useCallback(async () => {
+    if (!tokenPublicKey) return;
+    setFullRefreshing(true);
+    try {
+      await Promise.allSettled([
+        refreshBalances({ tokenPublicKey, force: true }),
+        refreshHoldings({ tokenPublicKey }),
+      ]);
+    } finally {
+      refetchToken();
+      refetchStats();
+      refetchDefi();
+      setFullRefreshing(false);
+    }
+  }, [
+    tokenPublicKey,
+    refreshBalances,
+    refreshHoldings,
+    refetchToken,
+    refetchStats,
+    refetchDefi,
+  ]);
+
+  const handleLightRefresh = useCallback(() => {
     refetchToken();
     refetchStats();
     refetchDefi();
   }, [refetchToken, refetchStats, refetchDefi]);
+
+  const needsFullRefresh = !isMonitoring || sseError;
+
+  const handleRefresh = useCallback(async () => {
+    if (needsFullRefresh) {
+      await handleFullRefresh();
+    } else {
+      handleLightRefresh();
+    }
+  }, [needsFullRefresh, handleFullRefresh, handleLightRefresh]);
 
   if (tokenLoading) {
     return <DashboardLoading />;
@@ -178,8 +250,8 @@ export function DashboardClient() {
           <DashboardHeader
             token={tokenData}
             header={statsData.header}
-            onRefresh={handleRefresh}
-            isRefreshing={statsRefreshing}
+            onRefresh={handleFullRefresh}
+            isRefreshing={fullRefreshing || statsRefreshing}
           />
           <DashboardStats metrics={statsData.metrics} />
           <DashboardOperations
@@ -187,11 +259,10 @@ export function DashboardClient() {
             tokenPublicKey={tokenPublicKey}
           />
           <PriceChart
+            tokenPublicKey={tokenPublicKey}
+            isComplete={statsData.header.isComplete}
             priceHistory={statsData.priceHistory}
-            currentPrice={{
-              priceSol: statsData.header.priceSol,
-              isComplete: statsData.header.isComplete,
-            }}
+            currentPriceSol={statsData.header.priceSol}
           />
           {defiData && defiData.pools.length > 0 && (
             <DashboardDefiPools pools={defiData.pools} />
@@ -212,8 +283,10 @@ export function DashboardClient() {
           isMonitoring={isMonitoring}
           onToggleMonitoring={handleToggleMonitoring}
           onRefresh={handleRefresh}
-          isRefreshing={statsRefreshing}
+          isRefreshing={fullRefreshing || statsRefreshing}
+          isFullRefresh={needsFullRefresh}
           dataUpdatedAt={dataUpdatedAt}
+          sseError={sseError}
         />
       )}
     </div>

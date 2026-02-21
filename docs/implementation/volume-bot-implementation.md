@@ -482,7 +482,7 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 
 ### Fallback Behavior
 
-- If `SHYFT_API_KEY` is not set, gRPC is disabled
+- If `SHYFT_GRPC_TOKEN` (or `SHYFT_API_KEY` fallback) is not set, gRPC is disabled
 - If gRPC connection fails, uses RPC with rate limiter
 - On cache miss, fetches via RPC with rate limiting
 - Auto-reconnect with 5-second delay on disconnect
@@ -496,7 +496,7 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 ## Environment Variables
 
 - `SOLANA_RPC_URL` — Solana RPC endpoint (required)
-- `SHYFT_API_KEY` — Shyft API key for gRPC streaming (optional, recommended)
+- `SHYFT_GRPC_TOKEN` — Shyft gRPC x-token for streaming (optional, recommended; falls back to `SHYFT_API_KEY`)
 - `DATABASE_URL` — PostgreSQL connection string (required)
 
 ## Logging

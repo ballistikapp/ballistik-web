@@ -3,9 +3,8 @@ import type { Prisma } from "@/lib/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { shyftApiService } from "@/server/services/shyft-api.service";
 import { walletService } from "@/server/services/wallet.service";
-import { getEnv } from "@/lib/config/env";
+import { retryRpc } from "@/lib/utils/rpc-retry";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
@@ -280,58 +279,6 @@ type BalanceResult = {
   isResolved: boolean;
 };
 
-const SHYFT_CONCURRENCY_DEFAULT = 8;
-const SHYFT_CONCURRENCY_LARGE = 15;
-const SHYFT_LARGE_WALLET_THRESHOLD = 40;
-const RPC_BATCH_WALLET_THRESHOLD = 120;
-const SHYFT_RETRY_ATTEMPTS = 2;
-const SHYFT_RETRY_BASE_DELAY_MS = 250;
-
-function formatUiAmount(amount: bigint, decimals: number) {
-  const divisor = 10 ** decimals;
-  return Number(amount) / divisor;
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
-function isTransientBalanceFetchError(error: unknown) {
-  const message =
-    error instanceof Error ? error.message.toLowerCase() : String(error).toLowerCase();
-  return (
-    message.includes("429") ||
-    message.includes("500") ||
-    message.includes("502") ||
-    message.includes("503") ||
-    message.includes("504") ||
-    message.includes("timeout") ||
-    message.includes("timed out") ||
-    message.includes("econnreset") ||
-    message.includes("fetch failed")
-  );
-}
-
-async function fetchBalanceViaShyftWithRetry(
-  walletPublicKey: string,
-  tokenPublicKey: string
-) {
-  let attempt = 0;
-  while (true) {
-    try {
-      return await shyftApiService.getTokenBalance(walletPublicKey, tokenPublicKey);
-    } catch (error) {
-      const isRetryable = isTransientBalanceFetchError(error);
-      if (!isRetryable || attempt >= SHYFT_RETRY_ATTEMPTS) {
-        throw error;
-      }
-      const backoffMs = SHYFT_RETRY_BASE_DELAY_MS * 2 ** attempt;
-      await delay(backoffMs);
-      attempt += 1;
-    }
-  }
-}
-
 async function fetchBalancesViaRpc(
   wallets: WalletRecord[],
   tokenPublicKey: string
@@ -360,7 +307,9 @@ async function fetchBalancesViaRpc(
   const accountInfos: ParsedAccountInfoItem[] = [];
   for (let i = 0; i < ataAddresses.length; i += 100) {
     const batch = ataAddresses.slice(i, i + 100);
-    const batchInfos = await connection.getMultipleParsedAccounts(batch);
+    const batchInfos = await retryRpc(() =>
+      connection.getMultipleParsedAccounts(batch)
+    );
     accountInfos.push(...batchInfos.value);
   }
 
@@ -380,102 +329,11 @@ async function fetchBalancesViaRpc(
   return { results, mintDecimals };
 }
 
-async function fetchSingleWalletBalanceFromRpc(
-  connection: Connection,
-  mintPubkey: PublicKey,
-  wallet: WalletRecord,
-  mintDecimals: number
-): Promise<BalanceResult> {
-  try {
-    const ata = await getAssociatedTokenAddress(
-      mintPubkey,
-      new PublicKey(wallet.publicKey)
-    );
-    const account = await getAccount(connection, ata);
-    return {
-      wallet,
-      tokenBalance: formatUiAmount(account.amount, mintDecimals),
-      ataExists: true,
-      isResolved: true,
-    };
-  } catch (error) {
-    if (
-      error instanceof Error &&
-      (error.message.includes("Account does not exist") ||
-        error.message.includes("could not find account") ||
-        error.name === "TokenAccountNotFoundError")
-    ) {
-      return { wallet, tokenBalance: 0, ataExists: false, isResolved: true };
-    }
-    return { wallet, tokenBalance: 0, ataExists: false, isResolved: false };
-  }
-}
-
 async function fetchBalances(
   wallets: WalletRecord[],
-  tokenPublicKey: string,
-  shyftApiKey: string | undefined
+  tokenPublicKey: string
 ): Promise<{ results: BalanceResult[]; mintDecimals: number }> {
-  if (!shyftApiKey || wallets.length >= RPC_BATCH_WALLET_THRESHOLD) {
-    return await fetchBalancesViaRpc(wallets, tokenPublicKey);
-  }
-
-  let mintDecimals = 9;
-  let rpcContext:
-    | { connection: Connection; mintPubkey: PublicKey; decimals: number }
-    | null = null;
-  const ensureRpcContext = async () => {
-    if (rpcContext) return rpcContext;
-    const connection = getSolanaConnection();
-    const mintPubkey = new PublicKey(tokenPublicKey);
-    const mintInfo = await connection.getParsedAccountInfo(mintPubkey);
-    const decimals =
-      (
-        mintInfo.value?.data as {
-          parsed?: { info?: { decimals?: number } };
-        }
-      )?.parsed?.info?.decimals ?? 9;
-    rpcContext = { connection, mintPubkey, decimals };
-    return rpcContext;
-  };
-
-  const concurrency =
-    wallets.length >= SHYFT_LARGE_WALLET_THRESHOLD
-      ? SHYFT_CONCURRENCY_LARGE
-      : SHYFT_CONCURRENCY_DEFAULT;
-
-  const results = await mapWithConcurrency(wallets, concurrency, async (wallet) => {
-    try {
-      const { balance, decimals, associatedAccount } =
-        await fetchBalanceViaShyftWithRetry(wallet.publicKey, tokenPublicKey);
-      if (Number.isFinite(decimals)) {
-        mintDecimals = decimals;
-      }
-      return {
-        wallet,
-        tokenBalance: balance,
-        ataExists: Boolean(associatedAccount),
-        isResolved: true,
-      };
-    } catch {
-      try {
-        const rpc = await ensureRpcContext();
-        if (Number.isFinite(rpc.decimals)) {
-          mintDecimals = rpc.decimals;
-        }
-        return await fetchSingleWalletBalanceFromRpc(
-          rpc.connection,
-          rpc.mintPubkey,
-          wallet,
-          rpc.decimals
-        );
-      } catch {
-        return { wallet, tokenBalance: 0, ataExists: false, isResolved: false };
-      }
-    }
-  });
-
-  return { results, mintDecimals };
+  return await fetchBalancesViaRpc(wallets, tokenPublicKey);
 }
 
 export const holdingService = {
@@ -527,10 +385,9 @@ export const holdingService = {
     );
 
     const walletPublicKeys = wallets.map((w) => w.publicKey);
-    const { SHYFT_API_KEY } = getEnv();
 
     const [balanceResults, existingHoldings] = await Promise.all([
-      fetchBalances(wallets, token.publicKey, SHYFT_API_KEY),
+      fetchBalances(wallets, token.publicKey),
       prisma.holding.findMany({
         where: {
           walletPublicKey: { in: walletPublicKeys },

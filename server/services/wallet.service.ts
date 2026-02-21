@@ -13,8 +13,7 @@ import { AppError } from "@/server/errors";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { shyftApiService } from "@/server/services/shyft-api.service";
-import { getEnv } from "@/lib/config/env";
+import { retryRpc } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
 
@@ -151,17 +150,10 @@ export const walletService = {
       throw new AppError("Main wallet not found", 404);
     }
 
-    let balanceSol: number;
-    const { SHYFT_API_KEY } = getEnv();
-
-    if (SHYFT_API_KEY) {
-      balanceSol = await shyftApiService.getWalletBalance(mainWallet.publicKey);
-    } else {
-      const connection = getSolanaConnection();
-      const walletPublicKey = new PublicKey(mainWallet.publicKey);
-      const solBalance = await connection.getBalance(walletPublicKey);
-      balanceSol = solBalance / 1_000_000_000;
-    }
+    const connection = getSolanaConnection();
+    const walletPubkey = new PublicKey(mainWallet.publicKey);
+    const solBalance = await retryRpc(() => connection.getBalance(walletPubkey));
+    const balanceSol = solBalance / 1_000_000_000;
 
     const now = new Date();
 
@@ -450,64 +442,36 @@ export const walletService = {
     }
 
     const solBalanceMap = new Map<string, number>();
-    const { SHYFT_API_KEY } = getEnv();
-
-    if (SHYFT_API_KEY) {
-      const batchSize = 10;
-      for (let i = 0; i < targetWallets.length; i += batchSize) {
-        const batch = targetWallets.slice(i, i + batchSize);
-        const results = await Promise.allSettled(
-          batch.map(async (wallet) => {
-            const balance = await shyftApiService.getWalletBalance(
-              wallet.publicKey
-            );
-            return { publicKey: wallet.publicKey, balance };
-          })
-        );
-        results.forEach((result) => {
-          if (result.status === "fulfilled") {
-            solBalanceMap.set(
-              result.value.publicKey,
-              result.value.balance * 1_000_000_000
-            );
-          }
+    const connection = getSolanaConnection();
+    const validWallets: {
+      wallet: (typeof targetWallets)[number];
+      key: PublicKey;
+    }[] = [];
+    for (const wallet of targetWallets) {
+      try {
+        validWallets.push({
+          wallet,
+          key: new PublicKey(wallet.publicKey),
         });
+      } catch {
+        solBalanceMap.set(wallet.publicKey, 0);
       }
-      targetWallets.forEach((wallet) => {
-        if (!solBalanceMap.has(wallet.publicKey)) {
-          solBalanceMap.set(wallet.publicKey, 0);
-        }
-      });
-    } else {
-      const connection = getSolanaConnection();
-      const validWallets: {
-        wallet: (typeof targetWallets)[number];
-        key: PublicKey;
-      }[] = [];
-      for (const wallet of targetWallets) {
-        try {
-          validWallets.push({
-            wallet,
-            key: new PublicKey(wallet.publicKey),
-          });
-        } catch {
-          solBalanceMap.set(wallet.publicKey, 0);
-        }
-      }
+    }
 
-      const batchSize = Math.max(1, rpcConfig.tuning.solBalanceBatchSize);
-      for (let i = 0; i < validWallets.length; i += batchSize) {
-        const batch = validWallets.slice(i, i + batchSize);
-        const infos = await connection.getMultipleAccountsInfo(
+    const batchSize = Math.max(1, rpcConfig.tuning.solBalanceBatchSize);
+    for (let i = 0; i < validWallets.length; i += batchSize) {
+      const batch = validWallets.slice(i, i + batchSize);
+      const infos = await retryRpc(() =>
+        connection.getMultipleAccountsInfo(
           batch.map((item) => item.key),
           "confirmed"
-        );
-        infos.forEach((info, index) => {
-          const walletKey = batch[index]?.wallet.publicKey;
-          if (!walletKey) return;
-          solBalanceMap.set(walletKey, info ? info.lamports : 0);
-        });
-      }
+        )
+      );
+      infos.forEach((info, index) => {
+        const walletKey = batch[index]?.wallet.publicKey;
+        if (!walletKey) return;
+        solBalanceMap.set(walletKey, info ? info.lamports : 0);
+      });
     }
 
     const balances = targetWallets.map((wallet) => ({

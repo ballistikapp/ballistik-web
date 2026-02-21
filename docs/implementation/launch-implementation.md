@@ -133,7 +133,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 - `SOLANA_RPC_URL` must be set for on-chain operations.
 - Jito block engine URLs are defined in `lib/config/jito.config.ts`.
-- `SHYFT_API_KEY` is optional but recommended for faster gRPC-assisted confirmation; launch confirmation still has RPC polling fallback.
+- `SHYFT_GRPC_TOKEN` (or `SHYFT_API_KEY` fallback) is optional but recommended for faster gRPC-assisted confirmation; launch confirmation still has RPC polling fallback.
 
 ## Bundle Launch
 

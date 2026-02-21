@@ -6,7 +6,8 @@ Shyft provides multiple APIs for interacting with Solana data. The project uses 
 
 ## Environment Variables
 
-- `SHYFT_API_KEY` — enables all Shyft integrations (gRPC, REST, Callbacks, DeFi)
+- `SHYFT_API_KEY` — enables Shyft REST APIs, Callbacks, and DeFi APIs
+- `SHYFT_GRPC_TOKEN` — x-token for gRPC authentication (separate from API key per Shyft docs). Falls back to `SHYFT_API_KEY` if not set.
 - `SHYFT_CALLBACK_SECRET` — validates incoming webhook requests at `/api/webhooks/shyft`
 - `APP_URL` — base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
 

@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatSol, formatTokenCount } from "@/lib/utils/format";
 
 interface TreasuryData {
   totalSol: number;
@@ -51,20 +52,6 @@ interface DashboardStatsProps {
     pnl: PnlData;
     activity: ActivityData;
   };
-}
-
-function formatSol(value: number): string {
-  if (Math.abs(value) >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
-  if (Math.abs(value) < 0.0001 && value !== 0) return value.toExponential(2);
-  return value.toFixed(4);
-}
-
-function formatTokenCount(value: number): string {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toFixed(0);
 }
 
 export function DashboardStats({ metrics }: DashboardStatsProps) {

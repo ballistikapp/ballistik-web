@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Activity, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import { Activity, AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,10 +15,12 @@ const POLL_INTERVAL_SECONDS = 30;
 
 interface MonitoringPanelProps {
   isMonitoring: boolean;
-  onToggleMonitoring: (enabled: boolean) => void;
-  onRefresh: () => void;
+  onToggleMonitoring: (enabled: boolean) => void | Promise<void>;
+  onRefresh: () => void | Promise<void>;
   isRefreshing: boolean;
+  isFullRefresh: boolean;
   dataUpdatedAt: number;
+  sseError?: boolean;
 }
 
 export function MonitoringPanel({
@@ -26,11 +28,14 @@ export function MonitoringPanel({
   onToggleMonitoring,
   onRefresh,
   isRefreshing,
+  isFullRefresh,
   dataUpdatedAt,
+  sseError,
 }: MonitoringPanelProps) {
   const [minimized, setMinimized] = useState(false);
   const [secondsAgo, setSecondsAgo] = useState(0);
   const [countdown, setCountdown] = useState(POLL_INTERVAL_SECONDS);
+  const [toggling, setToggling] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   useEffect(() => {
@@ -58,6 +63,12 @@ export function MonitoringPanel({
     }
   }, [isRefreshing, onRefresh]);
 
+  const statusIndicatorClass = isMonitoring
+    ? sseError
+      ? "bg-amber-500 animate-pulse"
+      : "bg-green-500 animate-pulse"
+    : "bg-muted-foreground/40";
+
   if (minimized) {
     return (
       <div className="fixed bottom-5 right-5 z-50">
@@ -72,12 +83,7 @@ export function MonitoringPanel({
               )}
             >
               <span
-                className={cn(
-                  "size-2.5 rounded-full shrink-0",
-                  isMonitoring
-                    ? "bg-green-500 animate-pulse"
-                    : "bg-muted-foreground/40"
-                )}
+                className={cn("size-2.5 rounded-full shrink-0", statusIndicatorClass)}
               />
               <span className="tabular-nums">
                 {secondsAgo}s ago
@@ -86,7 +92,11 @@ export function MonitoringPanel({
             </button>
           </TooltipTrigger>
           <TooltipContent side="left">
-            {isMonitoring ? "Monitoring active" : "Monitoring off"}
+            {isMonitoring
+              ? sseError
+                ? "Monitoring disconnected"
+                : "Monitoring active"
+              : "Monitoring off"}
           </TooltipContent>
         </Tooltip>
       </div>
@@ -114,22 +124,36 @@ export function MonitoringPanel({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span
-                className={cn(
-                  "size-2.5 rounded-full shrink-0",
-                  isMonitoring
-                    ? "bg-green-500 animate-pulse"
-                    : "bg-muted-foreground/40"
-                )}
+                className={cn("size-2.5 rounded-full shrink-0", statusIndicatorClass)}
               />
               <span className="text-sm">
-                {isMonitoring ? "Real-time" : "Polling (30s)"}
+                {isMonitoring
+                  ? sseError
+                    ? "Disconnected"
+                    : "Real-time"
+                  : "Polling (30s)"}
               </span>
             </div>
             <Switch
               checked={isMonitoring}
-              onCheckedChange={onToggleMonitoring}
+              disabled={toggling}
+              onCheckedChange={async (val) => {
+                setToggling(true);
+                try {
+                  await onToggleMonitoring(val);
+                } finally {
+                  setToggling(false);
+                }
+              }}
             />
           </div>
+
+          {isMonitoring && sseError && (
+            <div className="flex items-center gap-2 text-xs text-amber-500">
+              <AlertTriangle className="size-3.5 shrink-0" />
+              <span>SSE connection lost. Falling back to polling.</span>
+            </div>
+          )}
 
           <div className="flex items-center justify-between text-sm text-muted-foreground">
             <span>
@@ -149,21 +173,32 @@ export function MonitoringPanel({
             )}
           </div>
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="w-full h-8 text-sm"
-            onClick={handleRefresh}
-            disabled={isRefreshing}
-          >
-            <RefreshCw
-              className={cn(
-                "size-3.5 mr-1.5",
-                isRefreshing && "animate-spin"
-              )}
-            />
-            {isRefreshing ? "Refreshing..." : "Refresh now"}
-          </Button>
+          {isFullRefresh ? (
+            <Button
+              variant="outline"
+              size="sm"
+              className="w-full h-8 text-sm"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              <RefreshCw
+                className={cn(
+                  "size-3.5 mr-1.5",
+                  isRefreshing && "animate-spin"
+                )}
+              />
+              {isRefreshing ? "Refreshing..." : "Refresh now"}
+            </Button>
+          ) : (
+            <button
+              type="button"
+              className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors cursor-pointer py-1"
+              onClick={handleRefresh}
+              disabled={isRefreshing}
+            >
+              {isRefreshing ? "Refreshing..." : "Force re-read"}
+            </button>
+          )}
         </div>
       </div>
     </div>

@@ -2,8 +2,7 @@ import { Prisma, prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { shyftApiService } from "@/server/services/shyft-api.service";
-import { getEnv } from "@/lib/config/env";
+import { retryRpc } from "@/lib/utils/rpc-retry";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import {
   LAMPORTS_PER_SOL,
@@ -201,7 +200,6 @@ async function getTokenByPublicKeyWithOwner(tokenPublicKey: string) {
 async function getTokenSourceSignatures(
   tokenPublicKey: string,
   connection: ReturnType<typeof getSolanaConnection>,
-  shyftApiKey: string | undefined,
   knownSignatures: Set<string>
 ) {
   const signatureLimit = 120;
@@ -213,31 +211,12 @@ async function getTokenSourceSignatures(
   const seen = new Set<string>();
 
   for (const source of sources) {
-    let signatures: string[] = [];
-    if (shyftApiKey) {
-      try {
-        const history = await shyftApiService.getTransactionHistory(source, {
-          txNum: signatureLimit,
-        });
-        signatures = history
-          .map((tx) => tx.signatures?.[0])
-          .filter((value): value is string => Boolean(value));
-      } catch {
-        const infos = await connection.getSignaturesForAddress(
-          new PublicKey(source),
-          { limit: signatureLimit }
-        );
-        signatures = infos.map((info) => info.signature);
-      }
-    } else {
-      const infos = await connection.getSignaturesForAddress(
-        new PublicKey(source),
-        {
-          limit: signatureLimit,
-        }
-      );
-      signatures = infos.map((info) => info.signature);
-    }
+    const infos = await retryRpc(() =>
+      connection.getSignaturesForAddress(new PublicKey(source), {
+        limit: signatureLimit,
+      })
+    );
+    const signatures = infos.map((info) => info.signature);
 
     let knownStreak = 0;
     for (const signature of signatures) {
@@ -658,7 +637,6 @@ export const transactionService = {
     }
 
     const connection = getSolanaConnection();
-    const { SHYFT_API_KEY } = getEnv();
 
     const [latestRows, staleRows] = await Promise.all([
       prisma.tokenTransaction.findMany({
@@ -685,7 +663,6 @@ export const transactionService = {
     const signatures = await getTokenSourceSignatures(
       token.publicKey,
       connection,
-      SHYFT_API_KEY,
       knownSignatures
     );
     staleRows.forEach((row) => {

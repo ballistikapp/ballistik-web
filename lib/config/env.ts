@@ -4,6 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
   SOLANA_RPC_URL: z.string().min(1),
   SHYFT_API_KEY: z.string().min(1).optional(),
+  SHYFT_GRPC_TOKEN: z.string().min(1).optional(),
   SHYFT_CALLBACK_SECRET: z.string().min(1).optional(),
   APP_URL: z.string().url().optional(),
 });
@@ -45,6 +46,7 @@ export const getEnv = (): Env => {
   cachedEnv = envSchema.parse({
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
     SHYFT_API_KEY: process.env.SHYFT_API_KEY,
+    SHYFT_GRPC_TOKEN: process.env.SHYFT_GRPC_TOKEN,
     SHYFT_CALLBACK_SECRET: process.env.SHYFT_CALLBACK_SECRET,
     APP_URL: process.env.APP_URL,
   });

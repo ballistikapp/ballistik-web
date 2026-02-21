@@ -88,11 +88,25 @@ export type GrpcStream = {
 
 export async function loadGrpcClient(): Promise<GrpcClientCtor | null> {
   try {
-    const grpcModule = (await import("@triton-one/yellowstone-grpc")) as {
-      default?: GrpcClientCtor;
-    };
-    return grpcModule.default ?? null;
-  } catch {
+    const grpcModule = await import("@triton-one/yellowstone-grpc");
+    const Client =
+      (typeof grpcModule.default === "function" && grpcModule.default) ||
+      (typeof grpcModule.default?.default === "function" &&
+        grpcModule.default.default) ||
+      null;
+    if (!Client) {
+      console.error(
+        "[grpc-utils] yellowstone-grpc loaded but Client constructor not found. " +
+        `default type: ${typeof grpcModule.default}, ` +
+        `default.default type: ${typeof grpcModule.default?.default}`
+      );
+    }
+    return Client as GrpcClientCtor | null;
+  } catch (error) {
+    console.error(
+      "[grpc-utils] Failed to import @triton-one/yellowstone-grpc:",
+      error instanceof Error ? error.message : error
+    );
     return null;
   }
 }

@@ -13,6 +13,11 @@ import {
   dashboardEvents,
   type TradeCompleteEvent,
 } from "@/server/events/dashboard-events";
+import { invalidateStatsCache } from "@/server/services/dashboard.service";
+import { ingestionQueue } from "@/server/services/ingestion-queue.service";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ service: "subscription" });
 
 type BalanceUpdateEvent = {
   pubkey: string;
@@ -66,10 +71,15 @@ export const subscriptionRouter = router({
       if (allPubkeys.size === 0) return;
 
       const subscriptionId = `walletBalance:${ctx.user.id}:${input.tokenPublicKey}`;
-      await grpcManager.subscribe(
+      const subscribed = await grpcManager.subscribe(
         subscriptionId,
         Array.from(allPubkeys)
       );
+      if (!subscribed) {
+        log.warn("gRPC subscribe failed for onBalanceUpdate, SSE will be idle", {
+          tokenPublicKey: input.tokenPublicKey,
+        });
+      }
 
       const queue: BalanceUpdateEvent[] = [];
       let resolve: (() => void) | null = null;
@@ -77,12 +87,21 @@ export const subscriptionRouter = router({
       const removeListener = grpcManager.onAccountUpdate(
         (update: AccountUpdate) => {
           if (!allPubkeys.has(update.pubkey)) return;
+          const balanceSol = update.lamports / 1_000_000_000;
           queue.push({
             pubkey: update.pubkey,
-            balanceSol: update.lamports / 1_000_000_000,
+            balanceSol,
             slot: update.slot,
           });
           resolve?.();
+
+          prisma.wallet
+            .updateMany({
+              where: { publicKey: update.pubkey },
+              data: { balanceSol, balanceRefreshedAt: new Date() },
+            })
+            .catch(() => {});
+          invalidateStatsCache(input.tokenPublicKey);
         }
       );
 
@@ -125,10 +144,15 @@ export const subscriptionRouter = router({
       if (allPubkeys.size === 0) return;
 
       const subscriptionId = `tokenBalance:${ctx.user.id}:${input.tokenPublicKey}`;
-      await grpcManager.subscribe(
+      const subscribed = await grpcManager.subscribe(
         subscriptionId,
         Array.from(allPubkeys)
       );
+      if (!subscribed) {
+        log.warn("gRPC subscribe failed for onTokenBalanceUpdate, SSE will be idle", {
+          tokenPublicKey: input.tokenPublicKey,
+        });
+      }
 
       const queue: TokenBalanceUpdateEvent[] = [];
       let resolve: (() => void) | null = null;
@@ -146,6 +170,17 @@ export const subscriptionRouter = router({
             slot: update.slot,
           });
           resolve?.();
+
+          prisma.holding
+            .updateMany({
+              where: {
+                walletPublicKey: update.owner,
+                tokenPublicKey: update.mint,
+              },
+              data: { tokenBalance: Number(update.tokenAmount) },
+            })
+            .catch(() => {});
+          invalidateStatsCache(input.tokenPublicKey);
         }
       );
 
@@ -182,7 +217,12 @@ export const subscriptionRouter = router({
       ];
 
       const subscriptionId = `newTx:${ctx.user.id}:${input.tokenPublicKey}`;
-      await grpcManager.subscribe(subscriptionId, monitoredAccounts);
+      const subscribed = await grpcManager.subscribe(subscriptionId, monitoredAccounts);
+      if (!subscribed) {
+        log.warn("gRPC subscribe failed for onNewTransaction, SSE will be idle", {
+          tokenPublicKey: input.tokenPublicKey,
+        });
+      }
 
       const monitoredSet = new Set(monitoredAccounts);
       const queue: NewTransactionEvent[] = [];
@@ -201,6 +241,8 @@ export const subscriptionRouter = router({
             detectedAt: Date.now(),
           });
           resolve?.();
+
+          ingestionQueue.enqueue(input.tokenPublicKey, update.signature);
         }
       );
 

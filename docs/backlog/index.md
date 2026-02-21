@@ -38,6 +38,11 @@
 ## Dashboard
 
 - ~~Implement on-demand real-time updates~~ (Done: Monitoring Mode with SSE + polling, see `docs/implementation/dashboard-monitoring.md`)
+- ~~Fix wrong data: P&L, volumes, market cap, graduated token pricing~~ (Done: Full rework — switched to TokenTransaction, fixed holdings filtering, circulating supply market cap, DeFi pool price for graduated tokens)
+- ~~Fix price chart 1m candle interval~~ (Done: Server now sends 1-minute candles, client re-aggregates)
+- ~~SSE error handling~~ (Done: Monitoring panel shows disconnected state)
+- Future: Incremental SSE updates instead of full refetch on every event
+- Future: Error boundaries for partial dashboard failure (individual section fallback)
 
 ## Buy & Sell (Exit Flow)
 

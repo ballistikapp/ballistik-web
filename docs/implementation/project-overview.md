@@ -68,7 +68,8 @@ server/
 
 - `DATABASE_URL` — Prisma connection string
 - `SOLANA_RPC_URL` — required, Solana RPC endpoint
-- `SHYFT_API_KEY` — optional, enables Shyft gRPC streaming and REST APIs
+- `SHYFT_API_KEY` — optional, enables Shyft REST APIs, callbacks, and DeFi APIs
+- `SHYFT_GRPC_TOKEN` — optional, x-token for gRPC streaming authentication (falls back to `SHYFT_API_KEY`)
 - `SHYFT_CALLBACK_SECRET` — optional, validates incoming Shyft webhook requests
 - `APP_URL` — optional, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
 - `NEXT_PUBLIC_*` as needed for client-only configuration

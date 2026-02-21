@@ -21,7 +21,8 @@
 
 ## Environment Variables
 - `SOLANA_RPC_URL` is required and validated when `getEnv()` is called
-- `SHYFT_API_KEY` is optional and enables Shyft gRPC streaming, REST APIs, and callback management
+- `SHYFT_API_KEY` is optional and enables Shyft REST APIs, callback management, and DeFi APIs
+- `SHYFT_GRPC_TOKEN` is optional and provides the x-token for gRPC authentication (falls back to `SHYFT_API_KEY`)
 - `SHYFT_CALLBACK_SECRET` is optional and used to validate incoming Shyft webhook requests
 - `APP_URL` is optional (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`). Required for automatic callback registration on token and wallet creation.
 - `DATABASE_URL` is used for Prisma connections when set

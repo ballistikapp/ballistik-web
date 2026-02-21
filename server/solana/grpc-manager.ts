@@ -8,6 +8,9 @@ import {
   loadGrpcClient,
   type GrpcStream,
 } from "./grpc-utils";
+import { logger } from "@/lib/logger";
+
+const log = logger.child({ service: "grpc" });
 
 export type AccountUpdate = {
   pubkey: string;
@@ -48,13 +51,14 @@ class GrpcManager {
   async connect(
     endpoint?: "rabbitstream" | "yellowstone"
   ): Promise<boolean> {
-    const { SHYFT_API_KEY } = getEnv();
-    if (!SHYFT_API_KEY) {
-      console.log("[GrpcManager] SHYFT_API_KEY not set, gRPC disabled");
-      this.lastError = "SHYFT_API_KEY not set";
+    const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
+    const grpcToken = SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY;
+    if (!grpcToken) {
+      log.warn("SHYFT_GRPC_TOKEN not set, gRPC disabled");
+      this.lastError = "SHYFT_GRPC_TOKEN not set";
       return false;
     }
-    this.apiKey = SHYFT_API_KEY;
+    this.apiKey = grpcToken;
     this.endpointType = endpoint ?? "rabbitstream";
 
     try {
@@ -62,30 +66,25 @@ class GrpcManager {
         this.endpointType === "rabbitstream"
           ? getRabbitStreamUrl(process.env.VERCEL_REGION)
           : getDefaultShyftGrpcUrl(process.env.VERCEL_REGION);
-      console.log(
-        `[GrpcManager] Connecting to ${this.endpointType}:`,
-        url
-      );
+      log.info("Connecting", { endpoint: this.endpointType, url });
 
       const Client = await loadGrpcClient();
       if (!Client) {
-        console.log("[GrpcManager] Failed to load yellowstone-grpc client");
+        log.error("Failed to load yellowstone-grpc client");
         this.lastError = "Failed to load yellowstone-grpc client";
         return false;
       }
 
-      const client = new Client(url, SHYFT_API_KEY, undefined);
+      const client = new Client(url, grpcToken, undefined);
       this.stream = await client.subscribe();
       this.setupStreamHandlers();
       this.connected = true;
       this.lastError = null;
-      console.log(
-        `[GrpcManager] Connected successfully via ${this.endpointType}`
-      );
+      log.info("Connected successfully", { endpoint: this.endpointType });
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[GrpcManager] Connection failed:", message);
+      log.error("Connection failed", { error: message, endpoint: this.endpointType });
       this.lastError = message;
       this.scheduleReconnect();
       return false;
@@ -102,13 +101,13 @@ class GrpcManager {
     this.stream.on("data", (data: unknown) => this.handleUpdate(data));
     this.stream.on("error", (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
-      console.error("[GrpcManager] Stream error:", message);
+      log.error("Stream error", { error: message });
       this.connected = false;
       this.lastError = message;
       this.scheduleReconnect();
     });
     this.stream.on("end", () => {
-      console.log("[GrpcManager] Stream ended");
+      log.warn("Stream ended unexpectedly");
       this.connected = false;
       this.lastError = "Stream ended";
       this.scheduleReconnect();
@@ -258,6 +257,7 @@ class GrpcManager {
                 filters: [],
               },
             },
+            slots: {},
             transactions: {
               unified: {
                 vote: false,
@@ -267,7 +267,13 @@ class GrpcManager {
                 accountRequired: [],
               },
             },
+            transactionsStatus: {},
+            blocks: {},
+            blocksMeta: {},
+            entry: {},
             commitment: 1,
+            accountsDataSlice: [],
+            ping: undefined,
           },
           (err?: Error) => {
             if (err) reject(err);
@@ -275,12 +281,12 @@ class GrpcManager {
           }
         );
       });
+      log.info("Subscribed", { accounts: allAccounts.length });
       return true;
     } catch (error) {
-      console.error(
-        "[GrpcManager] Subscribe write failed:",
-        error instanceof Error ? error.message : String(error)
-      );
+      log.error("Subscribe write failed", {
+        error: error instanceof Error ? error.message : String(error),
+      });
       return false;
     }
   }
@@ -304,9 +310,11 @@ class GrpcManager {
   }
 
   getStatus() {
+    const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
+    const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY);
     return {
       connected: this.connected,
-      enabled: Boolean(this.apiKey),
+      enabled: tokenConfigured,
       lastError: this.lastError,
       endpointType: this.endpointType,
       subscriptionCount: this.subscriptions.size,
@@ -319,13 +327,15 @@ class GrpcManager {
     this.reconnecting = true;
     this.connected = false;
 
-    console.log("[GrpcManager] Scheduling reconnect in 5 seconds...");
+    log.warn("Scheduling reconnect in 5 seconds");
 
     setTimeout(async () => {
       this.reconnecting = false;
       const success = await this.connect();
       if (success && this.allSubscribedAccounts.size > 0) {
-        console.log("[GrpcManager] Reconnected, re-subscribing...");
+        log.info("Reconnected, re-subscribing", {
+          accounts: this.allSubscribedAccounts.size,
+        });
         await this.writeSubscription();
       }
     }, 5000);

@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { IconExternalLink, IconArrowUpRight, IconArrowDownRight, IconSparkles, IconWallet } from "@tabler/icons-react";
+import { IconExternalLink, IconArrowUpRight, IconArrowDownRight, IconSparkles } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -17,60 +17,31 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  truncateAddress,
+  formatTimeAgo,
+  formatTokenCount,
+  formatPrice,
+} from "@/lib/utils/format";
 
-interface Transaction {
+interface DashboardTransaction {
   id: string;
   transactionType: "BUY" | "SELL" | "CREATE";
   status: "PENDING" | "CONFIRMED" | "FAILED";
-  solAmount: unknown;
-  tokenAmount: unknown;
-  pricePerToken: unknown;
+  solAmount: number | string;
+  tokenAmount: number | string;
+  pricePerToken: number | string;
   transactionSignature: string;
+  blockTime: string | Date | null;
   createdAt: string | Date;
-  wallet: {
-    publicKey: string;
-    type: string;
-  };
+  walletPublicKey: string;
+  walletType: string | null;
+  isOwned: boolean;
 }
 
 interface DashboardTransactionsProps {
-  transactions: Transaction[];
+  transactions: DashboardTransaction[];
   tokenPublicKey: string;
-}
-
-function truncateAddress(address: string): string {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
-}
-
-function formatTimeAgo(date: string | Date): string {
-  const now = new Date();
-  const then = new Date(date);
-  const diffMs = now.getTime() - then.getTime();
-  const diffSecs = Math.floor(diffMs / 1000);
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffSecs < 30) return "just now";
-  if (diffMins < 1) return `${diffSecs}s ago`;
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 30) return `${diffDays}d ago`;
-  return then.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-}
-
-function formatTokenCount(value: number): string {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toFixed(0);
-}
-
-function formatPrice(price: number): string {
-  if (price === 0) return "—";
-  if (price < 0.000001) return price.toExponential(3);
-  if (price < 0.001) return price.toFixed(9);
-  return price.toFixed(6);
 }
 
 const typeConfig = {
@@ -103,7 +74,7 @@ export function DashboardTransactions({
       <Card>
         <CardHeader>
           <CardTitle>Recent Transactions</CardTitle>
-          <CardDescription>Transactions from this token&apos;s wallets</CardDescription>
+          <CardDescription>Token buy/sell activity</CardDescription>
         </CardHeader>
         <CardContent className="flex items-center justify-center py-8">
           <p className="text-muted-foreground text-sm">No transactions yet</p>
@@ -116,7 +87,7 @@ export function DashboardTransactions({
     <Card>
       <CardHeader>
         <CardTitle>Recent Transactions</CardTitle>
-        <CardDescription>Transactions from this token&apos;s wallets</CardDescription>
+        <CardDescription>Token buy/sell activity</CardDescription>
       </CardHeader>
       <CardContent className="px-0">
         <div className="divide-y">
@@ -143,6 +114,11 @@ export function DashboardTransactions({
                     <span className={`text-sm font-medium ${config.color}`}>
                       {config.label}
                     </span>
+                    {!tx.isOwned && (
+                      <Badge variant="secondary" className="text-[10px] px-1 py-0 leading-tight">
+                        EXT
+                      </Badge>
+                    )}
                     {tx.status === "FAILED" && (
                       <Badge variant="destructive" className="text-[10px] px-1 py-0 leading-tight">
                         FAILED
@@ -155,24 +131,37 @@ export function DashboardTransactions({
                     )}
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-mono text-xs text-muted-foreground">
-                      {truncateAddress(tx.wallet.publicKey)}
-                    </span>
-                    <Badge variant="outline" className="text-[10px] px-1 py-0 leading-tight">
-                      {tx.wallet.type}
-                    </Badge>
                     <Tooltip>
                       <TooltipTrigger asChild>
-                        <Link
-                          href={`/${tokenPublicKey}/wallets/${tx.wallet.publicKey}`}
-                          target="_blank"
-                          className="text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <IconWallet className="size-3" />
-                        </Link>
+                        {tx.isOwned ? (
+                          <Link
+                            href={`/${tokenPublicKey}/wallets/${tx.walletPublicKey}`}
+                            target="_blank"
+                            className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                          >
+                            {truncateAddress(tx.walletPublicKey)}
+                          </Link>
+                        ) : (
+                          <a
+                            href={`https://solscan.io/account/${tx.walletPublicKey}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="font-mono text-xs text-muted-foreground hover:text-foreground hover:underline transition-colors"
+                          >
+                            {truncateAddress(tx.walletPublicKey)}
+                          </a>
+                        )}
                       </TooltipTrigger>
-                      <TooltipContent>View wallet</TooltipContent>
+                      <TooltipContent className="flex items-center gap-1">
+                        {tx.isOwned ? "Go to Wallet" : "View Wallet on Solscan"}
+                        <IconExternalLink className="size-3" />
+                      </TooltipContent>
                     </Tooltip>
+                    {tx.walletType && (
+                      <Badge variant="outline" className="text-[10px] px-1 py-0 leading-tight">
+                        {tx.walletType}
+                      </Badge>
+                    )}
                   </div>
                 </div>
 
@@ -195,17 +184,22 @@ export function DashboardTransactions({
                 </div>
 
                 <span className="text-xs text-muted-foreground whitespace-nowrap w-14 text-right shrink-0">
-                  {formatTimeAgo(tx.createdAt)}
+                  {formatTimeAgo(tx.blockTime ?? tx.createdAt)}
                 </span>
 
-                <a
-                  href={`https://solscan.io/tx/${tx.transactionSignature}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
-                >
-                  <IconExternalLink className="size-3.5" />
-                </a>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <a
+                      href={`https://solscan.io/tx/${tx.transactionSignature}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
+                    >
+                      <IconExternalLink className="size-3.5" />
+                    </a>
+                  </TooltipTrigger>
+                  <TooltipContent>View Transaction on Solscan</TooltipContent>
+                </Tooltip>
               </div>
             );
           })}

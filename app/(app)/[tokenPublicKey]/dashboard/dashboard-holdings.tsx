@@ -19,6 +19,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  formatTokenCount,
+  formatSol,
+  formatPrice,
+  truncateAddress,
+} from "@/lib/utils/format";
 
 interface UserWallet {
   publicKey: string;
@@ -52,31 +58,6 @@ interface HoldingsBreakdownData {
 interface DashboardHoldingsProps {
   holdings: HoldingsBreakdownData;
   tokenPublicKey: string;
-}
-
-function formatTokenCount(value: number): string {
-  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
-  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
-  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
-  return value.toFixed(0);
-}
-
-function formatSol(value: number): string {
-  if (Math.abs(value) >= 1_000) return `${(value / 1_000).toFixed(2)}K`;
-  if (Math.abs(value) < 0.0001 && value !== 0) return value.toExponential(2);
-  return value.toFixed(4);
-}
-
-function formatPrice(price: number): string {
-  if (price === 0) return "—";
-  if (price < 0.000001) return price.toExponential(3);
-  if (price < 0.001) return price.toFixed(9);
-  if (price < 1) return price.toFixed(6);
-  return price.toFixed(4);
-}
-
-function truncateAddress(address: string): string {
-  return `${address.slice(0, 4)}...${address.slice(-4)}`;
 }
 
 export function DashboardHoldings({
