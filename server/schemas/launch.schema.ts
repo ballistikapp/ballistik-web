@@ -28,7 +28,7 @@ export const launchTokenSchema = z.object({
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(11, "Bundler wallet count must be 11 or less"),
+    .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
     .min(0, "Bundler buy amount must be 0 or more"),

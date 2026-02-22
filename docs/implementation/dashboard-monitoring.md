@@ -97,8 +97,8 @@ P&L = ownedSellVolume + holdingsValue - ownedBuyVolume
 
 1. `GrpcManager` streams on-chain account and transaction updates.
 2. `subscription.router.ts` filters relevant events, yields them via SSE, **and writes live data to DB**:
-   - `onBalanceUpdate`: updates `Wallet.balanceSol` in DB, awaits commit, then invalidates stats cache.
-   - `onTokenBalanceUpdate`: subscribes both wallet pubkeys and derived ATAs, updates `Holding.tokenBalance` in DB, awaits commit, then invalidates stats cache.
+   - `onBalanceUpdate`: subscribes all user-managed wallets for the token (operational + dev + main), updates `Wallet.balanceSol` in DB, awaits commit, then invalidates stats cache.
+   - `onTokenBalanceUpdate`: subscribes both managed wallet pubkeys and derived ATAs, updates `Holding.tokenBalance` in DB, creates a `Holding` row if one does not exist yet for that wallet/token pair, awaits commit, then invalidates stats cache.
    - `onNewTransaction`: enqueues the signature for auto-ingestion via `ingestionQueue`, yields the event immediately (before ingestion completes).
 3. `ingestionQueue` (`server/services/ingestion-queue.service.ts`) batches signatures per token (500ms window), calls `transactionService.ingestTokenSignatures` to parse and insert `TokenTransaction` records, then invalidates stats cache and emits `ingestionComplete` via `dashboardEvents`.
 4. `subscription.router.ts` `onIngestionComplete` listens to the `ingestionComplete` event and yields to SSE, notifying the client that fresh transaction data is now in the DB.

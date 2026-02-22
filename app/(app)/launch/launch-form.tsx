@@ -69,7 +69,7 @@ const formSchema = z.object({
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(11, "Bundler wallet count must be 11 or less"),
+    .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
     .min(0, "Bundler buy amount must be 0 or more"),
@@ -493,7 +493,7 @@ export function LaunchForm() {
       website: "",
       devWalletOption: "generate" as "import" | "generate" | "use_main",
       importedDevWalletKey: "",
-      devBuyAmountSol: 0.003,
+      devBuyAmountSol: 0.05,
       jitoTipAmountSol: 0.001,
       bundleBuyEnabled: true,
       vanityMint: false,
@@ -1048,7 +1048,7 @@ export function LaunchForm() {
                         id={field.name}
                         type="number"
                         step="0.0001"
-                        min="0.003"
+                        min="0.05"
                         max="100"
                         value={field.state.value}
                         onChange={(e) =>
@@ -1161,7 +1161,7 @@ export function LaunchForm() {
                                 id={field.name}
                                 type="number"
                                 min="1"
-                                max="11"
+                                max="10"
                                 value={field.state.value}
                                 onChange={(e) =>
                                   field.handleChange(
@@ -1171,7 +1171,7 @@ export function LaunchForm() {
                                 placeholder="5"
                               />
                               <FieldDescription>
-                                How many wallets to use for bundle buy (max 11)
+                                How many wallets to use for bundle buy (max 10)
                               </FieldDescription>
                             </Field>
                           )}

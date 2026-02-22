@@ -67,8 +67,9 @@ export function formatTimeAgo(date: string | Date): string {
 }
 
 export function formatRuntime(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`;
-  const mins = Math.floor(seconds / 60);
+  const safeSeconds = Math.max(0, Math.floor(seconds));
+  if (safeSeconds < 300) return `${safeSeconds}s`;
+  const mins = Math.floor(safeSeconds / 60);
   if (mins < 60) return `${mins}m`;
   const hours = Math.floor(mins / 60);
   const remainMins = mins % 60;

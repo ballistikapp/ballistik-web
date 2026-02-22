@@ -74,6 +74,14 @@ type LaunchRecoveryData = {
   distributionWallets: string[];
 };
 
+type SolReturnResult = {
+  publicKey: string;
+  status: "returned" | "skipped" | "failed";
+  signature?: string;
+  amountSol?: number;
+  error?: string;
+};
+
 type DistributionWallet = {
   parentIndex: number;
   wallet: Keypair;
@@ -749,7 +757,10 @@ async function fundWalletsFromMain(
 }
 
 function validateLaunchInput(input: LaunchTokenInput) {
-  const { minBuyAmountSol: MIN_BUY_AMOUNT_SOL } = getLaunchConfig();
+  const {
+    minBuyAmountSol: MIN_BUY_AMOUNT_SOL,
+    maxBundleWallets: MAX_BUNDLE_WALLETS,
+  } = getLaunchConfig();
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
   const bundlerWalletCount = Math.max(0, Math.floor(input.bundlerWalletCount));
@@ -775,8 +786,11 @@ function validateLaunchInput(input: LaunchTokenInput) {
       400
     );
   }
-  if (input.bundleBuyEnabled && bundlerWalletCount > 11) {
-    throw new AppError("Bundle buy supports up to 11 wallets per launch", 400);
+  if (input.bundleBuyEnabled && bundlerWalletCount > MAX_BUNDLE_WALLETS) {
+    throw new AppError(
+      `Bundle buy supports up to ${MAX_BUNDLE_WALLETS} wallets per launch`,
+      400
+    );
   }
 
   return {
@@ -1217,6 +1231,88 @@ async function persistTokenAndWallets(
   return { token, distributionWalletCount };
 }
 
+async function returnExcessSolToMain(
+  launchId: string,
+  mainWalletPublicKey: string,
+  sourceWallets: Keypair[]
+) {
+  const { transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS } =
+    getLaunchConfig();
+  const startedAt = Date.now();
+  const connection = getSolanaConnection();
+  const mainPublicKey = new PublicKey(mainWalletPublicKey);
+  const uniqueSourceWallets = sourceWallets.filter(
+    (wallet, index, all) =>
+      !wallet.publicKey.equals(mainPublicKey) &&
+      all.findIndex((item) => item.publicKey.equals(wallet.publicKey)) === index
+  );
+
+  if (uniqueSourceWallets.length === 0) {
+    return {
+      attempted: 0,
+      returned: 0,
+      failed: 0,
+      skipped: 0,
+      totalReturnedSol: 0,
+      results: [] as SolReturnResult[],
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  const results: SolReturnResult[] = [];
+  let totalReturnedLamports = BigInt(0);
+  for (const sourceWallet of uniqueSourceWallets) {
+    const balanceLamports = await connection.getBalance(sourceWallet.publicKey);
+    const lamportsToSend = balanceLamports - TRANSFER_FEE_BUFFER_LAMPORTS;
+    if (lamportsToSend <= 0) {
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "skipped",
+        error: "Insufficient balance",
+      });
+      continue;
+    }
+    try {
+      const transaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: sourceWallet.publicKey,
+          toPubkey: mainPublicKey,
+          lamports: lamportsToSend,
+        })
+      );
+      const signature = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [sourceWallet],
+        { commitment: "confirmed" }
+      );
+      totalReturnedLamports += BigInt(lamportsToSend);
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "returned",
+        signature,
+        amountSol: lamportsToSol(BigInt(lamportsToSend)),
+      });
+    } catch (error) {
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "failed",
+        error: getErrorMessage(error) || "Return failed",
+      });
+    }
+  }
+
+  return {
+    attempted: uniqueSourceWallets.length,
+    returned: results.filter((result) => result.status === "returned").length,
+    failed: results.filter((result) => result.status === "failed").length,
+    skipped: results.filter((result) => result.status === "skipped").length,
+    totalReturnedSol: lamportsToSol(totalReturnedLamports),
+    results,
+    durationMs: Date.now() - startedAt,
+  };
+}
+
 async function finalizeLaunch(
   launchId: string,
   tokenPublicKey: string,
@@ -1225,6 +1321,16 @@ async function finalizeLaunch(
   bundlerWalletKeypairs: Keypair[],
   recovery: LaunchRecoveryData,
   jitoTipAmountSol: number,
+  solReturn:
+    | {
+        attempted: number;
+        returned: number;
+        failed: number;
+        skipped: number;
+        totalReturnedSol: number;
+        results: SolReturnResult[];
+      }
+    | null,
   durationMs?: number
 ) {
   const finalStatus = (await isCancelRequested(launchId))
@@ -1246,6 +1352,7 @@ async function finalizeLaunch(
           wallet.publicKey.toBase58()
         ),
         jitoTipAmountSol,
+        solReturn,
         recovery,
       },
     },
@@ -1484,7 +1591,10 @@ export const launchService = {
       : recoveryWallets;
 
     if (targetWallets.length === 0) {
-      throw new AppError("No recovery wallets available", 400);
+      return {
+        mainWalletPublicKey,
+        results: [],
+      };
     }
 
     const wallets = await prisma.wallet.findMany({
@@ -2122,6 +2232,59 @@ export const launchService = {
         );
       }
 
+      await setStep(launchId, 90, "cleanup", "Returning excess SOL");
+      const managedLaunchWallets: Keypair[] = [
+        ...(input.devWalletOption === "generate" &&
+        devWalletPublicKey !== user.mainWallet.publicKey
+          ? [devWalletKeypair]
+          : []),
+        ...bundlerWalletKeypairs,
+        ...distributionWallets.map((wallet) => wallet.wallet),
+      ];
+      const solReturn = await returnExcessSolToMain(
+        launchId,
+        user.mainWallet.publicKey,
+        managedLaunchWallets
+      );
+      await appendLog(
+        launchId,
+        "INFO",
+        "Excess SOL returned to main wallet",
+        "cleanup",
+        {
+          attempted: solReturn.attempted,
+          returned: solReturn.returned,
+          failed: solReturn.failed,
+          skipped: solReturn.skipped,
+          totalReturnedSol: solReturn.totalReturnedSol,
+          durationMs: solReturn.durationMs,
+          results: solReturn.results,
+        }
+      );
+
+      const returnedWalletPublicKeys = solReturn.results
+        .filter((result) => result.status === "returned")
+        .map((result) => result.publicKey);
+      if (returnedWalletPublicKeys.length > 0) {
+        const refreshWalletPublicKeys = Array.from(
+          new Set([user.mainWallet.publicKey, ...returnedWalletPublicKeys])
+        );
+        try {
+          await walletService.refreshWalletBalances(
+            token.publicKey,
+            user.id,
+            refreshWalletPublicKeys,
+            true
+          );
+        } catch (error) {
+          logger.warn("Launch success post-sweep balance refresh failed", {
+            launchId,
+            tokenPublicKey: token.publicKey,
+            message: getErrorMessage(error),
+          });
+        }
+      }
+
       await finalizeLaunch(
         launchId,
         token.publicKey,
@@ -2137,6 +2300,14 @@ export const launchService = {
             distributionWallets
           ),
         jitoTipAmountSol,
+        {
+          attempted: solReturn.attempted,
+          returned: solReturn.returned,
+          failed: solReturn.failed,
+          skipped: solReturn.skipped,
+          totalReturnedSol: solReturn.totalReturnedSol,
+          results: solReturn.results,
+        },
         Date.now() - launchStartedAt
       );
     } catch (error) {

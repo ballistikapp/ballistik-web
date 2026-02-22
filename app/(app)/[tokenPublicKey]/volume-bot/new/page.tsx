@@ -91,6 +91,7 @@ const defaultRange: RangeInput = {
 
 const formatDuration = (seconds: number) => {
   if (!Number.isFinite(seconds) || seconds <= 0) return "—";
+  if (seconds < 300) return `${Math.floor(seconds)}s`;
   const totalMinutes = Math.floor(seconds / 60);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;

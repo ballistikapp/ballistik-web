@@ -43,6 +43,40 @@ type NewTransactionEvent = {
   detectedAt: number;
 };
 
+async function getMonitoredWalletPubkeys(
+  tokenPublicKey: string,
+  userId: string,
+  walletPublicKeys?: string[]
+): Promise<Set<string>> {
+  const [operationalWallets, devWallets, user] = await Promise.all([
+    prisma.wallet.findMany({
+      where: { tokenPublicKey },
+      select: { publicKey: true },
+    }),
+    prisma.tokenDevWallet.findMany({
+      where: { tokenPublicKey },
+      select: { walletPublicKey: true },
+    }),
+    prisma.user.findUnique({
+      where: { id: userId },
+      select: { mainWallet: { select: { publicKey: true } } },
+    }),
+  ]);
+
+  const allPubkeys = new Set<string>();
+  for (const wallet of operationalWallets) allPubkeys.add(wallet.publicKey);
+  for (const wallet of devWallets) allPubkeys.add(wallet.walletPublicKey);
+  if (user?.mainWallet?.publicKey) allPubkeys.add(user.mainWallet.publicKey);
+
+  if (!walletPublicKeys?.length) return allPubkeys;
+
+  const filtered = new Set<string>();
+  for (const publicKey of walletPublicKeys) {
+    if (allPubkeys.has(publicKey)) filtered.add(publicKey);
+  }
+  return filtered;
+}
+
 export const subscriptionRouter = router({
   onBalanceUpdate: protectedProcedure
     .input(
@@ -52,25 +86,11 @@ export const subscriptionRouter = router({
       })
     )
     .subscription(async function* ({ input, ctx }) {
-      const wallets = await prisma.wallet.findMany({
-        where: {
-          tokenPublicKey: input.tokenPublicKey,
-          ...(input.walletPublicKeys?.length
-            ? { publicKey: { in: input.walletPublicKeys } }
-            : {}),
-        },
-        select: { publicKey: true },
-      });
-
-      const user = await prisma.user.findUnique({
-        where: { id: ctx.user.id },
-        select: { mainWallet: { select: { publicKey: true } } },
-      });
-
-      const allPubkeys = new Set(wallets.map((w) => w.publicKey));
-      if (user?.mainWallet) {
-        allPubkeys.add(user.mainWallet.publicKey);
-      }
+      const allPubkeys = await getMonitoredWalletPubkeys(
+        input.tokenPublicKey,
+        ctx.user.id,
+        input.walletPublicKeys
+      );
 
       if (allPubkeys.size === 0) return;
 
@@ -163,18 +183,17 @@ export const subscriptionRouter = router({
       })
     )
     .subscription(async function* ({ input, ctx }) {
-      const wallets = await prisma.wallet.findMany({
-        where: {
-          tokenPublicKey: input.tokenPublicKey,
-          ...(input.walletPublicKeys?.length
-            ? { publicKey: { in: input.walletPublicKeys } }
-            : {}),
-        },
-        select: { publicKey: true },
-      });
-
-      const walletPubkeys = new Set(wallets.map((w) => w.publicKey));
+      const walletPubkeys = await getMonitoredWalletPubkeys(
+        input.tokenPublicKey,
+        ctx.user.id,
+        input.walletPublicKeys
+      );
       if (walletPubkeys.size === 0) return;
+
+      const tokenMeta = await prisma.token.findUnique({
+        where: { publicKey: input.tokenPublicKey },
+        select: { name: true, symbol: true, imageUrl: true },
+      });
 
       const monitoredPubkeys = new Set<string>();
       const ataToOwner = new Map<string, string>();
@@ -246,6 +265,15 @@ export const subscriptionRouter = router({
           }
           while (queue.length > 0) {
             const event = queue.shift()!;
+            const tokenBalance = Number(event.amount);
+            if (!Number.isFinite(tokenBalance)) {
+              log.warn("Skipping non-finite token balance update", {
+                tokenPublicKey: input.tokenPublicKey,
+                walletPublicKey: event.walletPublicKey,
+                amount: event.amount,
+              });
+              continue;
+            }
             if (!monitoringPipelineV2Enabled) {
               prisma.holding
                 .updateMany({
@@ -253,7 +281,7 @@ export const subscriptionRouter = router({
                     walletPublicKey: event.walletPublicKey,
                     tokenPublicKey: event.mint,
                   },
-                  data: { tokenBalance: Number(event.amount) },
+                  data: { tokenBalance },
                 })
                 .catch(() => {});
               invalidateStatsCache(input.tokenPublicKey);
@@ -261,13 +289,35 @@ export const subscriptionRouter = router({
               continue;
             }
             try {
-              await prisma.holding.updateMany({
+              const now = new Date();
+              const updated = await prisma.holding.updateMany({
                 where: {
                   walletPublicKey: event.walletPublicKey,
                   tokenPublicKey: event.mint,
                 },
-                data: { tokenBalance: Number(event.amount) },
+                data: { tokenBalance, lastUpdated: now },
               });
+
+              if (updated.count === 0) {
+                await prisma.holding.create({
+                  data: {
+                    walletPublicKey: event.walletPublicKey,
+                    tokenPublicKey: event.mint,
+                    tokenBalance,
+                    totalBuyAmount: 0,
+                    totalSellAmount: 0,
+                    averageBuyPrice: 0,
+                    lastTransactionSignature: "",
+                    lastUpdated: now,
+                    mintAddress: event.mint,
+                    tokenName: tokenMeta?.name ?? "",
+                    tokenSymbol: tokenMeta?.symbol ?? "",
+                    tokenImageUrl: tokenMeta?.imageUrl ?? "",
+                    tokenDecimals: 9,
+                  },
+                });
+              }
+
               grpcManager.reportDbWriteSuccess();
               invalidateStatsCache(input.tokenPublicKey);
             } catch (error) {

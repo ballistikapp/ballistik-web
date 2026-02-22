@@ -40,6 +40,8 @@ type WalletWithKey = WalletRecord & {
   privateKey: string;
 };
 
+const HOLDING_MUTATION_BATCH_SIZE = 100;
+
 async function getAllowedWallets(
   tokenPublicKey: string,
   userId: string,
@@ -450,7 +452,10 @@ export const holdingService = {
     const now = new Date();
     const createManyData: Prisma.HoldingCreateManyInput[] = [];
     const deleteIds: string[] = [];
-    const updateOperations: Prisma.PrismaPromise<unknown>[] = [];
+    const updateInputs: Array<{
+      id: string;
+      data: Prisma.HoldingUpdateInput;
+    }> = [];
 
     for (const { wallet, tokenBalance, ataExists, isResolved } of balanceResults.results) {
       if (!isResolved) {
@@ -507,36 +512,51 @@ export const holdingService = {
         continue;
       }
 
-      updateOperations.push(
-        prisma.holding.update({
-          where: { id: existing.id },
-          data: {
-            ...baseData,
-            lastUpdated: now,
-          },
-        })
-      );
+      updateInputs.push({
+        id: existing.id,
+        data: {
+          ...baseData,
+          lastUpdated: now,
+        },
+      });
     }
 
-    const operations: Prisma.PrismaPromise<unknown>[] = [];
     if (deleteIds.length > 0) {
-      operations.push(
-        prisma.holding.deleteMany({
-          where: { id: { in: deleteIds } },
-        })
-      );
+      for (let i = 0; i < deleteIds.length; i += HOLDING_MUTATION_BATCH_SIZE) {
+        const batch = deleteIds.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
+        await prisma.$transaction([
+          prisma.holding.deleteMany({
+            where: { id: { in: batch } },
+          }),
+        ]);
+      }
     }
     if (createManyData.length > 0) {
-      operations.push(
-        prisma.holding.createMany({
-          data: createManyData,
-        })
-      );
+      for (
+        let i = 0;
+        i < createManyData.length;
+        i += HOLDING_MUTATION_BATCH_SIZE
+      ) {
+        const batch = createManyData.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
+        await prisma.$transaction([
+          prisma.holding.createMany({
+            data: batch,
+          }),
+        ]);
+      }
     }
-    operations.push(...updateOperations);
-
-    if (operations.length > 0) {
-      await prisma.$transaction(operations);
+    if (updateInputs.length > 0) {
+      for (let i = 0; i < updateInputs.length; i += HOLDING_MUTATION_BATCH_SIZE) {
+        const batch = updateInputs.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
+        await prisma.$transaction(
+          batch.map((update) =>
+            prisma.holding.update({
+              where: { id: update.id },
+              data: update.data,
+            })
+          )
+        );
+      }
     }
 
     await refreshCacheService.touch({

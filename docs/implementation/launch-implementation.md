@@ -25,6 +25,7 @@
 - `launch.getActive` (query): resume latest running/pending launch.
 - `launch.recoveryWallets` (query): returns wallets eligible for SOL recovery after launch runs.
 - `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet.
+  - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
 
 ## Database Models
 
@@ -90,7 +91,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
-2. **Validate**: enforce min buy thresholds and bundle wallet limit.
+2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev/bundler buys) and bundle wallet limit (max `10` bundler wallets).
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
@@ -99,7 +100,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 8. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
 9. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
 10. **Persist**: create Token, link wallets, link vanity mint to token, link distribution wallets.
-11. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
+11. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
+12. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
 
@@ -153,7 +155,7 @@ When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito b
   - The token create instructions,
   - Up to 1 buy.
 - Subsequent transactions include up to 3 buys each.
-- With 10 bundler wallets + dev buy (11 total buys), the packing is:
+- With the max 10 bundler wallets + dev buy (11 total buys), the packing is:
   - TX1: create + dev buy
   - TX2: 3 buys
   - TX3: 3 buys

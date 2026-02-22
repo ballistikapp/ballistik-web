@@ -35,11 +35,11 @@ const launchConfigSchema = z.object({
 
 const baseLaunchConfig = {
   // Minimum buy amount per wallet (SOL).
-  minBuyAmountSol: 0.003,
+  minBuyAmountSol: 0.05,
   // Slippage basis points applied to pump.fun swaps.
   slippageBasisPoints: BigInt(10000),
   // Maximum bundler wallets allowed in a single bundle launch.
-  maxBundleWallets: 11,
+  maxBundleWallets: 10,
   // Extra lamports added to each buy wallet for transaction fees.
   fundingBufferLamports: 4_000_000,
   // Extra lamports reserved for token creation fees.
