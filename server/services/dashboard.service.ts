@@ -219,24 +219,17 @@ async function getHoldingsBreakdown(
   const userWalletRows = userHoldings
     .map((h) => {
       const tokenBalance = Number(h.tokenBalance);
-      const avgBuyPrice = Number(h.averageBuyPrice);
       const holdingPercent =
         circulatingSupply > 0
           ? round4((tokenBalance / circulatingSupply) * 100)
           : 0;
       const valueSol = round4(tokenBalance * priceSol);
-      const unrealizedPnl = round4(
-        tokenBalance * priceSol - tokenBalance * avgBuyPrice
-      );
       return {
         publicKey: h.wallet.publicKey,
         type: h.wallet.type,
         tokenBalance,
         holdingPercent,
         valueSol,
-        avgBuyPrice,
-        currentPrice: priceSol,
-        unrealizedPnl,
         solBalance: round4(Number(h.wallet.balanceSol)),
       };
     })

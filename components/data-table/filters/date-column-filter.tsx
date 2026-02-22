@@ -63,11 +63,11 @@ export function DateColumnFilter<TData, TValue>({
 
   const fromDate = React.useMemo(
     () => (filterValue?.from ? new Date(filterValue.from) : undefined),
-    [filterValue?.from]
+    [filterValue]
   );
   const toDate = React.useMemo(
     () => (filterValue?.to ? new Date(filterValue.to) : undefined),
-    [filterValue?.to]
+    [filterValue]
   );
 
   const handlePresetChange = (value: string) => {

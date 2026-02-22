@@ -22,7 +22,6 @@ import {
 import {
   formatTokenCount,
   formatSol,
-  formatPrice,
   truncateAddress,
 } from "@/lib/utils/format";
 
@@ -32,9 +31,6 @@ interface UserWallet {
   tokenBalance: number;
   holdingPercent: number;
   valueSol: number;
-  avgBuyPrice: number;
-  currentPrice: number;
-  unrealizedPnl: number;
   solBalance: number;
 }
 
@@ -77,10 +73,6 @@ export function DashboardHoldings({
     (sum, w) => sum + w.valueSol,
     0
   );
-  const totalUserPnl = holdings.userWallets.reduce(
-    (sum, w) => sum + w.unrealizedPnl,
-    0
-  );
 
   return (
     <Card>
@@ -96,11 +88,6 @@ export function DashboardHoldings({
           <SummaryCell
             label="Your Value"
             value={`${formatSol(totalUserValueSol)} SOL`}
-          />
-          <SummaryCell
-            label="Unrealized P&L"
-            value={`${totalUserPnl >= 0 ? "+" : ""}${formatSol(totalUserPnl)} SOL`}
-            valueClass={totalUserPnl >= 0 ? "text-green-500" : "text-red-500"}
           />
           <SummaryCell
             label="Total Supply"
@@ -201,9 +188,6 @@ export function DashboardHoldings({
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
                         <span className="font-mono tabular-nums">
-                          Avg {formatPrice(wallet.avgBuyPrice)}
-                        </span>
-                        <span className="font-mono tabular-nums">
                           SOL Bal: {formatSol(wallet.solBalance)}
                         </span>
                       </div>
@@ -234,21 +218,6 @@ export function DashboardHoldings({
                       </div>
                     </div>
 
-                    <div className="flex flex-col items-end shrink-0 w-24">
-                      <span
-                        className={`text-sm font-mono tabular-nums ${
-                          wallet.unrealizedPnl >= 0
-                            ? "text-green-500"
-                            : "text-red-500"
-                        }`}
-                      >
-                        {wallet.unrealizedPnl >= 0 ? "+" : ""}
-                        {formatSol(wallet.unrealizedPnl)}
-                      </span>
-                      <span className="text-[10px] text-muted-foreground">
-                        P&L
-                      </span>
-                    </div>
                   </div>
                 ))}
               </div>

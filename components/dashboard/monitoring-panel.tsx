@@ -12,6 +12,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_SECONDS = 30;
+type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
 interface MonitoringPanelProps {
   isMonitoring: boolean;
@@ -19,8 +20,8 @@ interface MonitoringPanelProps {
   onRefresh: () => void | Promise<void>;
   isRefreshing: boolean;
   isFullRefresh: boolean;
+  healthState: MonitoringHealthState;
   dataUpdatedAt: number;
-  sseError?: boolean;
 }
 
 export function MonitoringPanel({
@@ -29,8 +30,8 @@ export function MonitoringPanel({
   onRefresh,
   isRefreshing,
   isFullRefresh,
+  healthState,
   dataUpdatedAt,
-  sseError,
 }: MonitoringPanelProps) {
   const [minimized, setMinimized] = useState(false);
   const [secondsAgo, setSecondsAgo] = useState(0);
@@ -63,11 +64,21 @@ export function MonitoringPanel({
     }
   }, [isRefreshing, onRefresh]);
 
-  const statusIndicatorClass = isMonitoring
-    ? sseError
-      ? "bg-amber-500 animate-pulse"
-      : "bg-green-500 animate-pulse"
-    : "bg-muted-foreground/40";
+  const statusIndicatorClass =
+    healthState === "healthy"
+      ? "bg-green-500 animate-pulse"
+      : healthState === "degraded" || healthState === "failed"
+        ? "bg-amber-500 animate-pulse"
+        : "bg-muted-foreground/40";
+
+  const statusText =
+    healthState === "healthy"
+      ? "Real-time"
+      : healthState === "degraded"
+        ? "Degraded"
+        : healthState === "failed"
+          ? "Disconnected"
+          : "Polling (30s)";
 
   if (minimized) {
     return (
@@ -93,9 +104,11 @@ export function MonitoringPanel({
           </TooltipTrigger>
           <TooltipContent side="left">
             {isMonitoring
-              ? sseError
-                ? "Monitoring disconnected"
-                : "Monitoring active"
+              ? healthState === "degraded"
+                ? "Monitoring degraded"
+                : healthState === "failed"
+                  ? "Monitoring disconnected"
+                  : "Monitoring active"
               : "Monitoring off"}
           </TooltipContent>
         </Tooltip>
@@ -126,13 +139,7 @@ export function MonitoringPanel({
               <span
                 className={cn("size-2.5 rounded-full shrink-0", statusIndicatorClass)}
               />
-              <span className="text-sm">
-                {isMonitoring
-                  ? sseError
-                    ? "Disconnected"
-                    : "Real-time"
-                  : "Polling (30s)"}
-              </span>
+              <span className="text-sm">{statusText}</span>
             </div>
             <Switch
               checked={isMonitoring}
@@ -148,10 +155,17 @@ export function MonitoringPanel({
             />
           </div>
 
-          {isMonitoring && sseError && (
+          {isMonitoring && healthState === "failed" && (
             <div className="flex items-center gap-2 text-xs text-amber-500">
               <AlertTriangle className="size-3.5 shrink-0" />
               <span>SSE connection lost. Falling back to polling.</span>
+            </div>
+          )}
+
+          {isMonitoring && healthState === "degraded" && (
+            <div className="flex items-center gap-2 text-xs text-amber-500">
+              <AlertTriangle className="size-3.5 shrink-0" />
+              <span>Live events are delayed. Use refresh for recovery.</span>
             </div>
           )}
 

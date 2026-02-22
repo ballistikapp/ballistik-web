@@ -22,7 +22,6 @@ interface TreasuryData {
   operationalSol: number;
   devSol: number;
   walletCount: number;
-  runningVolumeBots: number;
 }
 
 interface HoldingsData {
@@ -42,7 +41,6 @@ interface ActivityData {
   buyVolume: number;
   sellVolume: number;
   transactionCount: number;
-  runningVolumeBots: number;
 }
 
 interface DashboardStatsProps {
@@ -75,20 +73,13 @@ export function DashboardStats({ metrics }: DashboardStatsProps) {
               {formatSol(treasury.operationalSol)}
             </span>
             <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="outline" className="text-muted-foreground text-xs">
+              <Badge
+                variant="outline"
+                className="text-muted-foreground text-xs"
+              >
                 {treasury.walletCount} wallet
                 {treasury.walletCount !== 1 ? "s" : ""}
               </Badge>
-              {treasury.runningVolumeBots > 0 && (
-                <Badge
-                  variant="outline"
-                  className="text-muted-foreground text-xs"
-                >
-                  <IconRobot className="size-3" />
-                  {treasury.runningVolumeBots} bot
-                  {treasury.runningVolumeBots > 1 ? "s" : ""} running
-                </Badge>
-              )}
             </div>
           </div>
         </CardHeader>
@@ -154,20 +145,13 @@ export function DashboardStats({ metrics }: DashboardStatsProps) {
               {formatSol(activity.sellVolume)}
             </span>
             <div className="flex gap-1.5 flex-wrap">
-              <Badge variant="outline" className="text-muted-foreground text-xs">
+              <Badge
+                variant="outline"
+                className="text-muted-foreground text-xs"
+              >
                 {activity.transactionCount} tx
                 {activity.transactionCount !== 1 ? "s" : ""}
               </Badge>
-              {activity.runningVolumeBots > 0 && (
-                <Badge
-                  variant="outline"
-                  className="text-muted-foreground text-xs"
-                >
-                  <IconRobot className="size-3" />
-                  {activity.runningVolumeBots} bot
-                  {activity.runningVolumeBots > 1 ? "s" : ""}
-                </Badge>
-              )}
             </div>
           </div>
         </CardHeader>

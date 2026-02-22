@@ -6,6 +6,10 @@ const envSchema = z.object({
   SHYFT_API_KEY: z.string().min(1).optional(),
   SHYFT_GRPC_TOKEN: z.string().min(1).optional(),
   SHYFT_CALLBACK_SECRET: z.string().min(1).optional(),
+  MONITORING_PIPELINE_V2: z
+    .string()
+    .optional()
+    .transform((value) => value !== "false"),
   APP_URL: z.string().url().optional(),
 });
 
@@ -48,6 +52,7 @@ export const getEnv = (): Env => {
     SHYFT_API_KEY: process.env.SHYFT_API_KEY,
     SHYFT_GRPC_TOKEN: process.env.SHYFT_GRPC_TOKEN,
     SHYFT_CALLBACK_SECRET: process.env.SHYFT_CALLBACK_SECRET,
+    MONITORING_PIPELINE_V2: process.env.MONITORING_PIPELINE_V2,
     APP_URL: process.env.APP_URL,
   });
   return cachedEnv;

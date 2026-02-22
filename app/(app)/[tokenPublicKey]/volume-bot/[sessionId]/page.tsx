@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -156,9 +156,8 @@ export default function VolumeBotRunPage() {
         })),
     [logs]
   );
-  const [runtimeSeconds, setRuntimeSeconds] = useState(
-    session?.runtimeSeconds ?? 0
-  );
+  const timerStartRef = useRef(Date.now());
+  const [, setTick] = useState(0);
 
   const handleStop = async () => {
     if (!session) {
@@ -172,22 +171,17 @@ export default function VolumeBotRunPage() {
     session?.status === "STOP_REQUESTED" ||
     session?.status === "STOPPING";
 
+  const baseRuntime = session?.runtimeSeconds ?? 0;
+  const elapsed = isActive
+    ? Math.floor((Date.now() - timerStartRef.current) / 1000)
+    : 0;
+  const runtimeSeconds = baseRuntime + elapsed;
   useEffect(() => {
-    if (!session) {
-      return;
-    }
-    const baseRuntime = session.runtimeSeconds ?? 0;
-    setRuntimeSeconds(baseRuntime);
-    if (!isActive) {
-      return;
-    }
-    const startedAt = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startedAt) / 1000);
-      setRuntimeSeconds(baseRuntime + elapsed);
-    }, 1000);
+    timerStartRef.current = Date.now();
+    if (!isActive) return;
+    const interval = setInterval(() => setTick((t) => t + 1), 1000);
     return () => clearInterval(interval);
-  }, [session?.runtimeSeconds, session?.status, session?.id, isActive]);
+  }, [isActive, baseRuntime]);
 
   if (isLoading) {
     return <DashboardLoading />;

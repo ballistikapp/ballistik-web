@@ -13,6 +13,7 @@ import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { rpcLimiter } from "@/lib/solana/rpc-limiter";
 import { mapWithConcurrency } from "@/lib/utils/async";
+import { ingestionQueue } from "@/server/services/ingestion-queue.service";
 import { getPumpProgram } from "@/server/solana/pump-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
@@ -675,9 +676,14 @@ export const processVolumeBotWalletRange = async (
       },
     });
 
+    if (signature) {
+      ingestionQueue.enqueue(session.tokenPublicKey, signature);
+    }
+
     dashboardEvents.emitTradeComplete({
       tokenPublicKey: session.tokenPublicKey,
       sessionId: session.id,
+      signature: signature ?? undefined,
     });
 
     return nextTickAt;
@@ -723,54 +729,83 @@ export const stopVolumeBotSession = async (sessionId: string) => {
     data: { status: "STOPPING" },
   });
 
-  try {
-    const wallets = await prisma.volumeBotWallet.findMany({
-      where: { sessionId: session.id },
-      include: { wallet: true },
-    });
+  const wallets = await prisma.volumeBotWallet.findMany({
+    where: { sessionId: session.id },
+    include: { wallet: true },
+  });
 
-    const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
-    const reclaimResults = await walletService.returnSolToMainWallet(
+  const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
+
+  let reclaimResults: Awaited<
+    ReturnType<typeof walletService.returnSolToMainWallet>
+  > | null = null;
+
+  try {
+    reclaimResults = await walletService.returnSolToMainWallet(
       session.tokenPublicKey,
       session.userId,
       walletPublicKeys,
       undefined,
       true
     );
-
-    const now = new Date();
-    await prisma.$transaction(
-      reclaimResults.map((result) =>
-        prisma.volumeBotWallet.updateMany({
-          where: { sessionId: session.id, walletPublicKey: result.publicKey },
-          data: {
-            status: result.signature ? "RECLAIMED" : undefined,
-            reclaimedAt: result.signature ? now : undefined,
-            reclaimTxSignature: result.signature ?? undefined,
-          },
-        })
-      )
-    );
-
-    await prisma.volumeBotSession.update({
-      where: { id: session.id },
-      data: { status: "STOPPED", stoppedAt: now },
-    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    console.warn(
+      `[Worker] SOL reclaim failed during stop (non-fatal): ${message}`
+    );
     await prisma.volumeBotLog.create({
       data: {
         sessionId: session.id,
-        level: "ERROR",
-        type: "stop",
-        message,
+        level: "WARN",
+        type: "reclaim_failed",
+        message: `SOL reclaim failed during stop: ${message}`,
       },
     });
-    await prisma.volumeBotSession.update({
-      where: { id: session.id },
-      data: { status: "FAILED", stoppedAt: new Date() },
-    });
   }
+
+  if (reclaimResults) {
+    try {
+      const now = new Date();
+      await prisma.$transaction(
+        reclaimResults.results.map((result) =>
+          prisma.volumeBotWallet.updateMany({
+            where: {
+              sessionId: session.id,
+              walletPublicKey: result.publicKey,
+            },
+            data: {
+              status: result.signature ? "RECLAIMED" : undefined,
+              reclaimedAt: result.signature ? now : undefined,
+              reclaimTxSignature: result.signature ?? undefined,
+            },
+          })
+        )
+      );
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error(
+        `[Worker] DB update after successful reclaim failed: ${message}`
+      );
+      await prisma.volumeBotLog.create({
+        data: {
+          sessionId: session.id,
+          level: "ERROR",
+          type: "reclaim",
+          message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
+          data: {
+            signatures: reclaimResults.results.map(
+              (r) => r.signature ?? null
+            ),
+          },
+        },
+      });
+    }
+  }
+
+  await prisma.volumeBotSession.update({
+    where: { id: session.id },
+    data: { status: "STOPPED", stoppedAt: new Date() },
+  });
 };
 
 export const reclaimVolumeBotSession = async (sessionId: string) => {
@@ -784,6 +819,7 @@ export const reclaimVolumeBotSession = async (sessionId: string) => {
     where: { sessionId: session.id },
   });
   const walletPublicKeys = wallets.map((wallet) => wallet.walletPublicKey);
+
   const reclaimResults = await walletService.returnSolToMainWallet(
     session.tokenPublicKey,
     session.userId,
@@ -791,26 +827,51 @@ export const reclaimVolumeBotSession = async (sessionId: string) => {
     undefined,
     true
   );
-  const now = new Date();
-  await prisma.$transaction(
-    reclaimResults.map((result) =>
-      prisma.volumeBotWallet.updateMany({
-        where: { sessionId: session.id, walletPublicKey: result.publicKey },
-        data: {
-          status: result.signature ? "RECLAIMED" : undefined,
-          reclaimedAt: result.signature ? now : undefined,
-          reclaimTxSignature: result.signature ?? undefined,
-        },
-      })
-    )
+
+  const signatures = reclaimResults.results.map(
+    (r) => r.signature ?? null
   );
+
+  try {
+    const now = new Date();
+    await prisma.$transaction(
+      reclaimResults.results.map((result) =>
+        prisma.volumeBotWallet.updateMany({
+          where: {
+            sessionId: session.id,
+            walletPublicKey: result.publicKey,
+          },
+          data: {
+            status: result.signature ? "RECLAIMED" : undefined,
+            reclaimedAt: result.signature ? now : undefined,
+            reclaimTxSignature: result.signature ?? undefined,
+          },
+        })
+      )
+    );
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error(
+      `[Worker] DB update after successful reclaim failed: ${message}`
+    );
+    await prisma.volumeBotLog.create({
+      data: {
+        sessionId: session.id,
+        level: "ERROR",
+        type: "reclaim",
+        message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
+        data: { signatures },
+      },
+    });
+  }
+
   await prisma.volumeBotLog.create({
     data: {
       sessionId: session.id,
       level: "INFO",
       type: "reclaim",
       message: "Reclaim requested",
-      data: { signatures: reclaimResults.map((result) => result.signature) },
+      data: { signatures },
     },
   });
 

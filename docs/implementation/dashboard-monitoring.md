@@ -27,6 +27,7 @@ Volume Bot Worker (trade events) ───┤    (tRPC)                 (debounc
                                      │
                                      ├──► Server-side DB writes (balance updates)
                                      ├──► Ingestion Queue → transactionService (auto-ingest)
+                                     │    └──► onIngestionComplete SSE → Dashboard Client (second refetch)
                                      ├──► Stats Cache Invalidation
                                      │
                                      └──► 30s polling fallback (always active)
@@ -96,16 +97,17 @@ P&L = ownedSellVolume + holdingsValue - ownedBuyVolume
 
 1. `GrpcManager` streams on-chain account and transaction updates.
 2. `subscription.router.ts` filters relevant events, yields them via SSE, **and writes live data to DB**:
-   - `onBalanceUpdate`: updates `Wallet.balanceSol` in DB (fire-and-forget) and invalidates stats cache.
-   - `onTokenBalanceUpdate`: updates `Holding.tokenBalance` in DB (fire-and-forget) and invalidates stats cache.
-   - `onNewTransaction`: enqueues the signature for auto-ingestion via `ingestionQueue`.
-3. `ingestionQueue` (`server/services/ingestion-queue.service.ts`) batches signatures per token (500ms window), calls `transactionService.ingestTokenSignatures` to parse and insert `TokenTransaction` records, then invalidates stats cache.
-4. `volume-bot-worker.ts` emits `tradeComplete` events through `dashboardEvents` EventEmitter.
-5. `subscription.router.ts` `onVolumeBotUpdate` listens to the EventEmitter and yields to SSE.
-6. `dashboard-client.tsx` subscribes to `onNewTransaction`, `onBalanceUpdate`, `onTokenBalanceUpdate`, and `onVolumeBotUpdate`.
-7. On any event, a debounced (2s) call to `refetchStats()` fires — by this time, DB writes and ingestion are complete, so `getStats` reads fresh data.
-8. 30-second polling remains active as a safety net.
-9. SSE errors are tracked and surfaced in the Monitoring Panel as a "Disconnected" state with amber indicator.
+   - `onBalanceUpdate`: updates `Wallet.balanceSol` in DB, awaits commit, then invalidates stats cache.
+   - `onTokenBalanceUpdate`: subscribes both wallet pubkeys and derived ATAs, updates `Holding.tokenBalance` in DB, awaits commit, then invalidates stats cache.
+   - `onNewTransaction`: enqueues the signature for auto-ingestion via `ingestionQueue`, yields the event immediately (before ingestion completes).
+3. `ingestionQueue` (`server/services/ingestion-queue.service.ts`) batches signatures per token (500ms window), calls `transactionService.ingestTokenSignatures` to parse and insert `TokenTransaction` records, then invalidates stats cache and emits `ingestionComplete` via `dashboardEvents`.
+4. `subscription.router.ts` `onIngestionComplete` listens to the `ingestionComplete` event and yields to SSE, notifying the client that fresh transaction data is now in the DB.
+5. `volume-bot-worker.ts` emits `tradeComplete` events through `dashboardEvents` EventEmitter.
+6. `subscription.router.ts` `onVolumeBotUpdate` listens to the EventEmitter and yields to SSE.
+7. `dashboard-client.tsx` subscribes to `onNewTransaction`, `onBalanceUpdate`, `onTokenBalanceUpdate`, `onVolumeBotUpdate`, and `onIngestionComplete`.
+8. On any event, a debounced (2s) call to `refetchStats()` fires. For transactions, the initial `onNewTransaction` event may trigger a refetch before ingestion completes (balance/holding data is fresh but transactions may be stale), while the subsequent `onIngestionComplete` event triggers a second refetch with fully fresh data.
+9. 30-second polling remains active as a safety net.
+10. SSE errors and stale/idle conditions are tracked and surfaced in the Monitoring Panel as `Healthy`, `Degraded`, or `Disconnected`.
 
 ### Auto-Ingestion (`server/services/ingestion-queue.service.ts`)
 
@@ -115,8 +117,17 @@ When monitoring is active, gRPC-detected transaction signatures are automaticall
 2. The queue collects signatures per token in a `Set<string>` (natural deduplication).
 3. After a 500ms batch window (debounced), `flush()` calls `transactionService.ingestTokenSignatures`.
 4. `ingestTokenSignatures` fetches parsed transactions via Solana RPC, extracts token owner transactions, and upserts `TokenTransaction` records.
-5. After ingestion, the stats cache is invalidated so the next `getStats` call reads fresh data.
-6. Errors are logged and swallowed — the 30s polling fallback ensures eventual consistency.
+5. After ingestion, the stats cache is invalidated and `dashboardEvents.emitIngestionComplete()` fires to notify the client via `onIngestionComplete` SSE.
+6. Failures are retried with bounded backoff. If retries are exhausted, the queue defers to polling fallback and exposes telemetry via `dashboard.getGrpcStatus`.
+
+### Pending Signature Handling (Real-time Consistency)
+
+Freshly detected signatures can briefly return `null` from `getParsedTransactions` due to RPC propagation/finality timing. To avoid missing real-time transaction rows:
+
+1. `transactionService.ingestTokenSignatures` performs bounded in-function re-fetches for unresolved signatures (small backoff, unresolved subset only).
+2. If monitoring ingestion still has unresolved signatures after bounded attempts, it throws a retryable pending-signature error containing only unresolved signatures.
+3. `ingestionQueue` re-enqueues only that unresolved subset (not the full original batch), preserving throughput and minimizing redundant RPC calls.
+4. `onIngestionComplete` is emitted only after a successful flush with no unresolved signatures for that queued subset.
 
 ### Stats Cache Invalidation
 
@@ -143,8 +154,9 @@ The refresh button in the monitoring panel behaves differently based on the curr
 
 1. `wallet.refreshBalances` — fetches SOL balances from Solana RPC via `getMultipleAccountsInfo`, writes to `Wallet.balanceSol` in DB.
 2. `holding.refreshByToken` — fetches token holdings from Solana RPC via `getMultipleParsedAccounts`, diffs and writes to `Holding` records in DB.
-3. Both run in parallel via `Promise.allSettled`.
-4. After both complete, `refetchStats()` / `refetchToken()` / `refetchDefi()` are called to re-read the now-fresh DB data.
+3. `transaction.refreshByToken` — fetches new transaction signatures from Solana RPC via `getSignaturesForAddress`, parses and upserts `TokenTransaction` records.
+4. All three run in parallel via `Promise.allSettled`.
+5. After all complete, `refetchStats()` / `refetchToken()` / `refetchDefi()` are called to re-read the now-fresh DB data.
 
 This is the user's primary way to get fully fresh data when monitoring is off.
 
@@ -162,18 +174,52 @@ The dashboard header's refresh button always performs a full chain refresh regar
 
 - Fixed position, bottom-right corner.
 - Two states: **expanded** (full controls) and **minimized** (small pill).
-- Three refresh modes:
+- Four panel health states:
   - **Monitoring OFF**: "Refresh now" button (full chain refresh) + "Next in Xs" countdown.
   - **Monitoring ON (healthy)**: "Force re-read" text link (lightweight DB re-read). No countdown — gRPC handles live updates.
-  - **Monitoring ON (disconnected)**: "Refresh now" button (full chain refresh) + SSE error warning.
+  - **Monitoring ON (degraded)**: "Refresh now" button + warning when stream is connected but data/event freshness exceeds threshold.
+  - **Monitoring ON (disconnected)**: "Refresh now" button (full chain refresh) + disconnection warning.
 - Shows: monitoring mode toggle (switch), "Updated Xs ago", mode-appropriate refresh control.
-- Minimized state shows a small pill with status indicator (green=active, amber=disconnected, gray=off).
+- Minimized state shows a small pill with status indicator (green=healthy, amber=degraded/disconnected, gray=off).
+
+## Monitoring Pipeline Rollout Flag
+
+- `MONITORING_PIPELINE_V2` controls robust behavior rollout in subscriptions.
+- Default behavior: enabled unless explicitly set to `false`.
+- When disabled, server falls back to legacy fire-and-forget persistence behavior.
+
+## Validation Scenarios
+
+Use these scenarios to validate correctness after changes:
+
+1. **Raw token account payload (no parsed info)**
+   - Trigger a token balance change for a monitored wallet.
+   - Expected: `onTokenBalanceUpdate` updates holdings without manual holdings-page refresh.
+
+2. **ATA-only update coverage**
+   - Trigger update on associated token account (ATA) where owner wallet pubkey is not directly in update account pubkey.
+   - Expected: event is still captured via ATA subscription and mapped to wallet holding.
+
+3. **Write failure handling**
+   - Simulate DB write failure for balance/holding update.
+   - Expected: structured error log, gRPC status `lastWriteFailureAt` populated, cache not falsely marked fresh.
+
+4. **Ingestion retry and fallback**
+   - Simulate RPC parsing failures for `ingestTokenSignatures`.
+   - Expected: bounded retries with backoff, telemetry visible in `dashboard.getGrpcStatus.ingestion`, eventual polling recovery.
+
+5. **UI health transitions**
+   - Stop SSE stream while monitoring is ON.
+   - Expected: panel transitions to `Disconnected`, refresh action becomes full refresh.
+   - Restore stream but stop receiving events for threshold interval.
+   - Expected: panel transitions to `Degraded`.
 
 ### Dashboard Events (`server/events/dashboard-events.ts`)
 
-- Singleton `EventEmitter` that bridges the volume bot worker to the subscription router.
+- Singleton `EventEmitter` that bridges server-side events to the subscription router.
 - Events:
-  - `tradeComplete`: `{ tokenPublicKey, sessionId }` — emitted after a successful trade in the worker.
+  - `tradeComplete`: `{ tokenPublicKey, sessionId }` — emitted after a successful trade in the volume bot worker.
+  - `ingestionComplete`: `{ tokenPublicKey, signatureCount }` — emitted after `ingestionQueue` successfully ingests a batch of transactions into the DB.
 
 ### Recent Transactions
 

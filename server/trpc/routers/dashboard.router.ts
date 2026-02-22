@@ -5,6 +5,8 @@ import {
   getDefiPoolsSchema,
 } from "@/server/schemas/dashboard.schema";
 import { grpcManager } from "@/server/solana/grpc-manager";
+import { ingestionQueue } from "@/server/services/ingestion-queue.service";
+import { getEnv } from "@/lib/config/env";
 
 export const dashboardRouter = router({
   getStats: protectedProcedure
@@ -19,10 +21,30 @@ export const dashboardRouter = router({
     }),
   getGrpcStatus: protectedProcedure.query(() => {
     const status = grpcManager.getStatus();
+    const ingestionStatus = ingestionQueue.getStatus();
+    const { MONITORING_PIPELINE_V2 } = getEnv();
     return {
       available: status.enabled,
       connected: status.connected,
       lastError: status.lastError,
+      monitoringPipelineV2: MONITORING_PIPELINE_V2,
+      endpointType: status.endpointType,
+      subscriptionCount: status.subscriptionCount,
+      accountCount: status.accountCount,
+      reconnecting: status.reconnecting,
+      lastEventAt: status.lastEventAt,
+      lastWriteFailureAt: status.lastWriteFailureAt,
+      metrics: status.metrics,
+      ingestion: {
+        queueCount: ingestionStatus.queueCount,
+        tokens: ingestionStatus.tokens.map((token) => ({
+          tokenPublicKey: token.tokenPublicKey,
+          pendingSignatures: token.pendingSignatures,
+          flushing: token.flushing,
+          retryCount: token.retryCount,
+          lastFailureAt: token.lastFailureAt,
+        })),
+      },
     };
   }),
 });

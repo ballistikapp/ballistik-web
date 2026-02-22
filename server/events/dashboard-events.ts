@@ -3,6 +3,12 @@ import { EventEmitter } from "events";
 export type TradeCompleteEvent = {
   tokenPublicKey: string;
   sessionId: string;
+  signature?: string;
+};
+
+export type IngestionCompleteEvent = {
+  tokenPublicKey: string;
+  signatureCount: number;
 };
 
 class DashboardEventEmitter extends EventEmitter {
@@ -14,6 +20,17 @@ class DashboardEventEmitter extends EventEmitter {
     this.on("tradeComplete", listener);
     return () => {
       this.removeListener("tradeComplete", listener);
+    };
+  }
+
+  emitIngestionComplete(event: IngestionCompleteEvent) {
+    this.emit("ingestionComplete", event);
+  }
+
+  onIngestionComplete(listener: (event: IngestionCompleteEvent) => void): () => void {
+    this.on("ingestionComplete", listener);
+    return () => {
+      this.removeListener("ingestionComplete", listener);
     };
   }
 }

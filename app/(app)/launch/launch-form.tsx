@@ -260,10 +260,12 @@ export function LaunchForm() {
         description: `Token ${launch.tokenPublicKey} is live.`,
       });
       setLaunchNotified(true);
-      void refreshWalletBalancesMutation.mutateAsync({
-        tokenPublicKey: launch.tokenPublicKey,
-        force: true,
-      });
+      if (launch.tokenPublicKey) {
+        void refreshWalletBalancesMutation.mutateAsync({
+          tokenPublicKey: launch.tokenPublicKey,
+          force: true,
+        });
+      }
       utils.wallet.getMain.invalidate();
       router.refresh();
     }

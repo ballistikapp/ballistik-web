@@ -18,6 +18,10 @@ import { MonitoringPanel } from "@/components/dashboard/monitoring-panel";
 const POLL_INTERVAL = 30_000;
 const DEBOUNCE_MS = 2_000;
 const MONITORING_HOUR_THRESHOLD = 60 * 60 * 1000;
+const HEALTH_CHECK_INTERVAL = 30_000;
+const STALE_THRESHOLD_MS = 90_000;
+
+type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
 function getStoredMonitoringOverride(tokenPublicKey: string): boolean | null {
   if (typeof window === "undefined") return null;
@@ -54,6 +58,9 @@ export function DashboardClient() {
     enabled: boolean;
   } | null>(null);
   const [sseError, setSseError] = useState(false);
+  const [lastSseEventAt, setLastSseEventAt] = useState<number | null>(null);
+  const [grpcConnected, setGrpcConnected] = useState<boolean | null>(null);
+  const [nowMs, setNowMs] = useState(() => Date.now());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -126,6 +133,11 @@ export function DashboardClient() {
 
       setUserMonitoringOverride({ tokenPublicKey, enabled });
       setStoredMonitoringOverride(tokenPublicKey, enabled);
+      if (!enabled) {
+        setSseError(false);
+        setLastSseEventAt(null);
+        setGrpcConnected(null);
+      }
     },
     [tokenPublicKey, grpcStatusQuery]
   );
@@ -143,8 +155,37 @@ export function DashboardClient() {
     };
   }, []);
 
+  useEffect(() => {
+    if (!isMonitoring) return;
+    const timer = setInterval(() => setNowMs(Date.now()), 5_000);
+    return () => clearInterval(timer);
+  }, [isMonitoring]);
+
+  useEffect(() => {
+    if (!isMonitoring) return;
+
+    let cancelled = false;
+    const checkHealth = async () => {
+      try {
+        const { data } = await grpcStatusQuery.refetch();
+        if (cancelled) return;
+        setGrpcConnected(Boolean(data?.connected && data?.available));
+      } catch {
+        if (!cancelled) setGrpcConnected(false);
+      }
+    };
+
+    checkHealth();
+    const timer = setInterval(checkHealth, HEALTH_CHECK_INTERVAL);
+    return () => {
+      cancelled = true;
+      clearInterval(timer);
+    };
+  }, [grpcStatusQuery, isMonitoring]);
+
   const handleSubscriptionData = useCallback(() => {
     setSseError(false);
+    setLastSseEventAt(Date.now());
     debouncedRefetch();
   }, [debouncedRefetch]);
 
@@ -188,10 +229,21 @@ export function DashboardClient() {
     }
   );
 
+  trpc.subscription.onIngestionComplete.useSubscription(
+    { tokenPublicKey: tokenPublicKey || "" },
+    {
+      enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
+      onData: handleSubscriptionData,
+      onError: handleSubscriptionError,
+    }
+  );
+
   const { mutateAsync: refreshBalances } =
     trpc.wallet.refreshBalances.useMutation();
   const { mutateAsync: refreshHoldings } =
     trpc.holding.refreshByToken.useMutation();
+  const { mutateAsync: refreshTransactions } =
+    trpc.transaction.refreshByToken.useMutation();
   const [fullRefreshing, setFullRefreshing] = useState(false);
 
   const handleFullRefresh = useCallback(async () => {
@@ -201,6 +253,7 @@ export function DashboardClient() {
       await Promise.allSettled([
         refreshBalances({ tokenPublicKey, force: true }),
         refreshHoldings({ tokenPublicKey }),
+        refreshTransactions({ tokenPublicKey }),
       ]);
     } finally {
       refetchToken();
@@ -212,6 +265,7 @@ export function DashboardClient() {
     tokenPublicKey,
     refreshBalances,
     refreshHoldings,
+    refreshTransactions,
     refetchToken,
     refetchStats,
     refetchDefi,
@@ -223,7 +277,23 @@ export function DashboardClient() {
     refetchDefi();
   }, [refetchToken, refetchStats, refetchDefi]);
 
-  const needsFullRefresh = !isMonitoring || sseError;
+  useEffect(() => {
+    if (!isMonitoring || !monitoringInitialized) return;
+    handleLightRefresh();
+  }, [isMonitoring, monitoringInitialized, handleLightRefresh]);
+
+  const staleByStats = dataUpdatedAt > 0 && nowMs - dataUpdatedAt > STALE_THRESHOLD_MS;
+  const staleByEvents =
+    lastSseEventAt !== null && nowMs - lastSseEventAt > STALE_THRESHOLD_MS;
+  const monitoringHealthState: MonitoringHealthState = !isMonitoring
+    ? "off"
+    : sseError || grpcConnected === false
+      ? "failed"
+      : staleByStats && staleByEvents
+        ? "degraded"
+        : "healthy";
+  const needsFullRefresh =
+    !isMonitoring || monitoringHealthState === "failed" || monitoringHealthState === "degraded";
 
   const handleRefresh = useCallback(async () => {
     if (needsFullRefresh) {
@@ -285,8 +355,8 @@ export function DashboardClient() {
           onRefresh={handleRefresh}
           isRefreshing={fullRefreshing || statsRefreshing}
           isFullRefresh={needsFullRefresh}
+          healthState={monitoringHealthState}
           dataUpdatedAt={dataUpdatedAt}
-          sseError={sseError}
         />
       )}
     </div>

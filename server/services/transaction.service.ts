@@ -34,6 +34,16 @@ type ParsedTransactionResult = {
   blockTime: Date | null;
 };
 
+export class PendingSignatureIngestionError extends Error {
+  signatures: string[];
+
+  constructor(signatures: string[]) {
+    super("Some signatures are not yet parseable");
+    this.name = "PendingSignatureIngestionError";
+    this.signatures = signatures;
+  }
+}
+
 type TokenTransactionListRow = {
   id: string;
   walletPublicKey: string;
@@ -53,6 +63,7 @@ type TokenTransactionListRow = {
 };
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
+const PARSE_RETRY_DELAYS_MS = [200, 500];
 
 type TokenBalanceEntry = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
@@ -70,6 +81,11 @@ function sumTokenBalances(
     return total + amount;
   }, 0);
 }
+
+const sleep = (ms: number) =>
+  new Promise<void>((resolve) => {
+    setTimeout(resolve, ms);
+  });
 
 function sumTokenBalancesByOwner(
   balances: TokenBalanceEntry[] | null | undefined,
@@ -424,6 +440,7 @@ export const transactionService = {
     signatures: string[];
     userId?: string;
     walletPublicKeys?: string[];
+    requireAllParsed?: boolean;
   }) {
     const token = input.userId
       ? await prisma.token.findFirst({
@@ -447,30 +464,48 @@ export const transactionService = {
       return [];
     }
 
-    const parsedBySignature = new Map<
-      string,
-      ParsedTransactionWithMeta | null
-    >();
-    const batchSize = 10;
-    const batches: string[][] = [];
-    for (let i = 0; i < signatures.length; i += batchSize) {
-      batches.push(signatures.slice(i, i + batchSize));
+    const parsedBySignature = new Map<string, ParsedTransactionWithMeta | null>();
+    let pendingSignatures = [...signatures];
+    const maxAttempts = PARSE_RETRY_DELAYS_MS.length + 1;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      const batchSize = 10;
+      const batches: string[][] = [];
+      for (let i = 0; i < pendingSignatures.length; i += batchSize) {
+        batches.push(pendingSignatures.slice(i, i + batchSize));
+      }
+
+      const batchResults = await mapWithConcurrency(batches, 3, async (batch) => {
+        return connection.getParsedTransactions(batch, {
+          maxSupportedTransactionVersion: 0,
+        });
+      });
+
+      batches.forEach((batch, batchIndex) => {
+        const parsedBatch = batchResults[batchIndex];
+        if (!parsedBatch) return;
+        parsedBatch.forEach((parsed, index) => {
+          const signature = batch[index];
+          if (signature) {
+            parsedBySignature.set(signature, parsed);
+          }
+        });
+      });
+
+      pendingSignatures = pendingSignatures.filter((signature) => {
+        const parsed = parsedBySignature.get(signature);
+        return parsed === null || parsed === undefined;
+      });
+
+      if (pendingSignatures.length === 0) {
+        break;
+      }
+
+      const delayMs = PARSE_RETRY_DELAYS_MS[attempt - 1];
+      if (delayMs) {
+        await sleep(delayMs);
+      }
     }
-    const batchResults = await mapWithConcurrency(batches, 3, async (batch) => {
-      return connection.getParsedTransactions(batch, {
-        maxSupportedTransactionVersion: 0,
-      });
-    });
-    batches.forEach((batch, batchIndex) => {
-      const parsedBatch = batchResults[batchIndex];
-      if (!parsedBatch) return;
-      parsedBatch.forEach((parsed, index) => {
-        const signature = batch[index];
-        if (signature) {
-          parsedBySignature.set(signature, parsed);
-        }
-      });
-    });
 
     const { wallets } = await getAllowedWallets(
       token.publicKey,
@@ -624,6 +659,10 @@ export const transactionService = {
       tokenPublicKey: token.publicKey,
       scope: "TRANSACTIONS",
     });
+
+    if (input.requireAllParsed && pendingSignatures.length > 0) {
+      throw new PendingSignatureIngestionError(pendingSignatures);
+    }
 
     return newTransactions;
   },

@@ -1,5 +1,4 @@
 import { z } from "zod";
-import { observable } from "@trpc/server/observable";
 import { router, protectedProcedure } from "../trpc";
 import {
   grpcManager,
@@ -8,16 +7,21 @@ import {
 } from "@/server/solana/grpc-manager";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import { PublicKey } from "@solana/web3.js";
+import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { prisma } from "@/lib/prisma";
 import {
   dashboardEvents,
   type TradeCompleteEvent,
+  type IngestionCompleteEvent,
 } from "@/server/events/dashboard-events";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
 import { ingestionQueue } from "@/server/services/ingestion-queue.service";
+import { transactionService } from "@/server/services/transaction.service";
 import { logger } from "@/lib/logger";
+import { getEnv } from "@/lib/config/env";
 
 const log = logger.child({ service: "subscription" });
+const { MONITORING_PIPELINE_V2: monitoringPipelineV2Enabled } = getEnv();
 
 type BalanceUpdateEvent = {
   pubkey: string;
@@ -79,6 +83,9 @@ export const subscriptionRouter = router({
         log.warn("gRPC subscribe failed for onBalanceUpdate, SSE will be idle", {
           tokenPublicKey: input.tokenPublicKey,
         });
+        if (monitoringPipelineV2Enabled) {
+          throw new Error("gRPC wallet balance subscription unavailable");
+        }
       }
 
       const queue: BalanceUpdateEvent[] = [];
@@ -94,14 +101,6 @@ export const subscriptionRouter = router({
             slot: update.slot,
           });
           resolve?.();
-
-          prisma.wallet
-            .updateMany({
-              where: { publicKey: update.pubkey },
-              data: { balanceSol, balanceRefreshedAt: new Date() },
-            })
-            .catch(() => {});
-          invalidateStatsCache(input.tokenPublicKey);
         }
       );
 
@@ -113,7 +112,41 @@ export const subscriptionRouter = router({
             });
           }
           while (queue.length > 0) {
-            yield queue.shift()!;
+            const event = queue.shift()!;
+            if (!monitoringPipelineV2Enabled) {
+              prisma.wallet
+                .updateMany({
+                  where: { publicKey: event.pubkey },
+                  data: {
+                    balanceSol: event.balanceSol,
+                    balanceRefreshedAt: new Date(),
+                  },
+                })
+                .catch(() => {});
+              invalidateStatsCache(input.tokenPublicKey);
+              yield event;
+              continue;
+            }
+            try {
+              await prisma.wallet.updateMany({
+                where: { publicKey: event.pubkey },
+                data: {
+                  balanceSol: event.balanceSol,
+                  balanceRefreshedAt: new Date(),
+                },
+              });
+              grpcManager.reportDbWriteSuccess();
+              invalidateStatsCache(input.tokenPublicKey);
+            } catch (error) {
+              grpcManager.reportDbWriteFailure();
+              log.error("Failed to persist wallet balance update", {
+                tokenPublicKey: input.tokenPublicKey,
+                walletPublicKey: event.pubkey,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              continue;
+            }
+            yield event;
           }
         }
       } finally {
@@ -140,18 +173,44 @@ export const subscriptionRouter = router({
         select: { publicKey: true },
       });
 
-      const allPubkeys = new Set(wallets.map((w) => w.publicKey));
-      if (allPubkeys.size === 0) return;
+      const walletPubkeys = new Set(wallets.map((w) => w.publicKey));
+      if (walletPubkeys.size === 0) return;
+
+      const monitoredPubkeys = new Set<string>();
+      const ataToOwner = new Map<string, string>();
+      for (const walletPublicKey of walletPubkeys) {
+        monitoredPubkeys.add(walletPublicKey);
+        try {
+          const ata = getAssociatedTokenAddressSync(
+            new PublicKey(input.tokenPublicKey),
+            new PublicKey(walletPublicKey)
+          );
+          const ataPubkey = ata.toBase58();
+          monitoredPubkeys.add(ataPubkey);
+          ataToOwner.set(ataPubkey, walletPublicKey);
+        } catch (error) {
+          log.warn("Failed to derive ATA for monitoring", {
+            tokenPublicKey: input.tokenPublicKey,
+            walletPublicKey,
+            error: error instanceof Error ? error.message : String(error),
+          });
+        }
+      }
 
       const subscriptionId = `tokenBalance:${ctx.user.id}:${input.tokenPublicKey}`;
       const subscribed = await grpcManager.subscribe(
         subscriptionId,
-        Array.from(allPubkeys)
+        Array.from(
+          monitoringPipelineV2Enabled ? monitoredPubkeys : walletPubkeys
+        )
       );
       if (!subscribed) {
         log.warn("gRPC subscribe failed for onTokenBalanceUpdate, SSE will be idle", {
           tokenPublicKey: input.tokenPublicKey,
         });
+        if (monitoringPipelineV2Enabled) {
+          throw new Error("gRPC token balance subscription unavailable");
+        }
       }
 
       const queue: TokenBalanceUpdateEvent[] = [];
@@ -161,26 +220,20 @@ export const subscriptionRouter = router({
         (update: AccountUpdate) => {
           if (!update.owner || !update.mint || update.tokenAmount === undefined)
             return;
-          if (!allPubkeys.has(update.owner)) return;
+          const ownerOrAccountMatched =
+            walletPubkeys.has(update.owner) || monitoredPubkeys.has(update.pubkey);
+          if (!ownerOrAccountMatched) return;
           if (update.mint !== input.tokenPublicKey) return;
+          const walletPublicKey = walletPubkeys.has(update.owner)
+            ? update.owner
+            : ataToOwner.get(update.pubkey) ?? update.owner;
           queue.push({
-            walletPublicKey: update.owner,
+            walletPublicKey,
             mint: update.mint,
             amount: update.tokenAmount.toString(),
             slot: update.slot,
           });
           resolve?.();
-
-          prisma.holding
-            .updateMany({
-              where: {
-                walletPublicKey: update.owner,
-                tokenPublicKey: update.mint,
-              },
-              data: { tokenBalance: Number(update.tokenAmount) },
-            })
-            .catch(() => {});
-          invalidateStatsCache(input.tokenPublicKey);
         }
       );
 
@@ -192,7 +245,41 @@ export const subscriptionRouter = router({
             });
           }
           while (queue.length > 0) {
-            yield queue.shift()!;
+            const event = queue.shift()!;
+            if (!monitoringPipelineV2Enabled) {
+              prisma.holding
+                .updateMany({
+                  where: {
+                    walletPublicKey: event.walletPublicKey,
+                    tokenPublicKey: event.mint,
+                  },
+                  data: { tokenBalance: Number(event.amount) },
+                })
+                .catch(() => {});
+              invalidateStatsCache(input.tokenPublicKey);
+              yield event;
+              continue;
+            }
+            try {
+              await prisma.holding.updateMany({
+                where: {
+                  walletPublicKey: event.walletPublicKey,
+                  tokenPublicKey: event.mint,
+                },
+                data: { tokenBalance: Number(event.amount) },
+              });
+              grpcManager.reportDbWriteSuccess();
+              invalidateStatsCache(input.tokenPublicKey);
+            } catch (error) {
+              grpcManager.reportDbWriteFailure();
+              log.error("Failed to persist token balance update", {
+                tokenPublicKey: input.tokenPublicKey,
+                walletPublicKey: event.walletPublicKey,
+                error: error instanceof Error ? error.message : String(error),
+              });
+              continue;
+            }
+            yield event;
           }
         }
       } finally {
@@ -222,6 +309,9 @@ export const subscriptionRouter = router({
         log.warn("gRPC subscribe failed for onNewTransaction, SSE will be idle", {
           tokenPublicKey: input.tokenPublicKey,
         });
+        if (monitoringPipelineV2Enabled) {
+          throw new Error("gRPC transaction subscription unavailable");
+        }
       }
 
       const monitoredSet = new Set(monitoredAccounts);
@@ -230,9 +320,10 @@ export const subscriptionRouter = router({
 
       const removeListener = grpcManager.onTransactionUpdate(
         (update: TransactionUpdate) => {
-          const isRelevant = update.accountKeys.some((key) =>
+          const isRelevantByKeys = update.accountKeys.some((key) =>
             monitoredSet.has(key)
           );
+          const isRelevant = isRelevantByKeys || update.accountKeys.length === 0;
           if (!isRelevant) return;
           queue.push({
             signature: update.signature,
@@ -275,6 +366,56 @@ export const subscriptionRouter = router({
 
       const removeListener = dashboardEvents.onTradeComplete(
         (event: TradeCompleteEvent) => {
+          if (event.tokenPublicKey !== input.tokenPublicKey) return;
+          queue.push(event);
+          resolve?.();
+        }
+      );
+
+      try {
+        while (true) {
+          if (queue.length === 0) {
+            await new Promise<void>((r) => {
+              resolve = r;
+            });
+          }
+          while (queue.length > 0) {
+            const event = queue.shift()!;
+            if (event.signature) {
+              try {
+                await transactionService.ingestTokenSignatures({
+                  tokenPublicKey: input.tokenPublicKey,
+                  signatures: [event.signature],
+                });
+                invalidateStatsCache(input.tokenPublicKey);
+              } catch (error) {
+                log.warn("Failed to ingest trade signature inline", {
+                  tokenPublicKey: input.tokenPublicKey,
+                  signature: event.signature,
+                  error: error instanceof Error ? error.message : String(error),
+                });
+              }
+            }
+            yield event;
+          }
+        }
+      } finally {
+        removeListener();
+      }
+    }),
+
+  onIngestionComplete: protectedProcedure
+    .input(
+      z.object({
+        tokenPublicKey: z.string().min(1),
+      })
+    )
+    .subscription(async function* ({ input }) {
+      const queue: IngestionCompleteEvent[] = [];
+      let resolve: (() => void) | null = null;
+
+      const removeListener = dashboardEvents.onIngestionComplete(
+        (event: IngestionCompleteEvent) => {
           if (event.tokenPublicKey !== input.tokenPublicKey) return;
           queue.push(event);
           resolve?.();

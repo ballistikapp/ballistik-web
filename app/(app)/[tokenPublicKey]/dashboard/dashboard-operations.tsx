@@ -1,7 +1,14 @@
 "use client";
 
 import Link from "next/link";
-import { IconRobot, IconArrowsExchange, IconClock, IconPlus, IconList } from "@tabler/icons-react";
+import {
+  IconRobot,
+  IconArrowsExchange,
+  IconClock,
+  IconPlus,
+  IconList,
+  IconExternalLink,
+} from "@tabler/icons-react";
 import { Button } from "@/components/ui/button";
 import { formatSol, formatRuntime, formatTimeAgo } from "@/lib/utils/format";
 
@@ -41,6 +48,24 @@ function BotActions({ tokenPublicKey }: { tokenPublicKey: string }) {
         </Link>
       </Button>
     </div>
+  );
+}
+
+function SessionLink({
+  tokenPublicKey,
+  sessionId,
+}: {
+  tokenPublicKey: string;
+  sessionId: string;
+}) {
+  return (
+    <Link
+      href={`/${tokenPublicKey}/volume-bot/${sessionId}`}
+      className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground hover:underline transition-colors"
+    >
+      View session
+      <IconExternalLink className="size-3.5" />
+    </Link>
   );
 }
 
@@ -96,6 +121,8 @@ export function DashboardOperations({
             <span className="text-muted-foreground">
               {bot.activeWallets}/{bot.walletCount} wallets
             </span>
+            <span className="text-muted-foreground">·</span>
+            <SessionLink tokenPublicKey={tokenPublicKey} sessionId={bot.id} />
           </div>
         ))}
         <BotActions tokenPublicKey={tokenPublicKey} />
@@ -114,7 +141,7 @@ export function DashboardOperations({
         <>
           <span className="text-muted-foreground">Last session:</span>
           <span className="text-muted-foreground tabular-nums">
-            {formatTimeAgo(lastFinished.stoppedAt ?? lastFinished.startedAt)}
+            {formatTimeAgo(lastFinished.stoppedAt ?? lastFinished.startedAt ?? new Date())}
           </span>
           <span className="text-muted-foreground">·</span>
           <span className="tabular-nums text-muted-foreground">
@@ -131,6 +158,8 @@ export function DashboardOperations({
             {lastFinished.totalPnlSol >= 0 ? "+" : ""}
             {formatSol(lastFinished.totalPnlSol)} SOL
           </span>
+          <span className="text-muted-foreground">·</span>
+          <SessionLink tokenPublicKey={tokenPublicKey} sessionId={lastFinished.id} />
           {lastFinished.status === "FAILED" && (
             <>
               <span className="text-muted-foreground">·</span>

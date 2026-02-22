@@ -3,8 +3,9 @@ import { getRabbitStreamUrl, getDefaultShyftGrpcUrl } from "@/lib/config/rpc.con
 import {
   isRecord,
   normalizePublicKey,
-  extractSignatureFromUpdate,
-  extractAccountKeysFromUpdate,
+  extractSignatureFromUpdateResult,
+  extractAccountKeysFromUpdateResult,
+  decodeTokenAccountData,
   loadGrpcClient,
   type GrpcStream,
 } from "./grpc-utils";
@@ -34,6 +35,8 @@ type Subscription = {
   accounts: string[];
 };
 
+const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
+
 class GrpcManager {
   private stream: GrpcStream | null = null;
   private connected = false;
@@ -47,6 +50,21 @@ class GrpcManager {
 
   private accountListeners = new Set<Listener<AccountUpdate>>();
   private transactionListeners = new Set<Listener<TransactionUpdate>>();
+  private lastEventAt: string | null = null;
+  private lastWriteFailureAt: string | null = null;
+  private metrics = {
+    streamEventsReceived: 0,
+    accountEventsReceived: 0,
+    transactionEventsReceived: 0,
+    accountEventsDecoded: 0,
+    transactionEventsDecoded: 0,
+    droppedMalformed: 0,
+    droppedUnsupported: 0,
+    subscriptionWriteSuccess: 0,
+    subscriptionWriteFailure: 0,
+    dbWriteSuccess: 0,
+    dbWriteFailure: 0,
+  };
 
   async connect(
     endpoint?: "rabbitstream" | "yellowstone"
@@ -115,23 +133,38 @@ class GrpcManager {
   }
 
   private handleUpdate(data: unknown) {
-    if (!isRecord(data)) return;
+    this.metrics.streamEventsReceived += 1;
+    this.lastEventAt = new Date().toISOString();
+    if (!isRecord(data)) {
+      this.metrics.droppedMalformed += 1;
+      return;
+    }
 
     if (data.account && isRecord(data.account)) {
+      this.metrics.accountEventsReceived += 1;
       this.handleAccountUpdate(data.account);
     }
 
     if (data.transaction) {
+      this.metrics.transactionEventsReceived += 1;
       this.handleTransactionUpdate(data);
     }
   }
 
   private handleAccountUpdate(accountUpdate: Record<string, unknown>) {
-    const account = accountUpdate.account;
-    if (!isRecord(account)) return;
+    const account = isRecord(accountUpdate.account)
+      ? accountUpdate.account
+      : accountUpdate;
+    if (!isRecord(account)) {
+      this.metrics.droppedMalformed += 1;
+      return;
+    }
 
     const pubkey = normalizePublicKey(account.pubkey);
-    if (!pubkey) return;
+    if (!pubkey) {
+      this.metrics.droppedMalformed += 1;
+      return;
+    }
 
     const slot =
       typeof accountUpdate.slot === "number"
@@ -150,6 +183,8 @@ class GrpcManager {
     const update: AccountUpdate = { pubkey, lamports, slot };
 
     const accountData = account.data;
+    const accountOwnerProgram = normalizePublicKey(account.owner);
+    let parsedTokenFields = false;
     if (accountData && isRecord(accountData)) {
       const parsed = accountData.parsed;
       if (isRecord(parsed)) {
@@ -168,12 +203,27 @@ class GrpcManager {
               update.owner = owner;
               update.mint = mint;
               update.tokenAmount = BigInt(amount);
+              parsedTokenFields = true;
             }
           }
         }
       }
     }
 
+    if (!parsedTokenFields && accountOwnerProgram === TOKEN_PROGRAM_ID) {
+      const decoded = decodeTokenAccountData(accountData);
+      if (decoded.status === "ok") {
+        update.owner = decoded.value.owner;
+        update.mint = decoded.value.mint;
+        update.tokenAmount = decoded.value.amount;
+      } else if (decoded.status === "malformed") {
+        this.metrics.droppedMalformed += 1;
+      } else {
+        this.metrics.droppedUnsupported += 1;
+      }
+    }
+
+    this.metrics.accountEventsDecoded += 1;
     this.accountListeners.forEach((listener) => {
       try {
         listener(update);
@@ -184,14 +234,32 @@ class GrpcManager {
   }
 
   private handleTransactionUpdate(data: unknown) {
-    const signature = extractSignatureFromUpdate(data);
-    if (!signature) return;
+    const signatureResult = extractSignatureFromUpdateResult(data);
+    if (signatureResult.status !== "ok") {
+      if (signatureResult.status === "malformed") {
+        this.metrics.droppedMalformed += 1;
+      } else {
+        this.metrics.droppedUnsupported += 1;
+      }
+      return;
+    }
+    const signature = signatureResult.value;
 
-    const accountKeys = extractAccountKeysFromUpdate(data);
+    const accountKeysResult = extractAccountKeysFromUpdateResult(data);
+    const accountKeys =
+      accountKeysResult.status === "ok" ? accountKeysResult.value : [];
+    if (accountKeysResult.status !== "ok") {
+      if (accountKeysResult.status === "malformed") {
+        this.metrics.droppedMalformed += 1;
+      } else {
+        this.metrics.droppedUnsupported += 1;
+      }
+    }
     const slot = isRecord(data) && typeof data.slot === "number" ? data.slot : 0;
 
     const update: TransactionUpdate = { signature, accountKeys, slot };
 
+    this.metrics.transactionEventsDecoded += 1;
     this.transactionListeners.forEach((listener) => {
       try {
         listener(update);
@@ -282,13 +350,24 @@ class GrpcManager {
         );
       });
       log.info("Subscribed", { accounts: allAccounts.length });
+      this.metrics.subscriptionWriteSuccess += 1;
       return true;
     } catch (error) {
       log.error("Subscribe write failed", {
         error: error instanceof Error ? error.message : String(error),
       });
+      this.metrics.subscriptionWriteFailure += 1;
       return false;
     }
+  }
+
+  reportDbWriteSuccess() {
+    this.metrics.dbWriteSuccess += 1;
+  }
+
+  reportDbWriteFailure() {
+    this.metrics.dbWriteFailure += 1;
+    this.lastWriteFailureAt = new Date().toISOString();
   }
 
   onAccountUpdate(listener: Listener<AccountUpdate>): () => void {
@@ -319,6 +398,10 @@ class GrpcManager {
       endpointType: this.endpointType,
       subscriptionCount: this.subscriptions.size,
       accountCount: this.allSubscribedAccounts.size,
+      reconnecting: this.reconnecting,
+      lastEventAt: this.lastEventAt,
+      lastWriteFailureAt: this.lastWriteFailureAt,
+      metrics: { ...this.metrics },
     };
   }
 
