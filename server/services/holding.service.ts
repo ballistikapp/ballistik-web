@@ -41,6 +41,9 @@ type WalletWithKey = WalletRecord & {
 };
 
 const HOLDING_MUTATION_BATCH_SIZE = 100;
+const HOLDING_RPC_BATCH_SIZE = 100;
+const HOLDING_RPC_CONCURRENCY = 3;
+const HOLDING_MUTATION_CONCURRENCY = 3;
 
 async function getAllowedWallets(
   tokenPublicKey: string,
@@ -306,14 +309,19 @@ async function fetchBalancesViaRpc(
     ReturnType<Connection["getMultipleParsedAccounts"]>
   >["value"][number];
   const ataAddresses = atas.map((a) => a.ata);
-  const accountInfos: ParsedAccountInfoItem[] = [];
-  for (let i = 0; i < ataAddresses.length; i += 100) {
-    const batch = ataAddresses.slice(i, i + 100);
-    const batchInfos = await retryRpc(() =>
-      connection.getMultipleParsedAccounts(batch)
-    );
-    accountInfos.push(...batchInfos.value);
+  const ataBatches: PublicKey[][] = [];
+  for (let i = 0; i < ataAddresses.length; i += HOLDING_RPC_BATCH_SIZE) {
+    ataBatches.push(ataAddresses.slice(i, i + HOLDING_RPC_BATCH_SIZE));
   }
+  const batchedInfos = await mapWithConcurrency(
+    ataBatches,
+    HOLDING_RPC_CONCURRENCY,
+    async (batch) =>
+      await retryRpc(() => connection.getMultipleParsedAccounts(batch))
+  );
+  const accountInfos: ParsedAccountInfoItem[] = batchedInfos.flatMap(
+    (batchInfo) => batchInfo.value
+  );
 
   const results = atas.map(({ wallet }, index) => {
     const accountInfo = accountInfos[index];
@@ -522,41 +530,57 @@ export const holdingService = {
     }
 
     if (deleteIds.length > 0) {
+      const deleteBatches: string[][] = [];
       for (let i = 0; i < deleteIds.length; i += HOLDING_MUTATION_BATCH_SIZE) {
-        const batch = deleteIds.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
-        await prisma.$transaction([
-          prisma.holding.deleteMany({
-            where: { id: { in: batch } },
-          }),
-        ]);
+        deleteBatches.push(deleteIds.slice(i, i + HOLDING_MUTATION_BATCH_SIZE));
       }
+      await mapWithConcurrency(
+        deleteBatches,
+        HOLDING_MUTATION_CONCURRENCY,
+        async (batch) =>
+          await prisma.holding.deleteMany({
+            where: { id: { in: batch } },
+          })
+      );
     }
     if (createManyData.length > 0) {
+      const createBatches: Prisma.HoldingCreateManyInput[][] = [];
       for (
         let i = 0;
         i < createManyData.length;
         i += HOLDING_MUTATION_BATCH_SIZE
       ) {
-        const batch = createManyData.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
-        await prisma.$transaction([
-          prisma.holding.createMany({
-            data: batch,
-          }),
-        ]);
-      }
-    }
-    if (updateInputs.length > 0) {
-      for (let i = 0; i < updateInputs.length; i += HOLDING_MUTATION_BATCH_SIZE) {
-        const batch = updateInputs.slice(i, i + HOLDING_MUTATION_BATCH_SIZE);
-        await prisma.$transaction(
-          batch.map((update) =>
-            prisma.holding.update({
-              where: { id: update.id },
-              data: update.data,
-            })
-          )
+        createBatches.push(
+          createManyData.slice(i, i + HOLDING_MUTATION_BATCH_SIZE)
         );
       }
+      await mapWithConcurrency(
+        createBatches,
+        HOLDING_MUTATION_CONCURRENCY,
+        async (batch) =>
+          await prisma.holding.createMany({
+            data: batch,
+          })
+      );
+    }
+    if (updateInputs.length > 0) {
+      const updateBatches: Array<typeof updateInputs> = [];
+      for (let i = 0; i < updateInputs.length; i += HOLDING_MUTATION_BATCH_SIZE) {
+        updateBatches.push(updateInputs.slice(i, i + HOLDING_MUTATION_BATCH_SIZE));
+      }
+      await mapWithConcurrency(
+        updateBatches,
+        HOLDING_MUTATION_CONCURRENCY,
+        async (batch) =>
+          await prisma.$transaction(
+            batch.map((update) =>
+              prisma.holding.update({
+                where: { id: update.id },
+                data: update.data,
+              })
+            )
+          )
+      );
     }
 
     await refreshCacheService.touch({

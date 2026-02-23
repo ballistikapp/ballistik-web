@@ -338,6 +338,8 @@ model Holding {
   tokenSymbol String
   tokenImageUrl String
   tokenDecimals Int
+  @@index([tokenPublicKey, walletPublicKey])
+  @@index([tokenPublicKey, lastUpdated])
   @@map("Holding")
 }
 
