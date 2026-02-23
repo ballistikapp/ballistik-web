@@ -160,6 +160,18 @@ The refresh button in the monitoring panel behaves differently based on the curr
 
 This is the user's primary way to get fully fresh data when monitoring is off.
 
+### Holdings Refresh Performance Notes
+
+`holding.refreshByToken` is optimized for large wallet sets to avoid linear latency growth:
+
+1. ATA account reads via Solana RPC are chunked and executed with bounded concurrency (instead of fully sequential batch loops).
+2. Holding mutations (delete/create/update) are chunked and executed with bounded concurrency to reduce end-to-end DB write time while avoiding unbounded load spikes.
+3. The `Holding` table uses query-oriented indexes for refresh/list paths:
+   - `(tokenPublicKey, walletPublicKey)` for token-scoped wallet lookups during refresh.
+   - `(tokenPublicKey, lastUpdated)` for holdings list reads ordered by recency.
+
+These optimizations specifically target slow manual refresh behavior on tokens with many managed wallets.
+
 **Monitoring ON (healthy):** "Force re-read" — lightweight DB re-read only:
 
 1. Calls `refetchStats()` / `refetchToken()` / `refetchDefi()` to re-read current DB data.
