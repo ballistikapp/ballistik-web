@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const publicRoutes = ["/auth", "/api/trpc", "/api/wallets/refresh"];
+const publicRoutes = [
+  "/auth",
+  "/api/trpc",
+  "/api/wallets/refresh",
+  "/api/webhooks/",
+];
 
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth-token")?.value;

@@ -91,6 +91,8 @@ export default function WalletPage() {
       {
         tokenPublicKey: tokenPublicKey || "",
         walletPublicKey: walletPublicKey || "",
+        page: 1,
+        pageSize: 100,
       },
       { enabled: !!tokenPublicKey && !!walletPublicKey }
     );
@@ -100,6 +102,8 @@ export default function WalletPage() {
         tokenPublicKey: tokenPublicKey || "",
         walletPublicKey: walletPublicKey || "",
         groupBySignature: false,
+        page: 1,
+        pageSize: 100,
       },
       { enabled: !!tokenPublicKey && !!walletPublicKey }
     );
@@ -226,10 +230,7 @@ export default function WalletPage() {
         tokenPublicKey,
         walletPublicKeys: [walletPublicKey],
       });
-      await utils.holding.listByToken.invalidate({
-        tokenPublicKey,
-        walletPublicKey,
-      });
+      await utils.holding.listByToken.invalidate();
       toast.success("Holdings refreshed", { id: toastId, icon: null });
     } catch (error) {
       toast.error("Failed to refresh holdings", { id: toastId, icon: null });
@@ -246,11 +247,7 @@ export default function WalletPage() {
         tokenPublicKey,
         walletPublicKeys: [walletPublicKey],
       });
-      await utils.transaction.listByToken.invalidate({
-        tokenPublicKey,
-        walletPublicKey,
-        groupBySignature: false,
-      });
+      await utils.transaction.listByToken.invalidate();
       toast.success("Transactions refreshed", { id: toastId, icon: null });
     } catch (error) {
       toast.error("Failed to refresh transactions", {
@@ -290,7 +287,7 @@ export default function WalletPage() {
     tokenSymbol: token.symbol,
   });
   const holdings = holdingsData?.holdings ?? [];
-  const transactions = transactionsData ?? [];
+  const transactions = transactionsData?.items ?? [];
 
   return (
     <div className="flex flex-col gap-6">
@@ -411,7 +408,8 @@ export default function WalletPage() {
           <h2 className="text-4xl -translate-y-4">Holdings</h2>
           <div className="flex items-center gap-2">
             <p className="text-sm text-muted-foreground">
-              {holdings.length} position{holdings.length === 1 ? "" : "s"}
+              {(holdingsData?.totalCount ?? holdings.length)} position
+              {(holdingsData?.totalCount ?? holdings.length) === 1 ? "" : "s"}
             </p>
             <Button
               variant="outline"
@@ -455,7 +453,10 @@ export default function WalletPage() {
           <h2 className="text-4xl -translate-y-4">Transactions</h2>
           <div className="flex items-center gap-2">
             <p className="text-sm text-muted-foreground">
-              {transactions.length} tx{transactions.length === 1 ? "" : "s"}
+              {(transactionsData?.totalCount ?? transactions.length)} tx
+              {(transactionsData?.totalCount ?? transactions.length) === 1
+                ? ""
+                : "s"}
             </p>
             <Button
               variant="outline"

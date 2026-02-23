@@ -94,6 +94,10 @@ interface DataTableProps<TData, TValue> {
   searchableColumns?: string[];
   enableUrlState?: boolean;
   urlStatePrefix?: string;
+  onPaginationStateChange?: (pagination: PaginationState) => void;
+  manualPagination?: boolean;
+  pageCount?: number;
+  rowCount?: number;
 }
 
 export function DataTable<TData, TValue>({
@@ -111,6 +115,10 @@ export function DataTable<TData, TValue>({
   searchableColumns,
   enableUrlState = false,
   urlStatePrefix,
+  onPaginationStateChange,
+  manualPagination = false,
+  pageCount,
+  rowCount,
 }: DataTableProps<TData, TValue>) {
   const urlState = useDataTableParams({
     defaultPageSize: initialPagination.pageSize,
@@ -139,6 +147,10 @@ export function DataTable<TData, TValue>({
   React.useEffect(() => {
     onRowSelectionChange?.(rowSelection);
   }, [rowSelection, onRowSelectionChange]);
+
+  React.useEffect(() => {
+    onPaginationStateChange?.(pagination);
+  }, [onPaginationStateChange, pagination]);
 
   const globalFilterFn = React.useMemo<FilterFn<TData>>(() => {
     return (row, _columnId, filterValue: string) => {
@@ -179,6 +191,13 @@ export function DataTable<TData, TValue>({
     onPaginationChange: setPagination,
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn,
+    manualPagination,
+    ...(manualPagination
+      ? {
+          pageCount,
+          rowCount,
+        }
+      : {}),
     filterFns: {
       numberRange: numberRangeFilter,
       dateRange: dateRangeFilter,

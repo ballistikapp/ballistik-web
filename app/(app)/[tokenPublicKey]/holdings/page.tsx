@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
+import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -36,6 +37,10 @@ export default function Page() {
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   const {
     data: tokenData,
@@ -49,7 +54,11 @@ export default function Page() {
 
   const { data: holdingsData, isLoading: holdingsLoading } =
     trpc.holding.listByToken.useQuery(
-      { tokenPublicKey: tokenPublicKey || "" },
+      {
+        tokenPublicKey: tokenPublicKey || "",
+        page: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+      },
       { enabled: !!tokenPublicKey && !!tokenData }
     );
 
@@ -102,18 +111,9 @@ export default function Page() {
   }, [holdingsData?.totalSupply, tokenData, tokenPublicKey]);
 
   const holdings = holdingsData?.holdings ?? [];
-  const totalBalance = useMemo(
-    () =>
-      holdings.reduce(
-        (sum, holding) =>
-          sum +
-          (Number.isFinite(Number(holding.tokenBalance))
-            ? Number(holding.tokenBalance)
-            : 0),
-        0
-      ),
-    [holdings]
-  );
+  const totalCount = holdingsData?.totalCount ?? 0;
+  const totalBalance = holdingsData?.totalBalance ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const walletsWithBalance = useMemo(
     () =>
       holdings.filter(
@@ -143,11 +143,11 @@ export default function Page() {
       },
       {
         label: "ATAs Tracked",
-        value: formatCompact(holdings.length),
+        value: formatCompact(totalCount),
       },
     ],
     [
-      holdings.length,
+      totalCount,
       tokenData?.symbol,
       totalBalance,
       totalSupplyShare,
@@ -171,7 +171,7 @@ export default function Page() {
       : null;
     try {
       await refreshHoldings({ tokenPublicKey });
-      void utils.holding.listByToken.invalidate({ tokenPublicKey });
+      void utils.holding.listByToken.invalidate();
       await refetchRefreshCache();
       if (toastId) {
         toast.success("Holdings refreshed", { id: toastId, icon: null });
@@ -375,6 +375,10 @@ export default function Page() {
         columns={columns}
         data={holdings}
         isLoading={holdingsLoading}
+        manualPagination
+        pageCount={pageCount}
+        rowCount={totalCount}
+        onPaginationStateChange={setPagination}
         getRowId={(row) => row.walletPublicKey}
         enableRowSelection
         onRowSelectionChange={setRowSelection}
@@ -430,7 +434,7 @@ export default function Page() {
         onOpenChange={handleExitDialogOpenChange}
         exit={exitData}
         tokenSymbol={tokenData.symbol}
-        totalWallets={holdings.length}
+        totalWallets={totalCount}
         walletsWithBalance={walletsWithBalance}
         totalBalance={totalBalance}
         isSubmitting={startExitMutation.isPending}

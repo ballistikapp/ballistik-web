@@ -378,8 +378,11 @@ model Transaction {
   blockTime DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([tokenPublicKey, createdAt])
+  @@index([tokenPublicKey, walletPublicKey, createdAt])
   @@index([walletPublicKey, tokenPublicKey, createdAt])
   @@index([tokenPublicKey, transactionSignature, walletPublicKey])
+  @@index([tokenPublicKey, updatedAt])
   @@map("Transaction")
 }
 

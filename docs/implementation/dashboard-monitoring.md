@@ -69,6 +69,7 @@ All RPC batch calls are wrapped in `retryRpc()` (`lib/utils/rpc-retry.ts`) — 2
 - `shyftDefiService.getPoolsByToken()` — for graduated token pricing and DeFi pool data (no RPC equivalent)
 - gRPC streaming — for real-time on-chain event subscriptions (separate from REST API)
 - Callback service — for webhook registration during launch
+- Incoming callbacks are received under `/api/webhooks/*`, which is intentionally treated as a public proxy path prefix and protected by route-level webhook secrets (for Shyft: `x-api-key` verification in `/api/webhooks/shyft`).
 
 ### Price for Graduated Tokens
 
@@ -160,7 +161,7 @@ The refresh button in the monitoring panel behaves differently based on the curr
 
 This is the user's primary way to get fully fresh data when monitoring is off.
 
-### Holdings Refresh Performance Notes
+### Holdings and Transaction Refresh Performance Notes
 
 `holding.refreshByToken` is optimized for large wallet sets to avoid linear latency growth:
 
@@ -169,8 +170,24 @@ This is the user's primary way to get fully fresh data when monitoring is off.
 3. The `Holding` table uses query-oriented indexes for refresh/list paths:
    - `(tokenPublicKey, walletPublicKey)` for token-scoped wallet lookups during refresh.
    - `(tokenPublicKey, lastUpdated)` for holdings list reads ordered by recency.
+4. The `Transaction` table uses query-oriented indexes for refresh/list and stale-row scans:
+   - `(tokenPublicKey, createdAt)` for token-scoped list/sort reads.
+   - `(tokenPublicKey, walletPublicKey, createdAt)` for wallet-scoped recency reads under a token.
+   - `(tokenPublicKey, transactionSignature, walletPublicKey)` for existing-row lookup during refresh.
+   - `(walletPublicKey, tokenPublicKey, createdAt)` for holdings `DISTINCT ON ("walletPublicKey") ... ORDER BY walletPublicKey, createdAt DESC`.
+   - `(tokenPublicKey, updatedAt)` for stale-row scans ordered by latest updates.
 
 These optimizations specifically target slow manual refresh behavior on tokens with many managed wallets.
+
+### List Endpoint Pagination
+
+Holdings and transactions list endpoints use server-side pagination to avoid returning full history payloads:
+
+- `holding.listByToken` accepts optional `page` and `pageSize` and returns `{ holdings, totalCount, totalBalance, totalSupply }`.
+- `transaction.listByToken` accepts optional `page` and `pageSize` and returns `{ items, totalCount }`.
+- UI tables pass current page state into list queries and use TanStack manual pagination (`manualPagination` + `pageCount`) to keep pagination server-driven.
+
+This keeps response size bounded and avoids client-side pagination over large result sets.
 
 **Monitoring ON (healthy):** "Force re-read" — lightweight DB re-read only:
 

@@ -357,20 +357,36 @@ export const holdingService = {
       throw new AppError("Token not found", 404);
     }
 
-    const [holdings, totalSupply] = await Promise.all([
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 10;
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+    const where = {
+      tokenPublicKey: input.tokenPublicKey,
+      ...(input.walletPublicKey ? { walletPublicKey: input.walletPublicKey } : {}),
+    };
+
+    const [holdings, totalCount, balanceAgg, totalSupply] = await Promise.all([
       prisma.holding.findMany({
-        where: {
-          tokenPublicKey: input.tokenPublicKey,
-          ...(input.walletPublicKey
-            ? { walletPublicKey: input.walletPublicKey }
-            : {}),
-        },
+        where,
         include: {
           wallet: {
             select: { publicKey: true, type: true },
           },
         },
         orderBy: { lastUpdated: "desc" },
+        skip,
+        take,
+      }),
+      prisma.holding.count({ where }),
+      prisma.holding.aggregate({
+        where: {
+          tokenPublicKey: input.tokenPublicKey,
+          ...(input.walletPublicKey
+            ? { walletPublicKey: input.walletPublicKey }
+            : {}),
+        },
+        _sum: { tokenBalance: true },
       }),
       (async () => {
         try {
@@ -384,7 +400,12 @@ export const holdingService = {
       })(),
     ]);
 
-    return { holdings, totalSupply };
+    return {
+      holdings,
+      totalCount,
+      totalBalance: Number(balanceAgg._sum.tokenBalance ?? 0),
+      totalSupply,
+    };
   },
 
   async refreshByToken(input: RefreshHoldingsByTokenInput, userId: string) {

@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
+import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -36,6 +37,10 @@ function formatSplit(owned: string, external: string) {
 export default function TransactionsPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const utils = trpc.useUtils();
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 10,
+  });
 
   const {
     data: tokenData,
@@ -49,7 +54,11 @@ export default function TransactionsPage() {
 
   const { data: transactionsData, isLoading: transactionsLoading } =
     trpc.transaction.listByToken.useQuery(
-      { tokenPublicKey: tokenPublicKey || "" },
+      {
+        tokenPublicKey: tokenPublicKey || "",
+        page: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+      },
       { enabled: !!tokenPublicKey && !!tokenData }
     );
 
@@ -76,7 +85,9 @@ export default function TransactionsPage() {
     });
   }, [tokenData, tokenPublicKey]);
 
-  const transactions = transactionsData ?? [];
+  const transactions = transactionsData?.items ?? [];
+  const totalCount = transactionsData?.totalCount ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const metrics = useMemo(() => {
@@ -172,7 +183,7 @@ export default function TransactionsPage() {
       : null;
     try {
       await refreshTransactions({ tokenPublicKey });
-      void utils.transaction.listByToken.invalidate({ tokenPublicKey });
+      void utils.transaction.listByToken.invalidate();
       await refetchRefreshCache();
       if (toastId) {
         toast.success("Transactions refreshed", { id: toastId, icon: null });
@@ -264,6 +275,10 @@ export default function TransactionsPage() {
         columns={columns}
         data={transactions}
         isLoading={transactionsLoading}
+        manualPagination
+        pageCount={pageCount}
+        rowCount={totalCount}
+        onPaginationStateChange={setPagination}
         initialColumnVisibility={{ status: false }}
         enableUrlState
         urlStatePrefix="transactions"
