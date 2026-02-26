@@ -11,6 +11,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
 import Link from "next/link";
+import { cn } from "@/lib/utils";
 
 export const NavMain = React.memo(function NavMain({
   items,
@@ -36,22 +37,18 @@ export const NavMain = React.memo(function NavMain({
             return (
               <SidebarMenuItem key={item.title}>
                 <SidebarMenuButton
-                  className="text-base py-2 h-auto text-muted-foreground"
-                  asChild={!isDisabled}
+                  className={cn(
+                    "text-base py-2 h-auto text-muted-foreground",
+                    isDisabled && "pointer-events-none opacity-50"
+                  )}
+                  asChild={true}
                   tooltip={item.title}
                   disabled={isDisabled}
                 >
-                  {isDisabled ? (
-                    <div>
-                      {item.icon && <item.icon className="size-10" />}
-                      <span>{item.title}</span>
-                    </div>
-                  ) : (
-                    <Link href={href}>
-                      {item.icon && <item.icon className="size-10" />}
-                      <span>{item.title}</span>
-                    </Link>
-                  )}
+                  <Link href={href}>
+                    {item.icon && <item.icon className="size-10" />}
+                    <span>{item.title}</span>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             );

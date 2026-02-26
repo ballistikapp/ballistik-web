@@ -51,12 +51,27 @@ export const launchRecoverySchema = z.object({
   launchId: z.string().min(1),
 });
 
+export const launchRecoveryByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1),
+});
+
 export const launchRecoverSolSchema = z.object({
   launchId: z.string().min(1),
+  walletPublicKeys: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export const launchRecoverSolByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1),
   walletPublicKeys: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export type LaunchTokenInput = z.infer<typeof launchTokenSchema>;
 export type LaunchStatusInput = z.infer<typeof launchStatusSchema>;
 export type LaunchRecoveryInput = z.infer<typeof launchRecoverySchema>;
+export type LaunchRecoveryByTokenInput = z.infer<
+  typeof launchRecoveryByTokenSchema
+>;
 export type LaunchRecoverSolInput = z.infer<typeof launchRecoverSolSchema>;
+export type LaunchRecoverSolByTokenInput = z.infer<
+  typeof launchRecoverSolByTokenSchema
+>;

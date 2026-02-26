@@ -128,6 +128,12 @@ Each range runs on its own independent timer. When the timer fires, a trade **al
 - `fundingPerGeneratedWallet`: SOL funded to each generated wallet
 - `topUpAmount`: SOL threshold for selected wallets (top up to this amount if below)
 
+### Generated Private Key Persistence
+
+- Volume bot generated wallets persist their private keys locally in `.keys/generated-private-keys.jsonl`.
+- Records include source metadata (`service`, `operation`), `publicKey`, `privateKey`, and timestamp.
+- The `.keys/` directory is local-only and gitignored.
+
 ### Behavior Configuration
 
 - `slippageBps`: slippage tolerance in basis points

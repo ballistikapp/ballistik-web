@@ -52,6 +52,7 @@ model Wallet {
   tokenTransactions TokenTransaction[] @relation("WalletTokenTransactions")
   devWalletTokens TokenDevWallet[] @relation("DevWalletTokens")
   volumeBotWallets VolumeBotWallet[] @relation("VolumeBotWallets")
+  launchRecoveryWallets LaunchRecoveryWallet[] @relation("LaunchRecoveryWalletRecordWallet")
   @@map("Wallet")
 }
 
@@ -63,9 +64,16 @@ enum WalletType {
   DISTRIBUTION
 }
 
+enum TokenStatus {
+  PENDING
+  ACTIVE
+  FAILED
+}
+
 model Token {
   publicKey String @id @unique
   privateKey String @unique
+  status TokenStatus @default(PENDING)
   name String
   symbol String
   description String?
@@ -112,6 +120,19 @@ enum LaunchLogLevel {
   WARN
   ERROR
   STEP
+}
+
+enum LaunchRecoveryWalletRole {
+  DEV
+  BUNDLER
+  DISTRIBUTION
+}
+
+enum LaunchRecoveryWalletStatus {
+  ELIGIBLE
+  RETURNED
+  FAILED
+  SKIPPED
 }
 
 enum HoldingExitStatus {
@@ -172,6 +193,7 @@ model Launch {
   cancelRequestedAt DateTime?
   errorMessage String?
   logs LaunchLog[] @relation("LaunchLogs")
+  recoveryWallets LaunchRecoveryWallet[] @relation("LaunchRecoveryWalletRecordLaunch")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("Launch")
@@ -187,6 +209,27 @@ model LaunchLog {
   data Json?
   createdAt DateTime @default(now())
   @@map("LaunchLog")
+}
+
+model LaunchRecoveryWallet {
+  id String @id @default(cuid())
+  launchId String
+  launch Launch @relation("LaunchRecoveryWalletRecordLaunch", fields: [launchId], references: [id])
+  walletPublicKey String
+  wallet Wallet @relation("LaunchRecoveryWalletRecordWallet", fields: [walletPublicKey], references: [publicKey])
+  walletType WalletType
+  role LaunchRecoveryWalletRole
+  isManaged Boolean @default(true)
+  reclaimStatus LaunchRecoveryWalletStatus @default(ELIGIBLE)
+  reclaimTxSignature String?
+  reclaimError String?
+  lastAttemptAt DateTime?
+  reclaimedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@unique([launchId, walletPublicKey])
+  @@index([launchId, reclaimStatus])
+  @@map("LaunchRecoveryWallet")
 }
 
 model HoldingExit {

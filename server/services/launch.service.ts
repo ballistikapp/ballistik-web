@@ -32,6 +32,7 @@ import {
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { walletService } from "@/server/services/wallet.service";
+import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -249,6 +250,67 @@ function buildLaunchRecoveryData(
       wallet.wallet.publicKey.toBase58()
     ),
   };
+}
+
+function buildLaunchRecoveryWalletRows(
+  launchId: string,
+  input: LaunchTokenInput,
+  mainWalletPublicKey: string,
+  devWalletPublicKey: string,
+  bundlerWalletKeypairs: Keypair[],
+  distributionWallets: DistributionWallet[]
+) {
+  const rows: Prisma.LaunchRecoveryWalletCreateManyInput[] = [];
+  if (devWalletPublicKey !== mainWalletPublicKey) {
+    rows.push({
+      launchId,
+      walletPublicKey: devWalletPublicKey,
+      walletType: "DEV",
+      role: "DEV",
+      isManaged: input.devWalletOption === "generate",
+    });
+  }
+  rows.push(
+    ...bundlerWalletKeypairs.map((wallet) => ({
+      launchId,
+      walletPublicKey: wallet.publicKey.toBase58(),
+      walletType: "BUNDLER" as const,
+      role: "BUNDLER" as const,
+      isManaged: true,
+    }))
+  );
+  rows.push(
+    ...distributionWallets.map((wallet) => ({
+      launchId,
+      walletPublicKey: wallet.wallet.publicKey.toBase58(),
+      walletType: "DISTRIBUTION" as const,
+      role: "DISTRIBUTION" as const,
+      isManaged: true,
+    }))
+  );
+  return rows;
+}
+
+async function persistLaunchRecoveryWallets(
+  launchId: string,
+  input: LaunchTokenInput,
+  mainWalletPublicKey: string,
+  devWalletPublicKey: string,
+  bundlerWalletKeypairs: Keypair[],
+  distributionWallets: DistributionWallet[]
+) {
+  const rows = buildLaunchRecoveryWalletRows(
+    launchId,
+    input,
+    mainWalletPublicKey,
+    devWalletPublicKey,
+    bundlerWalletKeypairs,
+    distributionWallets
+  );
+  await prisma.launchRecoveryWallet.deleteMany({ where: { launchId } });
+  if (rows.length > 0) {
+    await prisma.launchRecoveryWallet.createMany({ data: rows });
+  }
 }
 
 function parseLaunchRecoveryObject(
@@ -500,10 +562,11 @@ async function isCancelRequested(launchId: string) {
   return Boolean(launch?.cancelRequestedAt);
 }
 
-async function consumeVanityMint(userId: string) {
+async function reserveVanityMint(userId: string) {
   for (let attempt = 0; attempt < 3; attempt += 1) {
     const candidate = await prisma.vanityMint.findFirst({
       where: {
+        reservedAt: null,
         usedAt: null,
         tokenPublicKey: null,
       },
@@ -517,11 +580,12 @@ async function consumeVanityMint(userId: string) {
     const lock = await prisma.vanityMint.updateMany({
       where: {
         id: candidate.id,
+        reservedAt: null,
         usedAt: null,
         tokenPublicKey: null,
       },
       data: {
-        usedAt: new Date(),
+        reservedAt: new Date(),
         userId,
       },
     });
@@ -534,6 +598,35 @@ async function consumeVanityMint(userId: string) {
   return null;
 }
 
+async function consumeReservedVanityMint(vanityMintId: string, tokenPublicKey: string) {
+  await prisma.vanityMint.updateMany({
+    where: {
+      id: vanityMintId,
+      reservedAt: { not: null },
+      usedAt: null,
+    },
+    data: {
+      usedAt: new Date(),
+      tokenPublicKey,
+    },
+  });
+}
+
+async function releaseReservedVanityMint(vanityMintId: string) {
+  await prisma.vanityMint.updateMany({
+    where: {
+      id: vanityMintId,
+      reservedAt: { not: null },
+      usedAt: null,
+    },
+    data: {
+      reservedAt: null,
+      userId: null,
+      tokenPublicKey: null,
+    },
+  });
+}
+
 async function setStep(
   launchId: string,
   progress: number,
@@ -542,6 +635,16 @@ async function setStep(
 ) {
   await updateProgress(launchId, progress, step);
   await appendLog(launchId, "STEP", message, step);
+}
+
+function maybeInjectLaunchFailure(step: string) {
+  const configuredStep = process.env.LAUNCH_FAIL_AT_STEP?.trim().toLowerCase();
+  if (configuredStep && configuredStep === step.toLowerCase()) {
+    throw new AppError(
+      `Injected launch failure at step: ${step}`,
+      500
+    );
+  }
 }
 
 async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
@@ -850,10 +953,17 @@ async function resolveDevWallet(
   if (input.devWalletOption === "generate") {
     devWalletKeypair = Keypair.generate();
     devWalletPublicKey = devWalletKeypair.publicKey.toBase58();
+    const devWalletPrivateKey = bs58.encode(devWalletKeypair.secretKey);
+    await persistGeneratedPrivateKey({
+      service: "launchService",
+      operation: "resolveDevWallet.generate",
+      publicKey: devWalletPublicKey,
+      privateKey: devWalletPrivateKey,
+    });
     await prisma.wallet.create({
       data: {
         publicKey: devWalletPublicKey,
-        privateKey: bs58.encode(devWalletKeypair.secretKey),
+        privateKey: devWalletPrivateKey,
         type: "DEV",
         userId,
       },
@@ -871,10 +981,24 @@ async function ensureBundlerWallets(userId: string, walletCount: number) {
   for (let i = 0; i < walletCount; i += 1) {
     bundlerWalletKeypairs.push(Keypair.generate());
   }
+  const persistedBundlerWallets = bundlerWalletKeypairs.map((wallet) => ({
+    publicKey: wallet.publicKey.toBase58(),
+    privateKey: bs58.encode(wallet.secretKey),
+  }));
+  await Promise.all(
+    persistedBundlerWallets.map((wallet) =>
+      persistGeneratedPrivateKey({
+        service: "launchService",
+        operation: "ensureBundlerWallets",
+        publicKey: wallet.publicKey,
+        privateKey: wallet.privateKey,
+      })
+    )
+  );
   await prisma.wallet.createMany({
-    data: bundlerWalletKeypairs.map((wallet) => ({
-      publicKey: wallet.publicKey.toBase58(),
-      privateKey: bs58.encode(wallet.secretKey),
+    data: persistedBundlerWallets.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      privateKey: wallet.privateKey,
       type: "BUNDLER",
       userId,
     })),
@@ -900,10 +1024,24 @@ async function ensureDistributionWallets(
   if (distributionWallets.length === 0) {
     return distributionWallets;
   }
+  const persistedDistributionWallets = distributionWallets.map((wallet) => ({
+    publicKey: wallet.wallet.publicKey.toBase58(),
+    privateKey: bs58.encode(wallet.wallet.secretKey),
+  }));
+  await Promise.all(
+    persistedDistributionWallets.map((wallet) =>
+      persistGeneratedPrivateKey({
+        service: "launchService",
+        operation: "ensureDistributionWallets",
+        publicKey: wallet.publicKey,
+        privateKey: wallet.privateKey,
+      })
+    )
+  );
   await prisma.wallet.createMany({
-    data: distributionWallets.map((wallet) => ({
-      publicKey: wallet.wallet.publicKey.toBase58(),
-      privateKey: bs58.encode(wallet.wallet.secretKey),
+    data: persistedDistributionWallets.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      privateKey: wallet.privateKey,
       type: "DISTRIBUTION",
       userId,
     })),
@@ -929,10 +1067,19 @@ async function reserveMintIfRequested(
   vanityRequested: boolean
 ) {
   if (!vanityRequested) {
-    return { mintKeypair: Keypair.generate(), consumedVanityId: null };
+    const mintKeypair = Keypair.generate();
+    const mintPublicKey = mintKeypair.publicKey.toBase58();
+    const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
+    await persistGeneratedPrivateKey({
+      service: "launchService",
+      operation: "reserveMintIfRequested.generate",
+      publicKey: mintPublicKey,
+      privateKey: mintPrivateKey,
+    });
+    return { mintKeypair, consumedVanityId: null };
   }
-  const consumed = await consumeVanityMint(userId);
-  if (!consumed) {
+  const reserved = await reserveVanityMint(userId);
+  if (!reserved) {
     throw new AppError(
       "Vanity mint requested but no vanity mints available. Please add more vanity mints to the pool.",
       400
@@ -940,7 +1087,7 @@ async function reserveMintIfRequested(
   }
   let mintKeypair: Keypair;
   try {
-    mintKeypair = keypairFromPrivateKey(consumed.privateKey);
+    mintKeypair = keypairFromPrivateKey(reserved.privateKey);
   } catch {
     throw new AppError(
       "Vanity mint has an invalid private key. Please check the vanity mint pool.",
@@ -948,11 +1095,11 @@ async function reserveMintIfRequested(
     );
   }
   await appendLog(launchId, "INFO", "Using vanity mint", "mint", {
-    publicKey: consumed.publicKey,
+    publicKey: reserved.publicKey,
   });
   return {
     mintKeypair,
-    consumedVanityId: consumed.id,
+    consumedVanityId: reserved.id,
   };
 }
 
@@ -1145,7 +1292,7 @@ async function distributeTokensToWallets(
   };
 }
 
-async function persistTokenAndWallets(
+async function persistTokenPending(
   input: LaunchTokenInput,
   userId: string,
   mintPublicKey: string,
@@ -1162,6 +1309,7 @@ async function persistTokenAndWallets(
         data: {
           publicKey: mintPublicKey,
           privateKey: mintPrivateKey,
+          status: "PENDING",
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
           description: input.description.trim(),
@@ -1229,6 +1377,20 @@ async function persistTokenAndWallets(
   );
 
   return { token, distributionWalletCount };
+}
+
+async function activateToken(tokenPublicKey: string) {
+  return prisma.token.update({
+    where: { publicKey: tokenPublicKey },
+    data: { status: "ACTIVE" },
+  });
+}
+
+async function failToken(tokenPublicKey: string) {
+  return prisma.token.update({
+    where: { publicKey: tokenPublicKey },
+    data: { status: "FAILED" },
+  });
 }
 
 async function returnExcessSolToMain(
@@ -1372,6 +1534,97 @@ async function finalizeLaunch(
   );
 }
 
+async function finalizeLaunchFailure(params: {
+  launchId: string;
+  error: unknown;
+  launchStartedAt: number;
+  persistedTokenPublicKey: string | null;
+  reservedVanityId: string | null;
+  vanityConsumed: boolean;
+}) {
+  const {
+    launchId,
+    error,
+    launchStartedAt,
+    persistedTokenPublicKey,
+    reservedVanityId,
+    vanityConsumed,
+  } = params;
+  if (persistedTokenPublicKey) {
+    try {
+      await failToken(persistedTokenPublicKey);
+    } catch (tokenStatusError) {
+      logger.warn("Failed to mark token as failed after launch error", {
+        launchId,
+        tokenPublicKey: persistedTokenPublicKey,
+        message: getErrorMessage(tokenStatusError),
+      });
+    }
+  }
+
+  if (reservedVanityId && !vanityConsumed) {
+    try {
+      await releaseReservedVanityMint(reservedVanityId);
+    } catch (releaseError) {
+      logger.warn("Failed to release reserved vanity mint", {
+        launchId,
+        vanityMintId: reservedVanityId,
+        message: getErrorMessage(releaseError),
+      });
+    }
+  }
+
+  const durationMs = Date.now() - launchStartedAt;
+  const errorName = error instanceof Error ? error.name : "UnknownError";
+  const errorMessage = getErrorMessage(error);
+  const isUserError = isAppError(error);
+  const clientMessage = isUserError
+    ? error.message
+    : resolveLaunchClientMessage(error, errorMessage);
+  if (isUserError) {
+    logger.error("Launch failed", {
+      launchId,
+      errorName,
+      errorMessage: error.message,
+      statusCode: error.statusCode,
+      durationMs,
+    });
+  } else {
+    const context: Record<string, unknown> = {
+      launchId,
+      errorName,
+      durationMs,
+    };
+    if (errorMessage) {
+      context.errorMessage = errorMessage;
+    }
+    logger.error("Launch failed", context);
+  }
+
+  await prisma.launch.update({
+    where: { id: launchId },
+    data: {
+      status: "FAILED",
+      errorMessage: clientMessage,
+      completedAt: new Date(),
+    },
+  });
+  const logData: Prisma.InputJsonObject = {
+    durationMs,
+    errorName,
+    ...(errorMessage ? { errorMessage } : {}),
+    ...(reservedVanityId
+      ? {
+          vanityMint: {
+            id: reservedVanityId,
+            consumed: vanityConsumed,
+          },
+        }
+      : {}),
+  };
+  await appendLog(launchId, "ERROR", clientMessage, "error", logData);
+}
+
 async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
   const launch = await prisma.launch.findFirst({
     where: { id: launchId, userId },
@@ -1398,56 +1651,113 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
     throw new AppError("Main wallet not found", 400);
   }
 
-  const recovery = parseLaunchRecoveryData(resolvedLaunch.result);
-  if (recovery) {
-    const walletKeys = new Set<string>();
-    recovery.bundlerWallets.forEach((key) => walletKeys.add(key));
-    recovery.distributionWallets.forEach((key) => walletKeys.add(key));
-    if (
-      recovery.devWalletManaged &&
-      recovery.devWalletPublicKey &&
-      recovery.devWalletPublicKey !== mainWalletPublicKey
-    ) {
-      walletKeys.add(recovery.devWalletPublicKey);
-    }
-    const excludedDevWalletPublicKey =
-      !recovery.devWalletManaged &&
-      recovery.devWalletPublicKey &&
-      recovery.devWalletPublicKey !== mainWalletPublicKey
-        ? recovery.devWalletPublicKey
-        : null;
-
-    return {
-      launch: resolvedLaunch,
-      source: "result" as const,
-      mainWalletPublicKey,
-      walletPublicKeys: Array.from(walletKeys),
-      excludedDevWalletPublicKey,
-    };
-  }
-
-  const fallbackWallets = await prisma.wallet.findMany({
-    where: {
-      userId,
-      tokenPublicKey: null,
-      OR: [
-        { type: "BUNDLER" },
-        { type: "DEV", isImported: false, devWalletTokens: { none: {} } },
-      ],
+  const recoveryWallets = await prisma.launchRecoveryWallet.findMany({
+    where: { launchId },
+    orderBy: { createdAt: "asc" },
+    select: {
+      walletPublicKey: true,
+      walletType: true,
+      isManaged: true,
+      reclaimStatus: true,
+      reclaimTxSignature: true,
+      reclaimError: true,
+      reclaimedAt: true,
+      lastAttemptAt: true,
+      role: true,
     },
-    select: { publicKey: true },
   });
+  if (recoveryWallets.length === 0) {
+    throw new AppError("Launch recovery data is unavailable", 500);
+  }
+  const managedWalletPublicKeys = recoveryWallets
+    .filter((wallet) => wallet.isManaged)
+    .map((wallet) => wallet.walletPublicKey);
+  const excludedDevWalletPublicKey =
+    recoveryWallets.find((wallet) => wallet.role === "DEV" && !wallet.isManaged)
+      ?.walletPublicKey ?? null;
 
   return {
     launch: resolvedLaunch,
-    source: "fallback" as const,
+    source: "launch_snapshot" as const,
     mainWalletPublicKey,
-    walletPublicKeys: fallbackWallets.map((wallet) => wallet.publicKey),
-    excludedDevWalletPublicKey: null,
+    walletPublicKeys: managedWalletPublicKeys,
+    recoveryWallets,
+    excludedDevWalletPublicKey,
   };
 }
 
+async function resolveFailedLaunchByToken(tokenPublicKey: string, userId: string) {
+  const launch = await prisma.launch.findFirst({
+    where: {
+      userId,
+      tokenPublicKey,
+      status: { in: ["FAILED", "CANCELED"] },
+    },
+    orderBy: { createdAt: "desc" },
+    select: { id: true },
+  });
+  if (!launch) {
+    throw new AppError("No failed launch found for token", 404);
+  }
+  return launch.id;
+}
+
+export type FailedLaunchRow = {
+  launchId: string;
+  launchStatus: string;
+  tokenPublicKey: string | null;
+  tokenName: string;
+  tokenSymbol: string;
+  errorMessage: string | null;
+  createdAt: Date;
+};
+
 export const launchService = {
+  async getFailedLaunches(userId: string): Promise<FailedLaunchRow[]> {
+    logger.info("getFailedLaunches called", { userId });
+    try {
+      const launches = await prisma.launch.findMany({
+        where: {
+          userId,
+          status: { in: ["FAILED", "CANCELED"] },
+          recoveryWallets: { some: {} },
+        },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          status: true,
+          tokenPublicKey: true,
+          errorMessage: true,
+          createdAt: true,
+          input: true,
+        },
+      });
+      logger.info("getFailedLaunches result", { count: launches.length });
+      return launches.map((launch) => {
+        const input = launch.input as Record<string, unknown> | null;
+        return {
+          launchId: launch.id,
+          launchStatus: launch.status,
+          tokenPublicKey: launch.tokenPublicKey,
+          tokenName:
+            typeof input?.tokenName === "string"
+              ? input.tokenName
+              : "Failed Launch",
+          tokenSymbol:
+            typeof input?.tokenSymbol === "string" ? input.tokenSymbol : "—",
+          errorMessage: launch.errorMessage,
+          createdAt: launch.createdAt,
+        };
+      });
+    } catch (error) {
+      logger.error("getFailedLaunches error", {
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
+      throw error;
+    }
+  },
+
   async startLaunch(input: LaunchTokenInput, userId: string) {
     const launch = await prisma.launch.create({
       data: {
@@ -1504,6 +1814,7 @@ export const launchService = {
       source,
       mainWalletPublicKey,
       walletPublicKeys,
+      recoveryWallets,
       excludedDevWalletPublicKey,
     } = await loadLaunchRecoveryInfo(launchId, userId);
 
@@ -1532,6 +1843,9 @@ export const launchService = {
       .filter((wallet): wallet is NonNullable<(typeof walletRecords)[number]> =>
         Boolean(wallet)
       );
+    const recoveryWalletMap = new Map(
+      recoveryWallets.map((wallet) => [wallet.walletPublicKey, wallet])
+    );
 
     const connection = getSolanaConnection();
     const now = new Date();
@@ -1544,12 +1858,22 @@ export const launchService = {
           type: wallet.type,
           balanceSol: balanceLamports / LAMPORTS_PER_SOL,
           balanceRefreshedAt: now,
+          reclaimStatus:
+            recoveryWalletMap.get(wallet.publicKey)?.reclaimStatus ?? "ELIGIBLE",
+          reclaimTxSignature:
+            recoveryWalletMap.get(wallet.publicKey)?.reclaimTxSignature ?? null,
+          reclaimError:
+            recoveryWalletMap.get(wallet.publicKey)?.reclaimError ?? null,
+          reclaimedAt:
+            recoveryWalletMap.get(wallet.publicKey)?.reclaimedAt ?? null,
+          lastAttemptAt:
+            recoveryWalletMap.get(wallet.publicKey)?.lastAttemptAt ?? null,
         };
       })
     );
 
     if (balances.length > 0) {
-      await prisma.$transaction(
+      await Promise.all(
         balances.map((balance) =>
           prisma.wallet.update({
             where: { publicKey: balance.publicKey },
@@ -1569,16 +1893,19 @@ export const launchService = {
       excludedDevWalletPublicKey,
     };
   },
+  async getRecoveryWalletsByToken(tokenPublicKey: string, userId: string) {
+    const launchId = await resolveFailedLaunchByToken(tokenPublicKey, userId);
+    return await this.getRecoveryWallets(launchId, userId);
+  },
   async recoverSol(
     launchId: string,
     userId: string,
     walletPublicKeys?: string[]
   ) {
-    const { transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS } =
-      getLaunchConfig();
     const {
       launch,
       mainWalletPublicKey,
+      recoveryWallets: recoveryWalletRows,
       walletPublicKeys: recoveryWallets,
     } = await loadLaunchRecoveryInfo(launchId, userId);
 
@@ -1597,10 +1924,27 @@ export const launchService = {
       };
     }
 
+    const mainWalletRecord = await prisma.wallet.findUnique({
+      where: { publicKey: mainWalletPublicKey },
+      select: { publicKey: true, privateKey: true },
+    });
+    if (!mainWalletRecord) {
+      throw new AppError("Main wallet not accessible", 500);
+    }
+    const mainKeypair = Keypair.fromSecretKey(
+      bs58.decode(mainWalletRecord.privateKey)
+    );
     const wallets = await prisma.wallet.findMany({
       where: { userId, publicKey: { in: targetWallets } },
       select: { publicKey: true, privateKey: true },
     });
+    const walletMap = new Map(wallets.map((wallet) => [wallet.publicKey, wallet]));
+    const selectedWallets = targetWallets
+      .map((publicKey) => walletMap.get(publicKey))
+      .filter((wallet): wallet is (typeof wallets)[number] => Boolean(wallet));
+    const recoveryRowMap = new Map(
+      recoveryWalletRows.map((row) => [row.walletPublicKey, row])
+    );
 
     const connection = getSolanaConnection();
     const mainPublicKey = new PublicKey(mainWalletPublicKey);
@@ -1612,47 +1956,99 @@ export const launchService = {
       error?: string;
     }[] = [];
 
-    for (const wallet of wallets) {
-      const walletPublicKey = new PublicKey(wallet.publicKey);
-      const balanceLamports = await connection.getBalance(walletPublicKey);
-      const lamportsToSend = balanceLamports - TRANSFER_FEE_BUFFER_LAMPORTS;
-      if (lamportsToSend <= 0) {
-        results.push({
-          publicKey: wallet.publicKey,
-          status: "skipped",
-          error: "Insufficient balance",
-        });
-        continue;
-      }
+    const RECOVERY_BATCH_SIZE = 5;
+    for (let i = 0; i < selectedWallets.length; i += RECOVERY_BATCH_SIZE) {
+      const batch = selectedWallets.slice(i, i + RECOVERY_BATCH_SIZE);
+      const batchResults = await Promise.all(
+        batch.map(async (wallet) => {
+          const recoveryRow = recoveryRowMap.get(wallet.publicKey);
+          if (recoveryRow?.reclaimStatus === "RETURNED") {
+            return {
+              publicKey: wallet.publicKey,
+              status: "skipped" as const,
+              error: "Already returned",
+            };
+          }
 
-      try {
-        const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-        const transaction = new Transaction().add(
-          SystemProgram.transfer({
-            fromPubkey: sender.publicKey,
-            toPubkey: mainPublicKey,
-            lamports: lamportsToSend,
-          })
-        );
-        const signature = await sendAndConfirmTransaction(
-          connection,
-          transaction,
-          [sender],
-          { commitment: "confirmed" }
-        );
-        results.push({
-          publicKey: wallet.publicKey,
-          status: "returned",
-          signature,
-          amountSol: lamportsToSol(BigInt(lamportsToSend)),
-        });
-      } catch (error) {
-        results.push({
-          publicKey: wallet.publicKey,
-          status: "failed",
-          error: error instanceof Error ? error.message : "Return failed",
-        });
-      }
+          const attemptedAt = new Date();
+          const walletPublicKey = new PublicKey(wallet.publicKey);
+          const balanceLamports = await connection.getBalance(walletPublicKey);
+          if (balanceLamports <= 0) {
+            await prisma.launchRecoveryWallet.updateMany({
+              where: { launchId, walletPublicKey: wallet.publicKey },
+              data: {
+                reclaimStatus: "SKIPPED",
+                reclaimError: "Zero balance",
+                reclaimTxSignature: null,
+                lastAttemptAt: attemptedAt,
+              },
+            });
+            return {
+              publicKey: wallet.publicKey,
+              status: "skipped" as const,
+              error: "Zero balance",
+            };
+          }
+
+          try {
+            const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+            const transaction = new Transaction();
+            transaction.feePayer = mainPublicKey;
+            transaction.add(
+              SystemProgram.transfer({
+                fromPubkey: sender.publicKey,
+                toPubkey: mainPublicKey,
+                lamports: balanceLamports,
+              })
+            );
+            const signature = await sendAndConfirmTransaction(
+              connection,
+              transaction,
+              [mainKeypair, sender],
+              { commitment: "confirmed" }
+            );
+            await prisma.launchRecoveryWallet.updateMany({
+              where: { launchId, walletPublicKey: wallet.publicKey },
+              data: {
+                reclaimStatus: "RETURNED",
+                reclaimError: null,
+                reclaimTxSignature: signature,
+                lastAttemptAt: attemptedAt,
+                reclaimedAt: new Date(),
+              },
+            });
+            return {
+              publicKey: wallet.publicKey,
+              status: "returned" as const,
+              signature,
+              amountSol: lamportsToSol(BigInt(balanceLamports)),
+            };
+          } catch (error) {
+            const errorMessage =
+              error instanceof Error ? error.message : "Return failed";
+            logger.error("Recovery transfer failed", {
+              launchId,
+              walletPublicKey: wallet.publicKey,
+              error: errorMessage,
+            });
+            await prisma.launchRecoveryWallet.updateMany({
+              where: { launchId, walletPublicKey: wallet.publicKey },
+              data: {
+                reclaimStatus: "FAILED",
+                reclaimError: errorMessage,
+                reclaimTxSignature: null,
+                lastAttemptAt: attemptedAt,
+              },
+            });
+            return {
+              publicKey: wallet.publicKey,
+              status: "failed" as const,
+              error: errorMessage,
+            };
+          }
+        })
+      );
+      results.push(...batchResults);
     }
 
     const returnedWalletPublicKeys = results
@@ -1683,6 +2079,14 @@ export const launchService = {
       mainWalletPublicKey,
       results,
     };
+  },
+  async recoverSolByToken(
+    tokenPublicKey: string,
+    userId: string,
+    walletPublicKeys?: string[]
+  ) {
+    const launchId = await resolveFailedLaunchByToken(tokenPublicKey, userId);
+    return await this.recoverSol(launchId, userId, walletPublicKeys);
   },
 
   async cancelLaunch(launchId: string, userId: string) {
@@ -1756,7 +2160,9 @@ export const launchService = {
       slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
     } = getLaunchConfig();
     let consumedVanityId: string | null = null;
+    let vanityConsumed = false;
     let recoveryData: LaunchRecoveryData | null = null;
+    let persistedTokenPublicKey: string | null = null;
 
     try {
       const tokenMediaSource = input.tokenImage
@@ -1859,6 +2265,14 @@ export const launchService = {
         distributionWallets
       );
       await setLaunchRecovery(launchId, recoveryData);
+      await persistLaunchRecoveryWallets(
+        launchId,
+        input,
+        user.mainWallet.publicKey,
+        devWalletPublicKey,
+        bundlerWalletKeypairs,
+        distributionWallets
+      );
 
       const { SHYFT_API_KEY, APP_URL } = getEnv();
       if (SHYFT_API_KEY && APP_URL) {
@@ -1967,6 +2381,7 @@ export const launchService = {
         fundingTargets,
         mainReserveLamports
       );
+      maybeInjectLaunchFailure("after_funding");
 
       await setStep(launchId, 18, "metadata", "Preparing metadata");
       const metadataStartedAt = Date.now();
@@ -2008,11 +2423,53 @@ export const launchService = {
         return;
       }
 
+      await updateProgress(launchId, 40, "persist");
+      await appendLog(
+        launchId,
+        "STEP",
+        "Saving pending token and wallet links",
+        "persist"
+      );
+      const mintPublicKey = mintKeypair.publicKey.toBase58();
+      const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
+      const persistStartedAt = Date.now();
+      const { distributionWalletCount } = await persistTokenPending(
+        input,
+        user.id,
+        mintPublicKey,
+        mintPrivateKey,
+        devWalletPublicKey,
+        bundlerWalletKeypairs,
+        distributionWallets,
+        consumedVanityId
+      );
+      persistedTokenPublicKey = mintPublicKey;
+      if (consumedVanityId !== null) {
+        const resolvedVanityMintId = consumedVanityId!;
+        await consumeReservedVanityMint(resolvedVanityMintId, mintPublicKey);
+        vanityConsumed = true;
+      }
+      await appendLog(launchId, "INFO", "Pending token saved", "persist", {
+        tokenPublicKey: mintPublicKey,
+        distributionWalletCount,
+        durationMs: Date.now() - persistStartedAt,
+      });
+      maybeInjectLaunchFailure("after_persist");
+      if (distributionWalletCount > 0) {
+        await appendLog(
+          launchId,
+          "INFO",
+          "Distribution wallets linked",
+          "distribution",
+          {
+            count: distributionWalletCount,
+          }
+        );
+      }
+
       await setStep(launchId, 45, "create", "Creating token");
       const createStartedAt = Date.now();
       const pumpSdk = await createPumpSdk(devWalletKeypair);
-      let bundleResult: { bundleId: string; signatures: string[] } | null =
-        null;
       let createSignature: string | null = null;
       let bundleId: string | null = null;
       if (input.bundleBuyEnabled) {
@@ -2034,7 +2491,7 @@ export const launchService = {
           totalBuySol: lamportsToSol(totalBuyLamports).toFixed(4),
           totalBuyLamports: totalBuyLamports.toString(),
         });
-        bundleResult = await createAndBuyInBundle({
+        const bundleResult = await createAndBuyInBundle({
           launchId,
           creator: devWalletKeypair,
           mint: mintKeypair,
@@ -2056,6 +2513,7 @@ export const launchService = {
           signatureCount: bundleResult.signatures.length,
           durationMs: Date.now() - createStartedAt,
         });
+        maybeInjectLaunchFailure("after_create");
       } else {
         const { createTx } = await buildCreateTokenTransaction(
           devWalletKeypair,
@@ -2097,10 +2555,8 @@ export const launchService = {
           signature: createSignature,
           durationMs: Date.now() - createStartedAt,
         });
+        maybeInjectLaunchFailure("after_create");
       }
-
-      const mintPublicKey = mintKeypair.publicKey.toBase58();
-      const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
 
       await setStep(launchId, 55, "confirm", "Confirming token on-chain");
       const confirmation = await waitForMintAccount(mintPublicKey, launchId);
@@ -2201,36 +2657,11 @@ export const launchService = {
       }
 
       await updateProgress(launchId, 80, "persist");
-      await appendLog(launchId, "STEP", "Saving token", "persist");
-
-      const persistStartedAt = Date.now();
-      const { token, distributionWalletCount } = await persistTokenAndWallets(
-        input,
-        user.id,
-        mintPublicKey,
-        mintPrivateKey,
-        devWalletPublicKey,
-        bundlerWalletKeypairs,
-        distributionWallets,
-        consumedVanityId
-      );
-      await appendLog(launchId, "INFO", "Token saved", "persist", {
-        tokenPublicKey: token.publicKey,
-        distributionWalletCount,
-        durationMs: Date.now() - persistStartedAt,
+      await appendLog(launchId, "STEP", "Activating token", "persist");
+      await activateToken(mintPublicKey);
+      await appendLog(launchId, "INFO", "Token activated", "persist", {
+        tokenPublicKey: mintPublicKey,
       });
-
-      if (distributionWalletCount > 0) {
-        await appendLog(
-          launchId,
-          "INFO",
-          "Distribution wallets linked",
-          "distribution",
-          {
-            count: distributionWalletCount,
-          }
-        );
-      }
 
       await setStep(launchId, 90, "cleanup", "Returning excess SOL");
       const managedLaunchWallets: Keypair[] = [
@@ -2271,7 +2702,7 @@ export const launchService = {
         );
         try {
           await walletService.refreshWalletBalances(
-            token.publicKey,
+            mintPublicKey,
             user.id,
             refreshWalletPublicKeys,
             true
@@ -2279,7 +2710,7 @@ export const launchService = {
         } catch (error) {
           logger.warn("Launch success post-sweep balance refresh failed", {
             launchId,
-            tokenPublicKey: token.publicKey,
+            tokenPublicKey: mintPublicKey,
             message: getErrorMessage(error),
           });
         }
@@ -2287,7 +2718,7 @@ export const launchService = {
 
       await finalizeLaunch(
         launchId,
-        token.publicKey,
+        mintPublicKey,
         devWalletPublicKey,
         user.mainWallet.publicKey,
         bundlerWalletKeypairs,
@@ -2311,66 +2742,14 @@ export const launchService = {
         Date.now() - launchStartedAt
       );
     } catch (error) {
-      const durationMs = Date.now() - launchStartedAt;
-      const errorName = error instanceof Error ? error.name : "UnknownError";
-      const errorMessage = getErrorMessage(error);
-      const isUserError = isAppError(error);
-      const clientMessage = isUserError
-        ? error.message
-        : resolveLaunchClientMessage(error, errorMessage);
-      if (isUserError) {
-        logger.error("Launch failed", {
-          launchId,
-          errorName,
-          errorMessage: error.message,
-          statusCode: error.statusCode,
-          durationMs,
-        });
-      } else {
-        const context: Record<string, unknown> = {
-          launchId,
-          errorName,
-          durationMs,
-        };
-        if (errorMessage) {
-          context.errorMessage = errorMessage;
-        }
-        logger.error("Launch failed", context);
-      }
-      await prisma.launch.update({
-        where: { id: launchId },
-        data: {
-          status: "FAILED",
-          errorMessage: clientMessage,
-          completedAt: new Date(),
-        },
+      await finalizeLaunchFailure({
+        launchId,
+        error,
+        launchStartedAt,
+        persistedTokenPublicKey,
+        reservedVanityId: consumedVanityId,
+        vanityConsumed,
       });
-      const logData: Prisma.InputJsonObject = {
-        durationMs,
-        errorName,
-        ...(errorMessage ? { errorMessage } : {}),
-      };
-      await appendLog(launchId, "ERROR", clientMessage, "error", logData);
-      try {
-        const recoveryResult = await this.recoverSol(launchId, launch.userId);
-        await appendLog(
-          launchId,
-          "INFO",
-          "Recovery complete",
-          "recovery",
-          recoveryResult as Prisma.InputJsonValue
-        );
-      } catch (recoveryError) {
-        const recoveryMessage =
-          getErrorMessage(recoveryError) || "Recovery failed";
-        await appendLog(launchId, "WARN", recoveryMessage, "recovery", {
-          errorName:
-            recoveryError instanceof Error
-              ? recoveryError.name
-              : "UnknownError",
-          ...(recoveryMessage ? { errorMessage: recoveryMessage } : {}),
-        });
-      }
     }
   },
 };

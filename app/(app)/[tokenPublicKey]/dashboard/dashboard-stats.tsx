@@ -15,6 +15,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { formatSol, formatTokenCount } from "@/lib/utils/format";
 
 interface TreasuryData {
@@ -50,9 +51,17 @@ interface DashboardStatsProps {
     pnl: PnlData;
     activity: ActivityData;
   };
+  onOpenExitDialog: () => void;
+  exitDisabled?: boolean;
+  exitPending?: boolean;
 }
 
-export function DashboardStats({ metrics }: DashboardStatsProps) {
+export function DashboardStats({
+  metrics,
+  onOpenExitDialog,
+  exitDisabled = false,
+  exitPending = false,
+}: DashboardStatsProps) {
   const { treasury, holdingsValue, pnl, activity } = metrics;
   const isProfitable = pnl.net >= 0;
 
@@ -82,21 +91,6 @@ export function DashboardStats({ metrics }: DashboardStatsProps) {
               </Badge>
             </div>
           </div>
-        </CardHeader>
-      </Card>
-
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription className="flex items-center gap-1.5">
-            <IconCoins className="size-4" />
-            Holdings Value
-          </CardDescription>
-          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {formatSol(holdingsValue.valueSol)} SOL
-          </CardTitle>
-          <span className="text-xs text-muted-foreground tabular-nums mt-1">
-            {formatTokenCount(holdingsValue.tokenCount)} tokens held
-          </span>
         </CardHeader>
       </Card>
 
@@ -153,6 +147,31 @@ export function DashboardStats({ metrics }: DashboardStatsProps) {
                 {activity.transactionCount !== 1 ? "s" : ""}
               </Badge>
             </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Card className="@container/card">
+        <CardHeader className="h-full flex flex-col">
+          <CardDescription className="flex items-center gap-1.5">
+            <IconCoins className="size-4" />
+            Holdings Value
+          </CardDescription>
+          <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
+            {formatSol(holdingsValue.valueSol)} SOL
+          </CardTitle>
+          <div className="mt-auto flex justify-between items-end w-full gap-2 pt-3">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              {formatTokenCount(holdingsValue.tokenCount)} tokens held
+            </span>
+            <Button
+              variant="destructive"
+              className="h-8 self-end px-5 text-sm font-semibold"
+              onClick={onOpenExitDialog}
+              disabled={exitDisabled}
+            >
+              {exitPending ? "Starting..." : "Sell All and Exit"}
+            </Button>
           </div>
         </CardHeader>
       </Card>

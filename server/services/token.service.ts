@@ -8,9 +8,33 @@ import { getEnv } from "@/lib/config/env";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import { logger } from "@/lib/logger";
+import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 
 export const tokenService = {
   async getUserTokens(userId?: string) {
+    try {
+      let _userId = userId;
+      if (!_userId) {
+        const user = await getServerUser();
+        _userId = user?.id;
+      }
+      if (!_userId) {
+        return [];
+      }
+      const tokens = await prisma.token.findMany({
+        where: { userId: _userId },
+        orderBy: { createdAt: "desc" },
+      });
+      return tokens.filter((token) => {
+        const status = (token as { status?: string | null }).status;
+        return status === "ACTIVE" || status == null;
+      });
+    } catch (error) {
+      throw new AppError("Failed to fetch user tokens", 500, { error });
+    }
+  },
+
+  async getAllUserTokens(userId?: string) {
     try {
       let _userId = userId;
       if (!_userId) {
@@ -34,6 +58,12 @@ export const tokenService = {
       const keypair = Keypair.generate();
       const publicKey = keypair.publicKey.toBase58();
       const privateKey = bs58.encode(keypair.secretKey);
+      await persistGeneratedPrivateKey({
+        service: "tokenService",
+        operation: "createToken",
+        publicKey,
+        privateKey,
+      });
 
       const token = await prisma.token.create({
         data: {

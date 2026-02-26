@@ -264,6 +264,7 @@ export type WalletWhereInput = {
   tokenTransactions?: Prisma.TokenTransactionListRelationFilter
   devWalletTokens?: Prisma.TokenDevWalletListRelationFilter
   volumeBotWallets?: Prisma.VolumeBotWalletListRelationFilter
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletListRelationFilter
 }
 
 export type WalletOrderByWithRelationInput = {
@@ -285,6 +286,7 @@ export type WalletOrderByWithRelationInput = {
   tokenTransactions?: Prisma.TokenTransactionOrderByRelationAggregateInput
   devWalletTokens?: Prisma.TokenDevWalletOrderByRelationAggregateInput
   volumeBotWallets?: Prisma.VolumeBotWalletOrderByRelationAggregateInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletOrderByRelationAggregateInput
 }
 
 export type WalletWhereUniqueInput = Prisma.AtLeast<{
@@ -309,6 +311,7 @@ export type WalletWhereUniqueInput = Prisma.AtLeast<{
   tokenTransactions?: Prisma.TokenTransactionListRelationFilter
   devWalletTokens?: Prisma.TokenDevWalletListRelationFilter
   volumeBotWallets?: Prisma.VolumeBotWalletListRelationFilter
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletListRelationFilter
 }, "publicKey" | "publicKey" | "privateKey">
 
 export type WalletOrderByWithAggregationInput = {
@@ -362,6 +365,7 @@ export type WalletCreateInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateInput = {
@@ -381,6 +385,7 @@ export type WalletUncheckedCreateInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUpdateInput = {
@@ -400,6 +405,7 @@ export type WalletUpdateInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateInput = {
@@ -419,6 +425,7 @@ export type WalletUncheckedUpdateInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateManyInput = {
@@ -661,6 +668,20 @@ export type WalletUpdateOneRequiredWithoutDevWalletTokensNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.WalletUpdateToOneWithWhereWithoutDevWalletTokensInput, Prisma.WalletUpdateWithoutDevWalletTokensInput>, Prisma.WalletUncheckedUpdateWithoutDevWalletTokensInput>
 }
 
+export type WalletCreateNestedOneWithoutLaunchRecoveryWalletsInput = {
+  create?: Prisma.XOR<Prisma.WalletCreateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedCreateWithoutLaunchRecoveryWalletsInput>
+  connectOrCreate?: Prisma.WalletCreateOrConnectWithoutLaunchRecoveryWalletsInput
+  connect?: Prisma.WalletWhereUniqueInput
+}
+
+export type WalletUpdateOneRequiredWithoutLaunchRecoveryWalletsNestedInput = {
+  create?: Prisma.XOR<Prisma.WalletCreateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedCreateWithoutLaunchRecoveryWalletsInput>
+  connectOrCreate?: Prisma.WalletCreateOrConnectWithoutLaunchRecoveryWalletsInput
+  upsert?: Prisma.WalletUpsertWithoutLaunchRecoveryWalletsInput
+  connect?: Prisma.WalletWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.WalletUpdateToOneWithWhereWithoutLaunchRecoveryWalletsInput, Prisma.WalletUpdateWithoutLaunchRecoveryWalletsInput>, Prisma.WalletUncheckedUpdateWithoutLaunchRecoveryWalletsInput>
+}
+
 export type WalletCreateNestedOneWithoutVolumeBotWalletsInput = {
   create?: Prisma.XOR<Prisma.WalletCreateWithoutVolumeBotWalletsInput, Prisma.WalletUncheckedCreateWithoutVolumeBotWalletsInput>
   connectOrCreate?: Prisma.WalletCreateOrConnectWithoutVolumeBotWalletsInput
@@ -735,6 +756,7 @@ export type WalletCreateWithoutMainWalletUserInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutMainWalletUserInput = {
@@ -753,6 +775,7 @@ export type WalletUncheckedCreateWithoutMainWalletUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutMainWalletUserInput = {
@@ -776,6 +799,7 @@ export type WalletCreateWithoutUserInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutUserInput = {
@@ -794,6 +818,7 @@ export type WalletUncheckedCreateWithoutUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutUserInput = {
@@ -833,6 +858,7 @@ export type WalletUpdateWithoutMainWalletUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutMainWalletUserInput = {
@@ -851,6 +877,7 @@ export type WalletUncheckedUpdateWithoutMainWalletUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUpsertWithWhereUniqueWithoutUserInput = {
@@ -901,6 +928,7 @@ export type WalletCreateWithoutTokenInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutTokenInput = {
@@ -919,6 +947,7 @@ export type WalletUncheckedCreateWithoutTokenInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutTokenInput = {
@@ -963,6 +992,7 @@ export type WalletCreateWithoutDevWalletTokensInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutDevWalletTokensInput = {
@@ -981,6 +1011,7 @@ export type WalletUncheckedCreateWithoutDevWalletTokensInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutDevWalletTokensInput = {
@@ -1015,6 +1046,7 @@ export type WalletUpdateWithoutDevWalletTokensInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutDevWalletTokensInput = {
@@ -1032,6 +1064,99 @@ export type WalletUncheckedUpdateWithoutDevWalletTokensInput = {
   holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
+}
+
+export type WalletCreateWithoutLaunchRecoveryWalletsInput = {
+  publicKey: string
+  privateKey: string
+  type: $Enums.WalletType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Date | string | null
+  isImported?: boolean
+  user?: Prisma.UserCreateNestedOneWithoutWalletsInput
+  mainWalletUser?: Prisma.UserCreateNestedOneWithoutMainWalletInput
+  token?: Prisma.TokenCreateNestedOneWithoutOperationalWalletsInput
+  holdings?: Prisma.HoldingCreateNestedManyWithoutWalletInput
+  transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
+  tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
+  devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+}
+
+export type WalletUncheckedCreateWithoutLaunchRecoveryWalletsInput = {
+  publicKey: string
+  privateKey: string
+  type: $Enums.WalletType
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  userId?: string | null
+  tokenPublicKey?: string | null
+  balanceSol?: runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Date | string | null
+  isImported?: boolean
+  mainWalletUser?: Prisma.UserUncheckedCreateNestedOneWithoutMainWalletInput
+  holdings?: Prisma.HoldingUncheckedCreateNestedManyWithoutWalletInput
+  transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
+  devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+}
+
+export type WalletCreateOrConnectWithoutLaunchRecoveryWalletsInput = {
+  where: Prisma.WalletWhereUniqueInput
+  create: Prisma.XOR<Prisma.WalletCreateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedCreateWithoutLaunchRecoveryWalletsInput>
+}
+
+export type WalletUpsertWithoutLaunchRecoveryWalletsInput = {
+  update: Prisma.XOR<Prisma.WalletUpdateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedUpdateWithoutLaunchRecoveryWalletsInput>
+  create: Prisma.XOR<Prisma.WalletCreateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedCreateWithoutLaunchRecoveryWalletsInput>
+  where?: Prisma.WalletWhereInput
+}
+
+export type WalletUpdateToOneWithWhereWithoutLaunchRecoveryWalletsInput = {
+  where?: Prisma.WalletWhereInput
+  data: Prisma.XOR<Prisma.WalletUpdateWithoutLaunchRecoveryWalletsInput, Prisma.WalletUncheckedUpdateWithoutLaunchRecoveryWalletsInput>
+}
+
+export type WalletUpdateWithoutLaunchRecoveryWalletsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  user?: Prisma.UserUpdateOneWithoutWalletsNestedInput
+  mainWalletUser?: Prisma.UserUpdateOneWithoutMainWalletNestedInput
+  token?: Prisma.TokenUpdateOneWithoutOperationalWalletsNestedInput
+  holdings?: Prisma.HoldingUpdateManyWithoutWalletNestedInput
+  transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
+  devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+}
+
+export type WalletUncheckedUpdateWithoutLaunchRecoveryWalletsInput = {
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  type?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  balanceSol?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  balanceRefreshedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isImported?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletUser?: Prisma.UserUncheckedUpdateOneWithoutMainWalletNestedInput
+  holdings?: Prisma.HoldingUncheckedUpdateManyWithoutWalletNestedInput
+  transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
+  tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
+  devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
@@ -1051,6 +1176,7 @@ export type WalletCreateWithoutVolumeBotWalletsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutVolumeBotWalletsInput = {
@@ -1069,6 +1195,7 @@ export type WalletUncheckedCreateWithoutVolumeBotWalletsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutVolumeBotWalletsInput = {
@@ -1103,6 +1230,7 @@ export type WalletUpdateWithoutVolumeBotWalletsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutVolumeBotWalletsInput = {
@@ -1121,6 +1249,7 @@ export type WalletUncheckedUpdateWithoutVolumeBotWalletsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateWithoutHoldingsInput = {
@@ -1139,6 +1268,7 @@ export type WalletCreateWithoutHoldingsInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutHoldingsInput = {
@@ -1157,6 +1287,7 @@ export type WalletUncheckedCreateWithoutHoldingsInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutHoldingsInput = {
@@ -1191,6 +1322,7 @@ export type WalletUpdateWithoutHoldingsInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutHoldingsInput = {
@@ -1209,6 +1341,7 @@ export type WalletUncheckedUpdateWithoutHoldingsInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateWithoutTransactionsInput = {
@@ -1227,6 +1360,7 @@ export type WalletCreateWithoutTransactionsInput = {
   tokenTransactions?: Prisma.TokenTransactionCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutTransactionsInput = {
@@ -1245,6 +1379,7 @@ export type WalletUncheckedCreateWithoutTransactionsInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedCreateNestedManyWithoutWalletRefInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutTransactionsInput = {
@@ -1279,6 +1414,7 @@ export type WalletUpdateWithoutTransactionsInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutTransactionsInput = {
@@ -1297,6 +1433,7 @@ export type WalletUncheckedUpdateWithoutTransactionsInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateWithoutTokenTransactionsInput = {
@@ -1315,6 +1452,7 @@ export type WalletCreateWithoutTokenTransactionsInput = {
   transactions?: Prisma.TransactionCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutWalletInput
 }
 
 export type WalletUncheckedCreateWithoutTokenTransactionsInput = {
@@ -1333,6 +1471,7 @@ export type WalletUncheckedCreateWithoutTokenTransactionsInput = {
   transactions?: Prisma.TransactionUncheckedCreateNestedManyWithoutWalletInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedCreateNestedManyWithoutWalletInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedCreateNestedManyWithoutWalletInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutWalletInput
 }
 
 export type WalletCreateOrConnectWithoutTokenTransactionsInput = {
@@ -1367,6 +1506,7 @@ export type WalletUpdateWithoutTokenTransactionsInput = {
   transactions?: Prisma.TransactionUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutTokenTransactionsInput = {
@@ -1385,6 +1525,7 @@ export type WalletUncheckedUpdateWithoutTokenTransactionsInput = {
   transactions?: Prisma.TransactionUncheckedUpdateManyWithoutWalletNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletCreateManyUserInput = {
@@ -1415,6 +1556,7 @@ export type WalletUpdateWithoutUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutUserInput = {
@@ -1433,6 +1575,7 @@ export type WalletUncheckedUpdateWithoutUserInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateManyWithoutUserInput = {
@@ -1475,6 +1618,7 @@ export type WalletUpdateWithoutTokenInput = {
   tokenTransactions?: Prisma.TokenTransactionUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateWithoutTokenInput = {
@@ -1493,6 +1637,7 @@ export type WalletUncheckedUpdateWithoutTokenInput = {
   tokenTransactions?: Prisma.TokenTransactionUncheckedUpdateManyWithoutWalletRefNestedInput
   devWalletTokens?: Prisma.TokenDevWalletUncheckedUpdateManyWithoutWalletNestedInput
   volumeBotWallets?: Prisma.VolumeBotWalletUncheckedUpdateManyWithoutWalletNestedInput
+  launchRecoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletNestedInput
 }
 
 export type WalletUncheckedUpdateManyWithoutTokenInput = {
@@ -1518,6 +1663,7 @@ export type WalletCountOutputType = {
   tokenTransactions: number
   devWalletTokens: number
   volumeBotWallets: number
+  launchRecoveryWallets: number
 }
 
 export type WalletCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1526,6 +1672,7 @@ export type WalletCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions
   tokenTransactions?: boolean | WalletCountOutputTypeCountTokenTransactionsArgs
   devWalletTokens?: boolean | WalletCountOutputTypeCountDevWalletTokensArgs
   volumeBotWallets?: boolean | WalletCountOutputTypeCountVolumeBotWalletsArgs
+  launchRecoveryWallets?: boolean | WalletCountOutputTypeCountLaunchRecoveryWalletsArgs
 }
 
 /**
@@ -1573,6 +1720,13 @@ export type WalletCountOutputTypeCountVolumeBotWalletsArgs<ExtArgs extends runti
   where?: Prisma.VolumeBotWalletWhereInput
 }
 
+/**
+ * WalletCountOutputType without action
+ */
+export type WalletCountOutputTypeCountLaunchRecoveryWalletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LaunchRecoveryWalletWhereInput
+}
+
 
 export type WalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   publicKey?: boolean
@@ -1593,6 +1747,7 @@ export type WalletSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   tokenTransactions?: boolean | Prisma.Wallet$tokenTransactionsArgs<ExtArgs>
   devWalletTokens?: boolean | Prisma.Wallet$devWalletTokensArgs<ExtArgs>
   volumeBotWallets?: boolean | Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>
+  launchRecoveryWallets?: boolean | Prisma.Wallet$launchRecoveryWalletsArgs<ExtArgs>
   _count?: boolean | Prisma.WalletCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["wallet"]>
 
@@ -1649,6 +1804,7 @@ export type WalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   tokenTransactions?: boolean | Prisma.Wallet$tokenTransactionsArgs<ExtArgs>
   devWalletTokens?: boolean | Prisma.Wallet$devWalletTokensArgs<ExtArgs>
   volumeBotWallets?: boolean | Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>
+  launchRecoveryWallets?: boolean | Prisma.Wallet$launchRecoveryWalletsArgs<ExtArgs>
   _count?: boolean | Prisma.WalletCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type WalletIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1671,6 +1827,7 @@ export type $WalletPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     tokenTransactions: Prisma.$TokenTransactionPayload<ExtArgs>[]
     devWalletTokens: Prisma.$TokenDevWalletPayload<ExtArgs>[]
     volumeBotWallets: Prisma.$VolumeBotWalletPayload<ExtArgs>[]
+    launchRecoveryWallets: Prisma.$LaunchRecoveryWalletPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     publicKey: string
@@ -2085,6 +2242,7 @@ export interface Prisma__WalletClient<T, Null = never, ExtArgs extends runtime.T
   tokenTransactions<T extends Prisma.Wallet$tokenTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$tokenTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   devWalletTokens<T extends Prisma.Wallet$devWalletTokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$devWalletTokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenDevWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   volumeBotWallets<T extends Prisma.Wallet$volumeBotWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$volumeBotWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VolumeBotWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  launchRecoveryWallets<T extends Prisma.Wallet$launchRecoveryWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Wallet$launchRecoveryWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchRecoveryWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2694,6 +2852,30 @@ export type Wallet$volumeBotWalletsArgs<ExtArgs extends runtime.Types.Extensions
   take?: number
   skip?: number
   distinct?: Prisma.VolumeBotWalletScalarFieldEnum | Prisma.VolumeBotWalletScalarFieldEnum[]
+}
+
+/**
+ * Wallet.launchRecoveryWallets
+ */
+export type Wallet$launchRecoveryWalletsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LaunchRecoveryWallet
+   */
+  select?: Prisma.LaunchRecoveryWalletSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LaunchRecoveryWallet
+   */
+  omit?: Prisma.LaunchRecoveryWalletOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LaunchRecoveryWalletInclude<ExtArgs> | null
+  where?: Prisma.LaunchRecoveryWalletWhereInput
+  orderBy?: Prisma.LaunchRecoveryWalletOrderByWithRelationInput | Prisma.LaunchRecoveryWalletOrderByWithRelationInput[]
+  cursor?: Prisma.LaunchRecoveryWalletWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LaunchRecoveryWalletScalarFieldEnum | Prisma.LaunchRecoveryWalletScalarFieldEnum[]
 }
 
 /**

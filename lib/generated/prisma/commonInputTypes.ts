@@ -192,6 +192,23 @@ export type BoolWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedBoolFilter<$PrismaModel>
 }
 
+export type EnumTokenStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel> | $Enums.TokenStatus
+}
+
+export type EnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTokenStatusWithAggregatesFilter<$PrismaModel> | $Enums.TokenStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+}
+
 export type EnumLaunchStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.LaunchStatus | Prisma.EnumLaunchStatusFieldRefInput<$PrismaModel>
   in?: $Enums.LaunchStatus[] | Prisma.ListEnumLaunchStatusFieldRefInput<$PrismaModel>
@@ -353,6 +370,40 @@ export type EnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
+}
+
+export type EnumLaunchRecoveryWalletRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletRole | Prisma.EnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletRole
+}
+
+export type EnumLaunchRecoveryWalletStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletStatus | Prisma.EnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletStatus
+}
+
+export type EnumLaunchRecoveryWalletRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletRole | Prisma.EnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletRoleWithAggregatesFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel>
+}
+
+export type EnumLaunchRecoveryWalletStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletStatus | Prisma.EnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletStatusWithAggregatesFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel>
 }
 
 export type EnumHoldingExitStatusFilter<$PrismaModel = never> = {
@@ -716,6 +767,23 @@ export type NestedBoolWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedBoolFilter<$PrismaModel>
 }
 
+export type NestedEnumTokenStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel> | $Enums.TokenStatus
+}
+
+export type NestedEnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumTokenStatusWithAggregatesFilter<$PrismaModel> | $Enums.TokenStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+}
+
 export type NestedEnumLaunchStatusFilter<$PrismaModel = never> = {
   equals?: $Enums.LaunchStatus | Prisma.EnumLaunchStatusFieldRefInput<$PrismaModel>
   in?: $Enums.LaunchStatus[] | Prisma.ListEnumLaunchStatusFieldRefInput<$PrismaModel>
@@ -823,6 +891,40 @@ export type NestedEnumLaunchLogLevelWithAggregatesFilter<$PrismaModel = never> =
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
   _max?: Prisma.NestedEnumLaunchLogLevelFilter<$PrismaModel>
+}
+
+export type NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletRole | Prisma.EnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletRole
+}
+
+export type NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletStatus | Prisma.EnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletStatus
+}
+
+export type NestedEnumLaunchRecoveryWalletRoleWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletRole | Prisma.EnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletRole[] | Prisma.ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletRoleWithAggregatesFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletRole
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchRecoveryWalletRoleFilter<$PrismaModel>
+}
+
+export type NestedEnumLaunchRecoveryWalletStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchRecoveryWalletStatus | Prisma.EnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.LaunchRecoveryWalletStatus[] | Prisma.ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumLaunchRecoveryWalletStatusWithAggregatesFilter<$PrismaModel> | $Enums.LaunchRecoveryWalletStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchRecoveryWalletStatusFilter<$PrismaModel>
 }
 
 export type NestedEnumHoldingExitStatusFilter<$PrismaModel = never> = {

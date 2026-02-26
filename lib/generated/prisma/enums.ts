@@ -20,6 +20,15 @@ export const WalletType = {
 export type WalletType = (typeof WalletType)[keyof typeof WalletType]
 
 
+export const TokenStatus = {
+  PENDING: 'PENDING',
+  ACTIVE: 'ACTIVE',
+  FAILED: 'FAILED'
+} as const
+
+export type TokenStatus = (typeof TokenStatus)[keyof typeof TokenStatus]
+
+
 export const LaunchStatus = {
   PENDING: 'PENDING',
   RUNNING: 'RUNNING',
@@ -39,6 +48,25 @@ export const LaunchLogLevel = {
 } as const
 
 export type LaunchLogLevel = (typeof LaunchLogLevel)[keyof typeof LaunchLogLevel]
+
+
+export const LaunchRecoveryWalletRole = {
+  DEV: 'DEV',
+  BUNDLER: 'BUNDLER',
+  DISTRIBUTION: 'DISTRIBUTION'
+} as const
+
+export type LaunchRecoveryWalletRole = (typeof LaunchRecoveryWalletRole)[keyof typeof LaunchRecoveryWalletRole]
+
+
+export const LaunchRecoveryWalletStatus = {
+  ELIGIBLE: 'ELIGIBLE',
+  RETURNED: 'RETURNED',
+  FAILED: 'FAILED',
+  SKIPPED: 'SKIPPED'
+} as const
+
+export type LaunchRecoveryWalletStatus = (typeof LaunchRecoveryWalletStatus)[keyof typeof LaunchRecoveryWalletStatus]
 
 
 export const HoldingExitStatus = {

@@ -23,4 +23,7 @@ export const tokenRouter = router({
   getUserTokens: protectedProcedure.query(async ({ ctx }) => {
     return await tokenService.getUserTokens(ctx.user.id);
   }),
+  getAllUserTokens: protectedProcedure.query(async ({ ctx }) => {
+    return await tokenService.getAllUserTokens(ctx.user.id);
+  }),
 });

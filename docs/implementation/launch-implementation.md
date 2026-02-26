@@ -26,6 +26,8 @@
 - `launch.recoveryWallets` (query): returns wallets eligible for SOL recovery after launch runs.
 - `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet.
   - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
+- `launch.recoveryWalletsByToken` (query): resolves failed/canceled launch by token and returns wallets eligible for recovery.
+- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions.
 
 ## Database Models
 
@@ -54,11 +56,27 @@ Structured log entries per launch.
 
 Pool of pre-generated vanity mints (consume-on-lock, no release).
 
-- `usedAt`: set immediately when a mint is locked for a launch (never released)
-- `reservedAt`: optional reservation timestamp before final mint consumption
+- `reservedAt`: set when a mint is reserved for a launch before on-chain create submission.
+- `usedAt`: set only when the launch passes the consume threshold.
 - `tokenPublicKey`: linked when token creation succeeds
 - `userId`: user who consumed the mint
 - If vanity is requested and no mint is available, launch fails with an error
+
+### Vanity Mint Failure Handling
+
+- Vanity mints are reserved first, then consumed later in the pipeline.
+- Failures before the consume threshold release the vanity reservation back to the pool.
+- Failures after the consume threshold keep the vanity consumed and tied to the failed token.
+- The system never swaps a failed vanity token to a non-vanity key.
+
+### Token
+
+Token records are created before on-chain submission to avoid wallet orphaning.
+
+- `status`: PENDING | ACTIVE | FAILED
+- `PENDING`: token and wallet links are persisted before create transaction is submitted
+- `ACTIVE`: set after on-chain confirmation/distribution completes
+- `FAILED`: set when launch errors after token persistence
 
 ## Wallet Handling
 
@@ -87,6 +105,15 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Operational wallets (`BUNDLER`, `VOLUME`, `DISTRIBUTION`) are token-scoped via `Wallet.tokenPublicKey`
 - Dev wallets are linked through `TokenDevWallet` to allow sharing across multiple tokens
 - Main wallet remains user-scoped via `User.mainWallet`
+- During launch, wallet links are persisted while token is `PENDING`, then reused for recovery/cleanup if launch fails
+
+### Generated Private Key Persistence
+
+- Every private key generated during launch is persisted to a local JSONL file.
+- Storage directory: `.keys/` at the project root (created automatically when needed).
+- Storage file: `.keys/generated-private-keys.jsonl`.
+- Each record includes source metadata (`service`, `operation`), `publicKey`, `privateKey`, and timestamp.
+- The local key directory is gitignored and intended only for local operational recovery/debugging.
 
 ## Launch Job Steps (Short)
 
@@ -96,19 +123,23 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
 6. **Metadata + Mint**: resolve image, build metadata, consume vanity mint if requested (fails if none available).
-7. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
-8. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
-9. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
-10. **Persist**: create Token, link wallets, link vanity mint to token, link distribution wallets.
-11. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
-12. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
+7. **Persist Pending Token**: create Token with `PENDING` status and link wallets before on-chain create.
+   - Vanity consume threshold is reached here, after which vanity reservations are not released on failure.
+8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
+9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
+10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
+11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
+12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
+13. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
 
 ## UI Integration
 
 - Launch form starts via `launch.start` and polls `launch.status`.
 - Progress dialog renders launch status and logs.
-- Resume uses local storage or `launch.getActive`.
+- Resume uses local storage or `launch.getActive` for in-progress launches only.
 - User can request cancellation.
+- Reclaim actions are owned by Manage Tokens row actions and not by the launch progress dialog.
+- Failed launch progress surfaces a short CTA to open Manage Tokens with failed status filtering.
 
 ### Media Inputs
 

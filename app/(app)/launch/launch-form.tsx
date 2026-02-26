@@ -184,7 +184,6 @@ export function LaunchForm() {
   const [launchNotified, setLaunchNotified] = React.useState(false);
   const mainMediaInputRef = React.useRef<HTMLInputElement>(null);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
-  const launchStorageKey = "sollabs.launch.active";
 
   const startLaunchMutation = trpc.launch.start.useMutation({
     onSuccess: (data) => {
@@ -195,7 +194,6 @@ export function LaunchForm() {
       setActiveLaunchId(data.launchId);
       setIsProgressOpen(true);
       setLaunchNotified(false);
-      window.localStorage.setItem(launchStorageKey, data.launchId);
     },
     onError: (error) => {
       toast.error("Failed to start launch", {
@@ -234,18 +232,9 @@ export function LaunchForm() {
   );
 
   React.useEffect(() => {
-    const stored = window.localStorage.getItem(launchStorageKey);
-    if (stored) {
-      setActiveLaunchId(stored);
-      setIsProgressOpen(true);
-    }
-  }, []);
-
-  React.useEffect(() => {
     if (!activeLaunchId && activeLaunchQuery.data) {
       setActiveLaunchId(activeLaunchQuery.data.id);
       setIsProgressOpen(true);
-      window.localStorage.setItem(launchStorageKey, activeLaunchQuery.data.id);
     }
   }, [activeLaunchId, activeLaunchQuery.data]);
 
@@ -286,9 +275,8 @@ export function LaunchForm() {
     }
 
     if (launch.status !== "PENDING" && launch.status !== "RUNNING") {
-      if (launch.status === "SUCCEEDED") {
-        window.localStorage.removeItem(launchStorageKey);
-      }
+      // Keep terminal launch data in-memory so the dialog can show final logs/status.
+      // It will still not auto-resume on refresh because we no longer persist launch id.
     }
   }, [
     launchNotified,
@@ -299,17 +287,11 @@ export function LaunchForm() {
   ]);
 
   const clearActiveLaunch = React.useCallback(() => {
-    window.localStorage.removeItem(launchStorageKey);
     setActiveLaunchId(null);
   }, []);
 
   const launchStatus =
     launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
-  const showRecoveryBanner =
-    Boolean(activeLaunchId) &&
-    !isProgressOpen &&
-    (launchStatus === "FAILED" || launchStatus === "CANCELED");
-
   const scrollToStep = (stepId: string) => {
     const element = document.getElementById(stepId);
     if (element) {
@@ -557,25 +539,6 @@ export function LaunchForm() {
 
       {/* Form Content */}
       <div className="flex-1 space-y-6 pb-12">
-        {showRecoveryBanner && (
-          <div className="rounded-xl border border-destructive/30 bg-destructive/5 p-4">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2 text-sm">
-                <Info className="size-4 text-destructive" />
-                <span>
-                  Previous launch failed. Recover SOL from launch wallets.
-                </span>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setIsProgressOpen(true)}
-              >
-                Open recovery
-              </Button>
-            </div>
-          </div>
-        )}
         <form
           id="launch-form"
           onSubmit={(e) => {
@@ -1534,7 +1497,11 @@ export function LaunchForm() {
             setIsProgressOpen(false);
             const status =
               launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
-            if (status === "SUCCEEDED") {
+            if (
+              status === "SUCCEEDED" ||
+              status === "FAILED" ||
+              status === "CANCELED"
+            ) {
               clearActiveLaunch();
             }
           }}
