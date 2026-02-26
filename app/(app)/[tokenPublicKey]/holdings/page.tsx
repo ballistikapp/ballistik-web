@@ -18,6 +18,7 @@ import {
   DataTableSearch,
   DataTableViewOptions,
 } from "@/components/data-table";
+import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
@@ -330,9 +331,9 @@ export default function Page() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="-m-6 px-6 py-10 border-b">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-4xl">Holdings</h1>
+      <PageHeader
+        title="Holdings"
+        rightContent={
           <div className="flex flex-col items-end gap-1">
             <Button
               variant="outline"
@@ -351,8 +352,8 @@ export default function Page() {
               Last refresh {formatRefreshTime(refreshTimestamp)}
             </p>
           </div>
-        </div>
-      </div>
+        }
+      />
       <div />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">

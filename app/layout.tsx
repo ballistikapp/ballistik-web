@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono, Roboto } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import { TRPCProvider } from "@/lib/trpc/provider";
 import { NuqsAdapter } from "nuqs/adapters/next/app";
@@ -9,16 +10,45 @@ import NextTopLoader from "nextjs-toploader";
 import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
 import { TokenProvider } from "@/contexts/token-context";
 
-const roboto = Roboto({ subsets: ["latin"], variable: "--font-sans" });
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+});
+
+const clash = localFont({
+  variable: "--font-clash",
+  src: [
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Extralight.woff2",
+      weight: "200",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Light.woff2",
+      weight: "300",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Regular.woff2",
+      weight: "400",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Medium.woff2",
+      weight: "500",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Semibold.woff2",
+      weight: "600",
+      style: "normal",
+    },
+    {
+      path: "../public/fonts/clash/ClashGrotesk-Bold.woff2",
+      weight: "700",
+      style: "normal",
+    },
+  ],
 });
 
 export const metadata: Metadata = {
@@ -34,7 +64,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`dark ${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`dark ${clash.className} ${clash.variable} ${geistMono.variable} antialiased`}
       >
         <NuqsAdapter>
           <TooltipProvider delayDuration={0}>

@@ -23,6 +23,7 @@ import {
   DataTableSearch,
   DataTableViewOptions,
 } from "@/components/data-table";
+import { PageHeader } from "@/components/layout/sections";
 import {
   TrendingDownIcon,
   TrendingUpIcon,
@@ -194,53 +195,56 @@ export default function VolumeBotRunPage() {
 
   return (
     <section className="pb-8">
-      <div className="flex justify-between items-center gap-2 -mx-6 px-6 pt-6 pb-10 border-b">
-        <h1 className="text-4xl">Volume Bot Session</h1>
-        <div className="flex items-center gap-3">
-          <span
-            className={`inline-flex items-center gap-3 rounded-lg px-3 py-1.5 text-xl font-semibold ${
-              session.status === "RUNNING"
-                ? "bg-emerald-500/15 text-emerald-500"
-                : session.status === "STOPPED"
-                  ? "bg-muted text-muted-foreground"
-                  : session.status === "FAILED"
-                    ? "bg-red-500/15 text-red-500"
-                    : session.status === "SCHEDULED"
-                      ? "bg-amber-500/15 text-amber-500"
-                      : session.status === "STOP_REQUESTED" ||
-                          session.status === "STOPPING"
-                        ? "bg-orange-500/15 text-orange-500"
-                        : "bg-muted text-muted-foreground"
-            }`}
-          >
-            {session.status === "RUNNING" ? (
-              <PlayIcon className="size-4 fill-current" />
-            ) : session.status === "STOPPED" ? (
-              <SquareIcon className="size-4 fill-current" />
-            ) : session.status === "FAILED" ? (
-              <CircleAlertIcon className="size-4" />
-            ) : session.status === "SCHEDULED" ? (
-              <ClockIcon className="size-4" />
-            ) : session.status === "STOP_REQUESTED" ||
-              session.status === "STOPPING" ? (
-              <LoaderIcon className="size-4 animate-spin" />
-            ) : (
-              <PauseIcon className="size-4" />
-            )}
-            {session.status}
-          </span>
-          {isActive && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleStop}
-              disabled={stopMutation.isPending}
+      <PageHeader
+        title="Volume Bot Session"
+        className="-mx-6 pt-6 pb-10"
+        rightContent={
+          <div className="flex items-center gap-3">
+            <span
+              className={`inline-flex items-center gap-3 rounded-lg px-3 py-1.5 text-xl font-semibold ${
+                session.status === "RUNNING"
+                  ? "bg-emerald-500/15 text-emerald-500"
+                  : session.status === "STOPPED"
+                    ? "bg-muted text-muted-foreground"
+                    : session.status === "FAILED"
+                      ? "bg-red-500/15 text-red-500"
+                      : session.status === "SCHEDULED"
+                        ? "bg-amber-500/15 text-amber-500"
+                        : session.status === "STOP_REQUESTED" ||
+                            session.status === "STOPPING"
+                          ? "bg-orange-500/15 text-orange-500"
+                          : "bg-muted text-muted-foreground"
+              }`}
             >
-              Stop
-            </Button>
-          )}
-        </div>
-      </div>
+              {session.status === "RUNNING" ? (
+                <PlayIcon className="size-4 fill-current" />
+              ) : session.status === "STOPPED" ? (
+                <SquareIcon className="size-4 fill-current" />
+              ) : session.status === "FAILED" ? (
+                <CircleAlertIcon className="size-4" />
+              ) : session.status === "SCHEDULED" ? (
+                <ClockIcon className="size-4" />
+              ) : session.status === "STOP_REQUESTED" ||
+                session.status === "STOPPING" ? (
+                <LoaderIcon className="size-4 animate-spin" />
+              ) : (
+                <PauseIcon className="size-4" />
+              )}
+              {session.status}
+            </span>
+            {isActive && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleStop}
+                disabled={stopMutation.isPending}
+              >
+                Stop
+              </Button>
+            )}
+          </div>
+        }
+      />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-8">
         <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">

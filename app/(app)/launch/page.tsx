@@ -1,18 +1,44 @@
+"use client";
+
+import * as React from "react";
+import { Copy } from "lucide-react";
 import { LaunchForm } from "./launch-form";
+import { CloneTokenDialog } from "./clone-token-dialog";
+import { PageHeader } from "@/components/layout/sections";
+import { Button } from "@/components/ui/button";
 
 export default function LaunchPage() {
+  const [cloneDialogOpen, setCloneDialogOpen] = React.useState(false);
+  const [cloneValues, setCloneValues] = React.useState<Record<
+    string,
+    unknown
+  > | null>(null);
+  const [formKey, setFormKey] = React.useState(0);
+
+  const handleClone = (input: Record<string, unknown>) => {
+    setCloneValues(input);
+    setFormKey((k) => k + 1);
+  };
+
   return (
     <div className="flex flex-col gap-12">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <h1 className="text-4xl">New Token Launch</h1>
-        <p className=" leading-tight font-light text-right text-muted-foreground">
-          Launch a new token on pump.fun in.
-          <br />
-          Launch a new token on pump.fun in just a few clicks.
-        </p>
-      </div>
+      <PageHeader
+        title="New Token Launch"
+        actions={
+          <Button variant="outline" onClick={() => setCloneDialogOpen(true)}>
+            <Copy className="size-4" />
+            Clone Token
+          </Button>
+        }
+      />
 
-      <LaunchForm />
+      <LaunchForm key={formKey} initialValues={cloneValues} />
+
+      <CloneTokenDialog
+        open={cloneDialogOpen}
+        onOpenChange={setCloneDialogOpen}
+        onClone={handleClone}
+      />
     </div>
   );
 }

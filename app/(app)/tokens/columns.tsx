@@ -38,7 +38,7 @@ export type TokenTableRow = {
   twitterUrl?: string | null;
   telegramUrl?: string | null;
   createdAt: Date | string;
-  launchId?: string | null;
+  launchId: string;
   errorMessage?: string | null;
 };
 
@@ -179,6 +179,10 @@ export const createColumns = (
           {status}
         </Badge>
       );
+    },
+    filterFn: "textArray",
+    meta: {
+      filter: { filterType: "text" as const },
     },
   },
   {

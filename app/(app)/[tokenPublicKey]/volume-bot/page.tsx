@@ -12,6 +12,7 @@ import {
   DataTableSearch,
   DataTableViewOptions,
 } from "@/components/data-table";
+import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { getColumns } from "./columns";
 import { PlusIcon } from "lucide-react";
@@ -54,22 +55,19 @@ export default function VolumeBotPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <div>
-          <h1 className="text-4xl">Volume Bot Runs</h1>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Review and manage volume bot sessions for this token.
-          </p>
-        </div>
-        <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
-          <Button asChild size="lg">
-            <Link href={newRunHref}>
-              <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
-              <span className="font-semibold">New Session</span>
-            </Link>
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="Volume Bot Sessions"
+        rightContent={
+          <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
+            <Button asChild size="lg">
+              <Link href={newRunHref}>
+                <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
+                <span className="font-semibold">New Session</span>
+              </Link>
+            </Button>
+          </div>
+        }
+      />
       <div className="pt-6" />
 
       <DataTable
@@ -77,13 +75,13 @@ export default function VolumeBotPage() {
         data={sessions}
         isLoading={sessionsLoading}
         enableUrlState
-        urlStatePrefix="volumeBotRuns"
+        urlStatePrefix="volumeBotSessions"
         searchableColumns={["status"]}
         toolbar={(table) => (
           <div className="flex items-center justify-between gap-2">
             <DataTableSearch
               table={table}
-              placeholder="Search runs..."
+              placeholder="Search sessions..."
               className="max-w-sm"
             />
             <DataTableViewOptions table={table} />

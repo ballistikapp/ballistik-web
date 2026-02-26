@@ -22,6 +22,12 @@ import { Separator } from "@/components/ui/separator";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  PageHeader,
+  PageSection,
+  PageSectionDivider,
+  PageSectionHeader,
+} from "@/components/layout/sections";
+import {
   Dialog,
   DialogContent,
   DialogHeader,
@@ -861,50 +867,42 @@ export default function VolumeBotStartPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-10 border-b">
-        <div className="flex flex-col gap-3">
-          {/* <Link
-            href={
-              tokenPublicKey ? `/${tokenPublicKey}/volume-bot` : "/volume-bot"
-            }
-            className="text-sm text-muted-foreground hover:underline"
-          >
-            Back to runs
-          </Link> */}
-          <h1 className="text-4xl">New Volume Bot</h1>
-        </div>
-        <div className="flex flex-col items-end">
-          <Button
-            type="button"
-            variant="outline"
-            size="lg"
-            onClick={() => setPresetsDialogOpen(true)}
-            disabled={!presetsQuery.data?.length}
-          >
-            <FolderOpenIcon className="size-3.5 mr-1.5" />
-            Presets
-            {selectedPreset ? (
-              <span className="ml-1 text-muted-foreground">
-                · {selectedPreset.name}
-              </span>
-            ) : (presetsQuery.data?.length ?? 0) > 0 ? (
-              <span className="ml-1 text-muted-foreground">
-                · {presetsQuery.data!.length} saved
-              </span>
-            ) : null}
-          </Button>
-          <Button
-            type="button"
-            variant="ghost"
-            size="lg"
-            className="translate-y-2"
-            onClick={handleOpenCreatePreset}
-          >
-            <SaveIcon className="size-3.5 mr-1.5" />
-            Save preset
-          </Button>
-        </div>
-      </div>
+      <PageHeader
+        title="New Volume Bot"
+        rightContent={
+          <div className="flex flex-col items-end">
+            <Button
+              type="button"
+              variant="outline"
+              size="lg"
+              onClick={() => setPresetsDialogOpen(true)}
+              disabled={!presetsQuery.data?.length}
+            >
+              <FolderOpenIcon className="size-3.5 mr-1.5" />
+              Presets
+              {selectedPreset ? (
+                <span className="ml-1 text-muted-foreground">
+                  · {selectedPreset.name}
+                </span>
+              ) : (presetsQuery.data?.length ?? 0) > 0 ? (
+                <span className="ml-1 text-muted-foreground">
+                  · {presetsQuery.data!.length} saved
+                </span>
+              ) : null}
+            </Button>
+            <Button
+              type="button"
+              variant="ghost"
+              size="lg"
+              className="translate-y-2"
+              onClick={handleOpenCreatePreset}
+            >
+              <SaveIcon className="size-3.5 mr-1.5" />
+              Save preset
+            </Button>
+          </div>
+        }
+      />
 
       <div />
 
@@ -934,12 +932,14 @@ export default function VolumeBotStartPage() {
 
       <section className="pb-8">
         <div className="space-y-5">
-          <div className="flex items-baseline justify-between">
-            <h2 className="text-2xl font-normal">Ranges</h2>
-            <span className="text-sm text-muted-foreground">
-              {ranges.length} / 5
-            </span>
-          </div>
+          <PageSectionHeader
+            title="Ranges"
+            meta={
+              <span className="text-sm text-muted-foreground">
+                {ranges.length} / 5
+              </span>
+            }
+          />
 
           {ranges.map((range, index) => {
             const errors = getRangeValidationErrors(range);
@@ -1231,12 +1231,10 @@ export default function VolumeBotStartPage() {
           )}
         </div>
 
-        <div className="-mx-6 my-14">
-          <Separator />
-        </div>
+        <PageSectionDivider />
 
-        <div className="space-y-6">
-          <h2 className="text-2xl font-normal">Configuration</h2>
+        <PageSection>
+          <PageSectionHeader title="Configuration" />
 
           <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -1353,9 +1351,10 @@ export default function VolumeBotStartPage() {
                           className="w-16 h-8 text-center"
                           value={
                             scheduledStartDate
-                              ? String(
-                                  scheduledStartDate.getHours()
-                                ).padStart(2, "0")
+                              ? String(scheduledStartDate.getHours()).padStart(
+                                  2,
+                                  "0"
+                                )
                               : "00"
                           }
                           onChange={(e) => {
@@ -1364,9 +1363,7 @@ export default function VolumeBotStartPage() {
                               Math.max(0, Number(e.target.value))
                             );
                             setScheduledStartDate((prev) =>
-                              prev
-                                ? setHours(prev, h)
-                                : setHours(new Date(), h)
+                              prev ? setHours(prev, h) : setHours(new Date(), h)
                             );
                           }}
                         />
@@ -1474,14 +1471,12 @@ export default function VolumeBotStartPage() {
               </div>
             )}
           </div>
-        </div>
+        </PageSection>
 
-        <div className="-mx-6 my-14">
-          <Separator />
-        </div>
+        <PageSectionDivider />
 
-        <div className="space-y-6">
-          <h2 className="text-2xl font-normal">Wallets</h2>
+        <PageSection>
+          <PageSectionHeader title="Wallets" />
 
           <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
             <div className="space-y-1.5">
@@ -1572,7 +1567,7 @@ export default function VolumeBotStartPage() {
               )}
             </div>
           </div>
-        </div>
+        </PageSection>
 
         <Dialog open={walletDialogOpen} onOpenChange={setWalletDialogOpen}>
           <DialogContent className="sm:max-w-3xl max-h-[85vh] flex flex-col gap-0 p-0">
@@ -1778,12 +1773,10 @@ export default function VolumeBotStartPage() {
           </DialogContent>
         </Dialog>
 
-        <div className="-mx-6 my-14">
-          <Separator />
-        </div>
+        <PageSectionDivider />
 
-        <div className="space-y-6">
-          <h2 className="text-2xl font-normal">Overview</h2>
+        <PageSection>
+          <PageSectionHeader title="Overview" />
 
           <div className="grid gap-x-10 gap-y-6 md:grid-cols-4">
             <div className="space-y-1">
@@ -1922,7 +1915,7 @@ export default function VolumeBotStartPage() {
               )}
             </div>
           )}
-        </div>
+        </PageSection>
 
         <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
           <div className="flex items-center justify-between gap-8">
@@ -1996,7 +1989,6 @@ export default function VolumeBotStartPage() {
                 </span>
               </div>
             )}
-            {/* scheduledStopAt removed from UI */}
           </div>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancel</AlertDialogCancel>

@@ -33,6 +33,7 @@ import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
+import { storageService } from "@/server/services/storage.service";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -598,7 +599,10 @@ async function reserveVanityMint(userId: string) {
   return null;
 }
 
-async function consumeReservedVanityMint(vanityMintId: string, tokenPublicKey: string) {
+async function consumeReservedVanityMint(
+  vanityMintId: string,
+  tokenPublicKey: string
+) {
   await prisma.vanityMint.updateMany({
     where: {
       id: vanityMintId,
@@ -637,16 +641,6 @@ async function setStep(
   await appendLog(launchId, "STEP", message, step);
 }
 
-function maybeInjectLaunchFailure(step: string) {
-  const configuredStep = process.env.LAUNCH_FAIL_AT_STEP?.trim().toLowerCase();
-  if (configuredStep && configuredStep === step.toLowerCase()) {
-    throw new AppError(
-      `Injected launch failure at step: ${step}`,
-      500
-    );
-  }
-}
-
 async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
   const {
     mintConfirmTimeoutMs: MINT_CONFIRM_TIMEOUT_MS,
@@ -655,7 +649,9 @@ async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
   const connection = getSolanaConnection();
   const mintKey = new PublicKey(mintPublicKey);
   const startedAt = Date.now();
-  const subscriptionId = launchId ? `launch:${launchId}` : `launch:${mintPublicKey}`;
+  const subscriptionId = launchId
+    ? `launch:${launchId}`
+    : `launch:${mintPublicKey}`;
 
   type MintResult = {
     source: "grpc" | "rpc";
@@ -864,6 +860,7 @@ function validateLaunchInput(input: LaunchTokenInput) {
     minBuyAmountSol: MIN_BUY_AMOUNT_SOL,
     maxBundleWallets: MAX_BUNDLE_WALLETS,
   } = getLaunchConfig();
+  const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
   const bundlerWalletCount = Math.max(0, Math.floor(input.bundlerWalletCount));
@@ -883,9 +880,12 @@ function validateLaunchInput(input: LaunchTokenInput) {
       400
     );
   }
-  if (bundlerBuyAmountSol > 0 && bundlerBuyAmountSol < MIN_BUY_AMOUNT_SOL) {
+  if (
+    bundlerBuyAmountSol > 0 &&
+    bundlerBuyAmountSol < MIN_BUNDLER_BUY_AMOUNT_SOL
+  ) {
     throw new AppError(
-      `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL`,
+      `Buy amount per wallet must be at least ${MIN_BUNDLER_BUY_AMOUNT_SOL} SOL`,
       400
     );
   }
@@ -1294,6 +1294,7 @@ async function distributeTokensToWallets(
 
 async function persistTokenPending(
   input: LaunchTokenInput,
+  tokenImageUrl: string | null,
   userId: string,
   mintPublicKey: string,
   mintPrivateKey: string,
@@ -1313,7 +1314,7 @@ async function persistTokenPending(
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
           description: input.description.trim(),
-          imageUrl: input.tokenImage || null,
+          imageUrl: tokenImageUrl,
           twitterUrl: input.twitter?.trim() || null,
           telegramUrl: input.telegram?.trim() || null,
           websiteUrl: input.website?.trim() || null,
@@ -1483,16 +1484,14 @@ async function finalizeLaunch(
   bundlerWalletKeypairs: Keypair[],
   recovery: LaunchRecoveryData,
   jitoTipAmountSol: number,
-  solReturn:
-    | {
-        attempted: number;
-        returned: number;
-        failed: number;
-        skipped: number;
-        totalReturnedSol: number;
-        results: SolReturnResult[];
-      }
-    | null,
+  solReturn: {
+    attempted: number;
+    returned: number;
+    failed: number;
+    skipped: number;
+    totalReturnedSol: number;
+    results: SolReturnResult[];
+  } | null,
   durationMs?: number
 ) {
   const finalStatus = (await isCancelRequested(launchId))
@@ -1686,7 +1685,10 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
   };
 }
 
-async function resolveFailedLaunchByToken(tokenPublicKey: string, userId: string) {
+async function resolveFailedLaunchByToken(
+  tokenPublicKey: string,
+  userId: string
+) {
   const launch = await prisma.launch.findFirst({
     where: {
       userId,
@@ -1712,7 +1714,75 @@ export type FailedLaunchRow = {
   createdAt: Date;
 };
 
+export type UserLaunchRow = {
+  id: string;
+  status: string;
+  tokenPublicKey: string | null;
+  tokenName: string;
+  tokenSymbol: string;
+  imageUrl: string | null;
+  websiteUrl: string | null;
+  twitterUrl: string | null;
+  telegramUrl: string | null;
+  errorMessage: string | null;
+  createdAt: Date;
+  input: Record<string, unknown>;
+};
+
 export const launchService = {
+  async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
+    const launches = await prisma.launch.findMany({
+      where: { userId },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        status: true,
+        input: true,
+        tokenPublicKey: true,
+        errorMessage: true,
+        createdAt: true,
+        token: {
+          select: {
+            name: true,
+            symbol: true,
+            imageUrl: true,
+            websiteUrl: true,
+            twitterUrl: true,
+            telegramUrl: true,
+          },
+        },
+      },
+    });
+
+    return launches.map((launch) => {
+      const input = launch.input as Record<string, unknown> | null;
+      return {
+        id: launch.id,
+        status: launch.status,
+        tokenPublicKey: launch.tokenPublicKey,
+        tokenName:
+          launch.token?.name ??
+          (typeof input?.tokenName === "string" ? input.tokenName : "Unknown"),
+        tokenSymbol:
+          launch.token?.symbol ??
+          (typeof input?.tokenSymbol === "string" ? input.tokenSymbol : "—"),
+        imageUrl: launch.token?.imageUrl ?? null,
+        websiteUrl:
+          launch.token?.websiteUrl ??
+          (typeof input?.website === "string" ? input.website : null),
+        twitterUrl:
+          launch.token?.twitterUrl ??
+          (typeof input?.twitter === "string" ? input.twitter : null),
+        telegramUrl:
+          launch.token?.telegramUrl ??
+          (typeof input?.telegram === "string" ? input.telegram : null),
+        errorMessage: launch.errorMessage,
+        createdAt: launch.createdAt,
+        input: (input ?? {}) as Record<string, unknown>,
+      };
+    });
+  },
+
   async getFailedLaunches(userId: string): Promise<FailedLaunchRow[]> {
     logger.info("getFailedLaunches called", { userId });
     try {
@@ -1859,7 +1929,8 @@ export const launchService = {
           balanceSol: balanceLamports / LAMPORTS_PER_SOL,
           balanceRefreshedAt: now,
           reclaimStatus:
-            recoveryWalletMap.get(wallet.publicKey)?.reclaimStatus ?? "ELIGIBLE",
+            recoveryWalletMap.get(wallet.publicKey)?.reclaimStatus ??
+            "ELIGIBLE",
           reclaimTxSignature:
             recoveryWalletMap.get(wallet.publicKey)?.reclaimTxSignature ?? null,
           reclaimError:
@@ -1938,7 +2009,9 @@ export const launchService = {
       where: { userId, publicKey: { in: targetWallets } },
       select: { publicKey: true, privateKey: true },
     });
-    const walletMap = new Map(wallets.map((wallet) => [wallet.publicKey, wallet]));
+    const walletMap = new Map(
+      wallets.map((wallet) => [wallet.publicKey, wallet])
+    );
     const selectedWallets = targetWallets
       .map((publicKey) => walletMap.get(publicKey))
       .filter((wallet): wallet is (typeof wallets)[number] => Boolean(wallet));
@@ -1991,7 +2064,9 @@ export const launchService = {
           }
 
           try {
-            const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+            const sender = Keypair.fromSecretKey(
+              bs58.decode(wallet.privateKey)
+            );
             const transaction = new Transaction();
             transaction.feePayer = mainPublicKey;
             transaction.add(
@@ -2381,7 +2456,6 @@ export const launchService = {
         fundingTargets,
         mainReserveLamports
       );
-      maybeInjectLaunchFailure("after_funding");
 
       await setStep(launchId, 18, "metadata", "Preparing metadata");
       const metadataStartedAt = Date.now();
@@ -2433,8 +2507,13 @@ export const launchService = {
       const mintPublicKey = mintKeypair.publicKey.toBase58();
       const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
       const persistStartedAt = Date.now();
+      const tokenImageUrl = await storageService.uploadImage(
+        input.tokenImage,
+        input.tokenSymbol
+      );
       const { distributionWalletCount } = await persistTokenPending(
         input,
+        tokenImageUrl || null,
         user.id,
         mintPublicKey,
         mintPrivateKey,
@@ -2454,7 +2533,6 @@ export const launchService = {
         distributionWalletCount,
         durationMs: Date.now() - persistStartedAt,
       });
-      maybeInjectLaunchFailure("after_persist");
       if (distributionWalletCount > 0) {
         await appendLog(
           launchId,
@@ -2513,7 +2591,6 @@ export const launchService = {
           signatureCount: bundleResult.signatures.length,
           durationMs: Date.now() - createStartedAt,
         });
-        maybeInjectLaunchFailure("after_create");
       } else {
         const { createTx } = await buildCreateTokenTransaction(
           devWalletKeypair,
@@ -2555,7 +2632,6 @@ export const launchService = {
           signature: createSignature,
           durationMs: Date.now() - createStartedAt,
         });
-        maybeInjectLaunchFailure("after_create");
       }
 
       await setStep(launchId, 55, "confirm", "Confirming token on-chain");

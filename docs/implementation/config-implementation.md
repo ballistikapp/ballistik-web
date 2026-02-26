@@ -24,10 +24,20 @@
 - `SHYFT_API_KEY` is optional and enables Shyft REST APIs, callback management, and DeFi APIs
 - `SHYFT_GRPC_TOKEN` is optional and provides the x-token for gRPC authentication (falls back to `SHYFT_API_KEY`)
 - `SHYFT_CALLBACK_SECRET` is optional and used to validate incoming Shyft webhook requests
+- `PINATA_JWT` is optional and enables token media uploads to Pinata during token persistence
+- `PINATA_GATEWAY_URL` is optional (must be a valid URL) and sets the base gateway used for stored IPFS media URLs (defaults to `https://gateway.pinata.cloud`)
 - `APP_URL` is optional (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`). Required for automatic callback registration on token and wallet creation.
-- `DATABASE_URL` is used for Prisma connections when set
+- `DATABASE_URL` is used for Prisma connections when set (one value per Railway environment)
 - `getDatabaseUrl()` currently reads only `DATABASE_URL`
 - `DEV_STORAGE_POSTGRES_URL` / `PROD_STORAGE_POSTGRES_URL` may still appear in legacy error messaging, but are not part of `env.ts` parsing today
+
+## Environment Mapping
+
+- Deployment platform is Railway with two environments: `staging` and `production`
+- Branch mapping is `staging` -> Railway `staging`, and `main` -> Railway `production`
+- Each environment has an independent PostgreSQL instance and therefore a different `DATABASE_URL`
+- Local development currently uses the staging PostgreSQL connection via `DATABASE_URL`
+- Local development can keep working without Pinata; token media falls back to existing inline data-URL storage when `PINATA_JWT` is unset
 
 ## Logging
 - `LOG_LEVEL` is optional and defaults to `info`

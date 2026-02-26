@@ -7,12 +7,10 @@ import * as z from "zod";
 import { ImagePlus, X, Info, Import, Sparkles, Wallet } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+  PageSection,
+  PageSectionDivider,
+  PageSectionHeader,
+} from "@/components/layout/sections";
 import {
   Field,
   FieldDescription,
@@ -35,7 +33,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
-import { Separator } from "@/components/ui/separator";
 import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog";
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
 import { useRouter } from "next/navigation";
@@ -72,7 +69,7 @@ const formSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0, "Bundler buy amount must be 0 or more"),
+    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -129,29 +126,6 @@ const readVideoDimensions = (file: File) =>
     video.src = url;
   });
 
-const steps = [
-  {
-    id: "token-details",
-    title: "Token Details",
-    description: "Set up your token's name, symbol, image, and social links",
-  },
-  {
-    id: "launch-settings",
-    title: "Launch Settings",
-    description: "Select wallets, set dev buy amount and Jito tip for priority",
-  },
-  {
-    id: "bundler-settings",
-    title: "Bundler Settings",
-    description: "Configure bundle buy wallets and token distribution settings",
-  },
-  {
-    id: "review",
-    title: "Review",
-    description: "Review all details and launch your token on pump.fun",
-  },
-];
-
 function calculateLaunchTotals(values: {
   devBuyAmountSol: number;
   jitoTipAmountSol: number;
@@ -171,7 +145,11 @@ function calculateLaunchTotals(values: {
   return { bundleBuyTotal, totalCostSol, distributionWallets };
 }
 
-export function LaunchForm() {
+type LaunchFormProps = {
+  initialValues?: Record<string, unknown> | null;
+};
+
+export function LaunchForm({ initialValues }: LaunchFormProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
@@ -216,7 +194,8 @@ export function LaunchForm() {
   });
 
   const activeLaunchQuery = trpc.launch.getActive.useQuery();
-  const refreshWalletBalancesMutation = trpc.wallet.refreshBalances.useMutation();
+  const refreshWalletBalancesMutation =
+    trpc.wallet.refreshBalances.useMutation();
   const launchStatusQuery = trpc.launch.status.useQuery(
     { launchId: activeLaunchId ?? "" },
     {
@@ -292,13 +271,6 @@ export function LaunchForm() {
 
   const launchStatus =
     launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
-  const scrollToStep = (stepId: string) => {
-    const element = document.getElementById(stepId);
-    if (element) {
-      element.scrollIntoView({ behavior: "smooth", block: "start" });
-    }
-  };
-
   const resetMainMediaInput = () => {
     if (mainMediaInputRef.current) {
       mainMediaInputRef.current.value = "";
@@ -463,27 +435,42 @@ export function LaunchForm() {
     resetBannerInput();
   };
 
+  const defaults = {
+    tokenName: "",
+    tokenSymbol: "",
+    description: "",
+    tokenImage: "",
+    tokenBanner: "",
+    twitter: "",
+    telegram: "",
+    website: "",
+    devWalletOption: "generate" as "import" | "generate" | "use_main",
+    importedDevWalletKey: "",
+    devBuyAmountSol: 0.05,
+    jitoTipAmountSol: 0.001,
+    bundleBuyEnabled: true,
+    vanityMint: false,
+    bundlerWalletCount: 5,
+    bundlerBuyAmountSol: 0.1,
+    bundlerBuyVariancePercent: 20,
+    distributionWalletMultiplier: 1,
+  };
+
+  const mergedDefaults = React.useMemo(() => {
+    if (!initialValues) return defaults;
+    const clone = { ...defaults };
+    for (const key of Object.keys(clone) as (keyof typeof clone)[]) {
+      if (key === "tokenImage" || key === "tokenBanner") continue;
+      if (key in initialValues && initialValues[key] != null) {
+        (clone as Record<string, unknown>)[key] = initialValues[key];
+      }
+    }
+    return clone;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialValues]);
+
   const form = useForm({
-    defaultValues: {
-      tokenName: "",
-      tokenSymbol: "",
-      description: "",
-      tokenImage: "",
-      tokenBanner: "",
-      twitter: "",
-      telegram: "",
-      website: "",
-      devWalletOption: "generate" as "import" | "generate" | "use_main",
-      importedDevWalletKey: "",
-      devBuyAmountSol: 0.05,
-      jitoTipAmountSol: 0.001,
-      bundleBuyEnabled: true,
-      vanityMint: false,
-      bundlerWalletCount: 5,
-      bundlerBuyAmountSol: 0.01,
-      bundlerBuyVariancePercent: 20,
-      distributionWalletMultiplier: 1,
-    },
+    defaultValues: mergedDefaults,
     validators: {
       onSubmit: formSchema,
     },
@@ -534,31 +521,25 @@ export function LaunchForm() {
   };
 
   return (
-    <div className="flex gap-8">
-      {/* Sidebar Navigation */}
-
-      {/* Form Content */}
-      <div className="flex-1 space-y-6 pb-12">
-        <form
-          id="launch-form"
-          onSubmit={(e) => {
-            e.preventDefault();
-            form.handleSubmit();
-          }}
-          className="space-y-8"
-        >
-          {/* Step 1: Token Details */}
-          <Card id="token-details" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle className="text-primary text-xl">
-                Token Details
-              </CardTitle>
-              <CardDescription>
+    <div className="space-y-6 pb-12">
+      <form
+        id="launch-form"
+        onSubmit={(e) => {
+          e.preventDefault();
+          form.handleSubmit();
+        }}
+        className="space-y-0"
+      >
+        {/* Step 1: Token Details */}
+        <section id="token-details" className="scroll-mt-4">
+          <PageSection>
+            <div>
+              <PageSectionHeader title="Token Details" />
+              <p className="text-sm text-muted-foreground">
                 Basic information about your token
-              </CardDescription>
-            </CardHeader>
-            <Separator />
-            <CardContent>
+              </p>
+            </div>
+            <div>
               <div className="grid grid-cols-2 gap-6">
                 <div className="space-y-4">
                   <form.Field name="tokenName">
@@ -884,21 +865,21 @@ export function LaunchForm() {
                   </div>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </PageSection>
+        </section>
+        <PageSectionDivider />
 
-          {/* Step 2: Launch Settings */}
-          <Card id="launch-settings" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle className="text-primary text-xl">
-                Launch Settings
-              </CardTitle>
-              <CardDescription>
+        {/* Step 2: Launch Settings */}
+        <section id="launch-settings" className="scroll-mt-4">
+          <PageSection>
+            <div>
+              <PageSectionHeader title="Launch Settings" />
+              <p className="text-sm text-muted-foreground">
                 Select wallets and configure launch parameters
-              </CardDescription>
-            </CardHeader>
-            <Separator />
-            <CardContent className="space-y-6">
+              </p>
+            </div>
+            <div className="space-y-6">
               <Field>
                 <div className="flex items-center gap-2 mb-1">
                   <FieldLabel>Dev Wallet</FieldLabel>
@@ -1078,35 +1059,35 @@ export function LaunchForm() {
                   </Tooltip>
                 </div>
               </div>
-            </CardContent>
-          </Card>
+            </div>
+          </PageSection>
+        </section>
+        <PageSectionDivider />
 
-          {/* Step 3: Bundler Settings */}
-          <Card id="bundler-settings" className="scroll-mt-4">
-            <CardHeader>
-              <div className="flex items-center justify-between">
-                <div>
-                  <CardTitle className="text-primary text-xl">
-                    Bundler Settings
-                  </CardTitle>
-                  <CardDescription>
-                    Configure bundle buy wallets and distribution
-                  </CardDescription>
-                </div>
-                <form.Field name="bundleBuyEnabled">
-                  {(field) => (
-                    <Switch
-                      id="bundle-buy"
-                      size="lg"
-                      checked={field.state.value}
-                      onCheckedChange={field.handleChange}
-                    />
-                  )}
-                </form.Field>
-              </div>
-            </CardHeader>
-            <Separator />
-            <CardContent>
+        {/* Step 3: Bundler Settings */}
+        <section id="bundler-settings" className="scroll-mt-4">
+          <PageSection>
+            <div>
+              <PageSectionHeader
+                title="Bundler Settings"
+                meta={
+                  <form.Field name="bundleBuyEnabled">
+                    {(field) => (
+                      <Switch
+                        id="bundle-buy"
+                        size="lg"
+                        checked={field.state.value}
+                        onCheckedChange={field.handleChange}
+                      />
+                    )}
+                  </form.Field>
+                }
+              />
+              <p className="text-sm text-muted-foreground">
+                Configure bundle buy wallets and distribution
+              </p>
+            </div>
+            <div>
               <form.Subscribe
                 selector={(state) => state.values.bundleBuyEnabled}
               >
@@ -1149,14 +1130,14 @@ export function LaunchForm() {
                                 id={field.name}
                                 type="number"
                                 step="0.001"
-                                min="0.001"
+                                min="0.1"
                                 value={field.state.value}
                                 onChange={(e) =>
                                   field.handleChange(
                                     e.target.valueAsNumber || 0
                                   )
                                 }
-                                placeholder="0.01"
+                                placeholder="0.1"
                               />
                               <FieldDescription>
                                 Base SOL amount each wallet will spend
@@ -1266,19 +1247,21 @@ export function LaunchForm() {
                   )
                 }
               </form.Subscribe>
-            </CardContent>
-          </Card>
+            </div>
+          </PageSection>
+        </section>
+        <PageSectionDivider />
 
-          {/* Step 4: Review */}
-          <Card id="review" className="scroll-mt-4">
-            <CardHeader>
-              <CardTitle className="text-primary text-xl">Review</CardTitle>
-              <CardDescription>
+        {/* Step 4: Review */}
+        <section id="review" className="">
+          <PageSection className="-mb-18">
+            <div>
+              <PageSectionHeader title="Review" />
+              <p className="text-sm text-muted-foreground">
                 Review your token details before launching
-              </CardDescription>
-            </CardHeader>
-            <Separator />
-            <CardContent>
+              </p>
+            </div>
+            <div>
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => {
                   const { totalCostSol, distributionWallets } =
@@ -1440,103 +1423,91 @@ export function LaunchForm() {
                         </div>
                       </div>
 
-                      <div className="border-t pt-4">
-                        <div className="flex justify-between items-center text-sm">
-                          <span className="font-medium">Total Cost</span>
-                          <span className="text-lg font-bold">
-                            {totalCostSol.toFixed(4)} SOL
-                          </span>
+                      <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
+                        <div className="flex items-center justify-between gap-8">
+                          <div className="flex items-center gap-10">
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Dev buy
+                              </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {values.devBuyAmountSol.toFixed(4)}
+                                <span className="ml-1 text-sm text-muted-foreground">
+                                  SOL
+                                </span>
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Distribution wallets
+                              </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {values.bundleBuyEnabled
+                                  ? distributionWallets
+                                  : 0}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Total cost
+                              </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {totalCostSol.toFixed(4)}
+                                <span className="ml-1 text-sm text-muted-foreground">
+                                  SOL
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                          <Button
+                            size="lg"
+                            type="submit"
+                            form="launch-form"
+                            className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
+                          >
+                            LAUNCH TOKEN
+                          </Button>
                         </div>
                       </div>
                     </div>
                   );
                 }}
               </form.Subscribe>
-            </CardContent>
-          </Card>
-          <div className="flex items-center justify-end gap-4">
-            {/* <Button
-                  type="button"
-                  variant="outline"
-              onClick={() => {
-                form.reset();
-                setImagePreview(null);
-              }}
-                >
-                  Reset
-            </Button> */}
-            <Button
-              size={"lg"}
-              type="submit"
-              form="launch-form"
-              className="h-14 px-6 text-4xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black"
-            >
-              LAUNCH TOKEN
-            </Button>
-          </div>
-        </form>
-        <LaunchOverviewDialog
-          open={showLaunchDialog}
-          onOpenChange={setShowLaunchDialog}
-          onConfirm={handleConfirmLaunch}
-          launchInput={form.state.values}
-          imagePreview={imagePreview}
-          bannerPreview={bannerPreview}
-          isLoading={startLaunchMutation.isPending}
-        />
-        <LaunchProgressDialog
-          open={isProgressOpen}
-          onOpenChange={setIsProgressOpen}
-          launch={launchStatusQuery.data ?? activeLaunchQuery.data ?? null}
-          onCancel={() => {
-            if (activeLaunchId) {
-              cancelLaunchMutation.mutate({ launchId: activeLaunchId });
-            }
-          }}
-          onClose={() => {
-            setIsProgressOpen(false);
-            const status =
-              launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
-            if (
-              status === "SUCCEEDED" ||
-              status === "FAILED" ||
-              status === "CANCELED"
-            ) {
-              clearActiveLaunch();
-            }
-          }}
-        />
-      </div>
-      <div className="w-80 shrink-0">
-        <div className="sticky top-4 border rounded-xl overflow-hidden">
-          <nav className="divide-y">
-            {steps.map((step, index) => (
-              <button
-                key={step.id}
-                type="button"
-                onClick={() => scrollToStep(step.id)}
-                className={cn(
-                  "w-full text-left px-4 py-4 transition-colors",
-                  "hover:bg-accent hover:text-accent-foreground",
-                  "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
-                )}
-              >
-                <div className="flex items-start gap-4">
-                  <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border-2 text-sm font-semibold">
-                    {index + 1}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-base font-semibold">{step.title}</div>
-                    <div className="text-sm text-muted-foreground mt-0.5 leading-snug">
-                      {step.description}
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </nav>
-        </div>
-      </div>
+            </div>
+          </PageSection>
+        </section>
+      </form>
+      <LaunchOverviewDialog
+        open={showLaunchDialog}
+        onOpenChange={setShowLaunchDialog}
+        onConfirm={handleConfirmLaunch}
+        launchInput={form.state.values}
+        imagePreview={imagePreview}
+        bannerPreview={bannerPreview}
+        isLoading={startLaunchMutation.isPending}
+      />
+      <LaunchProgressDialog
+        open={isProgressOpen}
+        onOpenChange={setIsProgressOpen}
+        launch={launchStatusQuery.data ?? activeLaunchQuery.data ?? null}
+        onCancel={() => {
+          if (activeLaunchId) {
+            cancelLaunchMutation.mutate({ launchId: activeLaunchId });
+          }
+        }}
+        onClose={() => {
+          setIsProgressOpen(false);
+          const status =
+            launchStatusQuery.data?.status ?? activeLaunchQuery.data?.status;
+          if (
+            status === "SUCCEEDED" ||
+            status === "FAILED" ||
+            status === "CANCELED"
+          ) {
+            clearActiveLaunch();
+          }
+        }}
+      />
     </div>
   );
 }

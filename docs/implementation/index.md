@@ -36,4 +36,4 @@ This directory contains detailed implementation documentation for all features i
 ## Related Documentation
 
 - [Backlog](../backlog/index.md) — planned work and future tasks
-- [Deployment](../deployment/) — deployment guides
+- [Railway Deployment](../deployment/railway.md) — environment and branch deployment mapping

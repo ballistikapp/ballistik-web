@@ -1,19 +1,26 @@
 "use client";
 
+import { useEffect } from "react";
 import { useParams } from "next/navigation";
 import { useTokenContext } from "@/contexts/token-context";
 
 export function useSelectedToken() {
-  const params = useParams();
+  const params = useParams<{ tokenPublicKey?: string }>();
   const { selectedTokenPublicKey, setSelectedTokenPublicKey } =
     useTokenContext();
 
-  // If we're on a token-scoped page, use the URL param
-  const tokenPublicKeyFromUrl = params?.tokenPublicKey as string | undefined;
+  const tokenPublicKeyFromUrl = params?.tokenPublicKey;
 
-  // URL params take precedence over context
-  const effectiveTokenPublicKey =
-    tokenPublicKeyFromUrl || selectedTokenPublicKey;
+  useEffect(() => {
+    if (
+      tokenPublicKeyFromUrl &&
+      tokenPublicKeyFromUrl !== selectedTokenPublicKey
+    ) {
+      setSelectedTokenPublicKey(tokenPublicKeyFromUrl);
+    }
+  }, [tokenPublicKeyFromUrl, selectedTokenPublicKey, setSelectedTokenPublicKey]);
+
+  const effectiveTokenPublicKey = tokenPublicKeyFromUrl || selectedTokenPublicKey;
 
   return {
     selectedTokenPublicKey: effectiveTokenPublicKey,

@@ -24,7 +24,7 @@ export default async function MainLayout({
       <SidebarProvider
         style={
           {
-            "--sidebar-width": "calc(var(--spacing) * 68)",
+            "--sidebar-width": "calc(var(--spacing) * 62)",
             "--header-height": "calc(var(--spacing) * 12)",
           } as React.CSSProperties
         }

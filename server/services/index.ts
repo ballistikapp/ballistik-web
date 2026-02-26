@@ -9,3 +9,4 @@ export * from "./wallet.service";
 export * from "./launch.service";
 export * from "./holding.service";
 export * from "./transaction.service";
+export * from "./storage.service";

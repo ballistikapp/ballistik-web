@@ -30,6 +30,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PageHeader } from "@/components/layout/sections";
 import {
   Tooltip,
   TooltipContent,
@@ -153,90 +154,87 @@ export default function AccountPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      {/* Header: name + balance */}
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-6 border-b">
-        <div>
-          {isEditingName ? (
-            <div className="flex items-center gap-2">
-              <Input
-                value={nameValue}
-                onChange={(e) => setNameValue(e.target.value)}
-                className="h-10 text-2xl font-medium max-w-xs"
-                maxLength={50}
-                autoFocus
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") handleSaveName();
-                  if (e.key === "Escape") handleCancelEditName();
-                }}
-                disabled={updateNameMutation.isPending}
-              />
+      <PageHeader
+        title={currentUser.name || "Account"}
+        rightContent={
+          <div className="mt-3 flex flex-col items-end gap-4">
+            {isEditingName ? (
+              <div className="flex items-center gap-2">
+                <Input
+                  value={nameValue}
+                  onChange={(e) => setNameValue(e.target.value)}
+                  className="h-10 text-2xl font-medium max-w-xs"
+                  maxLength={50}
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") handleSaveName();
+                    if (e.key === "Escape") handleCancelEditName();
+                  }}
+                  disabled={updateNameMutation.isPending}
+                />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleSaveName}
+                  disabled={updateNameMutation.isPending}
+                >
+                  {updateNameMutation.isPending ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <IconCheck className="size-4" />
+                  )}
+                </Button>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  onClick={handleCancelEditName}
+                  disabled={updateNameMutation.isPending}
+                >
+                  <IconX className="size-4" />
+                </Button>
+              </div>
+            ) : (
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8"
-                onClick={handleSaveName}
-                disabled={updateNameMutation.isPending}
-              >
-                {updateNameMutation.isPending ? (
-                  <Spinner className="size-4" />
-                ) : (
-                  <IconCheck className="size-4" />
-                )}
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8"
-                onClick={handleCancelEditName}
-                disabled={updateNameMutation.isPending}
-              >
-                <IconX className="size-4" />
-              </Button>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <h1 className="text-4xl">{currentUser.name}</h1>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                className="h-8 w-8 text-muted-foreground hover:text-foreground self-end"
                 onClick={handleStartEditName}
               >
                 <IconPencil className="size-4" />
               </Button>
+            )}
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                WALLET BALANCE
+              </p>
+              <p className="font-mono leading-none">
+                <span className="text-4xl">{balanceSol.toFixed(4)}</span>{" "}
+                <span className="text-base text-muted-foreground">SOL</span>
+              </p>
             </div>
-          )}
-        </div>
-        <div className="mt-3 flex flex-col items-end gap-4">
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
-              WALLET BALANCE
-            </p>
-            <p className="font-mono leading-none">
-              <span className="text-4xl">{balanceSol.toFixed(4)}</span>{" "}
-              <span className="text-base text-muted-foreground">SOL</span>
-            </p>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Last refresh: {formatRefreshTime(wallet?.balanceRefreshedAt)}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleRefresh}
+                disabled={refreshMainBalance.isPending}
+              >
+                {refreshMainBalance.isPending ? (
+                  <Spinner className="mr-2 size-4" />
+                ) : (
+                  <IconRefresh className="mr-2 size-4" />
+                )}
+                Refresh Balance
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-muted-foreground">
-              Last refresh: {formatRefreshTime(wallet?.balanceRefreshedAt)}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={handleRefresh}
-              disabled={refreshMainBalance.isPending}
-            >
-              {refreshMainBalance.isPending ? (
-                <Spinner className="mr-2 size-4" />
-              ) : (
-                <IconRefresh className="mr-2 size-4" />
-              )}
-              Refresh Balance
-            </Button>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       {/* Wallet info */}
       <div className="flex flex-col gap-6 pt-8 lg:flex-row lg:items-start lg:justify-between">

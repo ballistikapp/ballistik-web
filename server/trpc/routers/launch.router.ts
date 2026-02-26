@@ -25,6 +25,9 @@ export const launchRouter = router({
   getFailedLaunches: protectedProcedure.query(async ({ ctx }) => {
     return await launchService.getFailedLaunches(ctx.user.id);
   }),
+  getUserLaunches: protectedProcedure.query(async ({ ctx }) => {
+    return await launchService.getUserLaunches(ctx.user.id);
+  }),
   recoveryWallets: protectedProcedure
     .input(launchRecoverySchema)
     .query(async ({ input, ctx }) => {

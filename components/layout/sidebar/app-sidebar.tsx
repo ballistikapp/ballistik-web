@@ -2,15 +2,10 @@
 
 import * as React from "react";
 import {
-  IconListDetails,
-  IconBolt,
-  IconRocket,
-  IconWallet,
-  IconLayoutDashboard,
-} from "@tabler/icons-react";
-
-import { NavMain } from "@/components/layout/sidebar/nav-main";
-import { NavSecondary } from "@/components/layout/sidebar/nav-secondary";
+  buildAndManageRoutes,
+  NavMain,
+  tokenWorkspaceRoutes,
+} from "@/components/layout/sidebar/nav-main";
 import {
   Sidebar,
   SidebarContent,
@@ -20,49 +15,14 @@ import { TokenSwitcher } from "./token-switcher";
 import { UserTokensOutput } from "@/server/services/token.service";
 import { useSelectedToken } from "@/hooks/use-selected-token";
 
-const data = {
-  tokenSpecificRoutes: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: IconLayoutDashboard,
-    },
-    {
-      title: "Holdings",
-      url: "/holdings",
-      icon: IconListDetails,
-    },
-    {
-      title: "Transactions",
-      url: "/transactions",
-      icon: IconListDetails,
-    },
-    {
-      title: "Volume Bot",
-      url: "/volume-bot",
-      icon: IconBolt,
-    },
-    {
-      title: "Wallets",
-      url: "/wallets",
-      icon: IconWallet,
-    },
-  ],
-  navSecondary: [
-    {
-      title: "Launch Token",
-      url: "/launch",
-      icon: IconRocket,
-    },
-  ],
-};
-
 type Props = React.ComponentProps<typeof Sidebar> & {
   tokens: UserTokensOutput;
 };
 
 export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
   const { selectedTokenPublicKey } = useSelectedToken();
+  const effectiveTokenPublicKey =
+    selectedTokenPublicKey ?? props.tokens[0]?.publicKey;
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -71,10 +31,16 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain
-          items={data.tokenSpecificRoutes}
-          currentToken={selectedTokenPublicKey || undefined}
+          title="Token Workspace"
+          items={tokenWorkspaceRoutes}
+          currentToken={effectiveTokenPublicKey}
         />
-        <NavSecondary items={data.navSecondary} className="mt-auto" />
+        <NavMain
+          title="Build & Manage"
+          items={buildAndManageRoutes}
+          currentToken={effectiveTokenPublicKey}
+          className="mt-6"
+        />
       </SidebarContent>
     </Sidebar>
   );

@@ -24,7 +24,7 @@ import {
   CommandList,
   CommandSeparator,
 } from "@/components/ui/command";
-import { SidebarMenuButton } from "@/components/ui/sidebar";
+import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
 import { UserTokensOutput } from "@/server/services/token.service";
 import Link from "next/link";
 import Image from "next/image";
@@ -39,6 +39,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   tokens: UserTokensOutput;
 }) {
   const router = useRouter();
+  const { state } = useSidebar();
   const { selectedTokenPublicKey, setSelectedTokenPublicKey } =
     useSelectedToken();
 
@@ -69,6 +70,13 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   );
 
   const [open, setOpen] = React.useState(false);
+  const isSidebarCollapsed = state === "collapsed";
+
+  React.useEffect(() => {
+    if (isSidebarCollapsed && open) {
+      setOpen(false);
+    }
+  }, [isSidebarCollapsed, open]);
 
   if (tokens.length === 0) {
     return (
@@ -79,11 +87,15 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   }
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover
+      open={open}
+      onOpenChange={(nextOpen) => setOpen(isSidebarCollapsed ? false : nextOpen)}
+    >
       <PopoverTrigger asChild>
         <SidebarMenuButton
           size="lg"
-          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-6"
+          disabled={isSidebarCollapsed}
+          className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-6 disabled:opacity-100"
         >
           <div className="flex aspect-square size-10 items-center justify-center rounded-xl overflow-hidden shrink-0 bg-sidebar-primary text-sidebar-primary-foreground">
             {selectedToken?.imageUrl ? (
