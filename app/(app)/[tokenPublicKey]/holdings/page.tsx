@@ -40,7 +40,7 @@ export default function Page() {
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 25,
   });
 
   const {
@@ -53,14 +53,17 @@ export default function Page() {
     { enabled: !!tokenPublicKey }
   );
 
-  const { data: holdingsData, isLoading: holdingsLoading } =
+  const { data: holdingsData, isLoading: holdingsLoading, isFetching: holdingsFetching } =
     trpc.holding.listByToken.useQuery(
       {
         tokenPublicKey: tokenPublicKey || "",
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
       },
-      { enabled: !!tokenPublicKey && !!tokenData }
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        placeholderData: (previousData) => previousData,
+      }
     );
 
   const {
@@ -376,6 +379,7 @@ export default function Page() {
         columns={columns}
         data={holdings}
         isLoading={holdingsLoading}
+        isRefreshing={holdingsFetching}
         manualPagination
         pageCount={pageCount}
         rowCount={totalCount}

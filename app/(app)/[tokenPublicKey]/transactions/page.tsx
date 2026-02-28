@@ -40,7 +40,7 @@ export default function TransactionsPage() {
   const utils = trpc.useUtils();
   const [pagination, setPagination] = useState<PaginationState>({
     pageIndex: 0,
-    pageSize: 10,
+    pageSize: 25,
   });
 
   const {
@@ -53,14 +53,21 @@ export default function TransactionsPage() {
     { enabled: !!tokenPublicKey }
   );
 
-  const { data: transactionsData, isLoading: transactionsLoading } =
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    isFetching: transactionsFetching,
+  } =
     trpc.transaction.listByToken.useQuery(
       {
         tokenPublicKey: tokenPublicKey || "",
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
       },
-      { enabled: !!tokenPublicKey && !!tokenData }
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        placeholderData: (previousData) => previousData,
+      }
     );
 
   const {
@@ -274,6 +281,7 @@ export default function TransactionsPage() {
         columns={columns}
         data={transactions}
         isLoading={transactionsLoading}
+        isRefreshing={transactionsFetching}
         manualPagination
         pageCount={pageCount}
         rowCount={totalCount}

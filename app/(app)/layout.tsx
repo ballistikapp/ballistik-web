@@ -18,7 +18,7 @@ export default async function MainLayout({
     redirect("/auth");
   }
 
-  const tokens = await tokenService.getUserTokens(user.id);
+  const { items: tokens } = await tokenService.getUserTokens(user.id);
   return (
     <TokenProvider>
       <SidebarProvider

@@ -12,11 +12,11 @@ import {
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { TokenSwitcher } from "./token-switcher";
-import { UserTokensOutput } from "@/server/services/token.service";
+import type { UserTokenItems } from "@/server/services/token.service";
 import { useSelectedToken } from "@/hooks/use-selected-token";
 
 type Props = React.ComponentProps<typeof Sidebar> & {
-  tokens: UserTokensOutput;
+  tokens: UserTokenItems;
 };
 
 export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {

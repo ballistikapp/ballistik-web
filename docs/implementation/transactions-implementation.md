@@ -30,6 +30,7 @@ The `refreshByToken` service is optimized for speed and incremental updates:
 3. Parsed transaction fetching uses batched RPC parsing, then converts each signature into one or more per-owner action rows.
 4. Writes are idempotent with unique dedupe keys, so overlap/retries are safe.
 5. `RefreshCache` is touched after refresh so the UI can decide staleness and trigger background refetch.
+6. Parsed transaction batches now use `retryRpcWithTimeout` with `rpcConfig.tuning.parseTimeoutMs` (45s default) to avoid long-tail RPC hangs while still retrying transient failures.
 
 ### Database Indexes
 

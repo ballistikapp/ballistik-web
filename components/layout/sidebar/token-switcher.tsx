@@ -25,7 +25,7 @@ import {
   CommandSeparator,
 } from "@/components/ui/command";
 import { SidebarMenuButton, useSidebar } from "@/components/ui/sidebar";
-import { UserTokensOutput } from "@/server/services/token.service";
+import type { UserTokenItems } from "@/server/services/token.service";
 import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
@@ -36,7 +36,7 @@ import { useSelectedToken } from "@/hooks/use-selected-token";
 export const TokenSwitcher = React.memo(function TokenSwitcher({
   tokens,
 }: {
-  tokens: UserTokensOutput;
+  tokens: UserTokenItems;
 }) {
   const router = useRouter();
   const { state } = useSidebar();

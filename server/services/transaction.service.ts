@@ -1,8 +1,9 @@
 import { Prisma, prisma } from "@/lib/prisma";
+import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { retryRpc } from "@/lib/utils/rpc-retry";
+import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import {
   LAMPORTS_PER_SOL,
@@ -64,6 +65,7 @@ type TokenTransactionListRow = {
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const PARSE_RETRY_DELAYS_MS = [200, 500];
+const TOKEN_TRANSACTION_UPDATE_BATCH_SIZE = 50;
 
 type TokenBalanceEntry = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
@@ -195,8 +197,9 @@ async function getAllowedWallets(
     ...operationalWallets,
   ];
 
-  const filteredWallets = walletPublicKeys?.length
-    ? allWallets.filter((wallet) => walletPublicKeys.includes(wallet.publicKey))
+  const walletSet = walletPublicKeys?.length ? new Set(walletPublicKeys) : null;
+  const filteredWallets = walletSet
+    ? allWallets.filter((wallet) => walletSet.has(wallet.publicKey))
     : allWallets;
 
   return { token, wallets: filteredWallets };
@@ -370,7 +373,7 @@ export const transactionService = {
       : Prisma.empty;
     const groupBySignature = input.groupBySignature ?? true;
     const page = input.page ?? 1;
-    const pageSize = input.pageSize ?? 10;
+    const pageSize = input.pageSize ?? 25;
     const skip = (page - 1) * pageSize;
     const take = pageSize;
     const { rows, totalCount } = groupBySignature
@@ -530,9 +533,13 @@ export const transactionService = {
       }
 
       const batchResults = await mapWithConcurrency(batches, 3, async (batch) => {
-        return connection.getParsedTransactions(batch, {
-          maxSupportedTransactionVersion: 0,
-        });
+        return retryRpcWithTimeout(
+          () =>
+            connection.getParsedTransactions(batch, {
+              maxSupportedTransactionVersion: 0,
+            }),
+          rpcConfig.tuning.parseTimeoutMs
+        );
       });
 
       batches.forEach((batch, batchIndex) => {
@@ -698,14 +705,21 @@ export const transactionService = {
     }
 
     if (updates.length > 0) {
-      await prisma.$transaction(
-        updates.map((update) =>
-          prisma.tokenTransaction.update({
-            where: { id: update.id },
-            data: update.data,
-          })
-        )
-      );
+      for (
+        let i = 0;
+        i < updates.length;
+        i += TOKEN_TRANSACTION_UPDATE_BATCH_SIZE
+      ) {
+        const chunk = updates.slice(i, i + TOKEN_TRANSACTION_UPDATE_BATCH_SIZE);
+        await prisma.$transaction(
+          chunk.map((update) =>
+            prisma.tokenTransaction.update({
+              where: { id: update.id },
+              data: update.data,
+            })
+          )
+        );
+      }
     }
 
     await refreshCacheService.touch({
@@ -758,9 +772,11 @@ export const transactionService = {
       connection,
       knownSignatures
     );
+    const signatureSet = new Set(signatures);
     staleRows.forEach((row) => {
-      if (!signatures.includes(row.transactionSignature)) {
+      if (!signatureSet.has(row.transactionSignature)) {
         signatures.push(row.transactionSignature);
+        signatureSet.add(row.transactionSignature);
       }
     });
 

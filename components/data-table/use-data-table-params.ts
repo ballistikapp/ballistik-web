@@ -29,7 +29,7 @@ export interface UseDataTableParamsOptions {
 }
 
 export function useDataTableParams(options: UseDataTableParamsOptions = {}) {
-  const { defaultPageSize = 10, prefix } = options;
+  const { defaultPageSize = 25, prefix } = options;
 
   const pageKey = prefix ? `${prefix}_page` : "page";
   const pageSizeKey = prefix ? `${prefix}_pageSize` : "pageSize";

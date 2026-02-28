@@ -26,7 +26,7 @@ interface DataTablePaginationProps<TData> {
 
 export function DataTablePagination<TData>({
   table,
-  pageSizeOptions = [10, 20, 30, 40, 50],
+  pageSizeOptions = [25, 50, 100],
   showSelectedCount = true,
 }: DataTablePaginationProps<TData>) {
   return (

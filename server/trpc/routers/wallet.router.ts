@@ -19,7 +19,8 @@ export const walletRouter = router({
     .query(async ({ input, ctx }) => {
       return await walletService.getOperationalWalletsByToken(
         input.tokenPublicKey,
-        ctx.user.id
+        ctx.user.id,
+        { page: input.page, pageSize: input.pageSize }
       );
     }),
   getDevByToken: protectedProcedure

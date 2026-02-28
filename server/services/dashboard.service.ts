@@ -14,7 +14,8 @@ import { logger } from "@/lib/logger";
 
 const log = logger.child({ service: "dashboard" });
 
-const PRICE_HISTORY_MAX_ROWS = 5_000;
+const PRICE_HISTORY_MAX_ROWS = 500;
+const PRICE_HISTORY_TARGET_POINTS = 250;
 const STATS_CACHE_TTL_MS = 10_000;
 
 type CachedStats = {
@@ -33,6 +34,28 @@ export function invalidateStatsCache(tokenPublicKey: string) {
 }
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
+
+function downsamplePriceHistory(
+  points: Array<{ time: number; price: number }>,
+  targetPoints: number
+) {
+  if (points.length <= targetPoints) return points;
+  const bucketSize = Math.ceil(points.length / targetPoints);
+  const sampled: Array<{ time: number; price: number }> = [];
+
+  for (let i = 0; i < points.length; i += bucketSize) {
+    const bucket = points.slice(i, i + bucketSize);
+    if (bucket.length === 0) continue;
+    const avgTime = Math.floor(
+      bucket.reduce((sum, point) => sum + point.time, 0) / bucket.length
+    );
+    const avgPrice =
+      bucket.reduce((sum, point) => sum + point.price, 0) / bucket.length;
+    sampled.push({ time: avgTime, price: avgPrice });
+  }
+
+  return sampled;
+}
 
 async function getHeaderData(tokenPublicKey: string) {
   const [currentPrice, successfulLaunch, solPriceUsd] = await Promise.all([
@@ -403,7 +426,10 @@ async function getPriceHistory(tokenPublicKey: string) {
   const lowerBound = median / 20;
   const upperBound = median * 20;
 
-  return points.filter((p) => p.price >= lowerBound && p.price <= upperBound);
+  const filteredPoints = points.filter(
+    (p) => p.price >= lowerBound && p.price <= upperBound
+  );
+  return downsamplePriceHistory(filteredPoints, PRICE_HISTORY_TARGET_POINTS);
 }
 
 async function buildStatsResponse(

@@ -71,8 +71,9 @@ export function AccountSendDialog({
   );
   const [amount, setAmount] = useState("");
 
-  const { data: tokens, isLoading: tokensLoading } =
+  const { data: tokensData, isLoading: tokensLoading } =
     trpc.token.getUserTokens.useQuery(undefined, { enabled: open });
+  const tokens = tokensData?.items ?? [];
 
   const { data: operationalData, isLoading: operationalLoading } =
     trpc.wallet.getOperationalByToken.useQuery(
@@ -240,12 +241,12 @@ export function AccountSendDialog({
                 />
               </SelectTrigger>
               <SelectContent>
-                {tokens?.map((token) => (
+                {tokens.map((token) => (
                   <SelectItem key={token.publicKey} value={token.publicKey}>
                     {token.symbol} — {token.name}
                   </SelectItem>
                 ))}
-                {tokens?.length === 0 && (
+                {tokens.length === 0 && (
                   <div className="px-2 py-1.5 text-sm text-muted-foreground">
                     No tokens found
                   </div>

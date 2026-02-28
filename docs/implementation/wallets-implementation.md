@@ -27,6 +27,8 @@ Prisma changes:
 tRPC procedures:
 
 - `wallet.getOperationalByToken` fetches operational wallets by `tokenPublicKey`.
+  - Supports optional pagination: `page`, `pageSize` (default `1` / `200`, max `200`).
+  - Returns `totalCount` alongside the current page of wallets.
 - `wallet.getDevByToken` fetches dev wallet for a token via `TokenDevWallet`.
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.
@@ -52,6 +54,8 @@ Service rules:
 - Operational wallets must match `Wallet.tokenPublicKey`.
 - Dev wallet access is validated through `TokenDevWallet`.
 - Main wallet is always user-scoped via `User.mainWallet`.
+- `wallet.getWalletByToken` parallelizes token/user ownership reads with `Promise.all` before wallet-specific validation.
+- `wallet.getWalletPrivateKey` parallelizes token/user ownership reads with `Promise.all` before wallet-specific validation.
 
 ## Access Rules
 
@@ -74,12 +78,18 @@ Service rules:
 - Balance refresh is initiated from the UI but executed on the server
 - When `SHYFT_API_KEY` is set, balance refresh uses Shyft Wallet API (`GET /sol/v1/wallet/balance`) instead of raw `getMultipleAccountsInfo` RPC calls
 - Falls back to raw RPC if Shyft API is unavailable
+- Timeout and retry controls are centralized:
+  - `retryRpcWithTimeout` wraps long-tail calls
+  - `rpcConfig.tuning.rpcTimeoutMs` defaults to 30s for read RPC calls
+  - `rpcConfig.tuning.confirmTimeoutMs` defaults to 120s for `sendAndConfirmTransaction`
+- Transfer mutations use configurable concurrency via `rpcConfig.tuning.transferConcurrency` (default 5)
 
 ## Data Fetch Patterns
 
 - Main wallet: `wallet.getMain`
 - Dev wallet: `wallet.getDevByToken`
 - Operational wallets: `wallet.getOperationalByToken`
+- Token selector data: `token.getUserTokens` returns paginated payloads (`items`, `totalCount`, `page`, `pageSize`) and UI currently consumes the first page.
 
 ## UI Behavior
 
@@ -182,3 +192,7 @@ The account page uses `AccountSendDialog` to send SOL from the main wallet to to
 ## Migrations
 
 Use `prisma migrate dev` to generate migrations after schema changes. Do not create migration files manually.
+
+Latest performance migration added:
+
+- `Wallet(tokenPublicKey, type)` for operational wallet list filters.

@@ -167,6 +167,8 @@ This is the user's primary way to get fully fresh data when monitoring is off.
 
 1. ATA account reads via Solana RPC are chunked and executed with bounded concurrency (instead of fully sequential batch loops).
 2. Holding mutations (delete/create/update) are chunked and executed with bounded concurrency to reduce end-to-end DB write time while avoiding unbounded load spikes.
+   - Holding row updates are chunked at 50 rows per transaction to keep individual DB transactions bounded.
+   - Token transaction stale-row updates are chunked at 50 rows per transaction.
 3. The `Holding` table uses query-oriented indexes for refresh/list paths:
    - `(tokenPublicKey, walletPublicKey)` for token-scoped wallet lookups during refresh.
    - `(tokenPublicKey, lastUpdated)` for holdings list reads ordered by recency.
@@ -177,6 +179,12 @@ This is the user's primary way to get fully fresh data when monitoring is off.
    - `(walletPublicKey, tokenPublicKey, createdAt)` for holdings `DISTINCT ON ("walletPublicKey") ... ORDER BY walletPublicKey, createdAt DESC`.
    - `(tokenPublicKey, updatedAt)` for stale-row scans ordered by latest updates.
 
+5. Additional query indexes are applied to high-traffic ownership/list paths:
+   - `Wallet(tokenPublicKey, type)` for operational wallet lists.
+   - `Token(userId, createdAt)` for user token lists ordered by recency.
+   - `RefreshCache(lastRefreshedAt)` for staleness sweeps/cleanup.
+   - `TokenTransaction(tokenPublicKey, transactionSignature)` and `TokenTransaction(tokenPublicKey, status, transactionType)` for signature-grouped recent-activity and price-history reads.
+
 These optimizations specifically target slow manual refresh behavior on tokens with many managed wallets.
 
 ### List Endpoint Pagination
@@ -185,6 +193,8 @@ Holdings and transactions list endpoints use server-side pagination to avoid ret
 
 - `holding.listByToken` accepts optional `page` and `pageSize` and returns `{ holdings, totalCount, totalBalance, totalSupply }`.
 - `transaction.listByToken` accepts optional `page` and `pageSize` and returns `{ items, totalCount }`.
+- `token.getUserTokens` and `token.getAllUserTokens` accept optional `page` and `pageSize` and return `{ items, totalCount, page, pageSize }` (defaults: page `1`, pageSize `50`, max `100`).
+- `wallet.getOperationalByToken` accepts optional `page` and `pageSize` and returns `{ token, wallets, totalCount, page, pageSize }` (defaults: page `1`, pageSize `200`).
 - UI tables pass current page state into list queries and use TanStack manual pagination (`manualPagination` + `pageCount`) to keep pagination server-driven.
 
 This keeps response size bounded and avoids client-side pagination over large result sets.
@@ -269,7 +279,7 @@ Uses two different chart implementations depending on token graduation status (`
 
 **Non-graduated tokens (`isComplete === false`):**
 - Uses `lightweight-charts` AreaSeries (curved line + gradient fill) rendered from transaction data.
-- Server sends `priceHistory`: an array of `{ time, price }` points derived from `TokenTransaction` rows (price = `solAmount / tokenAmount`), last 7 days, max 5,000 rows.
+- Server sends `priceHistory`: an array of `{ time, price }` points derived from `TokenTransaction` rows (price = `solAmount / tokenAmount`), capped at 500 source rows and downsampled to ~250 points when needed.
 - The current bonding curve price is appended as the final data point so the chart always extends to "now".
 - Custom price formatter using `formatPriceSol()` handles micro-SOL prices (sub-0.000001) without precision issues.
 - Refreshed on the same 30s polling / SSE-debounce cycle as other dashboard data.

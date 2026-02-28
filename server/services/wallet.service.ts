@@ -13,12 +13,16 @@ import { AppError } from "@/server/errors";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { retryRpc } from "@/lib/utils/rpc-retry";
+import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
 
 export const walletService = {
-  async getOperationalWalletsByToken(tokenPublicKey: string, userId: string) {
+  async getOperationalWalletsByToken(
+    tokenPublicKey: string,
+    userId: string,
+    options?: { page?: number; pageSize?: number }
+  ) {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
       select: {
@@ -33,20 +37,29 @@ export const walletService = {
       throw new AppError("Token not found", 404);
     }
 
-    const wallets = await prisma.wallet.findMany({
-      where: {
-        tokenPublicKey,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
-      },
-      select: {
-        publicKey: true,
-        type: true,
-        balanceSol: true,
-        balanceRefreshedAt: true,
-        createdAt: true,
-        updatedAt: true,
-      },
-    });
+    const page = options?.page ?? 1;
+    const pageSize = Math.min(options?.pageSize ?? 200, 200);
+    const skip = (page - 1) * pageSize;
+    const where = {
+      tokenPublicKey,
+      type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] as const },
+    };
+    const [wallets, totalCount] = await Promise.all([
+      prisma.wallet.findMany({
+        where,
+        select: {
+          publicKey: true,
+          type: true,
+          balanceSol: true,
+          balanceRefreshedAt: true,
+          createdAt: true,
+          updatedAt: true,
+        },
+        skip,
+        take: pageSize,
+      }),
+      prisma.wallet.count({ where }),
+    ]);
 
     return {
       token: {
@@ -56,6 +69,9 @@ export const walletService = {
         imageUrl: token.imageUrl,
       },
       wallets,
+      totalCount,
+      page,
+      pageSize,
     };
   },
 
@@ -177,35 +193,36 @@ export const walletService = {
     walletPublicKey: string,
     userId: string
   ) {
-    const token = await prisma.token.findFirst({
-      where: { publicKey: tokenPublicKey, userId },
-      select: {
-        publicKey: true,
-        name: true,
-        symbol: true,
-        imageUrl: true,
-      },
-    });
+    const [token, user] = await Promise.all([
+      prisma.token.findFirst({
+        where: { publicKey: tokenPublicKey, userId },
+        select: {
+          publicKey: true,
+          name: true,
+          symbol: true,
+          imageUrl: true,
+        },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          mainWallet: {
+            select: {
+              publicKey: true,
+              type: true,
+              balanceSol: true,
+              balanceRefreshedAt: true,
+              createdAt: true,
+              updatedAt: true,
+            },
+          },
+        },
+      }),
+    ]);
 
     if (!token) {
       throw new AppError("Token not found", 404);
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        mainWallet: {
-          select: {
-            publicKey: true,
-            type: true,
-            balanceSol: true,
-            balanceRefreshedAt: true,
-            createdAt: true,
-            updatedAt: true,
-          },
-        },
-      },
-    });
 
     const mainWallet = user?.mainWallet ?? null;
     if (mainWallet?.publicKey === walletPublicKey) {
@@ -278,26 +295,27 @@ export const walletService = {
     walletPublicKey: string,
     userId: string
   ) {
-    const token = await prisma.token.findFirst({
-      where: { publicKey: tokenPublicKey, userId },
-      select: { publicKey: true },
-    });
+    const [token, user] = await Promise.all([
+      prisma.token.findFirst({
+        where: { publicKey: tokenPublicKey, userId },
+        select: { publicKey: true },
+      }),
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          mainWallet: {
+            select: {
+              publicKey: true,
+              privateKey: true,
+            },
+          },
+        },
+      }),
+    ]);
 
     if (!token) {
       throw new AppError("Token not found", 404);
     }
-
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: {
-        mainWallet: {
-          select: {
-            publicKey: true,
-            privateKey: true,
-          },
-        },
-      },
-    });
 
     const mainWallet = user?.mainWallet ?? null;
     if (mainWallet?.publicKey === walletPublicKey) {
@@ -571,7 +589,7 @@ export const walletService = {
     const sender = Keypair.fromSecretKey(bs58.decode(mainWallet.privateKey));
     const lamports = Math.floor(amountSol * 1_000_000_000);
 
-    const transferConcurrency = 5;
+    const transferConcurrency = rpcConfig.tuning.transferConcurrency;
     const results = await mapWithConcurrency(
       targets,
       transferConcurrency,
@@ -580,7 +598,10 @@ export const walletService = {
           const destination = new PublicKey(publicKey);
           const sendTransfer = async () => {
             const { blockhash, lastValidBlockHeight } =
-              await connection.getLatestBlockhash("confirmed");
+              await retryRpcWithTimeout(
+                () => connection.getLatestBlockhash("confirmed"),
+                rpcConfig.tuning.rpcTimeoutMs
+              );
             const transaction = new Transaction().add(
               SystemProgram.transfer({
                 fromPubkey: sender.publicKey,
@@ -591,13 +612,12 @@ export const walletService = {
             transaction.recentBlockhash = blockhash;
             transaction.lastValidBlockHeight = lastValidBlockHeight;
             transaction.feePayer = sender.publicKey;
-            return await sendAndConfirmTransaction(
-              connection,
-              transaction,
-              [sender],
-              {
-                commitment: "confirmed",
-              }
+            return await retryRpcWithTimeout(
+              () =>
+                sendAndConfirmTransaction(connection, transaction, [sender], {
+                  commitment: "confirmed",
+                }),
+              rpcConfig.tuning.confirmTimeoutMs
             );
           };
 
@@ -753,7 +773,7 @@ export const walletService = {
     }
 
     const connection = getSolanaConnection();
-    const transferConcurrency = 5;
+    const transferConcurrency = rpcConfig.tuning.transferConcurrency;
     const results = await mapWithConcurrency(
       targets,
       transferConcurrency,
@@ -762,8 +782,9 @@ export const walletService = {
 
         const computeLamports = async (blockhash: string) => {
           if (useMax) {
-            const balanceLamports = await connection.getBalance(
-              sender.publicKey
+            const balanceLamports = await retryRpcWithTimeout(
+              () => connection.getBalance(sender.publicKey),
+              rpcConfig.tuning.rpcTimeoutMs
             );
             const feeTransaction = new Transaction().add(
               SystemProgram.transfer({
@@ -774,9 +795,13 @@ export const walletService = {
             );
             feeTransaction.recentBlockhash = blockhash;
             feeTransaction.feePayer = sender.publicKey;
-            const fee = await connection.getFeeForMessage(
-              feeTransaction.compileMessage(),
-              "confirmed"
+            const fee = await retryRpcWithTimeout(
+              () =>
+                connection.getFeeForMessage(
+                  feeTransaction.compileMessage(),
+                  "confirmed"
+                ),
+              rpcConfig.tuning.rpcTimeoutMs
             );
             const feeLamports = fee.value ?? 5000;
             const lamports = balanceLamports - feeLamports;
@@ -790,7 +815,10 @@ export const walletService = {
 
         const sendTransfer = async () => {
           const { blockhash } =
-            await connection.getLatestBlockhash("confirmed");
+            await retryRpcWithTimeout(
+              () => connection.getLatestBlockhash("confirmed"),
+              rpcConfig.tuning.rpcTimeoutMs
+            );
           const lamports = await computeLamports(blockhash);
           if (lamports <= 0) {
             return null;
@@ -804,11 +832,12 @@ export const walletService = {
           );
           transaction.recentBlockhash = blockhash;
           transaction.feePayer = sender.publicKey;
-          return await sendAndConfirmTransaction(
-            connection,
-            transaction,
-            [sender],
-            { commitment: "confirmed" }
+          return await retryRpcWithTimeout(
+            () =>
+              sendAndConfirmTransaction(connection, transaction, [sender], {
+                commitment: "confirmed",
+              }),
+            rpcConfig.tuning.confirmTimeoutMs
           );
         };
 

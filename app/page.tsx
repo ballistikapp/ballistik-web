@@ -10,7 +10,7 @@ export default async function Page() {
     redirect("/auth");
   }
 
-  const tokens = await tokenService.getUserTokens(user.id);
+  const { items: tokens } = await tokenService.getUserTokens(user.id);
 
   if (tokens.length === 0) {
     return redirect("/launch");

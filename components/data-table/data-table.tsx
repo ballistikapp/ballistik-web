@@ -98,6 +98,7 @@ interface DataTableProps<TData, TValue> {
   manualPagination?: boolean;
   pageCount?: number;
   rowCount?: number;
+  isRefreshing?: boolean;
 }
 
 export function DataTable<TData, TValue>({
@@ -109,7 +110,7 @@ export function DataTable<TData, TValue>({
   getRowId,
   initialSorting = [],
   initialColumnVisibility = {},
-  initialPagination = { pageIndex: 0, pageSize: 10 },
+  initialPagination = { pageIndex: 0, pageSize: 25 },
   enableRowSelection = false,
   onRowSelectionChange,
   searchableColumns,
@@ -119,6 +120,7 @@ export function DataTable<TData, TValue>({
   manualPagination = false,
   pageCount,
   rowCount,
+  isRefreshing = false,
 }: DataTableProps<TData, TValue>) {
   const urlState = useDataTableParams({
     defaultPageSize: initialPagination.pageSize,
@@ -212,10 +214,18 @@ export function DataTable<TData, TValue>({
     getFacetedMinMaxValues: getFacetedMinMaxValues(),
   });
 
+  const hasRows = table.getRowModel().rows.length > 0;
+  const showSkeletonRows = isLoading && !hasRows;
+  const showLoadingPulse = isRefreshing && hasRows;
+
   return (
     <div className="flex flex-col gap-4">
-      {!isLoading && toolbar?.(table)}
-      <div className="overflow-hidden rounded-lg border">
+      {toolbar?.(table)}
+      <div
+        className={`overflow-hidden rounded-lg border transition-opacity ${
+          showLoadingPulse ? "animate-pulse opacity-80" : ""
+        }`}
+      >
         <Table>
           <TableHeader className="bg-muted">
             {table.getHeaderGroups().map((headerGroup) => (
@@ -234,7 +244,7 @@ export function DataTable<TData, TValue>({
             ))}
           </TableHeader>
           <TableBody>
-            {isLoading ? (
+            {showSkeletonRows ? (
               Array.from({ length: 3 }).map((_, index) => (
                 <TableRow key={`skeleton-${index}`}>
                   {columns.map((_, colIndex) => (
@@ -244,7 +254,7 @@ export function DataTable<TData, TValue>({
                   ))}
                 </TableRow>
               ))
-            ) : table.getRowModel().rows?.length ? (
+            ) : hasRows ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
                   key={row.id}
@@ -277,7 +287,7 @@ export function DataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      {!isLoading && paginationSlot?.(table)}
+      {paginationSlot?.(table)}
     </div>
   );
 }
