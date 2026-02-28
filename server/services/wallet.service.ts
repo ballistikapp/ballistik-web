@@ -8,6 +8,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { prisma } from "@/lib/prisma";
+import { WalletType } from "@/lib/generated/prisma/client";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
 import { rpcConfig } from "@/lib/config/rpc.config";
@@ -42,7 +43,9 @@ export const walletService = {
     const skip = (page - 1) * pageSize;
     const where = {
       tokenPublicKey,
-      type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] as const },
+      type: {
+        in: [WalletType.BUNDLER, WalletType.VOLUME, WalletType.DISTRIBUTION],
+      },
     };
     const [wallets, totalCount] = await Promise.all([
       prisma.wallet.findMany({
