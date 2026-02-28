@@ -6,6 +6,8 @@ const envSchema = z.object({
   SHYFT_API_KEY: z.string().min(1).optional(),
   SHYFT_GRPC_TOKEN: z.string().min(1).optional(),
   SHYFT_CALLBACK_SECRET: z.string().min(1).optional(),
+  PINATA_JWT: z.string().min(1).optional(),
+  PINATA_GATEWAY_URL: z.string().url().optional(),
   MONITORING_PIPELINE_V2: z
     .string()
     .optional()
@@ -52,6 +54,8 @@ export const getEnv = (): Env => {
     SHYFT_API_KEY: process.env.SHYFT_API_KEY,
     SHYFT_GRPC_TOKEN: process.env.SHYFT_GRPC_TOKEN,
     SHYFT_CALLBACK_SECRET: process.env.SHYFT_CALLBACK_SECRET,
+    PINATA_JWT: process.env.PINATA_JWT,
+    PINATA_GATEWAY_URL: process.env.PINATA_GATEWAY_URL,
     MONITORING_PIPELINE_V2: process.env.MONITORING_PIPELINE_V2,
     APP_URL: process.env.APP_URL,
   });

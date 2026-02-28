@@ -4,7 +4,6 @@ import { format, formatDistanceToNowStrict } from "date-fns";
 import Link from "next/link";
 import Image from "next/image";
 import { type ColumnDef } from "@tanstack/react-table";
-import { type UserTokensOutput } from "@/server/services/token.service";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { DataTableColumnHeader } from "@/components/data-table/data-table-column-header";
@@ -22,10 +21,30 @@ import {
   IconBrandX,
   IconBrandTelegram,
   IconWorld,
+  IconRecycle,
 } from "@tabler/icons-react";
 import { GalleryVerticalEnd } from "lucide-react";
 
-type TokenItem = UserTokensOutput[number];
+export type TokenRowStatus = "PENDING" | "ACTIVE" | "FAILED";
+
+export type TokenTableRow = {
+  id: string;
+  name: string;
+  symbol: string;
+  status: TokenRowStatus;
+  publicKey: string | null;
+  imageUrl?: string | null;
+  websiteUrl?: string | null;
+  twitterUrl?: string | null;
+  telegramUrl?: string | null;
+  createdAt: Date | string;
+  launchId: string;
+  errorMessage?: string | null;
+};
+
+type TokenColumnsOptions = {
+  onReclaim?: (row: TokenTableRow) => void;
+};
 
 function truncateAddress(address: string) {
   if (address.length <= 12) return address;
@@ -46,7 +65,22 @@ function formatExactTime(dateValue?: Date | string | null) {
   return format(date, "MMM d, yyyy");
 }
 
-export const columns: ColumnDef<TokenItem>[] = [
+function statusBadgeClass(status: TokenRowStatus) {
+  switch (status) {
+    case "ACTIVE":
+      return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
+    case "PENDING":
+      return "bg-amber-500/10 text-amber-700 border-amber-500/20";
+    case "FAILED":
+      return "bg-red-500/10 text-red-700 border-red-500/20";
+    default:
+      return "";
+  }
+}
+
+export const createColumns = (
+  options: TokenColumnsOptions = {}
+): ColumnDef<TokenTableRow>[] => [
   {
     id: "token",
     accessorFn: (row) => `${row.name} ${row.symbol}`,
@@ -54,17 +88,15 @@ export const columns: ColumnDef<TokenItem>[] = [
       <DataTableColumnHeader column={column} title="Token" />
     ),
     cell: ({ row }) => {
-      const token = row.original;
-      return (
-        <Link
-          href={`/${token.publicKey}/dashboard`}
-          className="flex items-center gap-3 group"
-        >
+      const item = row.original;
+      const hasLink = Boolean(item.publicKey);
+      const content = (
+        <div className="flex items-center gap-3 group">
           <div className="flex aspect-square size-9 items-center justify-center rounded-lg overflow-hidden shrink-0 bg-muted">
-            {token.imageUrl ? (
+            {item.imageUrl ? (
               <Image
-                src={token.imageUrl}
-                alt={token.name}
+                src={item.imageUrl}
+                alt={item.name}
                 className="h-full w-full object-cover"
                 width={36}
                 height={36}
@@ -76,14 +108,20 @@ export const columns: ColumnDef<TokenItem>[] = [
           </div>
           <div className="flex flex-col gap-0.5 leading-none min-w-0">
             <span className="font-medium truncate group-hover:underline">
-              {token.name}
+              {item.name}
             </span>
             <Badge variant="secondary" className="text-xs font-mono w-fit">
-              ${token.symbol}
+              ${item.symbol}
             </Badge>
           </div>
-        </Link>
+        </div>
       );
+      if (hasLink) {
+        return (
+          <Link href={`/${item.publicKey}/dashboard`}>{content}</Link>
+        );
+      }
+      return content;
     },
     enableHiding: false,
     meta: {
@@ -92,16 +130,21 @@ export const columns: ColumnDef<TokenItem>[] = [
   },
   {
     id: "publicKey",
-    accessorKey: "publicKey",
+    accessorFn: (row) => row.publicKey ?? row.launchId ?? "",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Address" />
     ),
     cell: ({ row }) => {
-      const publicKey = row.original.publicKey;
+      const item = row.original;
+      if (!item.publicKey) {
+        return (
+          <span className="text-sm text-muted-foreground">—</span>
+        );
+      }
       return (
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-mono text-muted-foreground">
-            {truncateAddress(publicKey)}
+            {truncateAddress(item.publicKey)}
           </span>
           <Button
             type="button"
@@ -110,7 +153,7 @@ export const columns: ColumnDef<TokenItem>[] = [
             className="size-6 text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              navigator.clipboard.writeText(publicKey);
+              navigator.clipboard.writeText(item.publicKey!);
             }}
           >
             <IconCopy className="size-3.5" />
@@ -121,6 +164,25 @@ export const columns: ColumnDef<TokenItem>[] = [
     },
     meta: {
       searchable: true,
+    },
+  },
+  {
+    id: "status",
+    accessorKey: "status",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Status" />
+    ),
+    cell: ({ row }) => {
+      const status = row.original.status;
+      return (
+        <Badge variant="outline" className={statusBadgeClass(status)}>
+          {status}
+        </Badge>
+      );
+    },
+    filterFn: "textArray",
+    meta: {
+      filter: { filterType: "text" as const },
     },
   },
   {
@@ -214,7 +276,9 @@ export const columns: ColumnDef<TokenItem>[] = [
   {
     id: "actions",
     cell: ({ row }) => {
-      const token = row.original;
+      const item = row.original;
+      const isFailed = item.status === "FAILED";
+      const hasPublicKey = Boolean(item.publicKey);
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -228,39 +292,57 @@ export const columns: ColumnDef<TokenItem>[] = [
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            <DropdownMenuItem asChild>
-              <Link href={`/${token.publicKey}/dashboard`}>
-                <IconExternalLink className="size-4" />
-                Go to Dashboard
-              </Link>
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => navigator.clipboard.writeText(token.publicKey)}
-            >
-              <IconCopy className="size-4" />
-              Copy Address
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem asChild>
-              <a
-                href={`https://solscan.io/token/${token.publicKey}`}
-                target="_blank"
-                rel="noreferrer"
+            {hasPublicKey && (
+              <DropdownMenuItem asChild>
+                <Link href={`/${item.publicKey}/dashboard`}>
+                  <IconExternalLink className="size-4" />
+                  Go to Dashboard
+                </Link>
+              </DropdownMenuItem>
+            )}
+            {hasPublicKey && (
+              <DropdownMenuItem
+                onClick={() =>
+                  navigator.clipboard.writeText(item.publicKey!)
+                }
               >
-                <IconExternalLink className="size-4" />
-                View on Solscan
-              </a>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <a
-                href={`https://pump.fun/coin/${token.publicKey}`}
-                target="_blank"
-                rel="noreferrer"
+                <IconCopy className="size-4" />
+                Copy Address
+              </DropdownMenuItem>
+            )}
+            {isFailed && options.onReclaim && (
+              <DropdownMenuItem
+                onClick={() => options.onReclaim?.(item)}
               >
-                <IconExternalLink className="size-4" />
-                View on Pump.fun
-              </a>
-            </DropdownMenuItem>
+                <IconRecycle className="size-4" />
+                Reclaim SOL
+              </DropdownMenuItem>
+            )}
+            {hasPublicKey && (
+              <>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a
+                    href={`https://solscan.io/token/${item.publicKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <IconExternalLink className="size-4" />
+                    View on Solscan
+                  </a>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <a
+                    href={`https://pump.fun/coin/${item.publicKey}`}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    <IconExternalLink className="size-4" />
+                    View on Pump.fun
+                  </a>
+                </DropdownMenuItem>
+              </>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       );

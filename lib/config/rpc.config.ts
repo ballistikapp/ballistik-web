@@ -45,6 +45,11 @@ export const rpcConfig = {
     solBalanceBatchSize: 100,
     tokenBalanceConcurrency: 5,
     holdingBalanceConcurrency: 5,
+    transferConcurrency: 5,
+    sellConcurrency: 5,
+    rpcTimeoutMs: 30_000,
+    parseTimeoutMs: 45_000,
+    confirmTimeoutMs: 120_000,
   },
 };
 

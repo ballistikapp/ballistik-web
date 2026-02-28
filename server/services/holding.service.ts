@@ -1,10 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
-import { retryRpc } from "@/lib/utils/rpc-retry";
+import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
@@ -41,9 +42,17 @@ type WalletWithKey = WalletRecord & {
 };
 
 const HOLDING_MUTATION_BATCH_SIZE = 100;
+const HOLDING_UPDATE_BATCH_SIZE = 50;
 const HOLDING_RPC_BATCH_SIZE = 100;
 const HOLDING_RPC_CONCURRENCY = 3;
 const HOLDING_MUTATION_CONCURRENCY = 3;
+const TOKEN_SUPPLY_CACHE_TTL_MS = 10_000;
+const TOKEN_SUPPLY_CACHE_MAX_SIZE = 200;
+
+const tokenSupplyCache = new Map<
+  string,
+  { value: number; cachedAt: number }
+>();
 
 async function getAllowedWallets(
   tokenPublicKey: string,
@@ -88,8 +97,9 @@ async function getAllowedWallets(
     ...operationalWallets,
   ];
 
-  const filteredWallets = walletPublicKeys?.length
-    ? allWallets.filter((wallet) => walletPublicKeys.includes(wallet.publicKey))
+  const walletSet = walletPublicKeys?.length ? new Set(walletPublicKeys) : null;
+  const filteredWallets = walletSet
+    ? allWallets.filter((wallet) => walletSet.has(wallet.publicKey))
     : allWallets;
 
   return { token, wallets: filteredWallets };
@@ -180,6 +190,34 @@ async function getTokenBalanceForWallet(
       return BigInt(0);
     }
     throw error;
+  }
+}
+
+async function getCachedTokenSupply(
+  connection: Connection,
+  mintKey: string
+): Promise<number | null> {
+  const cached = tokenSupplyCache.get(mintKey);
+  if (cached && Date.now() - cached.cachedAt < TOKEN_SUPPLY_CACHE_TTL_MS) {
+    return cached.value;
+  }
+
+  try {
+    const supply = await retryRpcWithTimeout(
+      () => connection.getTokenSupply(new PublicKey(mintKey)),
+      rpcConfig.tuning.rpcTimeoutMs
+    );
+    const value = Number(supply.value.uiAmountString ?? "0");
+    tokenSupplyCache.set(mintKey, { value, cachedAt: Date.now() });
+    if (tokenSupplyCache.size > TOKEN_SUPPLY_CACHE_MAX_SIZE) {
+      const oldestKey = tokenSupplyCache.keys().next().value;
+      if (oldestKey) {
+        tokenSupplyCache.delete(oldestKey);
+      }
+    }
+    return value;
+  } catch {
+    return cached?.value ?? null;
   }
 }
 
@@ -357,34 +395,53 @@ export const holdingService = {
       throw new AppError("Token not found", 404);
     }
 
-    const [holdings, totalSupply] = await Promise.all([
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+    const where = {
+      tokenPublicKey: input.tokenPublicKey,
+      ...(input.walletPublicKey ? { walletPublicKey: input.walletPublicKey } : {}),
+    };
+
+    const [holdings, totalCount, balanceAgg, totalSupply] = await Promise.all([
       prisma.holding.findMany({
-        where: {
-          tokenPublicKey: input.tokenPublicKey,
-          ...(input.walletPublicKey
-            ? { walletPublicKey: input.walletPublicKey }
-            : {}),
-        },
+        where,
         include: {
           wallet: {
             select: { publicKey: true, type: true },
           },
         },
         orderBy: { lastUpdated: "desc" },
+        skip,
+        take,
+      }),
+      prisma.holding.count({ where }),
+      prisma.holding.aggregate({
+        where: {
+          tokenPublicKey: input.tokenPublicKey,
+          ...(input.walletPublicKey
+            ? { walletPublicKey: input.walletPublicKey }
+            : {}),
+        },
+        _sum: { tokenBalance: true },
       }),
       (async () => {
         try {
           const connection = getSolanaConnection();
-          const mint = new PublicKey(input.tokenPublicKey);
-          const supply = await connection.getTokenSupply(mint);
-          return Number(supply.value.uiAmountString ?? "0");
+          return await getCachedTokenSupply(connection, input.tokenPublicKey);
         } catch {
           return null;
         }
       })(),
     ]);
 
-    return { holdings, totalSupply };
+    return {
+      holdings,
+      totalCount,
+      totalBalance: Number(balanceAgg._sum.tokenBalance ?? 0),
+      totalSupply,
+    };
   },
 
   async refreshByToken(input: RefreshHoldingsByTokenInput, userId: string) {
@@ -565,8 +622,8 @@ export const holdingService = {
     }
     if (updateInputs.length > 0) {
       const updateBatches: Array<typeof updateInputs> = [];
-      for (let i = 0; i < updateInputs.length; i += HOLDING_MUTATION_BATCH_SIZE) {
-        updateBatches.push(updateInputs.slice(i, i + HOLDING_MUTATION_BATCH_SIZE));
+      for (let i = 0; i < updateInputs.length; i += HOLDING_UPDATE_BATCH_SIZE) {
+        updateBatches.push(updateInputs.slice(i, i + HOLDING_UPDATE_BATCH_SIZE));
       }
       await mapWithConcurrency(
         updateBatches,
@@ -620,8 +677,10 @@ export const holdingService = {
         )
       : null;
 
-    const results = await Promise.all(
-      wallets.map(async (wallet) => {
+    const results = await mapWithConcurrency(
+      wallets,
+      rpcConfig.tuning.sellConcurrency,
+      async (wallet) => {
         try {
           const balance = await getTokenBalanceForWallet(
             connection,
@@ -666,7 +725,10 @@ export const holdingService = {
               ? mainWalletKeypair
               : seller;
           const { blockhash, lastValidBlockHeight } =
-            await connection.getLatestBlockhash("confirmed");
+            await retryRpcWithTimeout(
+              () => connection.getLatestBlockhash("confirmed"),
+              rpcConfig.tuning.rpcTimeoutMs
+            );
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
           tx.feePayer = feePayer.publicKey;
@@ -674,11 +736,12 @@ export const holdingService = {
             feePayer.publicKey.toBase58() === seller.publicKey.toBase58()
               ? [seller]
               : [feePayer, seller];
-          const signature = await sendAndConfirmTransaction(
-            connection,
-            tx,
-            signers,
-            { commitment: "confirmed" }
+          const signature = await retryRpcWithTimeout(
+            () =>
+              sendAndConfirmTransaction(connection, tx, signers, {
+                commitment: "confirmed",
+              }),
+            rpcConfig.tuning.confirmTimeoutMs
           );
 
           return {
@@ -695,7 +758,7 @@ export const holdingService = {
             error: message,
           };
         }
-      })
+      }
     );
 
     const ataCloseResults = shouldCloseAta

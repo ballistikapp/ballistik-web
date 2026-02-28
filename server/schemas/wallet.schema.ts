@@ -2,6 +2,8 @@ import { z } from "zod";
 
 export const getOperationalWalletsByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
+  page: z.number().int().min(1).optional(),
+  pageSize: z.number().int().min(1).max(200).optional(),
 });
 
 export type GetOperationalWalletsByTokenInput = z.infer<

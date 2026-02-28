@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
+import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -17,6 +18,7 @@ import {
   DataTableSearch,
   DataTableViewOptions,
 } from "@/components/data-table";
+import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
@@ -36,6 +38,10 @@ export default function Page() {
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 25,
+  });
 
   const {
     data: tokenData,
@@ -47,10 +53,17 @@ export default function Page() {
     { enabled: !!tokenPublicKey }
   );
 
-  const { data: holdingsData, isLoading: holdingsLoading } =
+  const { data: holdingsData, isLoading: holdingsLoading, isFetching: holdingsFetching } =
     trpc.holding.listByToken.useQuery(
-      { tokenPublicKey: tokenPublicKey || "" },
-      { enabled: !!tokenPublicKey && !!tokenData }
+      {
+        tokenPublicKey: tokenPublicKey || "",
+        page: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+      },
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        placeholderData: (previousData) => previousData,
+      }
     );
 
   const {
@@ -102,18 +115,9 @@ export default function Page() {
   }, [holdingsData?.totalSupply, tokenData, tokenPublicKey]);
 
   const holdings = holdingsData?.holdings ?? [];
-  const totalBalance = useMemo(
-    () =>
-      holdings.reduce(
-        (sum, holding) =>
-          sum +
-          (Number.isFinite(Number(holding.tokenBalance))
-            ? Number(holding.tokenBalance)
-            : 0),
-        0
-      ),
-    [holdings]
-  );
+  const totalCount = holdingsData?.totalCount ?? 0;
+  const totalBalance = holdingsData?.totalBalance ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const walletsWithBalance = useMemo(
     () =>
       holdings.filter(
@@ -143,11 +147,11 @@ export default function Page() {
       },
       {
         label: "ATAs Tracked",
-        value: formatCompact(holdings.length),
+        value: formatCompact(totalCount),
       },
     ],
     [
-      holdings.length,
+      totalCount,
       tokenData?.symbol,
       totalBalance,
       totalSupplyShare,
@@ -171,7 +175,7 @@ export default function Page() {
       : null;
     try {
       await refreshHoldings({ tokenPublicKey });
-      void utils.holding.listByToken.invalidate({ tokenPublicKey });
+      void utils.holding.listByToken.invalidate();
       await refetchRefreshCache();
       if (toastId) {
         toast.success("Holdings refreshed", { id: toastId, icon: null });
@@ -330,9 +334,9 @@ export default function Page() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="-m-6 px-6 py-10 border-b">
-        <div className="flex items-center justify-between gap-4">
-          <h1 className="text-4xl">Holdings</h1>
+      <PageHeader
+        title="Holdings"
+        rightContent={
           <div className="flex flex-col items-end gap-1">
             <Button
               variant="outline"
@@ -351,8 +355,8 @@ export default function Page() {
               Last refresh {formatRefreshTime(refreshTimestamp)}
             </p>
           </div>
-        </div>
-      </div>
+        }
+      />
       <div />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -375,6 +379,11 @@ export default function Page() {
         columns={columns}
         data={holdings}
         isLoading={holdingsLoading}
+        isRefreshing={holdingsFetching}
+        manualPagination
+        pageCount={pageCount}
+        rowCount={totalCount}
+        onPaginationStateChange={setPagination}
         getRowId={(row) => row.walletPublicKey}
         enableRowSelection
         onRowSelectionChange={setRowSelection}
@@ -430,7 +439,7 @@ export default function Page() {
         onOpenChange={handleExitDialogOpenChange}
         exit={exitData}
         tokenSymbol={tokenData.symbol}
-        totalWallets={holdings.length}
+        totalWallets={totalCount}
         walletsWithBalance={walletsWithBalance}
         totalBalance={totalBalance}
         isSubmitting={startExitMutation.isPending}

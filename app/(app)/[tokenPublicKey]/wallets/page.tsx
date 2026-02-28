@@ -28,6 +28,7 @@ import { getColumns } from "./columns";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { PageHeader } from "@/components/layout/sections";
 import { WalletTransferDialog } from "@/components/wallets/wallet-transfer-dialog";
 import { Spinner } from "@/components/ui/spinner";
 import {
@@ -373,39 +374,40 @@ export default function Page() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="flex justify-between items-center gap-2 -m-6 px-6 py-6 border-b">
-        <h1 className="text-4xl">Wallets</h1>
-
-        <div className="mt-3 flex flex-col items-end gap-4">
-          <div className="text-right">
-            <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
-              TOTAL BALANCE
-            </p>
-            <p className="font-mono leading-none">
-              <span className="text-4xl">{totalSolBalance.toFixed(4)}</span>{" "}
-              <span className="text-base text-muted-foreground">SOL</span>
-            </p>
+      <PageHeader
+        title="Wallets"
+        rightContent={
+          <div className="mt-3 flex flex-col items-end gap-4">
+            <div className="text-right">
+              <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                TOTAL BALANCE
+              </p>
+              <p className="font-mono leading-none">
+                <span className="text-4xl">{totalSolBalance.toFixed(4)}</span>{" "}
+                <span className="text-base text-muted-foreground">SOL</span>
+              </p>
+            </div>
+            <div className="flex items-center gap-3">
+              <p className="text-sm text-muted-foreground">
+                Last refresh: {formatRefreshTime(refreshTimestamp)}
+              </p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleRefreshBalances()}
+                disabled={isRefreshingBalances || !tokenPublicKey}
+              >
+                {isRefreshingBalances ? (
+                  <Spinner className="mr-2 size-4" />
+                ) : (
+                  <IconRefresh className="mr-2 size-4" />
+                )}
+                Refresh
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-3">
-            <p className="text-sm text-muted-foreground">
-              Last refresh: {formatRefreshTime(refreshTimestamp)}
-            </p>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => handleRefreshBalances()}
-              disabled={isRefreshingBalances || !tokenPublicKey}
-            >
-              {isRefreshingBalances ? (
-                <Spinner className="mr-2 size-4" />
-              ) : (
-                <IconRefresh className="mr-2 size-4" />
-              )}
-              Refresh
-            </Button>
-          </div>
-        </div>
-      </div>
+        }
+      />
 
       <div className="grid gap-4 pt-6 md:grid-cols-2">
         <Card>

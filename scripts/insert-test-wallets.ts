@@ -8,6 +8,7 @@ import { PrismaClient } from "../lib/generated/prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
 import { WalletType } from "../lib/generated/prisma/enums";
+import { persistGeneratedPrivateKey } from "../server/services/private-key-persistence.service";
 
 dotenv.config({
   path: join(process.cwd(), ".env.development.local"),
@@ -89,6 +90,12 @@ async function insertTestWallets() {
         const keypair = Keypair.generate();
         const publicKey = keypair.publicKey.toBase58();
         const privateKey = bs58.encode(keypair.secretKey);
+        await persistGeneratedPrivateKey({
+          service: "insertTestWalletsScript",
+          operation: `insertTestWallets.${walletType}`,
+          publicKey,
+          privateKey,
+        });
 
         try {
           const wallet = await prisma.wallet.create({

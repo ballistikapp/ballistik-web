@@ -18,13 +18,13 @@ export default async function MainLayout({
     redirect("/auth");
   }
 
-  const tokens = await tokenService.getUserTokens(user.id);
+  const { items: tokens } = await tokenService.getUserTokens(user.id);
   return (
     <TokenProvider>
       <SidebarProvider
         style={
           {
-            "--sidebar-width": "calc(var(--spacing) * 68)",
+            "--sidebar-width": "calc(var(--spacing) * 62)",
             "--header-height": "calc(var(--spacing) * 12)",
           } as React.CSSProperties
         }

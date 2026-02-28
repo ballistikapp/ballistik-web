@@ -391,6 +391,7 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
   HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
@@ -418,7 +419,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
+    modelProps: "testTable" | "user" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -937,6 +938,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.LaunchLogCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.LaunchLogCountAggregateOutputType> | number
+        }
+      }
+    }
+    LaunchRecoveryWallet: {
+      payload: Prisma.$LaunchRecoveryWalletPayload<ExtArgs>
+      fields: Prisma.LaunchRecoveryWalletFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LaunchRecoveryWalletFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LaunchRecoveryWalletFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        findFirst: {
+          args: Prisma.LaunchRecoveryWalletFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LaunchRecoveryWalletFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        findMany: {
+          args: Prisma.LaunchRecoveryWalletFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>[]
+        }
+        create: {
+          args: Prisma.LaunchRecoveryWalletCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        createMany: {
+          args: Prisma.LaunchRecoveryWalletCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LaunchRecoveryWalletCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>[]
+        }
+        delete: {
+          args: Prisma.LaunchRecoveryWalletDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        update: {
+          args: Prisma.LaunchRecoveryWalletUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        deleteMany: {
+          args: Prisma.LaunchRecoveryWalletDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LaunchRecoveryWalletUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LaunchRecoveryWalletUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>[]
+        }
+        upsert: {
+          args: Prisma.LaunchRecoveryWalletUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchRecoveryWalletPayload>
+        }
+        aggregate: {
+          args: Prisma.LaunchRecoveryWalletAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLaunchRecoveryWallet>
+        }
+        groupBy: {
+          args: Prisma.LaunchRecoveryWalletGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchRecoveryWalletGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LaunchRecoveryWalletCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchRecoveryWalletCountAggregateOutputType> | number
         }
       }
     }
@@ -1906,6 +1981,7 @@ export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof 
 export const TokenScalarFieldEnum = {
   publicKey: 'publicKey',
   privateKey: 'privateKey',
+  status: 'status',
   name: 'name',
   symbol: 'symbol',
   description: 'description',
@@ -1960,6 +2036,25 @@ export const LaunchLogScalarFieldEnum = {
 } as const
 
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
+
+
+export const LaunchRecoveryWalletScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  walletPublicKey: 'walletPublicKey',
+  walletType: 'walletType',
+  role: 'role',
+  isManaged: 'isManaged',
+  reclaimStatus: 'reclaimStatus',
+  reclaimTxSignature: 'reclaimTxSignature',
+  reclaimError: 'reclaimError',
+  lastAttemptAt: 'lastAttemptAt',
+  reclaimedAt: 'reclaimedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchRecoveryWalletScalarFieldEnum = (typeof LaunchRecoveryWalletScalarFieldEnum)[keyof typeof LaunchRecoveryWalletScalarFieldEnum]
 
 
 export const HoldingExitScalarFieldEnum = {
@@ -2289,6 +2384,20 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
+ * Reference to a field of type 'TokenStatus'
+ */
+export type EnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TokenStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'TokenStatus[]'
+ */
+export type ListEnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TokenStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'LaunchStatus'
  */
 export type EnumLaunchStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchStatus'>
@@ -2341,6 +2450,34 @@ export type EnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$P
  * Reference to a field of type 'LaunchLogLevel[]'
  */
 export type ListEnumLaunchLogLevelFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchLogLevel[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchRecoveryWalletRole'
+ */
+export type EnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchRecoveryWalletRole'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchRecoveryWalletRole[]'
+ */
+export type ListEnumLaunchRecoveryWalletRoleFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchRecoveryWalletRole[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchRecoveryWalletStatus'
+ */
+export type EnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchRecoveryWalletStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchRecoveryWalletStatus[]'
+ */
+export type ListEnumLaunchRecoveryWalletStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchRecoveryWalletStatus[]'>
     
 
 
@@ -2585,6 +2722,7 @@ export type GlobalOmitConfig = {
   tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
   launchLog?: Prisma.LaunchLogOmit
+  launchRecoveryWallet?: Prisma.LaunchRecoveryWalletOmit
   holdingExit?: Prisma.HoldingExitOmit
   holdingExitLog?: Prisma.HoldingExitLogOmit
   volumeBotSession?: Prisma.VolumeBotSessionOmit

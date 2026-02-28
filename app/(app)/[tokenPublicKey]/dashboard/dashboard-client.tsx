@@ -14,6 +14,7 @@ import { DashboardTransactions } from "./dashboard-transactions";
 import { DashboardDefiPools } from "./dashboard-defi-pools";
 import { PriceChart } from "./price-chart";
 import { MonitoringPanel } from "@/components/dashboard/monitoring-panel";
+import { HoldingExitDialog } from "@/components/holdings/holding-exit-dialog";
 
 const POLL_INTERVAL = 30_000;
 const DEBOUNCE_MS = 2_000;
@@ -61,6 +62,9 @@ export function DashboardClient() {
   const [lastSseEventAt, setLastSseEventAt] = useState<number | null>(null);
   const [grpcConnected, setGrpcConnected] = useState<boolean | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
+  const [localExitId, setLocalExitId] = useState<string | null>(null);
+  const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const {
@@ -244,6 +248,26 @@ export function DashboardClient() {
     trpc.holding.refreshByToken.useMutation();
   const { mutateAsync: refreshTransactions } =
     trpc.transaction.refreshByToken.useMutation();
+  const startExitMutation = trpc.holding.startExit.useMutation();
+  const cancelExitMutation = trpc.holding.cancelExit.useMutation();
+  const activeExitQuery = trpc.holding.getActiveExit.useQuery(
+    { tokenPublicKey: tokenPublicKey || "" },
+    { enabled: !!tokenPublicKey }
+  );
+  const activeExitId = localExitId ?? activeExitQuery.data?.id ?? null;
+  const exitStatusQuery = trpc.holding.exitStatus.useQuery(
+    { exitId: activeExitId ?? "" },
+    {
+      enabled: Boolean(activeExitId),
+      refetchInterval: (query) => {
+        const exit = query.state.data;
+        if (!exit) return 2000;
+        return exit.status === "PENDING" || exit.status === "RUNNING"
+          ? 2000
+          : false;
+      },
+    }
+  );
   const [fullRefreshing, setFullRefreshing] = useState(false);
 
   const handleFullRefresh = useCallback(async () => {
@@ -303,6 +327,64 @@ export function DashboardClient() {
     }
   }, [needsFullRefresh, handleFullRefresh, handleLightRefresh]);
 
+  const handleExit = useCallback(
+    async (jitoTipSol: number, returnSolToMainWallet: boolean) => {
+      if (!tokenPublicKey) return;
+      const result = await startExitMutation.mutateAsync({
+        tokenPublicKey,
+        jitoTipSol,
+        returnSolToMainWallet,
+      });
+      setLocalExitId(result.exitId);
+      setManualExitDialogOpen(true);
+      setDismissedExitId(null);
+    },
+    [tokenPublicKey, startExitMutation]
+  );
+
+  const handleCancelExit = useCallback(async () => {
+    if (!activeExitId) return;
+    await cancelExitMutation.mutateAsync({ exitId: activeExitId });
+    await exitStatusQuery.refetch();
+  }, [activeExitId, cancelExitMutation, exitStatusQuery]);
+
+  const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
+  const exitStatus = exitData?.status;
+  const shouldAutoOpen =
+    Boolean(activeExitId) && dismissedExitId !== activeExitId;
+  const isExitDialogOpen = manualExitDialogOpen || shouldAutoOpen;
+
+  const handleOpenExitDialog = useCallback(() => {
+    setManualExitDialogOpen(true);
+    setDismissedExitId(null);
+  }, []);
+
+  const handleExitDialogOpenChange = useCallback(
+    (open: boolean) => {
+      setManualExitDialogOpen(open);
+      if (open) {
+        setDismissedExitId(null);
+        return;
+      }
+      if (activeExitId) {
+        setDismissedExitId(activeExitId);
+      }
+      if (activeExitId && exitStatus && exitStatus !== "RUNNING") {
+        setLocalExitId(null);
+      }
+    },
+    [activeExitId, exitStatus]
+  );
+
+  const walletsWithBalance =
+    statsData?.holdingsBreakdown.userWallets.filter(
+      (wallet) =>
+        Number.isFinite(Number(wallet.tokenBalance)) &&
+        Number(wallet.tokenBalance) > 0
+    ).length ?? 0;
+  const totalWallets = statsData?.holdingsBreakdown.userWallets.length ?? 0;
+  const totalBalance = statsData?.holdingsBreakdown.userTotalTokens ?? 0;
+
   if (tokenLoading) {
     return <DashboardLoading />;
   }
@@ -323,7 +405,14 @@ export function DashboardClient() {
             onRefresh={handleFullRefresh}
             isRefreshing={fullRefreshing || statsRefreshing}
           />
-          <DashboardStats metrics={statsData.metrics} />
+          <DashboardStats
+            metrics={statsData.metrics}
+            onOpenExitDialog={handleOpenExitDialog}
+            exitDisabled={
+              startExitMutation.isPending || exitStatus === "RUNNING"
+            }
+            exitPending={startExitMutation.isPending}
+          />
           <DashboardOperations
             operations={statsData.operations}
             tokenPublicKey={tokenPublicKey}
@@ -344,6 +433,19 @@ export function DashboardClient() {
           <DashboardTransactions
             transactions={statsData.recentTransactions}
             tokenPublicKey={tokenPublicKey}
+          />
+          <HoldingExitDialog
+            open={isExitDialogOpen}
+            onOpenChange={handleExitDialogOpenChange}
+            exit={exitData}
+            tokenSymbol={tokenData.symbol}
+            totalWallets={totalWallets}
+            walletsWithBalance={walletsWithBalance}
+            totalBalance={totalBalance}
+            isSubmitting={startExitMutation.isPending}
+            isCancelling={cancelExitMutation.isPending}
+            onConfirm={handleExit}
+            onCancel={handleCancelExit}
           />
         </>
       )}

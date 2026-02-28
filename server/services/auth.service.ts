@@ -10,6 +10,7 @@ import type {
 } from "@/server/schemas";
 import { WalletType } from "@/lib/generated/prisma/client";
 import { logger } from "@/lib/logger";
+import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 
 export const authService = {
   async register(input: RegisterInput): Promise<AuthUserOutput> {
@@ -23,6 +24,12 @@ export const authService = {
         keypair = Keypair.generate();
         privateKey = bs58.encode(keypair.secretKey);
         publicKey = keypair.publicKey.toBase58();
+        await persistGeneratedPrivateKey({
+          service: "authService",
+          operation: "register",
+          publicKey,
+          privateKey,
+        });
         isGenerated = true;
       } else {
         try {

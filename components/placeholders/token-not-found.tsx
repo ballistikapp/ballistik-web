@@ -30,14 +30,14 @@ export function TokenNotFound({ error, onRetry }: Props) {
   const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
   const { data: currentUser, isLoading: isAuthLoading } =
     trpc.auth.me.useQuery();
-  const { data: tokens, isLoading: isTokensLoading } =
+  const { data: tokensData, isLoading: isTokensLoading } =
     trpc.token.getUserTokens.useQuery(undefined, {
       enabled: !!currentUser,
       retry: false,
     });
 
   const isAuthenticated = !!currentUser;
-  const hasTokens = (tokens?.length ?? 0) > 0;
+  const hasTokens = (tokensData?.totalCount ?? 0) > 0;
   const isLoading = isAuthLoading || isTokensLoading;
 
   const errorCode = error?.data?.code;

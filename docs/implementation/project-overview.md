@@ -26,6 +26,7 @@ sollabs-web is the modern successor to sollabv0. It reimplements core launch, wa
 - React Query for client data caching (5 min default staleTime)
 - Shyft gRPC manager for real-time on-chain streaming
 - Shyft REST/DeFi/Callback APIs for enriched data
+- Pinata-backed IPFS media storage for token images
 
 ## Directory Structure
 
@@ -71,8 +72,19 @@ server/
 - `SHYFT_API_KEY` — optional, enables Shyft REST APIs, callbacks, and DeFi APIs
 - `SHYFT_GRPC_TOKEN` — optional, x-token for gRPC streaming authentication (falls back to `SHYFT_API_KEY`)
 - `SHYFT_CALLBACK_SECRET` — optional, validates incoming Shyft webhook requests
+- `PINATA_JWT` — optional, enables Pinata uploads for persisted token media
+- `PINATA_GATEWAY_URL` — optional, custom Pinata gateway base URL (defaults to `https://gateway.pinata.cloud`)
 - `APP_URL` — optional, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
 - `NEXT_PUBLIC_*` as needed for client-only configuration
+
+## Deployment Environments
+
+- Hosting platform: Railway
+- Environments: `staging` and `production`
+- Branch mapping: `staging` branch -> Railway `staging`, `main` branch -> Railway `production`
+- Runtime deployment uses Railway GitHub repository integration for the Next.js app
+- Each environment has a separate PostgreSQL database and exposes its own `DATABASE_URL`
+- Local development currently points `DATABASE_URL` to the staging database
 
 ## Deployment and Build
 

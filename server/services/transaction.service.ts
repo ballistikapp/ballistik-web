@@ -1,8 +1,9 @@
 import { Prisma, prisma } from "@/lib/prisma";
+import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
-import { retryRpc } from "@/lib/utils/rpc-retry";
+import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import {
   LAMPORTS_PER_SOL,
@@ -64,6 +65,7 @@ type TokenTransactionListRow = {
 
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const PARSE_RETRY_DELAYS_MS = [200, 500];
+const TOKEN_TRANSACTION_UPDATE_BATCH_SIZE = 50;
 
 type TokenBalanceEntry = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
@@ -195,8 +197,9 @@ async function getAllowedWallets(
     ...operationalWallets,
   ];
 
-  const filteredWallets = walletPublicKeys?.length
-    ? allWallets.filter((wallet) => walletPublicKeys.includes(wallet.publicKey))
+  const walletSet = walletPublicKeys?.length ? new Set(walletPublicKeys) : null;
+  const filteredWallets = walletSet
+    ? allWallets.filter((wallet) => walletSet.has(wallet.publicKey))
     : allWallets;
 
   return { token, wallets: filteredWallets };
@@ -220,19 +223,32 @@ async function getTokenSourceSignatures(
 ) {
   const signatureLimit = 120;
   const knownStreakStop = 25;
+  const sourceConcurrency = 2;
+  const rpcTimeoutMs = 10_000;
   const mint = new PublicKey(tokenPublicKey);
   const { bondingCurve } = derivePumpAddresses(mint);
   const sources = [tokenPublicKey, bondingCurve.toBase58()];
   const orderedUnique: string[] = [];
   const seen = new Set<string>();
+  const sourceResults = await mapWithConcurrency(
+    sources,
+    sourceConcurrency,
+    async (source) => {
+      const response = await Promise.race([
+        retryRpc(() =>
+          connection.getSignaturesForAddress(new PublicKey(source), {
+            limit: signatureLimit,
+          })
+        ),
+        new Promise<null>((resolve) => {
+          setTimeout(() => resolve(null), rpcTimeoutMs);
+        }),
+      ]);
+      return { signatures: response?.map((info) => info.signature) ?? [] };
+    }
+  );
 
-  for (const source of sources) {
-    const infos = await retryRpc(() =>
-      connection.getSignaturesForAddress(new PublicKey(source), {
-        limit: signatureLimit,
-      })
-    );
-    const signatures = infos.map((info) => info.signature);
+  for (const { signatures } of sourceResults) {
 
     let knownStreak = 0;
     for (const signature of signatures) {
@@ -356,83 +372,124 @@ export const transactionService = {
       ? Prisma.sql`AND tt."walletPublicKey" = ${input.walletPublicKey}`
       : Prisma.empty;
     const groupBySignature = input.groupBySignature ?? true;
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const skip = (page - 1) * pageSize;
+    const take = pageSize;
+    const { rows, totalCount } = groupBySignature
+      ? await (async () => {
+          const [groupedRows, groupedCountRows] = await Promise.all([
+            prisma.$queryRaw<TokenTransactionListRow[]>(
+              Prisma.sql`
+                SELECT *
+                FROM (
+                  SELECT DISTINCT ON (tt."transactionSignature")
+                    tt."id",
+                    tt."walletPublicKey",
+                    tt."walletType",
+                    tt."isOwned",
+                    tt."transactionType",
+                    tt."status",
+                    tt."transactionSignature",
+                    tt."solAmount"::double precision AS "solAmount",
+                    tt."tokenAmount"::double precision AS "tokenAmount",
+                    tt."pricePerToken"::double precision AS "pricePerToken",
+                    tt."slippageBps",
+                    tt."feeAmount"::double precision AS "feeAmount",
+                    tt."blockTime",
+                    tt."createdAt",
+                    tt."updatedAt"
+                  FROM "TokenTransaction" tt
+                  WHERE tt."tokenPublicKey" = ${token.publicKey}
+                    ${walletFilter}
+                  ORDER BY
+                    tt."transactionSignature",
+                    CASE WHEN tt."walletPublicKey" = ${bondingCurvePublicKey} THEN 1 ELSE 0 END ASC,
+                    CASE WHEN tt."walletType" IS NULL THEN 1 ELSE 0 END ASC,
+                    COALESCE(tt."blockTime", tt."createdAt") DESC,
+                    tt."createdAt" DESC
+                ) grouped
+                ORDER BY COALESCE(grouped."blockTime", grouped."createdAt") DESC
+                LIMIT ${take}
+                OFFSET ${skip}
+              `
+            ),
+            prisma.$queryRaw<Array<{ count: bigint | number }>>(
+              Prisma.sql`
+                SELECT COUNT(DISTINCT tt."transactionSignature") AS "count"
+                FROM "TokenTransaction" tt
+                WHERE tt."tokenPublicKey" = ${token.publicKey}
+                  ${walletFilter}
+              `
+            ),
+          ]);
 
-    const rows = groupBySignature
-      ? await prisma.$queryRaw<TokenTransactionListRow[]>(
-          Prisma.sql`
-            SELECT *
-            FROM (
-              SELECT DISTINCT ON (tt."transactionSignature")
-                tt."id",
-                tt."walletPublicKey",
-                tt."walletType",
-                tt."isOwned",
-                tt."transactionType",
-                tt."status",
-                tt."transactionSignature",
-                tt."solAmount"::double precision AS "solAmount",
-                tt."tokenAmount"::double precision AS "tokenAmount",
-                tt."pricePerToken"::double precision AS "pricePerToken",
-                tt."slippageBps",
-                tt."feeAmount"::double precision AS "feeAmount",
-                tt."blockTime",
-                tt."createdAt",
-                tt."updatedAt"
-              FROM "TokenTransaction" tt
-              WHERE tt."tokenPublicKey" = ${token.publicKey}
-                ${walletFilter}
-              ORDER BY
-                tt."transactionSignature",
-                CASE WHEN tt."walletPublicKey" = ${bondingCurvePublicKey} THEN 1 ELSE 0 END ASC,
-                CASE WHEN tt."walletType" IS NULL THEN 1 ELSE 0 END ASC,
-                COALESCE(tt."blockTime", tt."createdAt") DESC,
-                tt."createdAt" DESC
-            ) grouped
-            ORDER BY COALESCE(grouped."blockTime", grouped."createdAt") DESC
-          `
-        )
-      : (
-          await prisma.tokenTransaction.findMany({
-            where: {
-              tokenPublicKey: token.publicKey,
-              ...(input.walletPublicKey
-                ? { walletPublicKey: input.walletPublicKey }
-                : {}),
-            },
-            select: {
-              id: true,
-              walletPublicKey: true,
-              walletType: true,
-              isOwned: true,
-              transactionType: true,
-              status: true,
-              transactionSignature: true,
-              solAmount: true,
-              tokenAmount: true,
-              pricePerToken: true,
-              slippageBps: true,
-              feeAmount: true,
-              blockTime: true,
-              createdAt: true,
-              updatedAt: true,
-            },
-            orderBy: [{ blockTime: "desc" }, { createdAt: "desc" }],
-          })
-        ).map((row) => ({
-          ...row,
-          solAmount: Number(row.solAmount),
-          tokenAmount: Number(row.tokenAmount),
-          pricePerToken: Number(row.pricePerToken),
-          feeAmount: Number(row.feeAmount),
-        }));
+          return {
+            rows: groupedRows,
+            totalCount: Number(groupedCountRows[0]?.count ?? 0),
+          };
+        })()
+      : await (async () => {
+          const [flatRows, count] = await Promise.all([
+            prisma.tokenTransaction.findMany({
+              where: {
+                tokenPublicKey: token.publicKey,
+                ...(input.walletPublicKey
+                  ? { walletPublicKey: input.walletPublicKey }
+                  : {}),
+              },
+              select: {
+                id: true,
+                walletPublicKey: true,
+                walletType: true,
+                isOwned: true,
+                transactionType: true,
+                status: true,
+                transactionSignature: true,
+                solAmount: true,
+                tokenAmount: true,
+                pricePerToken: true,
+                slippageBps: true,
+                feeAmount: true,
+                blockTime: true,
+                createdAt: true,
+                updatedAt: true,
+              },
+              orderBy: [{ blockTime: "desc" }, { createdAt: "desc" }],
+              skip,
+              take,
+            }),
+            prisma.tokenTransaction.count({
+              where: {
+                tokenPublicKey: token.publicKey,
+                ...(input.walletPublicKey
+                  ? { walletPublicKey: input.walletPublicKey }
+                  : {}),
+              },
+            }),
+          ]);
 
-    return rows.map((row) => ({
+          return {
+            rows: flatRows.map((row) => ({
+              ...row,
+              solAmount: Number(row.solAmount),
+              tokenAmount: Number(row.tokenAmount),
+              pricePerToken: Number(row.pricePerToken),
+              feeAmount: Number(row.feeAmount),
+            })),
+            totalCount: count,
+          };
+        })();
+
+    const items = rows.map((row) => ({
       ...row,
       wallet: {
         publicKey: row.walletPublicKey,
         type: row.walletType,
       },
     }));
+
+    return { items, totalCount };
   },
 
   async ingestTokenSignatures(input: {
@@ -476,9 +533,13 @@ export const transactionService = {
       }
 
       const batchResults = await mapWithConcurrency(batches, 3, async (batch) => {
-        return connection.getParsedTransactions(batch, {
-          maxSupportedTransactionVersion: 0,
-        });
+        return retryRpcWithTimeout(
+          () =>
+            connection.getParsedTransactions(batch, {
+              maxSupportedTransactionVersion: 0,
+            }),
+          rpcConfig.tuning.parseTimeoutMs
+        );
       });
 
       batches.forEach((batch, batchIndex) => {
@@ -644,14 +705,21 @@ export const transactionService = {
     }
 
     if (updates.length > 0) {
-      await prisma.$transaction(
-        updates.map((update) =>
-          prisma.tokenTransaction.update({
-            where: { id: update.id },
-            data: update.data,
-          })
-        )
-      );
+      for (
+        let i = 0;
+        i < updates.length;
+        i += TOKEN_TRANSACTION_UPDATE_BATCH_SIZE
+      ) {
+        const chunk = updates.slice(i, i + TOKEN_TRANSACTION_UPDATE_BATCH_SIZE);
+        await prisma.$transaction(
+          chunk.map((update) =>
+            prisma.tokenTransaction.update({
+              where: { id: update.id },
+              data: update.data,
+            })
+          )
+        );
+      }
     }
 
     await refreshCacheService.touch({
@@ -704,9 +772,11 @@ export const transactionService = {
       connection,
       knownSignatures
     );
+    const signatureSet = new Set(signatures);
     staleRows.forEach((row) => {
-      if (!signatures.includes(row.transactionSignature)) {
+      if (!signatureSet.has(row.transactionSignature)) {
         signatures.push(row.transactionSignature);
+        signatureSet.add(row.transactionSignature);
       }
     });
 
@@ -721,4 +791,4 @@ export const transactionService = {
 
 export type TransactionItem = Awaited<
   ReturnType<typeof transactionService.listByToken>
->[number];
+>["items"][number];

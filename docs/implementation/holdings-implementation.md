@@ -40,9 +40,13 @@ The `refreshByToken` service is optimized for speed:
 2. Client sends `holding.sellByToken` with token public key, wallet public keys, sell percentage, and optional toggles (`closeAta`, `returnSolToMainWallet`).
 3. Service fetches on-chain token balances, computes sell amounts, and submits RPC sell transactions per wallet.
 4. Sell transactions can use the main wallet as fee payer when available.
-5. If close ATA is enabled, the service closes empty associated token accounts after selling.
-6. If return SOL is enabled, the service transfers spendable SOL from processed wallets to the main wallet.
-7. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
+5. Sell submissions are concurrency-limited via `rpcConfig.tuning.sellConcurrency` (default 5) instead of unbounded fan-out.
+6. Sell RPC calls now use `retryRpcWithTimeout`:
+   - `getLatestBlockhash` uses `rpcConfig.tuning.rpcTimeoutMs` (30s default)
+   - `sendAndConfirmTransaction` uses `rpcConfig.tuning.confirmTimeoutMs` (120s default)
+7. If close ATA is enabled, the service closes empty associated token accounts after selling.
+8. If return SOL is enabled, the service transfers spendable SOL from processed wallets to the main wallet.
+9. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
 
 ## UI Behavior
 
@@ -52,6 +56,7 @@ The `refreshByToken` service is optimized for speed:
 - Metrics cards are shown under the header and summarize currently loaded holdings rows.
 - Holding percentage uses `tokenBalance / totalMintSupply * 100`.
 - Mint supply is fetched by `holding.listByToken` from RPC (`getTokenSupply`) and returned with the list payload.
+- Mint supply lookups use a short-lived in-memory cache (10s TTL, capped map size) to reduce repeated RPC calls across paginated requests.
 - If supply is temporarily unavailable, the table shows `--` instead of `0.0000%`.
 - Zero-balance rows appear when the wallet has an open ATA for the token.
 - Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells).

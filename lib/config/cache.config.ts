@@ -1,8 +1,8 @@
 export const cacheConfig = {
   staleMs: {
-    transactions: 30_000,
-    holdings: 30_000,
-    wallets: 60_000,
+    transactions: 300_000,
+    holdings: 300_000,
+    wallets: 300_000,
   },
   cooldownMs: {
     walletBalances: 5_000,

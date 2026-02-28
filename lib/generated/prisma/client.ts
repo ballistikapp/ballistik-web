@@ -75,6 +75,11 @@ export type Launch = Prisma.LaunchModel
  */
 export type LaunchLog = Prisma.LaunchLogModel
 /**
+ * Model LaunchRecoveryWallet
+ * 
+ */
+export type LaunchRecoveryWallet = Prisma.LaunchRecoveryWalletModel
+/**
  * Model HoldingExit
  * 
  */

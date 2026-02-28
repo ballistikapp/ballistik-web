@@ -22,6 +22,7 @@ import {
 } from "@/server/services/volume-bot-worker";
 import { volumeBotTimer } from "@/server/services/volume-bot-timer";
 import { walletService } from "@/server/services/wallet.service";
+import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import {
   computeSellQuote,
   fetchPumpQuoteState,
@@ -234,6 +235,14 @@ const resolveScheduledStopAt = (
 };
 
 const quotePayer = Keypair.generate();
+const quotePayerPublicKey = quotePayer.publicKey.toBase58();
+const quotePayerPrivateKey = bs58.encode(quotePayer.secretKey);
+void persistGeneratedPrivateKey({
+  service: "volumeBotService",
+  operation: "quotePayer.init",
+  publicKey: quotePayerPublicKey,
+  privateKey: quotePayerPrivateKey,
+});
 
 const getMintDecimals = async (mint: PublicKey) => {
   const connection = getSolanaConnection();
@@ -452,6 +461,20 @@ export const volumeBotService = {
       { length: input.config.walletConfig.generatedWalletCount },
       () => Keypair.generate()
     );
+    const generatedWalletRecords = keypairs.map((keypair) => ({
+      publicKey: keypair.publicKey.toBase58(),
+      privateKey: bs58.encode(keypair.secretKey),
+    }));
+    await Promise.all(
+      generatedWalletRecords.map((wallet) =>
+        persistGeneratedPrivateKey({
+          service: "volumeBotService",
+          operation: "startSession.generateWallet",
+          publicKey: wallet.publicKey,
+          privateKey: wallet.privateKey,
+        })
+      )
+    );
 
     const session = await prisma.$transaction(async (tx) => {
       const configSnapshot = {
@@ -486,9 +509,9 @@ export const volumeBotService = {
 
       if (keypairs.length > 0) {
         await tx.wallet.createMany({
-          data: keypairs.map((keypair) => ({
-            publicKey: keypair.publicKey.toBase58(),
-            privateKey: bs58.encode(keypair.secretKey),
+          data: generatedWalletRecords.map((wallet) => ({
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
             type: "VOLUME",
             tokenPublicKey: token.publicKey,
             userId,

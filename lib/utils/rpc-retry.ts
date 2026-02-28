@@ -34,3 +34,23 @@ export async function retryRpc<T>(fn: () => Promise<T>): Promise<T> {
     }
   }
 }
+
+export async function retryRpcWithTimeout<T>(
+  fn: () => Promise<T>,
+  timeoutMs = 30_000
+): Promise<T> {
+  return retryRpc(() =>
+    new Promise<T>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        reject(new Error("RPC timeout"));
+      }, timeoutMs);
+
+      fn()
+        .then(resolve)
+        .catch(reject)
+        .finally(() => {
+          clearTimeout(timeout);
+        });
+    })
+  );
+}

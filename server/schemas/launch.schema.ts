@@ -31,7 +31,7 @@ export const launchTokenSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0, "Bundler buy amount must be 0 or more"),
+    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -51,12 +51,27 @@ export const launchRecoverySchema = z.object({
   launchId: z.string().min(1),
 });
 
+export const launchRecoveryByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1),
+});
+
 export const launchRecoverSolSchema = z.object({
   launchId: z.string().min(1),
+  walletPublicKeys: z.array(z.string().min(1)).min(1).optional(),
+});
+
+export const launchRecoverSolByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1),
   walletPublicKeys: z.array(z.string().min(1)).min(1).optional(),
 });
 
 export type LaunchTokenInput = z.infer<typeof launchTokenSchema>;
 export type LaunchStatusInput = z.infer<typeof launchStatusSchema>;
 export type LaunchRecoveryInput = z.infer<typeof launchRecoverySchema>;
+export type LaunchRecoveryByTokenInput = z.infer<
+  typeof launchRecoveryByTokenSchema
+>;
 export type LaunchRecoverSolInput = z.infer<typeof launchRecoverSolSchema>;
+export type LaunchRecoverSolByTokenInput = z.infer<
+  typeof launchRecoverSolByTokenSchema
+>;

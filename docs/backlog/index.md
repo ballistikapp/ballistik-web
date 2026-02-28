@@ -6,8 +6,6 @@
 
 ## Deployment
 
-- Set up S3 bucket in Railway for image storage
-
 ## Launch
 
 - Implement two-step launch flow: Create token first, then launch separately

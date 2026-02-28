@@ -44,5 +44,12 @@ export default function TokenLayout({
     return <TokenNotFound error={error} onRetry={() => refetch()} />;
   }
 
+  const tokenStatus = (
+    tokenData as { status?: "PENDING" | "ACTIVE" | "FAILED" }
+  ).status;
+  if (tokenStatus === "PENDING" || tokenStatus === "FAILED") {
+    redirect("/launch");
+  }
+
   return <>{children}</>;
 }

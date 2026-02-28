@@ -26,3 +26,7 @@
 ## Backlog
 
 - `backlog/index.md` — consolidated list of simple tasks and implementation items
+
+## Deployment
+
+- `deployment/railway.md` — Railway environments, branch mapping, and database setup

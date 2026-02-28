@@ -58,6 +58,7 @@ export const ModelName = {
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
   LaunchLog: 'LaunchLog',
+  LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
   HoldingExitLog: 'HoldingExitLog',
   VolumeBotSession: 'VolumeBotSession',
@@ -127,6 +128,7 @@ export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof 
 export const TokenScalarFieldEnum = {
   publicKey: 'publicKey',
   privateKey: 'privateKey',
+  status: 'status',
   name: 'name',
   symbol: 'symbol',
   description: 'description',
@@ -181,6 +183,25 @@ export const LaunchLogScalarFieldEnum = {
 } as const
 
 export type LaunchLogScalarFieldEnum = (typeof LaunchLogScalarFieldEnum)[keyof typeof LaunchLogScalarFieldEnum]
+
+
+export const LaunchRecoveryWalletScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  walletPublicKey: 'walletPublicKey',
+  walletType: 'walletType',
+  role: 'role',
+  isManaged: 'isManaged',
+  reclaimStatus: 'reclaimStatus',
+  reclaimTxSignature: 'reclaimTxSignature',
+  reclaimError: 'reclaimError',
+  lastAttemptAt: 'lastAttemptAt',
+  reclaimedAt: 'reclaimedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchRecoveryWalletScalarFieldEnum = (typeof LaunchRecoveryWalletScalarFieldEnum)[keyof typeof LaunchRecoveryWalletScalarFieldEnum]
 
 
 export const HoldingExitScalarFieldEnum = {

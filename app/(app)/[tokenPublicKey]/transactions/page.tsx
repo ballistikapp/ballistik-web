@@ -1,8 +1,9 @@
 "use client";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
+import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
@@ -14,6 +15,7 @@ import {
   DataTableSearch,
   DataTableViewOptions,
 } from "@/components/data-table";
+import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { getColumns } from "./columns";
@@ -36,6 +38,10 @@ function formatSplit(owned: string, external: string) {
 export default function TransactionsPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const utils = trpc.useUtils();
+  const [pagination, setPagination] = useState<PaginationState>({
+    pageIndex: 0,
+    pageSize: 25,
+  });
 
   const {
     data: tokenData,
@@ -47,10 +53,21 @@ export default function TransactionsPage() {
     { enabled: !!tokenPublicKey }
   );
 
-  const { data: transactionsData, isLoading: transactionsLoading } =
+  const {
+    data: transactionsData,
+    isLoading: transactionsLoading,
+    isFetching: transactionsFetching,
+  } =
     trpc.transaction.listByToken.useQuery(
-      { tokenPublicKey: tokenPublicKey || "" },
-      { enabled: !!tokenPublicKey && !!tokenData }
+      {
+        tokenPublicKey: tokenPublicKey || "",
+        page: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+      },
+      {
+        enabled: !!tokenPublicKey && !!tokenData,
+        placeholderData: (previousData) => previousData,
+      }
     );
 
   const {
@@ -76,7 +93,9 @@ export default function TransactionsPage() {
     });
   }, [tokenData, tokenPublicKey]);
 
-  const transactions = transactionsData ?? [];
+  const transactions = transactionsData?.items ?? [];
+  const totalCount = transactionsData?.totalCount ?? 0;
+  const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const metrics = useMemo(() => {
@@ -172,7 +191,7 @@ export default function TransactionsPage() {
       : null;
     try {
       await refreshTransactions({ tokenPublicKey });
-      void utils.transaction.listByToken.invalidate({ tokenPublicKey });
+      void utils.transaction.listByToken.invalidate();
       await refetchRefreshCache();
       if (toastId) {
         toast.success("Transactions refreshed", { id: toastId, icon: null });
@@ -217,11 +236,9 @@ export default function TransactionsPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <div className="-m-6 px-6 py-10 border-b">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h1 className="text-4xl">Transactions</h1>
-          </div>
+      <PageHeader
+        title="Transactions"
+        rightContent={
           <div className="flex flex-col items-end gap-1">
             <Button
               variant="outline"
@@ -240,8 +257,8 @@ export default function TransactionsPage() {
               Last refresh: {formatRefreshTime(refreshTimestamp)}
             </p>
           </div>
-        </div>
-      </div>
+        }
+      />
 
       <div />
 
@@ -264,6 +281,11 @@ export default function TransactionsPage() {
         columns={columns}
         data={transactions}
         isLoading={transactionsLoading}
+        isRefreshing={transactionsFetching}
+        manualPagination
+        pageCount={pageCount}
+        rowCount={totalCount}
+        onPaginationStateChange={setPagination}
         initialColumnVisibility={{ status: false }}
         enableUrlState
         urlStatePrefix="transactions"

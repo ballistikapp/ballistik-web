@@ -108,7 +108,11 @@ export function AuthButton() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="default" className="h-11 gap-3 px-3">
+        <Button
+          variant="ghost"
+          size="default"
+          className="h-12 gap-3 px-3 rounded-xl hover:bg-muted/10"
+        >
           <span className="flex size-8 items-center justify-center rounded-full bg-muted">
             <IconWallet className="size-4" />
           </span>
@@ -120,7 +124,7 @@ export function AuthButton() {
               {mainWalletBalanceSol.toFixed(4)} SOL
             </span>
           </span>
-          <IconDotsVertical className="size-4 text-muted-foreground" />
+          <IconDotsVertical className="size-4 ml-4 text-muted-foreground" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56">

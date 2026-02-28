@@ -2,10 +2,8 @@
 
 import * as React from "react";
 import Link from "next/link";
-import { toast } from "sonner";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
-import { trpc } from "@/lib/trpc/client";
 import { copyToClipboard } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -23,8 +21,6 @@ import { Spinner } from "@/components/ui/spinner";
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type LaunchStatusOutput = RouterOutputs["launch"]["status"];
 type LaunchActiveOutput = RouterOutputs["launch"]["getActive"];
-type LaunchRecoveryWallet =
-  RouterOutputs["launch"]["recoveryWallets"]["wallets"][number];
 
 const statusVariantMap: Record<
   string,
@@ -60,7 +56,6 @@ export function LaunchProgressDialog({
   onCancel,
   onClose,
 }: LaunchProgressDialogProps) {
-  const utils = trpc.useUtils();
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
   const canCancel = status === "PENDING" || status === "RUNNING";
@@ -70,94 +65,7 @@ export function LaunchProgressDialog({
   const tokenPublicKey = launch?.tokenPublicKey ?? "";
   const hasTokenPublicKey = Boolean(tokenPublicKey);
   const hasTokenLink = status === "SUCCEEDED" && hasTokenPublicKey;
-  const recoveryEnabled =
-    Boolean(launch?.id) && (status === "FAILED" || status === "CANCELED");
-  const recoveryQuery = trpc.launch.recoveryWallets.useQuery(
-    { launchId: launch?.id ?? "" },
-    { enabled: recoveryEnabled }
-  );
-  const recoverMutation = trpc.launch.recoverSol.useMutation();
-  const refreshWalletBalancesMutation = trpc.wallet.refreshBalances.useMutation();
-  const refreshMainWalletMutation = trpc.wallet.refreshMainBalance.useMutation();
-
-  const recoveryWallets: LaunchRecoveryWallet[] =
-    recoveryQuery.data?.wallets ?? [];
-  const hasRecoverableBalance = recoveryWallets.some(
-    (wallet) => Number(wallet.balanceSol ?? 0) > 0
-  );
-
-  const formatSol = (value: number | string | null | undefined) => {
-    const numeric = Number(value ?? 0);
-    if (!Number.isFinite(numeric)) {
-      return "0.0000";
-    }
-    return numeric.toFixed(4);
-  };
-
-  const handleRecover = async () => {
-    if (!launch?.id) return;
-    const toastId = toast.loading("Returning SOL...", {
-      icon: <Spinner className="size-4" />,
-    });
-    try {
-      const result = await recoverMutation.mutateAsync({ launchId: launch.id });
-      const returnedWalletPublicKeys = result.results
-        .filter((item) => item.status === "returned")
-        .map((item) => item.publicKey);
-      const refreshWalletPublicKeys = Array.from(
-        new Set([result.mainWalletPublicKey, ...returnedWalletPublicKeys])
-      );
-      if (tokenPublicKey) {
-        await refreshWalletBalancesMutation.mutateAsync({
-          tokenPublicKey,
-          walletPublicKeys: refreshWalletPublicKeys,
-          force: true,
-        });
-      } else {
-        await refreshMainWalletMutation.mutateAsync({});
-      }
-      await Promise.all([
-        utils.wallet.getMain.invalidate(),
-        tokenPublicKey
-          ? utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey })
-          : Promise.resolve(),
-        tokenPublicKey
-          ? utils.wallet.getDevByToken.invalidate({ tokenPublicKey })
-          : Promise.resolve(),
-      ]);
-      const returnedCount = result.results.filter(
-        (item) => item.status === "returned"
-      ).length;
-      const failedCount = result.results.filter(
-        (item) => item.status === "failed"
-      ).length;
-      if (returnedCount === 0 && failedCount === 0) {
-        toast.message("No SOL available to return", {
-          id: toastId,
-          icon: null,
-        });
-      } else if (failedCount > 0) {
-        toast.error("Some returns failed", {
-          id: toastId,
-          description: `${returnedCount} succeeded, ${failedCount} failed.`,
-          icon: null,
-        });
-      } else {
-        toast.success("SOL returned to main wallet", {
-          id: toastId,
-          description: `${returnedCount} wallet${
-            returnedCount === 1 ? "" : "s"
-          }`,
-          icon: null,
-        });
-      }
-      await recoveryQuery.refetch();
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Recovery failed";
-      toast.error(message, { id: toastId, icon: null });
-    }
-  };
+  const failedTokensHref = "/tokens";
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -244,89 +152,16 @@ export function LaunchProgressDialog({
               )}
             </div>
           </div>
-          {recoveryEnabled && (
+          {status === "FAILED" && (
             <div className="space-y-2">
-              <div className="text-sm font-medium">Recovery</div>
-              <div className="rounded-md border p-3 space-y-3">
-                {recoveryQuery.isLoading ? (
-                  <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Spinner className="size-4" />
-                    Loading recovery wallets...
-                  </div>
-                ) : recoveryQuery.error ? (
-                  <div className="text-sm text-muted-foreground">
-                    Recovery data is unavailable.
-                  </div>
-                ) : (
-                  <>
-                    <div className="text-xs text-muted-foreground break-all">
-                      Returning funds to{" "}
-                      {recoveryQuery.data?.mainWalletPublicKey}
-                    </div>
-                    {recoveryQuery.data?.source === "fallback" && (
-                      <div className="text-xs text-muted-foreground">
-                        Showing unassigned wallets because launch recovery data
-                        was not saved.
-                      </div>
-                    )}
-                    {recoveryQuery.data?.excludedDevWalletPublicKey && (
-                      <div className="text-xs text-muted-foreground break-all">
-                        Imported dev wallet not included:{" "}
-                        {recoveryQuery.data.excludedDevWalletPublicKey}
-                      </div>
-                    )}
-                    {recoveryWallets.length ? (
-                      <div className="space-y-2">
-                        {recoveryWallets.map((wallet) => (
-                          <div
-                            key={wallet.publicKey}
-                            className="flex flex-wrap items-center justify-between gap-2 text-sm"
-                          >
-                            <div className="flex items-center gap-2 min-w-0">
-                              <Badge variant="secondary">{wallet.type}</Badge>
-                              <span className="font-mono text-xs break-all">
-                                {wallet.publicKey}
-                              </span>
-                            </div>
-                            <span className="text-xs text-muted-foreground">
-                              {formatSol(wallet.balanceSol)} SOL
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-sm text-muted-foreground">
-                        No recovery wallets available.
-                      </div>
-                    )}
-                    <div className="flex flex-wrap justify-end gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => recoveryQuery.refetch()}
-                        disabled={recoveryQuery.isFetching}
-                      >
-                        {recoveryQuery.isFetching && (
-                          <Spinner className="mr-2 size-4" />
-                        )}
-                        Refresh
-                      </Button>
-                      <Button
-                        size="sm"
-                        onClick={handleRecover}
-                        disabled={
-                          recoverMutation.isPending ||
-                          recoveryWallets.length === 0 ||
-                          !hasRecoverableBalance
-                        }
-                      >
-                        {recoverMutation.isPending
-                          ? "Returning..."
-                          : "Return SOL"}
-                      </Button>
-                    </div>
-                  </>
-                )}
+              <div className="text-sm font-medium">Launch Failed</div>
+              <div className="rounded-md border p-3 flex flex-wrap items-center justify-between gap-3">
+                <div className="text-sm text-muted-foreground">
+                  Manage reclaim from the Manage Tokens page.
+                </div>
+                <Button asChild size="sm" variant="outline">
+                  <Link href={failedTokensHref}>Go to Manage Tokens</Link>
+                </Button>
               </div>
             </div>
           )}

@@ -1,6 +1,9 @@
 import { router, protectedProcedure } from "../trpc";
 import { tokenService } from "@/server/services/token.service";
-import { createTokenSchema } from "@/server/schemas/token.schema";
+import {
+  createTokenSchema,
+  tokenListPaginationSchema,
+} from "@/server/schemas/token.schema";
 import { z } from "zod";
 
 export const tokenRouter = router({
@@ -20,7 +23,14 @@ export const tokenRouter = router({
         ctx.user.id
       );
     }),
-  getUserTokens: protectedProcedure.query(async ({ ctx }) => {
-    return await tokenService.getUserTokens(ctx.user.id);
-  }),
+  getUserTokens: protectedProcedure
+    .input(tokenListPaginationSchema.optional())
+    .query(async ({ ctx, input }) => {
+      return await tokenService.getUserTokens(ctx.user.id, input);
+    }),
+  getAllUserTokens: protectedProcedure
+    .input(tokenListPaginationSchema.optional())
+    .query(async ({ ctx, input }) => {
+      return await tokenService.getAllUserTokens(ctx.user.id, input);
+    }),
 });
