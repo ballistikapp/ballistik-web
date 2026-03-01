@@ -563,19 +563,36 @@ async function isCancelRequested(launchId: string) {
   return Boolean(launch?.cancelRequestedAt);
 }
 
-async function reserveVanityMint(userId: string) {
-  for (let attempt = 0; attempt < 3; attempt += 1) {
+const VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS = 3;
+
+async function reserveVanityMint(userId: string, excludedIds: string[] = []) {
+  const where: Prisma.VanityMintWhereInput = {
+    reservedAt: null,
+    usedAt: null,
+    tokenPublicKey: null,
+    ...(excludedIds.length > 0 ? { id: { notIn: excludedIds } } : {}),
+  };
+
+  for (
+    let attempt = 0;
+    attempt < VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS;
+    attempt += 1
+  ) {
+    const availableCount = await prisma.vanityMint.count({ where });
+    if (availableCount === 0) {
+      return null;
+    }
+
+    const randomOffset = Math.floor(Math.random() * availableCount);
     const candidate = await prisma.vanityMint.findFirst({
-      where: {
-        reservedAt: null,
-        usedAt: null,
-        tokenPublicKey: null,
-      },
+      where,
+      orderBy: { id: "asc" },
+      skip: randomOffset,
       select: { id: true, publicKey: true, privateKey: true },
     });
 
     if (!candidate) {
-      return null;
+      continue;
     }
 
     const lock = await prisma.vanityMint.updateMany({
@@ -725,6 +742,20 @@ async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
 
 function keypairFromPrivateKey(privateKey: string) {
   return Keypair.fromSecretKey(bs58.decode(privateKey));
+}
+
+async function mintAccountExistsOnChain(mint: PublicKey) {
+  try {
+    const connection = getSolanaConnection();
+    const accountInfo = await connection.getAccountInfo(mint, "confirmed");
+    return Boolean(accountInfo);
+  } catch (error) {
+    logger.warn("Vanity mint precheck failed", {
+      mint: mint.toBase58(),
+      message: getErrorMessage(error),
+    });
+    return false;
+  }
 }
 
 function requiredBuyLamports(
@@ -1076,31 +1107,94 @@ async function reserveMintIfRequested(
       publicKey: mintPublicKey,
       privateKey: mintPrivateKey,
     });
-    return { mintKeypair, consumedVanityId: null };
+    return { mintKeypair, reservedVanityId: null };
   }
-  const reserved = await reserveVanityMint(userId);
-  if (!reserved) {
-    throw new AppError(
-      "Vanity mint requested but no vanity mints available. Please add more vanity mints to the pool.",
-      400
-    );
+
+  const attemptedVanityIds: string[] = [];
+  for (
+    let attempt = 1;
+    attempt <= VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS;
+    attempt += 1
+  ) {
+    const reserved = await reserveVanityMint(userId, attemptedVanityIds);
+    if (!reserved) {
+      break;
+    }
+    attemptedVanityIds.push(reserved.id);
+
+    let mintKeypair: Keypair;
+    try {
+      mintKeypair = keypairFromPrivateKey(reserved.privateKey);
+    } catch {
+      await releaseReservedVanityMint(reserved.id);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Skipping vanity mint with invalid private key",
+        "mint",
+        {
+          vanityMintId: reserved.id,
+          publicKey: reserved.publicKey,
+          attempt,
+          maxAttempts: VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS,
+        }
+      );
+      continue;
+    }
+
+    const mintPublicKey = mintKeypair.publicKey.toBase58();
+    if (mintPublicKey !== reserved.publicKey) {
+      await releaseReservedVanityMint(reserved.id);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Skipping vanity mint with mismatched public key",
+        "mint",
+        {
+          vanityMintId: reserved.id,
+          expectedPublicKey: reserved.publicKey,
+          derivedPublicKey: mintPublicKey,
+          attempt,
+          maxAttempts: VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS,
+        }
+      );
+      continue;
+    }
+
+    const existsOnChain = await mintAccountExistsOnChain(mintKeypair.publicKey);
+    if (existsOnChain) {
+      await releaseReservedVanityMint(reserved.id);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Skipping vanity mint already present on-chain",
+        "mint",
+        {
+          vanityMintId: reserved.id,
+          publicKey: reserved.publicKey,
+          attempt,
+          maxAttempts: VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS,
+        }
+      );
+      continue;
+    }
+
+    await appendLog(launchId, "INFO", "Using vanity mint", "mint", {
+      vanityMintId: reserved.id,
+      publicKey: reserved.publicKey,
+      attempt,
+      maxAttempts: VANITY_MINT_ASSIGNMENT_MAX_ATTEMPTS,
+    });
+    return {
+      mintKeypair,
+      reservedVanityId: reserved.id,
+    };
   }
-  let mintKeypair: Keypair;
-  try {
-    mintKeypair = keypairFromPrivateKey(reserved.privateKey);
-  } catch {
-    throw new AppError(
-      "Vanity mint has an invalid private key. Please check the vanity mint pool.",
-      500
-    );
-  }
-  await appendLog(launchId, "INFO", "Using vanity mint", "mint", {
-    publicKey: reserved.publicKey,
-  });
-  return {
-    mintKeypair,
-    consumedVanityId: reserved.id,
-  };
+
+  throw new AppError(
+    "Error assigning vanity mint. Try disabling vanity mint.",
+    400
+  );
 }
 
 function buildBundlerBuyTarget(
@@ -1301,7 +1395,7 @@ async function persistTokenPending(
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
   distributionWallets: DistributionWallet[],
-  consumedVanityId: string | null
+  reservedVanityId: string | null
 ) {
   let distributionWalletCount = 0;
   const token = await prisma.$transaction(
@@ -1344,9 +1438,9 @@ async function persistTokenPending(
         });
       }
 
-      if (consumedVanityId) {
+      if (reservedVanityId) {
         await tx.vanityMint.update({
-          where: { id: consumedVanityId },
+          where: { id: reservedVanityId },
           data: {
             tokenPublicKey: createdToken.publicKey,
           },
@@ -2234,7 +2328,7 @@ export const launchService = {
       minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
       slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
     } = getLaunchConfig();
-    let consumedVanityId: string | null = null;
+    let reservedVanityId: string | null = null;
     let vanityConsumed = false;
     let recoveryData: LaunchRecoveryData | null = null;
     let persistedTokenPublicKey: string | null = null;
@@ -2485,12 +2579,12 @@ export const launchService = {
         input.vanityMint
       );
       const { mintKeypair } = mintReservation;
-      consumedVanityId = mintReservation.consumedVanityId;
+      reservedVanityId = mintReservation.reservedVanityId;
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),
         vanityMint: input.vanityMint,
-        consumedVanityId,
+        reservedVanityId,
       });
 
       if (await cancelLaunchIfRequested(launchId)) {
@@ -2520,14 +2614,9 @@ export const launchService = {
         devWalletPublicKey,
         bundlerWalletKeypairs,
         distributionWallets,
-        consumedVanityId
+        reservedVanityId
       );
       persistedTokenPublicKey = mintPublicKey;
-      if (consumedVanityId !== null) {
-        const resolvedVanityMintId = consumedVanityId!;
-        await consumeReservedVanityMint(resolvedVanityMintId, mintPublicKey);
-        vanityConsumed = true;
-      }
       await appendLog(launchId, "INFO", "Pending token saved", "persist", {
         tokenPublicKey: mintPublicKey,
         distributionWalletCount,
@@ -2636,10 +2725,16 @@ export const launchService = {
 
       await setStep(launchId, 55, "confirm", "Confirming token on-chain");
       const confirmation = await waitForMintAccount(mintPublicKey, launchId);
+      if (reservedVanityId !== null) {
+        await consumeReservedVanityMint(reservedVanityId, mintPublicKey);
+        vanityConsumed = true;
+      }
       await appendLog(launchId, "INFO", "Token confirmed", "confirm", {
         createSignature,
         bundleId,
         ...confirmation,
+        vanityConsumed,
+        reservedVanityId,
       });
 
       if (!input.bundleBuyEnabled) {
@@ -2823,7 +2918,7 @@ export const launchService = {
         error,
         launchStartedAt,
         persistedTokenPublicKey,
-        reservedVanityId: consumedVanityId,
+        reservedVanityId,
         vanityConsumed,
       });
     }

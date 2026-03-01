@@ -1,5 +1,4 @@
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
+import { BN } from "@coral-xyz/anchor";
 import {
   ComputeBudgetProgram,
   Keypair,
@@ -14,7 +13,6 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { rpcLimiter } from "@/lib/solana/rpc-limiter";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { ingestionQueue } from "@/server/services/ingestion-queue.service";
-import { getPumpProgram } from "@/server/solana/pump-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
 import {
@@ -401,7 +399,7 @@ export const processVolumeBotWalletRange = async (
         mintPublicKey,
         buyLamports,
         undefined,
-        minTokensOut
+        BigInt(minTokensOut.toString())
       );
       baseBuyTx = addComputeBudget(baseBuyTx, computeUnits, priorityFee);
 
@@ -512,14 +510,7 @@ export const processVolumeBotWalletRange = async (
           `[Worker] ${walletPk}: Slippage quote failed (sell): ${message}`
         );
       }
-      const provider = new AnchorProvider(
-        connection,
-        new NodeWallet(walletKeypair),
-        { commitment: "finalized" }
-      );
-      const program = getPumpProgram(provider);
       let baseSellTx = await sellTokensWithNewIdl(
-        program,
         walletKeypair,
         mintPublicKey,
         new BN(tokenAmount.toString()),

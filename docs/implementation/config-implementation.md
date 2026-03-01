@@ -1,11 +1,13 @@
 # Config Implementation
 
 ## Goals
+
 - Centralize environment variable parsing and validation
 - Provide typed, domain-focused config objects
 - Keep config access consistent across server modules
 
 ## Structure
+
 - `lib/config/env.ts` parses and validates raw environment values with Zod
 - `lib/config/launch.config.ts` exposes launch-specific settings derived from `env`
 - `lib/config/rpc.config.ts` stores RPC tuning, gRPC region defaults, and RabbitStream endpoints
@@ -14,12 +16,14 @@
 - `lib/config/volume-bot.config.ts` stores volume bot limits and runtime defaults
 
 ## Usage
+
 - Call `getEnv()` when you need raw environment values
 - Call `getDatabaseUrl()` when you need the Prisma connection string
 - Call `getLaunchConfig()` for launch-specific constants and env-derived settings
 - Avoid direct `process.env` access outside `lib/config`
 
 ## Environment Variables
+
 - `SOLANA_RPC_URL` is required and validated when `getEnv()` is called
 - `SHYFT_API_KEY` is optional and enables Shyft REST APIs, callback management, and DeFi APIs
 - `SHYFT_GRPC_TOKEN` is optional and provides the x-token for gRPC authentication (falls back to `SHYFT_API_KEY`)
@@ -40,6 +44,7 @@
 - Local development can keep working without Pinata; token media falls back to existing inline data-URL storage when `PINATA_JWT` is unset
 
 ## Logging
+
 - `LOG_LEVEL` is optional and defaults to `info`
 - Supported levels: `debug`, `info`, `warn`, `error`
 - Server logs are JSON lines to console with `timestamp`, `level`, `message`, and merged context fields
@@ -58,6 +63,7 @@
 When tRPC subscriptions are active, cooldowns are relaxed (e.g. 30s for wallet balances instead of 10s) because real-time updates supplement polling.
 
 ## Extending
+
 - Add new domain configs under `lib/config`
 - Derive values from `env` and validate with Zod
 - Export inferred types for new config objects

@@ -1,4 +1,4 @@
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import { Keypair, type PublicKey, type Transaction } from "@solana/web3.js";
 import type { CreateTokenMetadata } from "pumpdotfun-sdk";
@@ -92,23 +92,14 @@ export async function buildBuyTokenTransaction(
   mint: PublicKey,
   buyAmountLamport: bigint,
   creator?: PublicKey,
-  minTokensOut?: BN
+  minTokensOut?: bigint
 ): Promise<Transaction> {
-  const spendableLamports = new BN(buyAmountLamport.toString());
-  const minOut = minTokensOut ?? new BN(1);
-  const provider = new AnchorProvider(
-    getSolanaConnection(),
-    new NodeWallet(buyer),
-    { commitment: "finalized" }
-  );
-  const program = getPumpProgram(provider);
   const tx = await buyTokensWithNewIdl(
-    program,
     buyer,
     mint,
-    spendableLamports,
-    minOut,
-    creator
+    buyAmountLamport,
+    creator,
+    minTokensOut
   );
   tx.feePayer = buyer.publicKey;
   return tx;
