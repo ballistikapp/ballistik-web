@@ -89,7 +89,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     logger.error("Create simulation failed", {
       ...logContext,
       error: simulationResult.value.err,
-      logs: simulationResult.value.logs?.slice(0, 6),
+      logs: simulationResult.value.logs?.slice(0, 30),
     });
     throw new Error(
       `Create simulation failed: ${JSON.stringify(simulationResult.value.err)}`

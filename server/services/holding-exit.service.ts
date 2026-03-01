@@ -4,11 +4,8 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { walletService } from "@/server/services/wallet.service";
-import { getPumpProgram } from "@/server/solana/pump-idl";
-import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
+import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   PublicKey,
@@ -373,12 +370,6 @@ async function buildExitBundleTransactions({
   const signerGroups: Keypair[][] = [];
 
   const ensureSellerAta = !sellerAtaExists;
-  const provider = new AnchorProvider(
-    connection,
-    new NodeWallet(sellerKeypair),
-    { commitment: "finalized" }
-  );
-  const program = getPumpProgram(provider);
 
   // Process transfer groups (no sell instruction in these)
   for (let groupIndex = 0; groupIndex < senderGroups.length; groupIndex += 1) {
@@ -423,13 +414,15 @@ async function buildExitBundleTransactions({
     signerGroups.push([mainWallet, ...transferSigners]);
   }
 
-  // Create a separate sell transaction (no transfers, only sell)
-  // This ensures the sell tx with its 14 accounts stays under size limit
-  const sellTx = new Transaction();
+  const sellTx = await buildSellTransaction(
+    sellerKeypair,
+    mint,
+    BigInt(totalAmount.toString())
+  );
 
-  // If no transfers were made (seller is the only wallet), ensure ATA exists
+  const tx = new Transaction();
   if (senderGroups.length === 0 && ensureSellerAta) {
-    sellTx.add(
+    tx.add(
       createAssociatedTokenAccountInstruction(
         mainWallet.publicKey,
         sellerAta,
@@ -438,20 +431,11 @@ async function buildExitBundleTransactions({
       )
     );
   }
-
-  const sellIxTx = await sellTokensWithNewIdl(
-    program,
-    sellerKeypair,
-    mint,
-    new BN(totalAmount.toString()),
-    new BN(0)
-  );
-  sellIxTx.instructions.forEach((instruction) => {
-    sellTx.add(instruction);
+  sellTx.instructions.forEach((instruction) => {
+    tx.add(instruction);
   });
-
-  sellTx.feePayer = mainWallet.publicKey;
-  transactions.push(sellTx);
+  tx.feePayer = mainWallet.publicKey;
+  transactions.push(tx);
   signerGroups.push([mainWallet, sellerKeypair]);
 
   if (transactions.length > MAX_BUNDLE_TXS) {
@@ -702,7 +686,7 @@ async function runExitFlow(exitId: string) {
     );
     const jitoTipSol =
       typeof exit.input === "object" && exit.input
-        ? Number((exit.input as { jitoTipSol?: number }).jitoTipSol ?? 0)
+        ? Number((exit.input as { jitoTipSol?: number }).jitoTipSol ?? DEFAULT_JITO_TIP_SOL)
         : DEFAULT_JITO_TIP_SOL;
     const returnSolToMainWallet =
       typeof exit.input === "object" && exit.input

@@ -1,4 +1,5 @@
-import { Program, BN } from "@coral-xyz/anchor";
+import type { Program } from "@coral-xyz/anchor";
+import { BN } from "@coral-xyz/anchor";
 import {
   PublicKey,
   Keypair,
@@ -9,6 +10,7 @@ import {
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
+  createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAccount,
@@ -36,6 +38,62 @@ export const DISCRIMINATORS = {
   BUY_EXACT_SOL_IN: Buffer.from([56, 252, 116, 8, 158, 223, 205, 95]),
   SELL: Buffer.from([51, 230, 133, 164, 1, 127, 131, 173]),
 } as const;
+
+export interface BondingCurveState {
+  virtualSolReserves: bigint;
+  virtualTokenReserves: bigint;
+  realTokenReserves: bigint;
+}
+
+export function calculateBuyTokenAmount(
+  solAmountLamports: bigint,
+  state: BondingCurveState
+): bigint {
+  if (solAmountLamports <= BigInt(0)) return BigInt(0);
+  const product = state.virtualSolReserves * state.virtualTokenReserves;
+  const newSolReserves = state.virtualSolReserves + solAmountLamports;
+  const newTokenReserves = product / newSolReserves + BigInt(1);
+  const tokensOut = state.virtualTokenReserves - newTokenReserves;
+  return tokensOut < state.realTokenReserves
+    ? tokensOut
+    : state.realTokenReserves;
+}
+
+export function applyBuyToState(
+  tokenAmount: bigint,
+  solAmount: bigint,
+  state: BondingCurveState
+): BondingCurveState {
+  return {
+    virtualSolReserves: state.virtualSolReserves + solAmount,
+    virtualTokenReserves: state.virtualTokenReserves - tokenAmount,
+    realTokenReserves: state.realTokenReserves - tokenAmount,
+  };
+}
+
+export async function fetchInitialBondingCurveState(): Promise<BondingCurveState> {
+  const connection = getSolanaConnection();
+  const [globalPDA] = PublicKey.findProgramAddressSync(
+    [GLOBAL_SEED],
+    PUMP_PROGRAM_ID
+  );
+  const globalAccountInfo = await connection.getAccountInfo(globalPDA);
+  if (!globalAccountInfo || !globalAccountInfo.data) {
+    throw new Error("Failed to fetch Pump.fun global account");
+  }
+  const data = globalAccountInfo.data;
+  const virtualTokenReserves = data.readBigUInt64LE(73);
+  const virtualSolReserves = data.readBigUInt64LE(81);
+  const realTokenReserves = data.readBigUInt64LE(89);
+
+  logger.info("Initial bonding curve state fetched", {
+    virtualTokenReserves: virtualTokenReserves.toString(),
+    virtualSolReserves: virtualSolReserves.toString(),
+    realTokenReserves: realTokenReserves.toString(),
+  });
+
+  return { virtualSolReserves, virtualTokenReserves, realTokenReserves };
+}
 
 export function derivePumpAddresses(mint: PublicKey) {
   const [global] = PublicKey.findProgramAddressSync(
@@ -316,29 +374,25 @@ export async function createTokenWithNewIdl(
   }
 }
 
+const FEE_CONFIG_SEED_BYTES = Buffer.from([
+  1, 86, 224, 246, 147, 102, 90, 207, 68, 219, 21, 104, 191, 23, 91, 170,
+  81, 137, 203, 151, 245, 210, 255, 59, 101, 93, 43, 182, 253, 109, 24, 176,
+]);
+
+function encodeU64LE(value: bigint): Buffer {
+  const buf = Buffer.allocUnsafe(8);
+  buf.writeBigUInt64LE(value, 0);
+  return buf;
+}
+
 export async function buyTokensWithNewIdl(
-  program: Program,
   buyer: Keypair,
   mint: PublicKey,
-  spendableSolIn: BN, // SOL amount to spend (including fees and rent)
-  minTokensOut: BN, // Minimum tokens to receive (slippage protection)
-  creator?: PublicKey // Optional: for bundle transactions where bonding curve doesn't exist yet
+  solAmountLamports: bigint,
+  creator?: PublicKey,
+  minTokensOut?: bigint
 ): Promise<Transaction> {
   const addresses = derivePumpAddresses(mint);
-
-  const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
-    [
-      addresses.bondingCurve.toBuffer(),
-      Buffer.from([
-        6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121,
-        172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0,
-        169,
-      ]),
-      mint.toBuffer(),
-    ],
-    ASSOCIATED_TOKEN_PROGRAM_ID
-  );
-
   const associatedUser = await getAssociatedTokenAddress(mint, buyer.publicKey);
 
   let ataExists = false;
@@ -355,16 +409,9 @@ export async function buyTokensWithNewIdl(
     ) {
       logger.info("ATA missing, will create", associatedUser.toBase58());
     } else if (err.message.includes("Invalid account owner")) {
-      logger.info(
-        "ATA exists but not initialized, will create",
-        associatedUser.toBase58()
-      );
+      logger.info("ATA exists but not initialized, will create", associatedUser.toBase58());
     } else {
-      logger.info(
-        "ATA check failed, will create",
-        associatedUser.toBase58()
-      );
-      logger.info("ATA check error", err.message);
+      logger.info("ATA check failed, will create", associatedUser.toBase58());
     }
   }
 
@@ -377,7 +424,47 @@ export async function buyTokensWithNewIdl(
     "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
   );
 
-  logger.info("Fee recipient", feeRecipient.toBase58());
+  let creatorPubkey: PublicKey;
+  try {
+    const connection = getSolanaConnection();
+    const bondingCurveAccountInfo = await connection.getAccountInfo(
+      addresses.bondingCurve
+    );
+    if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
+      if (creator) {
+        creatorPubkey = creator;
+        logger.info("Bonding curve missing; using provided creator", creatorPubkey.toBase58());
+      } else {
+        throw new Error("Bonding curve not found and no creator provided.");
+      }
+    } else {
+      const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
+      creatorPubkey = new PublicKey(creatorBytes);
+      logger.info("Creator fetched from bonding curve", creatorPubkey.toBase58());
+    }
+  } catch (error) {
+    const err = error instanceof Error ? error : new Error(String(error));
+    if (creator) {
+      creatorPubkey = creator;
+      logger.info("Using provided creator fallback", creatorPubkey.toBase58());
+    } else {
+      throw new Error(`Cannot determine token creator. Error: ${err.message}`);
+    }
+  }
+
+  const [creatorVault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("creator-vault"), creatorPubkey.toBuffer()],
+    PUMP_PROGRAM_ID
+  );
+
+  const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
+    [
+      addresses.bondingCurve.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
+      mint.toBuffer(),
+    ],
+    ASSOCIATED_TOKEN_PROGRAM_ID
+  );
 
   const [eventAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("__event_authority")],
@@ -394,95 +481,29 @@ export async function buyTokensWithNewIdl(
     PUMP_PROGRAM_ID
   );
 
-  let creatorPubkey: PublicKey;
+  const [feeConfig] = PublicKey.findProgramAddressSync(
+    [Buffer.from("fee_config"), FEE_CONFIG_SEED_BYTES],
+    FEE_PROGRAM_ID
+  );
 
-  try {
-    const connection = getSolanaConnection();
-    const bondingCurveAccountInfo = await connection.getAccountInfo(
-      addresses.bondingCurve
-    );
-
-    if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
-      if (creator) {
-        creatorPubkey = creator;
-        logger.info(
-          "Bonding curve missing; using provided creator",
-          creatorPubkey.toBase58()
-        );
-      } else {
-        throw new Error(
-          "Bonding curve not found and no creator provided. Cannot determine creator_vault."
-        );
-      }
-    } else {
-      const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
-      creatorPubkey = new PublicKey(creatorBytes);
-      logger.info("Creator fetched from bonding curve", creatorPubkey.toBase58());
-    }
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    logger.error("Failed to get creator from bonding curve", err.message);
-
-    if (creator) {
-      creatorPubkey = creator;
-      logger.info("Using provided creator fallback", creatorPubkey.toBase58());
-    } else {
-      throw new Error(
-        `Cannot determine token creator. Error: ${err.message}`
-      );
-    }
-  }
-
-  const [creatorVault] = PublicKey.findProgramAddressSync(
-    [Buffer.from("creator-vault"), creatorPubkey.toBuffer()],
+  const [bondingCurveV2] = PublicKey.findProgramAddressSync(
+    [Buffer.from("bonding-curve-v2"), mint.toBuffer()],
     PUMP_PROGRAM_ID
   );
 
-  logger.info("Creator for creator_vault", creatorPubkey.toBase58());
-  logger.info("Creator vault", creatorVault.toBase58());
-
-  const feeProgram = FEE_PROGRAM_ID;
-  const [feeConfig] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("fee_config"),
-      Buffer.from([
-        1, 86, 224, 246, 147, 102, 90, 207, 68, 219, 21, 104, 191, 23, 91, 170,
-        81, 137, 203, 151, 245, 210, 255, 59, 101, 93, 43, 182, 253, 109, 24,
-        176,
-      ]),
-    ],
-    feeProgram
-  );
-
-  logger.info("Building buy_exact_sol_in instruction");
-  logger.info("Buy inputs", {
+  logger.info("Building buy_exact_sol_in instruction (raw)", {
     mint: mint.toBase58(),
     buyer: buyer.publicKey.toBase58(),
-    spendableLamports: spendableSolIn.toString(),
-    spendableSol: Number(spendableSolIn) / 1e9,
-    minTokensOut: minTokensOut.toString(),
+    solAmountLamports: solAmountLamports.toString(),
+    solAmountSol: Number(solAmountLamports) / 1e9,
     bondingCurve: addresses.bondingCurve.toBase58(),
   });
 
-  const buyDiscriminator = Buffer.from([56, 252, 116, 8, 158, 223, 205, 95]);
-
-  const encodeU64 = (value: BN): Buffer => {
-    const buf = Buffer.allocUnsafe(8);
-    buf.writeBigUInt64LE(BigInt(value.toString()), 0);
-    return buf;
-  };
-
-  const trackVolumeEncoded = Buffer.from([0]); // None = 0x00
-
-  const instructionData = Buffer.concat([
-    buyDiscriminator,
-    encodeU64(spendableSolIn), // SOL amount to spend
-    encodeU64(minTokensOut), // Minimum tokens to receive
-    trackVolumeEncoded,
+  const data = Buffer.concat([
+    DISCRIMINATORS.BUY_EXACT_SOL_IN,
+    encodeU64LE(solAmountLamports),
+    encodeU64LE(minTokensOut ?? BigInt(1)),
   ]);
-
-  logger.info("Buy instruction data length", instructionData.length);
-  logger.info("Buy discriminator", buyDiscriminator.toString("hex"));
 
   const buyIx = new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
@@ -499,45 +520,39 @@ export async function buyTokensWithNewIdl(
       { pubkey: creatorVault, isSigner: false, isWritable: true },
       { pubkey: eventAuthority, isSigner: false, isWritable: false },
       { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: globalVolumeAccumulator, isSigner: false, isWritable: true },
+      { pubkey: globalVolumeAccumulator, isSigner: false, isWritable: false },
       { pubkey: userVolumeAccumulator, isSigner: false, isWritable: true },
       { pubkey: feeConfig, isSigner: false, isWritable: false },
-      { pubkey: feeProgram, isSigner: false, isWritable: false },
+      { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: bondingCurveV2, isSigner: false, isWritable: false },
     ],
-    data: instructionData,
+    data,
   });
 
-  logger.info("Buy instruction accounts", buyIx.keys.length);
+  logger.info("Raw buy_exact_sol_in instruction built", {
+    accountCount: buyIx.keys.length,
+    dataLength: data.length,
+    bondingCurveV2: bondingCurveV2.toBase58(),
+  });
 
   const tx = new Transaction();
 
   if (!ataExists) {
     logger.info("Adding ATA creation instruction");
     if (creator) {
-      logger.info(
-        "Bundle mode: ATA will be created after CREATE instructions"
-      );
-    } else {
-      logger.info("Standalone buy mode: mint exists for ATA creation");
+      logger.info("Bundle mode: ATA will be created after CREATE instructions");
     }
-
-    const { createAssociatedTokenAccountInstruction } = await import(
-      "@solana/spl-token"
-    );
-
     tx.add(
       createAssociatedTokenAccountInstruction(
-        buyer.publicKey, // payer
-        associatedUser, // ata
-        buyer.publicKey, // owner
-        mint, // mint
-        TOKEN_PROGRAM_ID, // programId (REQUIRED for Pump.fun)
-        ASSOCIATED_TOKEN_PROGRAM_ID // associatedTokenProgramId
+        buyer.publicKey,
+        associatedUser,
+        buyer.publicKey,
+        mint,
+        TOKEN_PROGRAM_ID,
+        ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
     logger.info("ATA creation instruction added");
-  } else {
-    logger.info("Skipping ATA creation (already exists)");
   }
 
   tx.add(buyIx);
@@ -551,125 +566,63 @@ export async function buyTokensWithNewIdl(
   return tx;
 }
 
-export async function sellTokensWithNewIdl(
-  _program: Program,
+export async function buildSellTransaction(
   seller: Keypair,
   mint: PublicKey,
-  amount: BN,
-  minSolOutput: BN
+  amount: bigint,
+  minSolOutput: bigint = BigInt(0)
 ): Promise<Transaction> {
+  const connection = getSolanaConnection();
   const addresses = derivePumpAddresses(mint);
+  const associatedUser = await getAssociatedTokenAddress(mint, seller.publicKey);
+
+  const bondingCurveAccountInfo = await connection.getAccountInfo(
+    addresses.bondingCurve
+  );
+  if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
+    throw new Error("Cannot build sell: Bonding curve not found");
+  }
+
+  const bcData = bondingCurveAccountInfo.data;
+  const creatorPubkey = new PublicKey(bcData.slice(49, 81));
+
+  const feeRecipient = new PublicKey(
+    "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
+  );
+
+  const [creatorVault] = PublicKey.findProgramAddressSync(
+    [Buffer.from("creator-vault"), creatorPubkey.toBuffer()],
+    PUMP_PROGRAM_ID
+  );
 
   const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
     [
       addresses.bondingCurve.toBuffer(),
-      Buffer.from([
-        6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121,
-        172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0,
-        169,
-      ]),
+      TOKEN_PROGRAM_ID.toBuffer(),
       mint.toBuffer(),
     ],
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
-
-  const associatedUser = await getAssociatedTokenAddress(
-    mint,
-    seller.publicKey
-  );
-
-  let feeRecipient: PublicKey;
-  try {
-    const connection = getSolanaConnection();
-    const globalAccountInfo = await connection.getAccountInfo(addresses.global);
-    if (!globalAccountInfo || !globalAccountInfo.data) {
-      logger.warn("Global account not found, using default fee recipient");
-      feeRecipient = new PublicKey(
-        "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
-      ); // Known pump.fun fee recipient
-    } else {
-      const feeRecipientBytes = globalAccountInfo.data.slice(41, 73);
-      feeRecipient = new PublicKey(feeRecipientBytes);
-      logger.info("Fee recipient from global", feeRecipient.toBase58());
-    }
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    logger.warn(
-      "Failed to fetch global account, using default fee recipient",
-      err.message
-    );
-    feeRecipient = new PublicKey(
-      "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
-    );
-  }
 
   const [eventAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("__event_authority")],
     PUMP_PROGRAM_ID
   );
 
-  let creator: PublicKey;
-  let creatorVault: PublicKey;
-  try {
-    const connection = getSolanaConnection();
-    const bondingCurveAccountInfo = await connection.getAccountInfo(
-      addresses.bondingCurve
-    );
-    if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
-      logger.warn(
-        "Bonding curve not found, using seller as creator for creator_vault"
-      );
-      creator = seller.publicKey;
-    } else {
-      const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
-      creator = new PublicKey(creatorBytes);
-      logger.info("Creator fetched from bonding curve", creator.toBase58());
-    }
-
-    const [creatorVaultPDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from("creator-vault"), creator.toBuffer()],
-      PUMP_PROGRAM_ID
-    );
-    creatorVault = creatorVaultPDA;
-    logger.info("Creator vault PDA", creatorVault.toBase58());
-  } catch (error) {
-    const err = error instanceof Error ? error : new Error(String(error));
-    logger.error("Failed to get creator vault", err.message);
-    creator = seller.publicKey;
-    const [creatorVaultPDA] = PublicKey.findProgramAddressSync(
-      [Buffer.from("creator-vault"), creator.toBuffer()],
-      PUMP_PROGRAM_ID
-    );
-    creatorVault = creatorVaultPDA;
-    logger.warn("Using seller as creator for creator_vault");
-  }
-
-  const feeProgram = new PublicKey(
-    "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"
-  );
-
   const [feeConfig] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("fee_config"),
-      Buffer.from([
-        1, 86, 224, 246, 147, 102, 90, 207, 68, 219, 21, 104, 191, 23, 91, 170,
-        81, 137, 203, 151, 245, 210, 255, 59, 101, 93, 43, 182, 253, 109, 24,
-        176,
-      ]),
-    ],
-    feeProgram
+    [Buffer.from("fee_config"), FEE_CONFIG_SEED_BYTES],
+    FEE_PROGRAM_ID
   );
 
-  const encodeU64 = (value: BN): Buffer => {
-    const buf = Buffer.allocUnsafe(8);
-    buf.writeBigUInt64LE(BigInt(value.toString()), 0);
-    return buf;
-  };
+  const [bondingCurveV2] = PublicKey.findProgramAddressSync(
+    [Buffer.from("bonding-curve-v2"), mint.toBuffer()],
+    PUMP_PROGRAM_ID
+  );
 
   const data = Buffer.concat([
     DISCRIMINATORS.SELL,
-    encodeU64(amount),
-    encodeU64(minSolOutput),
+    encodeU64LE(amount),
+    encodeU64LE(minSolOutput),
   ]);
 
   const sellIx = new TransactionInstruction({
@@ -688,206 +641,36 @@ export async function sellTokensWithNewIdl(
       { pubkey: eventAuthority, isSigner: false, isWritable: false },
       { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: feeConfig, isSigner: false, isWritable: false },
-      { pubkey: feeProgram, isSigner: false, isWritable: false },
+      { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: bondingCurveV2, isSigner: false, isWritable: false },
     ],
     data,
   });
 
   const tx = new Transaction();
   tx.add(sellIx);
+  tx.feePayer = seller.publicKey;
+
+  logger.info("Sell transaction built", {
+    mint: mint.toBase58(),
+    seller: seller.publicKey.toBase58(),
+    amount: amount.toString(),
+    bondingCurveV2: bondingCurveV2.toBase58(),
+  });
 
   return tx;
 }
 
-export async function buyTokensExactSolInWithNewIdl(
-  program: Program,
-  buyer: Keypair,
+export async function sellTokensWithNewIdl(
+  seller: Keypair,
   mint: PublicKey,
-  spendableSolIn: BN,
-  minTokensOut: BN,
-  creator?: PublicKey // Optional: for bundle transactions where bonding curve doesn't exist yet
+  amount: BN,
+  minSolOutput: BN
 ): Promise<Transaction> {
-  const addresses = derivePumpAddresses(mint);
-
-  const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
-    [
-      addresses.bondingCurve.toBuffer(),
-      Buffer.from([
-        6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121,
-        172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0,
-        169,
-      ]),
-      mint.toBuffer(),
-    ],
-    ASSOCIATED_TOKEN_PROGRAM_ID
+  return buildSellTransaction(
+    seller,
+    mint,
+    BigInt(amount.toString()),
+    BigInt(minSolOutput.toString())
   );
-
-  const associatedUser = await getAssociatedTokenAddress(mint, buyer.publicKey);
-
-  const feeRecipient = new PublicKey(
-    "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
-  );
-  logger.info(
-    `🔹 Using fee_recipient: ${feeRecipient.toBase58()} (authorized pump.fun protocol fee recipient)`
-  );
-
-  const [eventAuthority] = PublicKey.findProgramAddressSync(
-    [Buffer.from("__event_authority")],
-    PUMP_PROGRAM_ID
-  );
-
-  const [globalVolumeAccumulator] = PublicKey.findProgramAddressSync(
-    [Buffer.from("global_volume_accumulator")],
-    PUMP_PROGRAM_ID
-  );
-
-  const [userVolumeAccumulator] = PublicKey.findProgramAddressSync(
-    [Buffer.from("user_volume_accumulator"), buyer.publicKey.toBuffer()],
-    PUMP_PROGRAM_ID
-  );
-
-  let creatorPubkey: PublicKey;
-  if (creator) {
-    creatorPubkey = creator;
-    logger.info(
-      "🔹 Using provided creator for creator_vault:",
-      creatorPubkey.toBase58()
-    );
-  } else {
-    try {
-      const connection = getSolanaConnection();
-      const bondingCurveAccountInfo = await connection.getAccountInfo(
-        addresses.bondingCurve
-      );
-      if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
-        logger.warn(
-          "⚠️ Bonding curve account not found yet (will be created in bundle), using buyer as creator fallback"
-        );
-        creatorPubkey = buyer.publicKey;
-      } else {
-        const creatorBytes = bondingCurveAccountInfo.data.slice(8, 40);
-        creatorPubkey = new PublicKey(creatorBytes);
-        logger.info(
-          "✅ Creator fetched from bonding curve:",
-          creatorPubkey.toBase58()
-        );
-      }
-    } catch (error) {
-      const err = error instanceof Error ? error : new Error(String(error));
-      logger.error(
-        "❌ Failed to get creator from bonding curve:",
-        err.message
-      );
-      creatorPubkey = buyer.publicKey;
-      logger.warn(
-        "⚠️ Using buyer as creator for creator_vault (bonding curve not available yet)"
-      );
-    }
-  }
-
-  const [creatorVault] = PublicKey.findProgramAddressSync(
-    [Buffer.from("creator-vault"), creatorPubkey.toBuffer()],
-    PUMP_PROGRAM_ID
-  );
-
-  const feeProgram = FEE_PROGRAM_ID;
-  const [feeConfig] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from("fee_config"),
-      Buffer.from([
-        1, 86, 224, 246, 147, 102, 90, 207, 68, 219, 21, 104, 191, 23, 91, 170,
-        81, 137, 203, 151, 245, 210, 255, 59, 101, 93, 43, 182, 253, 109, 24,
-        176,
-      ]),
-    ],
-    feeProgram
-  );
-
-  logger.info("Building buy_exact_sol_in instruction");
-  logger.info("Buy exact inputs", {
-    mint: mint.toBase58(),
-    buyer: buyer.publicKey.toBase58(),
-    spendableLamports: spendableSolIn.toString(),
-    minTokensOut: minTokensOut.toString(),
-  });
-
-  const buyExactSolInDiscriminator = Buffer.from([
-    56, 252, 116, 8, 158, 223, 205, 95,
-  ]);
-
-  const encodeU64 = (value: BN): Buffer => {
-    const buf = Buffer.allocUnsafe(8);
-    buf.writeBigUInt64LE(BigInt(value.toString()), 0);
-    return buf;
-  };
-
-  const trackVolumeEncoded = Buffer.from([0]);
-
-  const instructionData = Buffer.concat([
-    buyExactSolInDiscriminator,
-    encodeU64(spendableSolIn),
-    encodeU64(minTokensOut),
-    trackVolumeEncoded,
-  ]);
-
-  logger.info("Buy exact instruction data length", instructionData.length);
-  logger.info(
-    "Buy exact discriminator",
-    buyExactSolInDiscriminator.toString("hex")
-  );
-
-  const buyExactSolInIx = new TransactionInstruction({
-    programId: PUMP_PROGRAM_ID,
-    keys: [
-      { pubkey: addresses.global, isSigner: false, isWritable: false },
-      { pubkey: feeRecipient, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: addresses.bondingCurve, isSigner: false, isWritable: true },
-      { pubkey: associatedBondingCurve, isSigner: false, isWritable: true },
-      { pubkey: associatedUser, isSigner: false, isWritable: true },
-      { pubkey: buyer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: creatorVault, isSigner: false, isWritable: true },
-      { pubkey: eventAuthority, isSigner: false, isWritable: false },
-      { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: globalVolumeAccumulator, isSigner: false, isWritable: true },
-      { pubkey: userVolumeAccumulator, isSigner: false, isWritable: true },
-      { pubkey: feeConfig, isSigner: false, isWritable: false },
-      { pubkey: feeProgram, isSigner: false, isWritable: false },
-    ],
-    data: instructionData,
-  });
-
-  logger.info("Buy exact instruction accounts", buyExactSolInIx.keys.length);
-
-  const tx = new Transaction();
-
-  if (creator) {
-    logger.info("Bundle mode: adding ATA creation for associated_user");
-    const { createAssociatedTokenAccountInstruction } = await import(
-      "@solana/spl-token"
-    );
-    tx.add(
-      createAssociatedTokenAccountInstruction(
-        buyer.publicKey, // payer
-        associatedUser, // ata
-        buyer.publicKey, // owner
-        mint, // mint
-        TOKEN_PROGRAM_ID, // programId (REQUIRED for Pump.fun)
-        ASSOCIATED_TOKEN_PROGRAM_ID // associatedTokenProgramId
-      )
-    );
-    logger.info("ATA creation instruction added for bundle mode");
-  }
-
-  tx.add(buyExactSolInIx);
-  tx.feePayer = buyer.publicKey;
-
-  logger.info("Buy exact transaction built", {
-    instructionCount: tx.instructions.length,
-    feePayer: tx.feePayer?.toBase58(),
-  });
-
-  return tx;
 }

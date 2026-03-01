@@ -6,8 +6,6 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
-import { AnchorProvider, BN } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   PublicKey,
@@ -24,8 +22,7 @@ import {
 import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
-import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
-import { getPumpProgram } from "@/server/solana/pump-idl";
+import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import type {
   ListHoldingsByTokenInput,
   RefreshHoldingsByTokenInput,
@@ -705,18 +702,10 @@ export const holdingService = {
           }
 
           const seller = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-          const provider = new AnchorProvider(
-            connection,
-            new NodeWallet(seller),
-            { commitment: "finalized" }
-          );
-          const program = getPumpProgram(provider);
-          const tx = await sellTokensWithNewIdl(
-            program,
+          const sellTx = await buildSellTransaction(
             seller,
             mintPublicKey,
-            new BN(sellAmount.toString()),
-            new BN(0)
+            sellAmount
           );
           const feePayer =
             mainWalletKeypair &&
@@ -724,21 +713,22 @@ export const holdingService = {
               seller.publicKey.toBase58()
               ? mainWalletKeypair
               : seller;
+          const signers =
+            feePayer.publicKey.toBase58() === seller.publicKey.toBase58()
+              ? [seller]
+              : [feePayer, seller];
+
           const { blockhash, lastValidBlockHeight } =
             await retryRpcWithTimeout(
               () => connection.getLatestBlockhash("confirmed"),
               rpcConfig.tuning.rpcTimeoutMs
             );
-          tx.recentBlockhash = blockhash;
-          tx.lastValidBlockHeight = lastValidBlockHeight;
-          tx.feePayer = feePayer.publicKey;
-          const signers =
-            feePayer.publicKey.toBase58() === seller.publicKey.toBase58()
-              ? [seller]
-              : [feePayer, seller];
+          sellTx.recentBlockhash = blockhash;
+          sellTx.lastValidBlockHeight = lastValidBlockHeight;
+          sellTx.feePayer = feePayer.publicKey;
           const signature = await retryRpcWithTimeout(
             () =>
-              sendAndConfirmTransaction(connection, tx, signers, {
+              sendAndConfirmTransaction(connection, sellTx, signers, {
                 commitment: "confirmed",
               }),
             rpcConfig.tuning.confirmTimeoutMs
@@ -752,6 +742,9 @@ export const holdingService = {
         } catch (error) {
           const message =
             error instanceof Error ? error.message : String(error);
+          console.error(
+            `[Sell] ${wallet.publicKey} FAILED for ${input.tokenPublicKey}: ${message}`
+          );
           return {
             walletPublicKey: wallet.publicKey,
             status: "FAILED",

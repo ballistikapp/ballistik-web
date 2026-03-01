@@ -63,12 +63,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
   const firstAmounts = buyAmountsLamport.slice(0, firstTransactionBuyCount);
   const firstBuyTxResults = await Promise.allSettled(
     firstWallets.map((wallet, i) =>
-      buildBuyTokenTransaction(
-        wallet,
-        mint,
-        firstAmounts[i],
-        creator
-      )
+      buildBuyTokenTransaction(wallet, mint, firstAmounts[i], creator)
     )
   );
   const firstRejected = firstBuyTxResults.filter(
@@ -146,12 +141,7 @@ async function buildBuyBundleTransaction(
   }
   const buyTxResults = await Promise.allSettled(
     wallets.map((wallet, i) =>
-      buildBuyTokenTransaction(
-        wallet,
-        mint,
-        buyAmountsLamport[i],
-        creator
-      )
+      buildBuyTokenTransaction(wallet, mint, buyAmountsLamport[i], creator)
     )
   );
   const rejected = buyTxResults.filter(

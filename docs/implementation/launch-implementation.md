@@ -5,7 +5,7 @@
 - Provide a clean, async launch pipeline with clear progress tracking and logs.
 - Persist launches and allow UI resume after refresh.
 - Use main wallet as funding wallet; generate dev and bundler wallets server-side.
-- Support vanity mint pool selection with consume-on-lock behavior (no release).
+- Support vanity mint pool selection with reserve-first behavior and bounded retry fallback.
 - Keep launch logic modular for reuse in tokens and wallets.
 - Volume bot uses dedicated `VolumeBotSession` and `VolumeBotLog` models.
 
@@ -55,19 +55,22 @@ Structured log entries per launch.
 
 ### VanityMint
 
-Pool of pre-generated vanity mints (consume-on-lock, no release).
+Pool of pre-generated vanity mints (reserve first, consume after on-chain confirmation).
 
-- `reservedAt`: set when a mint is reserved for a launch before on-chain create submission.
-- `usedAt`: set only when the launch passes the consume threshold.
-- `tokenPublicKey`: linked when token creation succeeds
-- `userId`: user who consumed the mint
-- If vanity is requested and no mint is available, launch fails with an error
+- `reservedAt`: set when a mint is reserved for a launch attempt before create submission.
+- `usedAt`: set only after the mint is confirmed on-chain.
+- `tokenPublicKey`: linked when token creation succeeds.
+- `userId`: user who reserved/consumed the mint.
+- If vanity is requested and no valid mint can be assigned, launch fails with a user-facing fallback message.
 
 ### Vanity Mint Failure Handling
 
-- Vanity mints are reserved first, then consumed later in the pipeline.
-- Failures before the consume threshold release the vanity reservation back to the pool.
-- Failures after the consume threshold keep the vanity consumed and tied to the failed token.
+- Vanity mints are reserved first, then consumed only after mint confirmation succeeds on-chain.
+- Vanity assignment uses up to 3 random candidates from the unreserved/unused pool.
+- If a candidate mint already exists on-chain, its reservation is released immediately and another candidate is attempted.
+- If no valid vanity mint is assigned after retries, launch fails with: `Error assigning vanity mint. Try disabling vanity mint.`
+- Failures before consume release the active reservation back to the pool.
+- Failures after consume keep the vanity consumed and tied to the token.
 - The system never swaps a failed vanity token to a non-vanity key.
 
 ### Token
@@ -123,13 +126,15 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
-6. **Metadata + Mint**: resolve image, build metadata, consume vanity mint if requested (fails if none available).
+6. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+   - Vanity reservation retries up to 3 random candidates.
+   - Candidates that already exist on-chain are released and skipped.
 7. **Persist Pending Token**: create Token with `PENDING` status and link wallets before on-chain create.
    - `tokenImage` is uploaded to Pinata when `PINATA_JWT` is configured, and the resulting gateway URL is stored in `Token.imageUrl`.
    - If Pinata is not configured, the existing base64 data URL fallback behavior is preserved.
-   - Vanity consume threshold is reached here, after which vanity reservations are not released on failure.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
+   - Vanity mint is consumed only after this confirmation succeeds.
 10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
 11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
@@ -176,15 +181,26 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `PINATA_JWT` is optional; when set, token media is uploaded to Pinata and persisted as a gateway URL.
 - `PINATA_GATEWAY_URL` is optional and defaults to `https://gateway.pinata.cloud`.
 
+## On-chain Confirmation Timeouts
+
+- Bundle CREATE confirmation timeout is set to 5 minutes in `server/solana/jito-bundle.ts`.
+- Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
+- These longer windows reduce false launch failures during network congestion and delayed status propagation.
+
 ## Bundle Launch
 
 ### Overview
 
 When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito bundle. The path is:
 
-1. Build the token create transaction.
-2. Build buy transactions for each buyer.
+1. Build the token create transaction (via Anchor `program.methods.create`).
+2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
 3. Pack transactions into a bundle and submit through Jito.
+4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
+
+Note: Buy instructions are built as raw `TransactionInstruction` (not via Anchor) using the `buy_exact_sol_in` discriminator with 24-byte data (discriminator + sol_amount + min_tokens_out). The `track_volume` OptionBool parameter is omitted. Each buy instruction includes 17 accounts: the standard 16 accounts plus a trailing `bonding_curve_v2` PDA (derived from `["bonding-curve-v2", mint]`). The V2 trailing account is required by the current program version — without it, the program falls into a legacy code path that overflows at `buy.rs:181`.
+
+Note: No off-chain token amount calculation is needed. The program determines tokens from the SOL input, deducts fees (currently 1.25% via the `pfee` program), and transfers the appropriate token amount. `min_tokens_out = 1` is safe inside an atomic Jito bundle where MEV is not a concern.
 
 ### Transaction Packing Rules
 

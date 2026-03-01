@@ -50,6 +50,26 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 - Cleanup (ATA close + SOL recovery) runs only after all chunk jobs settle.
 - Cleanup wallet work runs with bounded concurrency (wallet-level parallelism) and aggregates results after all wallet tasks settle.
 
+### Sell Instruction
+
+The sell instruction is built by `buildSellTransaction` in `pump-new-idl.ts`. It uses the same shared constants as the buy instruction (fee recipient, fee config, fee program) for consistency. The function:
+
+- Fetches the creator from the bonding curve on-chain
+- Derives all PDAs consistently with the buy instruction
+- Does not require an Anchor `Program` object (pure instruction building)
+- **Includes `bondingCurveV2`** as a trailing remaining account (V2 account layout). Without this account, the on-chain program falls back to a legacy code path with u64 arithmetic that overflows on the constant-product `k = virtualTokenReserves * virtualSolReserves` calculation, causing error 6024 (Overflow) for any sell amount
+- Returns a single `Transaction`
+
+All three sell paths (holding sell, volume bot sell, exit bundle sell) use this function. The holding service and exit bundle use `buildSellTransaction` directly. The volume bot uses the `sellTokensWithNewIdl` wrapper which delegates to it.
+
+### Jito Bundle Resilience
+
+The exit flow uses Jito bundles which can fail during network congestion. The bundle confirmation system handles this with:
+
+- **Resend loop**: While the blockhash is fresh (<55s), the bundle is resent every 5 seconds if no signatures are found on-chain.
+- **Blockhash rebuild**: When the blockhash expires (>55s) and signatures are still not found, the entire bundle is rebuilt with a fresh blockhash and resent. Up to 2 rebuilds are allowed, giving the bundle ~165s total window to land.
+- **Default tip**: When no `jitoTipSol` is provided in the exit input, the default tip (`DEFAULT_JITO_TIP_SOL = 0.005 SOL`) is used. Higher tips improve priority during congestion.
+
 ### Future: Fast Mode (Optional)
 
 If faster exits are needed later, add a configurable "fast mode" profile:
@@ -99,7 +119,7 @@ Solana enforces strict transaction size limits:
 
 ### Why These Chunk Sizes?
 
-The pump.fun sell instruction is large (14 accounts, ~700-900 bytes). Combining it with multiple transfers exceeded the 1232 byte limit.
+The pump.fun sell instruction is large (15 accounts including bondingCurveV2, ~750-950 bytes). Combining it with multiple transfers exceeded the 1232 byte limit.
 
 **Key constants:**
 ```typescript
@@ -115,7 +135,7 @@ const WALLETS_PER_CHUNK = 20;    // Max wallets per exit bundle iteration
 - Practical chunk cap is 20 wallets (1 seller + up to 19 senders)
 
 **Why sell is separate?**
-- The sell instruction has 14 accounts (~450 bytes just for account keys)
+- The sell instruction has 15 accounts (~480 bytes just for account keys)
 - Plus instruction data, signatures, and transaction metadata
 - Combining with transfers caused the "transaction too large" error
 

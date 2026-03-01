@@ -25,6 +25,7 @@ const BUNDLE_CONFIRM_GRPC_POLL_MS = 100;
 const BUNDLE_CONFIRM_RPC_SLOW_POLL_MS = 3000;
 const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
+const MAX_BLOCKHASH_REBUILDS = 2;
 
 export async function sendJitoBundle(
   txs: Transaction[],
@@ -82,10 +83,10 @@ export async function sendJitoBundle(
     );
   }
 
-  const blockhashFetchedAt = Date.now();
-  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  let blockhashFetchedAt = Date.now();
+  let { blockhash } = await connection.getLatestBlockhash("confirmed");
   logger.info("Bundle blockhash fetched", { blockhash });
-  const { versionedTxs, signatures } = buildVersionedTransactions(
+  let currentBuild = buildVersionedTransactions(
     bundleTxs,
     signers,
     tipper,
@@ -93,101 +94,151 @@ export async function sendJitoBundle(
     blockhash
   );
   logger.info("Bundle versioned transactions built", {
-    signatureCount: signatures.length,
-    signaturesPreview: signatures.slice(0, 3),
+    signatureCount: currentBuild.signatures.length,
+    signaturesPreview: currentBuild.signatures.slice(0, 3),
     feePayers,
     blockhash,
   });
-  if (versionedTxs[0]) {
-    const simulation = await connection.simulateTransaction(versionedTxs[0], {
+  if (currentBuild.versionedTxs[0]) {
+    const simulation = await connection.simulateTransaction(currentBuild.versionedTxs[0], {
       sigVerify: false,
       commitment: "processed",
     });
     if (simulation.value.err) {
+      const errStr = JSON.stringify(simulation.value.err);
       logger.error("Bundle first transaction simulation failed", {
         error: simulation.value.err,
-        logs: simulation.value.logs?.slice(0, 8),
+        logs: simulation.value.logs?.slice(0, 100),
       });
-
-      const errStr = JSON.stringify(simulation.value.err);
-      const isCriticalError =
-        errStr.includes("InsufficientFundsForRent") ||
-        errStr.includes("InsufficientFunds") ||
-        errStr.includes("AccountNotFound") ||
-        errStr.includes("InvalidAccountData") ||
-        errStr.includes("ProgramFailedToComplete");
-
-      if (isCriticalError) {
-        throw new Error(`Transaction simulation failed: ${errStr}`);
-      }
+      throw new Error(`Transaction simulation failed: ${errStr}`);
     } else {
       logger.info("Bundle first transaction simulation succeeded", {
         unitsConsumed: simulation.value.unitsConsumed ?? null,
       });
     }
   }
-  const bundleContainer = new bundle.Bundle([], MAX_TRANSACTIONS_PER_BUNDLE);
-  const withTxs = bundleContainer.addTransactions(...versionedTxs);
-  if (withTxs instanceof Error) {
-    throw withTxs;
-  }
 
   let lastSendEndpoint: string | null = null;
-  const sendBundleWithRetries = async () => {
-    let lastError: Error | null = null;
-    for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
-      try {
-        const result = await sendBundle(withTxs);
-        if (typeof result === "object" && result && "endpoint" in result) {
-          lastSendEndpoint =
-            typeof result.endpoint === "string" ? result.endpoint : null;
+
+  function buildBundleFromVersionedTxs(vtxs: VersionedTransaction[]) {
+    const container = new bundle.Bundle([], MAX_TRANSACTIONS_PER_BUNDLE);
+    const result = container.addTransactions(...vtxs);
+    if (result instanceof Error) {
+      throw result;
+    }
+    return result;
+  }
+
+  let currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
+
+  function createSendBundleWithRetries(bundleToSend: bundle.Bundle) {
+    return async () => {
+      let lastError: Error | null = null;
+      for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
+        try {
+          const result = await sendBundle(bundleToSend);
+          if (typeof result === "object" && result && "endpoint" in result) {
+            lastSendEndpoint =
+              typeof result.endpoint === "string" ? result.endpoint : null;
+          }
+          if (!result.ok) {
+            const message =
+              typeof result.error === "string"
+                ? result.error
+                : result.error?.message || "Jito bundle send failed";
+            throw new Error(message);
+          }
+          return result.value;
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (
+            !isRateLimitMessage(message) ||
+            attempt === MAX_BUNDLE_SEND_ATTEMPTS
+          ) {
+            throw error instanceof Error ? error : new Error(message);
+          }
+          lastError = error instanceof Error ? error : new Error(message);
+          const delayMs = Math.min(
+            BUNDLE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
+            BUNDLE_RETRY_MAX_DELAY_MS
+          );
+          const jitterMs = Math.floor(Math.random() * 100);
+          await sleep(delayMs + jitterMs);
         }
-        if (!result.ok) {
-          const message =
-            typeof result.error === "string"
-              ? result.error
-              : result.error?.message || "Jito bundle send failed";
-          throw new Error(message);
-        }
-        return result.value;
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        if (
-          !isRateLimitMessage(message) ||
-          attempt === MAX_BUNDLE_SEND_ATTEMPTS
-        ) {
-          throw error instanceof Error ? error : new Error(message);
-        }
-        lastError = error instanceof Error ? error : new Error(message);
-        const delayMs = Math.min(
-          BUNDLE_RETRY_BASE_DELAY_MS * 2 ** (attempt - 1),
-          BUNDLE_RETRY_MAX_DELAY_MS
-        );
-        const jitterMs = Math.floor(Math.random() * 100);
-        await sleep(delayMs + jitterMs);
       }
-    }
-    if (lastError) {
-      throw lastError;
-    }
-    throw new Error("Jito bundle send failed");
-  };
+      if (lastError) {
+        throw lastError;
+      }
+      throw new Error("Jito bundle send failed");
+    };
+  }
+
+  let sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
   const initialBundleId = await sendBundleWithRetries();
   logger.info("Jito bundle sent", {
     bundleId: initialBundleId,
-    signatureCount: signatures.length,
+    signatureCount: currentBuild.signatures.length,
     endpoint: lastSendEndpoint,
   });
+
+  let rebuilds = 0;
+  const rebuildAndResend = async (): Promise<{
+    bundleId: string;
+    signatures: string[];
+    blockhashFetchedAt: number;
+  }> => {
+    if (rebuilds >= MAX_BLOCKHASH_REBUILDS) {
+      throw new Error(`Max blockhash rebuilds (${MAX_BLOCKHASH_REBUILDS}) exceeded`);
+    }
+    rebuilds += 1;
+
+    blockhashFetchedAt = Date.now();
+    const fresh = await connection.getLatestBlockhash("confirmed");
+    blockhash = fresh.blockhash;
+
+    logger.info("Rebuilding bundle with fresh blockhash", {
+      rebuild: rebuilds,
+      maxRebuilds: MAX_BLOCKHASH_REBUILDS,
+      newBlockhash: blockhash,
+    });
+
+    currentBuild = buildVersionedTransactions(
+      bundleTxs,
+      signers,
+      tipper,
+      tipLamports,
+      blockhash
+    );
+    currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
+    sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
+
+    const newBundleId = await sendBundleWithRetries();
+
+    logger.info("Bundle rebuilt and resent", {
+      rebuild: rebuilds,
+      bundleId: newBundleId,
+      signatureCount: currentBuild.signatures.length,
+      newBlockhash: blockhash,
+    });
+
+    return {
+      bundleId: newBundleId,
+      signatures: currentBuild.signatures,
+      blockhashFetchedAt,
+    };
+  };
+
   const confirmedBundleId = await confirmBundleOnChain({
     connection,
-    signatures,
+    initialSignatures: currentBuild.signatures,
     accountKeys: feePayers,
-    blockhashFetchedAt,
-    sendBundleWithRetries,
+    initialBlockhashFetchedAt: blockhashFetchedAt,
+    sendBundleWithRetries: () => sendBundleWithRetries(),
     bundleId: initialBundleId,
+    rebuildAndResend,
   });
-  return { bundleId: confirmedBundleId, signatures };
+  return { bundleId: confirmedBundleId, signatures: currentBuild.signatures };
 }
 
 function dedupeSigners(signers: Keypair[]) {
@@ -254,22 +305,30 @@ function sleep(ms: number) {
 
 async function confirmBundleOnChain({
   connection,
-  signatures,
+  initialSignatures,
   accountKeys,
-  blockhashFetchedAt,
+  initialBlockhashFetchedAt,
   sendBundleWithRetries,
   bundleId,
+  rebuildAndResend,
 }: {
   connection: ReturnType<typeof getSolanaConnection>;
-  signatures: string[];
+  initialSignatures: string[];
   accountKeys: string[];
-  blockhashFetchedAt: number;
+  initialBlockhashFetchedAt: number;
   sendBundleWithRetries: () => Promise<string>;
   bundleId: string;
+  rebuildAndResend?: () => Promise<{
+    bundleId: string;
+    signatures: string[];
+    blockhashFetchedAt: number;
+  }>;
 }) {
   const startedAt = Date.now();
   let lastResendAt = 0;
   let currentBundleId = bundleId;
+  let currentSignatures = initialSignatures;
+  let currentBlockhashFetchedAt = initialBlockhashFetchedAt;
   let lastSummary: BundleStatusSummary | null = null;
   let lastStatusError: string | null = null;
   let lastLoggedSummary: string | null = null;
@@ -277,20 +336,24 @@ async function confirmBundleOnChain({
   const fallbackConnection = getFallbackConnection();
   logger.info("Bundle confirmation start", {
     bundleId,
-    signatureCount: signatures.length,
-    createSignature: signatures[0],
+    signatureCount: currentSignatures.length,
+    createSignature: currentSignatures[0],
     rpcEndpoint: connection.rpcEndpoint,
     fallbackRpcEndpoint: fallbackConnection?.rpcEndpoint ?? null,
     accountKeyCount: accountKeys.length,
   });
-  const grpcState: { done: boolean; result: Set<string> | null; active: boolean } = {
+  const grpcState: {
+    done: boolean;
+    result: Set<string> | null;
+    active: boolean;
+  } = {
     done: false,
     result: null,
     active: false,
   };
 
   const grpcPromise = waitForSignaturesViaGrpc({
-    signatures,
+    signatures: currentSignatures,
     accountKeys,
     timeoutMs: BUNDLE_CONFIRM_TIMEOUT_MS,
   });
@@ -323,10 +386,10 @@ async function confirmBundleOnChain({
   let lastRpcCheckAt = 0;
 
   while (Date.now() - startedAt < BUNDLE_CONFIRM_TIMEOUT_MS) {
-    if (grpcState.result?.has(signatures[0])) {
+    if (grpcState.result?.has(currentSignatures[0])) {
       logger.info("Bundle confirmed via gRPC", {
         bundleId: currentBundleId,
-        signature: signatures[0],
+        signature: currentSignatures[0],
         elapsedMs: Date.now() - startedAt,
       });
       return currentBundleId;
@@ -346,10 +409,10 @@ async function confirmBundleOnChain({
       try {
         const primaryStatuses = await fetchSignatureStatuses(
           connection,
-          signatures
+          currentSignatures
         );
         const fallbackStatuses = fallbackConnection
-          ? await fetchSignatureStatuses(fallbackConnection, signatures)
+          ? await fetchSignatureStatuses(fallbackConnection, currentSignatures)
           : null;
         const statuses = fallbackStatuses
           ? mergeSignatureStatuses(primaryStatuses, fallbackStatuses)
@@ -370,7 +433,7 @@ async function confirmBundleOnChain({
           logger.info("Bundle confirmation summary", {
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
-            blockhashAgeMs: Date.now() - blockhashFetchedAt,
+            blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
             grpcActive: grpcState.active,
             ...summary,
           });
@@ -389,7 +452,36 @@ async function confirmBundleOnChain({
         if (summary.createConfirmed) {
           return currentBundleId;
         }
-        const blockhashAge = Date.now() - blockhashFetchedAt;
+        const blockhashAge = Date.now() - currentBlockhashFetchedAt;
+
+        if (
+          summary.foundCount === 0 &&
+          blockhashAge >= BUNDLE_BLOCKHASH_MAX_AGE_MS &&
+          rebuildAndResend
+        ) {
+          logger.warn("Blockhash expired, rebuilding bundle", {
+            bundleId: currentBundleId,
+            elapsedMs: Date.now() - startedAt,
+            blockhashAgeMs: blockhashAge,
+          });
+          try {
+            const rebuilt = await rebuildAndResend();
+            currentBundleId = rebuilt.bundleId;
+            currentSignatures = rebuilt.signatures;
+            currentBlockhashFetchedAt = rebuilt.blockhashFetchedAt;
+            lastResendAt = Date.now();
+            lastLoggedSummary = null;
+            continue;
+          } catch (rebuildError) {
+            const msg = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
+            logger.warn("Bundle rebuild failed", {
+              bundleId: currentBundleId,
+              error: msg,
+              elapsedMs: Date.now() - startedAt,
+            });
+          }
+        }
+
         if (
           summary.foundCount === 0 &&
           blockhashAge < BUNDLE_BLOCKHASH_MAX_AGE_MS &&
@@ -448,7 +540,9 @@ async function confirmBundleOnChain({
   const summaryText = lastSummary
     ? `found=${lastSummary.foundCount} confirmed=${lastSummary.confirmedCount} failed=${lastSummary.failedCount} notFound=${lastSummary.notFoundCount} createStatus=${lastSummary.createStatus}`
     : "no status summary";
-  const statusErrorText = lastStatusError ? ` statusError=${lastStatusError}` : "";
+  const statusErrorText = lastStatusError
+    ? ` statusError=${lastStatusError}`
+    : "";
   throw new Error(
     `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${statusErrorText})`
   );
@@ -493,9 +587,9 @@ function summarizeBundleStatuses(
 
   const createConfirmed = Boolean(
     createStatus &&
-      !createStatus.err &&
-      (createStatus.confirmationStatus === "confirmed" ||
-        createStatus.confirmationStatus === "finalized")
+    !createStatus.err &&
+    (createStatus.confirmationStatus === "confirmed" ||
+      createStatus.confirmationStatus === "finalized")
   );
   const createError = createStatus?.err ?? null;
   const createStatusLabel = createStatus
