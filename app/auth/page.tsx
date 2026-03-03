@@ -387,325 +387,301 @@ export default function AuthPage() {
     registerMutation.isPending || loginWithPrivateKeyMutation.isPending;
 
   return (
-    <div className="min-h-screen flex">
-      <div className="hidden lg:flex lg:w-1/3 bg-muted/30 items-center justify-center p-12">
-        <div className="max-w-md">
-          <div className="inline-flex items-center justify-center w-14 h-14 rounded-xl bg-primary/10 mb-6">
-            <Wallet className="w-7 h-7 text-primary" />
-          </div>
-          <h1 className="text-3xl font-semibold tracking-tight mb-3">
-            Sollabs
-          </h1>
-          <p className="text-muted-foreground">
-            Solana trading tools for token launches, volume management, and
-            portfolio tracking.
-          </p>
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-4 lg:p-8">
+      <div className="w-full max-w-[460px]">
+        <h1 className="text-center text-5xl font-bold mb-12">BALLISTIK</h1>
 
-      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
-        <div className="w-full max-w-[520px]">
-          <div className="lg:hidden text-center mb-8">
-            <div className="inline-flex items-center justify-center w-12 h-12 rounded-xl bg-primary/10 mb-3">
-              <Wallet className="w-6 h-6 text-primary" />
+        <div className="rounded-lg border bg-card shadow-sm">
+          <div className="border-b">
+            <div className="flex">
+              <button
+                type="button"
+                onClick={() => setView("register")}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
+                  view === "register"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Create Account
+                {view === "register" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
+              </button>
+              <button
+                type="button"
+                onClick={() => setView("signin")}
+                className={`flex-1 py-2.5 text-sm font-medium transition-colors relative ${
+                  view === "signin"
+                    ? "text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                Sign In
+                {view === "signin" && (
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                )}
+              </button>
             </div>
-            <h1 className="text-xl font-semibold tracking-tight">Sollabs</h1>
           </div>
 
-          <div className="rounded-xl border bg-card shadow-sm">
-            <div className="border-b">
-              <div className="flex">
-                <button
-                  type="button"
-                  onClick={() => setView("register")}
-                  className={`flex-1 py-3.5 text-base font-medium transition-colors relative ${
-                    view === "register"
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Create Account
-                  {view === "register" && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+          <div className="p-6">
+            {view === "register" ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  registerForm.validateAllFields("submit");
+                  registerForm.handleSubmit();
+                }}
+                className="space-y-4"
+              >
+                <registerForm.Field name="accountName">
+                  {(field) => (
+                    <Field>
+                      <FieldLabel htmlFor={field.name}>
+                        Account Name{" "}
+                        <span className="text-muted-foreground font-normal">
+                          (optional)
+                        </span>
+                      </FieldLabel>
+                      <Input
+                        id={field.name}
+                        type="text"
+                        placeholder="e.g., Main Account"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) => field.handleChange(e.target.value)}
+                        disabled={isLoading}
+                        className="h-10 text-sm"
+                      />
+                      <FieldDescription>
+                        Leave empty to use your wallet address as the name
+                      </FieldDescription>
+                    </Field>
                   )}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setView("signin")}
-                  className={`flex-1 py-3.5 text-base font-medium transition-colors relative ${
-                    view === "signin"
-                      ? "text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  Sign In
-                  {view === "signin" && (
-                    <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
-                  )}
-                </button>
-              </div>
-            </div>
+                </registerForm.Field>
 
-            <div className="p-8">
-              {view === "register" ? (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    registerForm.validateAllFields("submit");
-                    registerForm.handleSubmit();
-                  }}
-                  className="space-y-6"
-                >
-                  <registerForm.Field name="accountName">
+                <div className="space-y-2.5">
+                  <Label className="text-sm font-medium">Wallet Setup</Label>
+                  <registerForm.Field name="walletMode">
                     {(field) => (
-                      <Field>
-                        <FieldLabel htmlFor={field.name}>
-                          Account Name{" "}
-                          <span className="text-muted-foreground font-normal">
-                            (optional)
-                          </span>
-                        </FieldLabel>
-                        <Input
-                          id={field.name}
-                          type="text"
-                          placeholder="e.g., Main Account"
-                          value={field.state.value}
-                          onBlur={field.handleBlur}
-                          onChange={(e) => field.handleChange(e.target.value)}
-                          disabled={isLoading}
-                          className="h-12"
-                        />
-                        <FieldDescription>
-                          Leave empty to use your wallet address as the name
-                        </FieldDescription>
-                      </Field>
+                      <Tabs
+                        value={field.state.value}
+                        onValueChange={(v) =>
+                          field.handleChange(v as WalletMode)
+                        }
+                      >
+                        <TabsList className="grid w-full grid-cols-2 group-data-horizontal/tabs:h-10">
+                          <TabsTrigger
+                            value="generate"
+                            className="text-sm gap-2"
+                          >
+                            <Sparkles className="w-4 h-4" />
+                            Generate
+                          </TabsTrigger>
+                          <TabsTrigger
+                            value="connect"
+                            className="text-sm gap-2"
+                          >
+                            <Wallet className="w-4 h-4" />
+                            Import
+                          </TabsTrigger>
+                        </TabsList>
+
+                        <TabsContent
+                          value="generate"
+                          className="mt-2.5 space-y-2.5"
+                        >
+                          <p className="text-sm text-muted-foreground">
+                            Create a new Solana wallet. You&apos;ll receive your
+                            keys after registration.
+                          </p>
+                          <div className="rounded-lg bg-muted/50 border p-3">
+                            <p className="text-sm text-muted-foreground">
+                              Remember to fund your new wallet with SOL before
+                              making transactions.
+                            </p>
+                          </div>
+                        </TabsContent>
+
+                        <TabsContent
+                          value="connect"
+                          className="mt-2.5 space-y-2.5"
+                        >
+                          <p className="text-sm text-muted-foreground">
+                            Import an existing Solana wallet using your private
+                            key.
+                          </p>
+                          <registerForm.Subscribe
+                            selector={(state) => state.values.walletMode}
+                          >
+                            {(walletMode) => (
+                              <registerForm.Field
+                                name="privateKey"
+                                validators={{
+                                  onChange: ({ value }) => {
+                                    if (walletMode === "connect" && !value) {
+                                      return {
+                                        message: "Private key is required",
+                                      };
+                                    }
+                                    return undefined;
+                                  },
+                                }}
+                              >
+                                {(privateKeyField) => {
+                                  const isInvalid =
+                                    (privateKeyField.state.meta.isTouched ||
+                                      privateKeyField.state.meta.isDirty) &&
+                                    privateKeyField.state.meta.errors.length >
+                                      0;
+                                  return (
+                                    <div className="space-y-2">
+                                      {!privateKeyField.state.value ? (
+                                        <>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            onClick={() =>
+                                              setPrivateKeyDialogOpen(true)
+                                            }
+                                            className="w-full h-10 text-sm"
+                                            disabled={isLoading}
+                                          >
+                                            <Key className="mr-2 h-3.5 w-3.5" />
+                                            Enter Private Key
+                                          </Button>
+                                          {isInvalid && (
+                                            <FieldError
+                                              errors={
+                                                privateKeyField.state.meta
+                                                  .errors
+                                              }
+                                            />
+                                          )}
+                                        </>
+                                      ) : (
+                                        <div className="flex gap-2">
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                              setPrivateKeyDialogOpen(true)
+                                            }
+                                            className="flex-1"
+                                            disabled={isLoading}
+                                          >
+                                            <Edit2 className="mr-1.5 h-3.5 w-3.5" />
+                                            Edit
+                                          </Button>
+                                          <Button
+                                            type="button"
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={copyKey}
+                                            className="flex-1"
+                                            disabled={isLoading}
+                                          >
+                                            <Copy className="mr-1.5 h-3.5 w-3.5" />
+                                            Copy
+                                          </Button>
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                }}
+                              </registerForm.Field>
+                            )}
+                          </registerForm.Subscribe>
+                        </TabsContent>
+                      </Tabs>
                     )}
                   </registerForm.Field>
+                </div>
 
-                  <div className="space-y-3">
-                    <Label className="text-base font-medium">
-                      Wallet Setup
-                    </Label>
-                    <registerForm.Field name="walletMode">
-                      {(field) => (
-                        <Tabs
-                          value={field.state.value}
-                          onValueChange={(v) =>
-                            field.handleChange(v as WalletMode)
-                          }
-                        >
-                          <TabsList className="grid w-full grid-cols-2 group-data-horizontal/tabs:h-10">
-                            <TabsTrigger
-                              value="generate"
-                              className="text-base gap-2"
-                            >
-                              <Sparkles className="w-4 h-4" />
-                              Generate
-                            </TabsTrigger>
-                            <TabsTrigger
-                              value="connect"
-                              className="text-base gap-2"
-                            >
-                              <Wallet className="w-4 h-4" />
-                              Import
-                            </TabsTrigger>
-                          </TabsList>
-
-                          <TabsContent
-                            value="generate"
-                            className="mt-3 space-y-3"
-                          >
-                            <p className="text-sm text-muted-foreground">
-                              Create a new Solana wallet. You&apos;ll receive
-                              your keys after registration.
-                            </p>
-                            <div className="rounded-lg bg-muted/50 border p-3">
-                              <p className="text-sm text-muted-foreground">
-                                Remember to fund your new wallet with SOL before
-                                making transactions.
-                              </p>
-                            </div>
-                          </TabsContent>
-
-                          <TabsContent
-                            value="connect"
-                            className="mt-3 space-y-3"
-                          >
-                            <p className="text-sm text-muted-foreground">
-                              Import an existing Solana wallet using your
-                              private key.
-                            </p>
-                            <registerForm.Subscribe
-                              selector={(state) => state.values.walletMode}
-                            >
-                              {(walletMode) => (
-                                <registerForm.Field
-                                  name="privateKey"
-                                  validators={{
-                                    onChange: ({ value }) => {
-                                      if (walletMode === "connect" && !value) {
-                                        return {
-                                          message: "Private key is required",
-                                        };
-                                      }
-                                      return undefined;
-                                    },
-                                  }}
-                                >
-                                  {(privateKeyField) => {
-                                    const isInvalid =
-                                      (privateKeyField.state.meta.isTouched ||
-                                        privateKeyField.state.meta.isDirty) &&
-                                      privateKeyField.state.meta.errors.length >
-                                        0;
-                                    return (
-                                      <div className="space-y-2">
-                                        {!privateKeyField.state.value ? (
-                                          <>
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              onClick={() =>
-                                                setPrivateKeyDialogOpen(true)
-                                              }
-                                              className="w-full h-11"
-                                              disabled={isLoading}
-                                            >
-                                              <Key className="mr-2 h-3.5 w-3.5" />
-                                              Enter Private Key
-                                            </Button>
-                                            {isInvalid && (
-                                              <FieldError
-                                                errors={
-                                                  privateKeyField.state.meta
-                                                    .errors
-                                                }
-                                              />
-                                            )}
-                                          </>
-                                        ) : (
-                                          <div className="flex gap-2">
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={() =>
-                                                setPrivateKeyDialogOpen(true)
-                                              }
-                                              className="flex-1"
-                                              disabled={isLoading}
-                                            >
-                                              <Edit2 className="mr-1.5 h-3.5 w-3.5" />
-                                              Edit
-                                            </Button>
-                                            <Button
-                                              type="button"
-                                              variant="outline"
-                                              size="sm"
-                                              onClick={copyKey}
-                                              className="flex-1"
-                                              disabled={isLoading}
-                                            >
-                                              <Copy className="mr-1.5 h-3.5 w-3.5" />
-                                              Copy
-                                            </Button>
-                                          </div>
-                                        )}
-                                      </div>
-                                    );
-                                  }}
-                                </registerForm.Field>
-                              )}
-                            </registerForm.Subscribe>
-                          </TabsContent>
-                        </Tabs>
-                      )}
-                    </registerForm.Field>
-                  </div>
-
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Creating account..." : "Create Account"}
-                  </Button>
-                </form>
-              ) : (
-                <form
-                  onSubmit={(e) => {
-                    e.preventDefault();
-                    signinForm.validateAllFields("submit");
-                    signinForm.handleSubmit();
-                  }}
-                  className="space-y-6"
+                <Button
+                  type="submit"
+                  className="w-full h-10 text-sm"
+                  disabled={isLoading}
                 >
-                  <signinForm.Field
-                    name="privateKey"
-                    validators={{
-                      onChange: ({ value }) => {
-                        if (!value || value.trim() === "") {
-                          return { message: "Private key is required" };
-                        }
-                        return undefined;
-                      },
-                    }}
-                  >
-                    {(privateKeyField) => {
-                      const isInvalid =
-                        (privateKeyField.state.meta.isTouched ||
-                          privateKeyField.state.meta.isDirty) &&
-                        privateKeyField.state.meta.errors.length > 0;
-                      return (
-                        <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor="signin-private-key">
-                            Private Key
-                          </FieldLabel>
-                          <Input
-                            id="signin-private-key"
-                            type="password"
-                            placeholder="Enter your Solana private key"
-                            value={privateKeyField.state.value || ""}
-                            onBlur={privateKeyField.handleBlur}
-                            onChange={(e) =>
-                              privateKeyField.handleChange(
-                                e.target.value || undefined
-                              )
-                            }
-                            disabled={isLoading}
-                            className="font-mono text-base h-12"
-                            aria-invalid={isInvalid}
+                  {isLoading ? "Creating account..." : "Create Account"}
+                </Button>
+              </form>
+            ) : (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  signinForm.validateAllFields("submit");
+                  signinForm.handleSubmit();
+                }}
+                className="space-y-4"
+              >
+                <signinForm.Field
+                  name="privateKey"
+                  validators={{
+                    onChange: ({ value }) => {
+                      if (!value || value.trim() === "") {
+                        return { message: "Private key is required" };
+                      }
+                      return undefined;
+                    },
+                  }}
+                >
+                  {(privateKeyField) => {
+                    const isInvalid =
+                      (privateKeyField.state.meta.isTouched ||
+                        privateKeyField.state.meta.isDirty) &&
+                      privateKeyField.state.meta.errors.length > 0;
+                    return (
+                      <Field data-invalid={isInvalid}>
+                        <FieldLabel htmlFor="signin-private-key">
+                          Private Key
+                        </FieldLabel>
+                        <Input
+                          id="signin-private-key"
+                          type="password"
+                          placeholder="Enter your Solana private key"
+                          value={privateKeyField.state.value || ""}
+                          onBlur={privateKeyField.handleBlur}
+                          onChange={(e) =>
+                            privateKeyField.handleChange(
+                              e.target.value || undefined
+                            )
+                          }
+                          disabled={isLoading}
+                          className="font-mono text-sm h-10"
+                          aria-invalid={isInvalid}
+                        />
+                        {isInvalid ? (
+                          <FieldError
+                            errors={privateKeyField.state.meta.errors}
                           />
-                          {isInvalid ? (
-                            <FieldError
-                              errors={privateKeyField.state.meta.errors}
-                            />
-                          ) : (
-                            <FieldDescription>
-                              Your base58-encoded Solana wallet private key
-                            </FieldDescription>
-                          )}
-                        </Field>
-                      );
-                    }}
-                  </signinForm.Field>
+                        ) : (
+                          <FieldDescription>
+                            Your base58-encoded Solana wallet private key
+                          </FieldDescription>
+                        )}
+                      </Field>
+                    );
+                  }}
+                </signinForm.Field>
 
-                  <Button
-                    type="submit"
-                    className="w-full h-12 text-base"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Signing in..." : "Sign In"}
-                  </Button>
-                </form>
-              )}
-            </div>
+                <Button
+                  type="submit"
+                  className="w-full h-10 text-sm"
+                  disabled={isLoading}
+                >
+                  {isLoading ? "Signing in..." : "Sign In"}
+                </Button>
+              </form>
+            )}
           </div>
-
-          <p className="text-center text-xs text-muted-foreground mt-6">
-            By continuing, you agree to our terms of service.
-          </p>
         </div>
+
+        <p className="text-center text-xs text-muted-foreground mt-4">
+          By continuing, you agree to our terms of service.
+        </p>
       </div>
 
       <PrivateKeyDialog

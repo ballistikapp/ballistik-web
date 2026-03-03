@@ -25,8 +25,12 @@ export default function LaunchPage() {
       <PageHeader
         title="New Token Launch"
         actions={
-          <Button variant="outline" onClick={() => setCloneDialogOpen(true)}>
-            <Copy className="size-4" />
+          <Button
+            size="lg"
+            variant="outline"
+            onClick={() => setCloneDialogOpen(true)}
+          >
+            <Copy className="size-4 mr-2 text-primary" />
             Clone Token
           </Button>
         }

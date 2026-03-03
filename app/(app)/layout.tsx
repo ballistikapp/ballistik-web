@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import type { Metadata } from "next";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { SiteHeader } from "@/components/layout/site-header";
 import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
@@ -7,6 +8,12 @@ import { TokenProvider } from "@/contexts/token-context";
 import { getServerUser } from "@/lib/utils/auth";
 
 export const dynamic = "force-dynamic";
+export const metadata: Metadata = {
+  title: {
+    default: "BALLISTIK",
+    template: "%s | BALLISTIK",
+  },
+};
 
 export default async function MainLayout({
   children,

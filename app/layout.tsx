@@ -52,8 +52,14 @@ const clash = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "BALLISTIK",
+  title: {
+    default: "BALLISTIK",
+    template: "%s | BALLISTIK",
+  },
   description: "BALLISTIK | Solana Launch Platform",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({

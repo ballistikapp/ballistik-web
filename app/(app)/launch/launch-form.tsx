@@ -4,7 +4,15 @@ import * as React from "react";
 import { useForm } from "@tanstack/react-form";
 import { toast } from "sonner";
 import * as z from "zod";
-import { ImagePlus, X, Info, Import, Sparkles, Wallet } from "lucide-react";
+import {
+  ImagePlus,
+  X,
+  Info,
+  Import,
+  Sparkles,
+  Wallet,
+  ChevronRight,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   PageSection,
@@ -32,6 +40,11 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  Collapsible,
+  CollapsibleContent,
+  CollapsibleTrigger,
+} from "@/components/ui/collapsible";
 import { cn } from "@/lib/utils";
 import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog";
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
@@ -49,7 +62,6 @@ const formSchema = z.object({
     .max(10, "Token symbol must be at most 10 characters"),
   description: z
     .string()
-    .min(20, "Description must be at least 20 characters")
     .max(500, "Description must be at most 500 characters"),
   tokenImage: z.string().min(1, "Main image or video is required"),
   tokenBanner: z.string(),
@@ -446,10 +458,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     website: "",
     devWalletOption: "generate" as "import" | "generate" | "use_main",
     importedDevWalletKey: "",
-    devBuyAmountSol: 0.05,
+    devBuyAmountSol: 0.5,
     jitoTipAmountSol: 0.001,
     bundleBuyEnabled: true,
-    vanityMint: false,
+    vanityMint: true,
     bundlerWalletCount: 5,
     bundlerBuyAmountSol: 0.1,
     bundlerBuyVariancePercent: 20,
@@ -501,7 +513,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     startLaunchMutation.mutate({
       tokenName: values.tokenName,
       tokenSymbol: values.tokenSymbol,
-      description: values.description,
+      description: values.description || undefined,
       tokenImage: values.tokenImage,
       tokenBanner: values.tokenBanner,
       twitter: values.twitter || undefined,
@@ -534,13 +546,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         <section id="token-details" className="scroll-mt-4">
           <PageSection>
             <div>
-              <PageSectionHeader title="Token Details" />
-              <p className="text-sm text-muted-foreground">
-                Basic information about your token
-              </p>
-            </div>
-            <div>
-              <div className="grid grid-cols-2 gap-6">
+              <div className="grid grid-cols-2 gap-8 items-start">
                 <div className="space-y-4">
                   <form.Field name="tokenName">
                     {(field) => {
@@ -596,11 +602,156 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       );
                     }}
                   </form.Field>
+                  <div className="flex items-center space-x-3 pt-1">
+                    <form.Field name="vanityMint">
+                      {(field) => (
+                        <Switch
+                          id="vanity-mint"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      )}
+                    </form.Field>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="vanity-mint">Vanity Token Address</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Generate a custom token address starting with
+                          &quot;pump&quot;
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <form.Field name="description">
+                    {(field) => {
+                      const isInvalid =
+                        field.state.meta.isTouched && !field.state.meta.isValid;
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel htmlFor={field.name}>Description</FieldLabel>
+                          <InputGroup>
+                            <InputGroupTextarea
+                              id={field.name}
+                              name={field.name}
+                              value={field.state.value}
+                              onBlur={field.handleBlur}
+                              onChange={(e) => field.handleChange(e.target.value)}
+                              placeholder="Describe your token and its purpose..."
+                              rows={4}
+                              className="min-h-24 resize-none"
+                              aria-invalid={isInvalid}
+                            />
+                            <InputGroupAddon align="block-end">
+                              <InputGroupText className="tabular-nums">
+                                {field.state.value.length}/500 characters
+                              </InputGroupText>
+                            </InputGroupAddon>
+                          </InputGroup>
+                          {isInvalid && (
+                            <FieldError errors={field.state.meta.errors} />
+                          )}
+                        </Field>
+                      );
+                    }}
+                  </form.Field>
+                  <div className="pt-2">
+                    <p className="text-sm font-medium mb-3">Social Links</p>
+                    <div className="grid grid-cols-3 gap-4">
+                      <form.Field name="twitter">
+                        {(field) => {
+                          const isInvalid =
+                            field.state.meta.isTouched &&
+                            !field.state.meta.isValid;
+                          return (
+                            <Field data-invalid={isInvalid}>
+                              <FieldLabel htmlFor={field.name}>
+                                Twitter/X
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                name={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                aria-invalid={isInvalid}
+                                placeholder="https://twitter.com/yourtoken"
+                                autoComplete="off"
+                              />
+                              {isInvalid && (
+                                <FieldError errors={field.state.meta.errors} />
+                              )}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+                      <form.Field name="telegram">
+                        {(field) => {
+                          const isInvalid =
+                            field.state.meta.isTouched &&
+                            !field.state.meta.isValid;
+                          return (
+                            <Field data-invalid={isInvalid}>
+                              <FieldLabel htmlFor={field.name}>
+                                Telegram
+                              </FieldLabel>
+                              <Input
+                                id={field.name}
+                                name={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                aria-invalid={isInvalid}
+                                placeholder="https://t.me/yourtoken"
+                                autoComplete="off"
+                              />
+                              {isInvalid && (
+                                <FieldError errors={field.state.meta.errors} />
+                              )}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+                      <form.Field name="website">
+                        {(field) => {
+                          const isInvalid =
+                            field.state.meta.isTouched &&
+                            !field.state.meta.isValid;
+                          return (
+                            <Field data-invalid={isInvalid}>
+                              <FieldLabel htmlFor={field.name}>Website</FieldLabel>
+                              <Input
+                                id={field.name}
+                                name={field.name}
+                                value={field.state.value}
+                                onBlur={field.handleBlur}
+                                onChange={(e) =>
+                                  field.handleChange(e.target.value)
+                                }
+                                aria-invalid={isInvalid}
+                                placeholder="https://yourtoken.com"
+                                autoComplete="off"
+                              />
+                              {isInvalid && (
+                                <FieldError errors={field.state.meta.errors} />
+                              )}
+                            </Field>
+                          );
+                        }}
+                      </form.Field>
+                    </div>
+                  </div>
                 </div>
-
-                <Field>
-                  <FieldLabel>Main Image</FieldLabel>
-                  <div className="flex items-start gap-4">
+                <div className="space-y-6">
+                  <Field>
+                    <FieldLabel>Main Image</FieldLabel>
+                    <div className="flex items-start gap-4">
                     <div
                       className={cn(
                         "relative flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
@@ -668,11 +819,11 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       <p>Image - 1:1 square recommended (1000x1000px+)</p>
                       <p>Video - 16:9 or 9:16, 1080p+ recommended</p>
                     </div>
-                  </div>
-                </Field>
-                <Field className="col-span-2">
-                  <FieldLabel>Banner</FieldLabel>
-                  <div className="flex items-start gap-4">
+                    </div>
+                  </Field>
+                  <Field>
+                    <FieldLabel>Banner</FieldLabel>
+                    <div className="flex items-start gap-4">
                     <div
                       className={cn(
                         "relative flex h-24 w-72 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
@@ -734,135 +885,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       </p>
                       <p>3:1 aspect ratio, 1500x500px recommended</p>
                     </div>
-                  </div>
-                </Field>
-                <form.Field name="description">
-                  {(field) => {
-                    const isInvalid =
-                      field.state.meta.isTouched && !field.state.meta.isValid;
-                    return (
-                      <Field data-invalid={isInvalid} className="col-span-2">
-                        <FieldLabel htmlFor={field.name}>
-                          Description
-                        </FieldLabel>
-                        <InputGroup>
-                          <InputGroupTextarea
-                            id={field.name}
-                            name={field.name}
-                            value={field.state.value}
-                            onBlur={field.handleBlur}
-                            onChange={(e) => field.handleChange(e.target.value)}
-                            placeholder="Describe your token and its purpose..."
-                            rows={4}
-                            className="min-h-24 resize-none"
-                            aria-invalid={isInvalid}
-                          />
-                          <InputGroupAddon align="block-end">
-                            <InputGroupText className="tabular-nums">
-                              {field.state.value.length}/500 characters
-                            </InputGroupText>
-                          </InputGroupAddon>
-                        </InputGroup>
-                        {isInvalid && (
-                          <FieldError errors={field.state.meta.errors} />
-                        )}
-                      </Field>
-                    );
-                  }}
-                </form.Field>
-                <div className="col-span-2 border-t pt-4">
-                  <p className="text-sm font-medium mb-3">
-                    Social Links (optional)
-                  </p>
-                  <div className="grid grid-cols-3 gap-4">
-                    <form.Field name="twitter">
-                      {(field) => {
-                        const isInvalid =
-                          field.state.meta.isTouched &&
-                          !field.state.meta.isValid;
-                        return (
-                          <Field data-invalid={isInvalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Twitter/X
-                            </FieldLabel>
-                            <Input
-                              id={field.name}
-                              name={field.name}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              aria-invalid={isInvalid}
-                              placeholder="https://twitter.com/yourtoken"
-                              autoComplete="off"
-                            />
-                            {isInvalid && (
-                              <FieldError errors={field.state.meta.errors} />
-                            )}
-                          </Field>
-                        );
-                      }}
-                    </form.Field>
-                    <form.Field name="telegram">
-                      {(field) => {
-                        const isInvalid =
-                          field.state.meta.isTouched &&
-                          !field.state.meta.isValid;
-                        return (
-                          <Field data-invalid={isInvalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Telegram
-                            </FieldLabel>
-                            <Input
-                              id={field.name}
-                              name={field.name}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              aria-invalid={isInvalid}
-                              placeholder="https://t.me/yourtoken"
-                              autoComplete="off"
-                            />
-                            {isInvalid && (
-                              <FieldError errors={field.state.meta.errors} />
-                            )}
-                          </Field>
-                        );
-                      }}
-                    </form.Field>
-                    <form.Field name="website">
-                      {(field) => {
-                        const isInvalid =
-                          field.state.meta.isTouched &&
-                          !field.state.meta.isValid;
-                        return (
-                          <Field data-invalid={isInvalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Website
-                            </FieldLabel>
-                            <Input
-                              id={field.name}
-                              name={field.name}
-                              value={field.state.value}
-                              onBlur={field.handleBlur}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                              aria-invalid={isInvalid}
-                              placeholder="https://yourtoken.com"
-                              autoComplete="off"
-                            />
-                            {isInvalid && (
-                              <FieldError errors={field.state.meta.errors} />
-                            )}
-                          </Field>
-                        );
-                      }}
-                    </form.Field>
-                  </div>
+                    </div>
+                  </Field>
                 </div>
               </div>
             </div>
@@ -870,15 +894,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         </section>
         <PageSectionDivider />
 
-        {/* Step 2: Launch Settings */}
+        {/* Step 2: Dev Wallet Settings */}
         <section id="launch-settings" className="scroll-mt-4">
           <PageSection>
-            <div>
-              <PageSectionHeader title="Launch Settings" />
-              <p className="text-sm text-muted-foreground">
-                Select wallets and configure launch parameters
-              </p>
-            </div>
+            <PageSectionHeader title="Dev Wallet Settings" />
             <div className="space-y-6">
               <Field>
                 <div className="flex items-center gap-2 mb-1">
@@ -971,94 +990,38 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 </form.Subscribe>
               </Field>
 
-              <div className="grid grid-cols-2 gap-6">
-                <form.Field name="devBuyAmountSol">
-                  {(field) => (
-                    <Field>
-                      <div className="flex items-center gap-2 mb-1">
-                        <FieldLabel htmlFor={field.name}>
-                          Dev Buy Amount (SOL)
-                        </FieldLabel>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Amount of SOL the dev wallet will use to buy tokens
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id={field.name}
-                        type="number"
-                        step="0.0001"
-                        min="0.05"
-                        max="100"
-                        value={field.state.value}
-                        onChange={(e) =>
-                          field.handleChange(e.target.valueAsNumber || 0)
-                        }
-                        placeholder="0"
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-                <form.Field name="jitoTipAmountSol">
-                  {(field) => (
-                    <Field>
-                      <div className="flex items-center gap-2 mb-1">
-                        <FieldLabel htmlFor={field.name}>
-                          Jito Tip Amount (SOL)
-                        </FieldLabel>
-                        <Tooltip>
-                          <TooltipTrigger>
-                            <Info className="h-4 w-4 text-muted-foreground" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Priority fee for faster transaction confirmation
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id={field.name}
-                        type="number"
-                        step="0.0001"
-                        min="0"
-                        max="1"
-                        value={field.state.value}
-                        onChange={(e) =>
-                          field.handleChange(e.target.valueAsNumber || 0)
-                        }
-                        placeholder="0.001"
-                      />
-                    </Field>
-                  )}
-                </form.Field>
-              </div>
-
-              <div className="flex items-center space-x-3 pt-2">
-                <form.Field name="vanityMint">
-                  {(field) => (
-                    <Switch
-                      id="vanity-mint"
-                      checked={field.state.value}
-                      onCheckedChange={field.handleChange}
+              <form.Field name="devBuyAmountSol">
+                {(field) => (
+                  <Field>
+                    <div className="flex items-center gap-2 mb-1">
+                      <FieldLabel htmlFor={field.name}>
+                        Dev Buy Amount (SOL)
+                      </FieldLabel>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Amount of SOL the dev wallet will use to buy tokens
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                    <Input
+                      id={field.name}
+                      type="number"
+                      step="0.0001"
+                      min="0.05"
+                      max="100"
+                      value={field.state.value}
+                      onChange={(e) =>
+                        field.handleChange(e.target.valueAsNumber || 0)
+                      }
+                      placeholder="0"
                     />
-                  )}
-                </form.Field>
-                <div className="flex items-center gap-2">
-                  <Label htmlFor="vanity-mint">Vanity Token Address</Label>
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Generate a custom token address starting with
-                      &quot;pump&quot;
-                    </TooltipContent>
-                  </Tooltip>
-                </div>
-              </div>
+                  </Field>
+                )}
+              </form.Field>
+
             </div>
           </PageSection>
         </section>
@@ -1067,26 +1030,21 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         {/* Step 3: Bundler Settings */}
         <section id="bundler-settings" className="scroll-mt-4">
           <PageSection>
-            <div>
-              <PageSectionHeader
-                title="Bundler Settings"
-                meta={
-                  <form.Field name="bundleBuyEnabled">
-                    {(field) => (
-                      <Switch
-                        id="bundle-buy"
-                        size="lg"
-                        checked={field.state.value}
-                        onCheckedChange={field.handleChange}
-                      />
-                    )}
-                  </form.Field>
-                }
-              />
-              <p className="text-sm text-muted-foreground">
-                Configure bundle buy wallets and distribution
-              </p>
-            </div>
+            <PageSectionHeader
+              title="Bundler Settings"
+              meta={
+                <form.Field name="bundleBuyEnabled">
+                  {(field) => (
+                    <Switch
+                      id="bundle-buy"
+                      size="lg"
+                      checked={field.state.value}
+                      onCheckedChange={field.handleChange}
+                    />
+                  )}
+                </form.Field>
+              }
+            />
             <div>
               <form.Subscribe
                 selector={(state) => state.values.bundleBuyEnabled}
@@ -1147,59 +1105,109 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                         </form.Field>
                       </div>
 
-                      <div className="grid grid-cols-2 gap-6">
-                        <form.Field name="bundlerBuyVariancePercent">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={field.name}>
-                                Buy Amount Variance (%)
-                              </FieldLabel>
-                              <Input
-                                id={field.name}
-                                type="number"
-                                min="0"
-                                max="50"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.valueAsNumber || 0
-                                  )
-                                }
-                                placeholder="20"
-                              />
-                              <FieldDescription>
-                                Random variance applied to each buy (0-50%)
-                              </FieldDescription>
-                            </Field>
-                          )}
-                        </form.Field>
-                        <form.Field name="distributionWalletMultiplier">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={field.name}>
-                                Distribution Multiplier
-                              </FieldLabel>
-                              <Input
-                                id={field.name}
-                                type="number"
-                                min="1"
-                                max="5"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.valueAsNumber || 1
-                                  )
-                                }
-                                placeholder="1"
-                              />
-                              <FieldDescription>
-                                Multiply wallets after launch (1 = no
-                                distribution)
-                              </FieldDescription>
-                            </Field>
-                          )}
-                        </form.Field>
-                      </div>
+                      <Collapsible>
+                        <CollapsibleTrigger asChild>
+                          <button
+                            type="button"
+                            className="group flex w-full items-center gap-2 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <ChevronRight className="h-4 w-4 transition-transform group-data-[state=open]:rotate-90" />
+                            Advanced Settings
+                          </button>
+                        </CollapsibleTrigger>
+                        <CollapsibleContent className="pt-4">
+                          <div className="space-y-6">
+                            <div className="grid grid-cols-2 gap-6">
+                              <form.Field name="bundlerBuyVariancePercent">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={field.name}>
+                                      Buy Amount Variance (%)
+                                    </FieldLabel>
+                                    <Input
+                                      id={field.name}
+                                      type="number"
+                                      min="0"
+                                      max="50"
+                                      value={field.state.value}
+                                      onChange={(e) =>
+                                        field.handleChange(
+                                          e.target.valueAsNumber || 0
+                                        )
+                                      }
+                                      placeholder="20"
+                                    />
+                                    <FieldDescription>
+                                      Random variance applied to each buy
+                                      (0-50%)
+                                    </FieldDescription>
+                                  </Field>
+                                )}
+                              </form.Field>
+                              <form.Field name="distributionWalletMultiplier">
+                                {(field) => (
+                                  <Field>
+                                    <FieldLabel htmlFor={field.name}>
+                                      Distribution Multiplier
+                                    </FieldLabel>
+                                    <Input
+                                      id={field.name}
+                                      type="number"
+                                      min="1"
+                                      max="5"
+                                      value={field.state.value}
+                                      onChange={(e) =>
+                                        field.handleChange(
+                                          e.target.valueAsNumber || 1
+                                        )
+                                      }
+                                      placeholder="1"
+                                    />
+                                    <FieldDescription>
+                                      Multiply wallets after launch (1 = no
+                                      distribution)
+                                    </FieldDescription>
+                                  </Field>
+                                )}
+                              </form.Field>
+                            </div>
+                            <form.Field name="jitoTipAmountSol">
+                              {(field) => (
+                                <Field>
+                                  <div className="flex items-center gap-2 mb-1">
+                                    <FieldLabel htmlFor={field.name}>
+                                      Jito Tip Amount (SOL)
+                                    </FieldLabel>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Info className="h-4 w-4 text-muted-foreground" />
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        Priority fee for faster transaction
+                                        confirmation
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <Input
+                                    id={field.name}
+                                    type="number"
+                                    step="0.0001"
+                                    min="0"
+                                    max="1"
+                                    value={field.state.value}
+                                    onChange={(e) =>
+                                      field.handleChange(
+                                        e.target.valueAsNumber || 0
+                                      )
+                                    }
+                                    placeholder="0.001"
+                                  />
+                                </Field>
+                              )}
+                            </form.Field>
+                          </div>
+                        </CollapsibleContent>
+                      </Collapsible>
 
                       <form.Subscribe
                         selector={(state) => ({
@@ -1255,12 +1263,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         {/* Step 4: Review */}
         <section id="review" className="">
           <PageSection className="-mb-18">
-            <div>
-              <PageSectionHeader title="Review" />
-              <p className="text-sm text-muted-foreground">
-                Review your token details before launching
-              </p>
-            </div>
+            <PageSectionHeader title="Review" />
             <div>
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => {

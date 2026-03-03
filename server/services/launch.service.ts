@@ -392,7 +392,7 @@ function buildTokenMetadata(
   const metadata: PumpMetadataUpload = {
     name: input.tokenName.trim(),
     symbol: normalizeSymbol(input.tokenSymbol),
-    description: input.description.trim(),
+    description: input.description?.trim() || "",
     file,
   };
 
@@ -1407,7 +1407,7 @@ async function persistTokenPending(
           status: "PENDING",
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
-          description: input.description.trim(),
+          description: input.description?.trim() || null,
           imageUrl: tokenImageUrl,
           twitterUrl: input.twitter?.trim() || null,
           telegramUrl: input.telegram?.trim() || null,
