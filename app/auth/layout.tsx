@@ -1,6 +1,11 @@
 import { Suspense } from "react";
+import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 import { getServerUser } from "@/lib/utils/auth";
+
+export const metadata: Metadata = {
+  title: "Auth",
+};
 
 export default async function AuthLayout({
   children,

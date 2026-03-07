@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
 const publicRoutes = [
+  "/",
   "/auth",
   "/api/trpc",
   "/api/wallets/refresh",
@@ -13,7 +14,7 @@ export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   const isPublicRoute = publicRoutes.some((route) =>
-    pathname.startsWith(route)
+    route === "/" ? pathname === "/" : pathname.startsWith(route)
   );
 
   if (isPublicRoute) {

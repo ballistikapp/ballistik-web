@@ -9,6 +9,7 @@ import {
 import {
   Sidebar,
   SidebarContent,
+  SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import { TokenSwitcher } from "./token-switcher";
@@ -42,6 +43,11 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
           className="mt-6"
         />
       </SidebarContent>
+      <SidebarFooter className="pt-0">
+        <p className="text-center text-4xl font-bold tracking-wide text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">
+          BALLISTIK
+        </p>
+      </SidebarFooter>
     </Sidebar>
   );
 });

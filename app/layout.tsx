@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import NextTopLoader from "nextjs-toploader";
 import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { TokenProvider } from "@/contexts/token-context";
 
 const geistMono = Geist_Mono({
@@ -52,8 +53,14 @@ const clash = localFont({
 });
 
 export const metadata: Metadata = {
-  title: "BALLISTIK",
+  title: {
+    default: "BALLISTIK",
+    template: "%s | BALLISTIK",
+  },
   description: "BALLISTIK | Solana Launch Platform",
+  icons: {
+    icon: "/favicon.png",
+  },
 };
 
 export default function RootLayout({
@@ -86,6 +93,7 @@ export default function RootLayout({
           </TooltipProvider>
         </NuqsAdapter>
         <ClickyAnalytics />
+        <GoogleAnalytics />
       </body>
     </html>
   );
