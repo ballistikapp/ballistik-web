@@ -200,10 +200,10 @@ function WalletKeysDialog({
         </DialogHeader>
 
         <div className="space-y-4 pt-2">
-          <div className="rounded-lg bg-red-500/10 border border-red-500/20 p-3">
+          <div className="rounded-lg bg-amber-500/10 border border-amber-500/20 p-3">
             <div className="flex gap-2.5">
-              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0 mt-0.5" />
-              <div className="text-xs text-red-700 dark:text-red-300">
+              <AlertTriangle className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+              <div className="text-xstext-amber-300">
                 <p className="font-medium">Store these keys securely</p>
                 <p className="mt-1 opacity-90">
                   You cannot recover them if lost.
@@ -405,7 +405,7 @@ export default function AuthPage() {
               >
                 Create Account
                 {view === "register" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20" />
                 )}
               </button>
               <button
@@ -419,7 +419,7 @@ export default function AuthPage() {
               >
                 Sign In
                 {view === "signin" && (
-                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-primary" />
+                  <span className="absolute bottom-0 left-0 right-0 h-0.5 bg-white/20" />
                 )}
               </button>
             </div>
@@ -496,12 +496,6 @@ export default function AuthPage() {
                             Create a new Solana wallet. You&apos;ll receive your
                             keys after registration.
                           </p>
-                          <div className="rounded-lg bg-muted/50 border p-3">
-                            <p className="text-sm text-muted-foreground">
-                              Remember to fund your new wallet with SOL before
-                              making transactions.
-                            </p>
-                          </div>
                         </TabsContent>
 
                         <TabsContent

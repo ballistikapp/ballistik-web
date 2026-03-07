@@ -8,6 +8,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "sonner";
 import NextTopLoader from "nextjs-toploader";
 import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
+import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { TokenProvider } from "@/contexts/token-context";
 
 const geistMono = Geist_Mono({
@@ -92,6 +93,7 @@ export default function RootLayout({
           </TooltipProvider>
         </NuqsAdapter>
         <ClickyAnalytics />
+        <GoogleAnalytics />
       </body>
     </html>
   );
