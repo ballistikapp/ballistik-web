@@ -197,6 +197,12 @@ Holdings and transactions list endpoints use server-side pagination to avoid ret
 - `wallet.getOperationalByToken` accepts optional `page` and `pageSize` and returns `{ token, wallets, totalCount, page, pageSize }` (defaults: page `1`, pageSize `200`).
 - UI tables pass current page state into list queries and use TanStack manual pagination (`manualPagination` + `pageCount`) to keep pagination server-driven.
 
+Token API security contract:
+
+- `token.getUserTokens`, `token.getAllUserTokens`, and `token.getByPublicKey` return only public token metadata (`publicKey`, `status`, `name`, `symbol`, `description`, `imageUrl`, `websiteUrl`, `twitterUrl`, `telegramUrl`, `createdAt`, `updatedAt`, `userId`).
+- `privateKey` is excluded from all default token read endpoints and must never be relied on by UI/query cache payloads.
+- Private key retrieval is explicit-only through `token.getPrivateKey` (protected mutation, on-demand call by user action).
+
 This keeps response size bounded and avoids client-side pagination over large result sets.
 
 **Monitoring ON (healthy):** "Force re-read" — lightweight DB re-read only:
