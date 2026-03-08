@@ -1,5 +1,6 @@
 import { getEnv } from "@/lib/config/env";
 import { getDefaultShyftGrpcUrl } from "@/lib/config/rpc.config";
+import { logger } from "@/lib/logger";
 import {
   isRecord,
   extractSignatureFromUpdate,
@@ -12,15 +13,17 @@ type GrpcWaitInput = {
   timeoutMs: number;
 };
 
+const log = logger.child({ service: "shyft-grpc" });
+
 export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
   const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
   const grpcToken = SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY;
   if (!grpcToken) {
-    console.log("[gRPC] SHYFT_GRPC_TOKEN not set, skipping gRPC");
+    log.info("SHYFT_GRPC_TOKEN not set, skipping gRPC");
     return null;
   }
   if (input.signatures.length === 0 || input.accountKeys.length === 0) {
-    console.log("[gRPC] No signatures or account keys provided");
+    log.info("No signatures or account keys provided");
     return null;
   }
   const targetSignatures = new Set(input.signatures);
@@ -29,20 +32,19 @@ export async function waitForSignaturesViaGrpc(input: GrpcWaitInput) {
   let stream: unknown;
   try {
     const url = getDefaultShyftGrpcUrl(process.env.VERCEL_REGION);
-    console.log("[gRPC] Connecting to", url);
+    log.info("Connecting to gRPC stream", { url });
     const Client = await loadGrpcClient();
     if (!Client) {
-      console.log("[gRPC] Failed to load yellowstone-grpc client");
+      log.warn("Failed to load yellowstone-grpc client");
       return null;
     }
     const client = new Client(url, grpcToken, {});
     stream = await client.subscribe();
-    console.log("[gRPC] Stream connected successfully");
+    log.info("gRPC stream connected successfully");
   } catch (error) {
-    console.log(
-      "[gRPC] Connection failed:",
-      error instanceof Error ? error.message : String(error)
-    );
+    log.warn("gRPC connection failed", {
+      errorMessage: error instanceof Error ? error.message : String(error),
+    });
     return null;
   }
 

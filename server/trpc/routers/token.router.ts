@@ -2,9 +2,9 @@ import { router, protectedProcedure } from "../trpc";
 import { tokenService } from "@/server/services/token.service";
 import {
   createTokenSchema,
+  tokenPublicKeySchema,
   tokenListPaginationSchema,
 } from "@/server/schemas/token.schema";
-import { z } from "zod";
 
 export const tokenRouter = router({
   create: protectedProcedure
@@ -16,7 +16,7 @@ export const tokenRouter = router({
       return await tokenService.createToken(input, ctx.user.id);
     }),
   getByPublicKey: protectedProcedure
-    .input(z.object({ publicKey: z.string() }))
+    .input(tokenPublicKeySchema)
     .query(async ({ input, ctx }) => {
       return await tokenService.getTokenByPublicKey(
         input.publicKey,
@@ -32,5 +32,13 @@ export const tokenRouter = router({
     .input(tokenListPaginationSchema.optional())
     .query(async ({ ctx, input }) => {
       return await tokenService.getAllUserTokens(ctx.user.id, input);
+    }),
+  getPrivateKey: protectedProcedure
+    .input(tokenPublicKeySchema)
+    .mutation(async ({ input, ctx }) => {
+      return await tokenService.getTokenPrivateKeyByPublicKey(
+        input.publicKey,
+        ctx.user.id
+      );
     }),
 });

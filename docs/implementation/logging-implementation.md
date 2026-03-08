@@ -2,8 +2,9 @@
 
 ## Goals
 - Centralize server-side logging
-- Keep output console-only for now
-- Make it easy to add external transports later
+- Keep runtime output console-first for now
+- Keep audit timelines in main Postgres only where product flows require it
+- Make it easy to add external transports later (Loki planned later)
 
 ## Current Logger
 - Location: `lib/logger.ts`
@@ -11,12 +12,23 @@
 - Levels: `debug`, `info`, `warn`, `error`
 - Minimum level: `LOG_LEVEL` (defaults to `info`)
 
+## Source of Truth Policy
+- Main Postgres log tables (`LaunchLog`, `HoldingExitLog`, `VolumeBotLog`) are for domain/audit timelines shown in product flows.
+- Runtime/operational logs (request lifecycle, infra diagnostics, background worker health, unexpected errors) go through the shared logger transport and are not treated as product timeline data.
+- Main DB is not the sink for all operational logs.
+
 ## Log Shape
 Each log line is JSON with:
 - `timestamp`
 - `level`
 - `message`
 - Context fields merged in (ex: `requestId`, `userId`, `path`, `durationMs`)
+
+## Minimum Structured Context
+- `requestId` for request-scoped logs (or job/session ID for background work)
+- `service` or subsystem tag for non-request work
+- `durationMs` on operation completion/failure logs where timing is relevant
+- Entity identifiers (`launchId`, `exitId`, `sessionId`) for domain workflows
 
 ## Usage
 - Base logger: `import { logger } from "@/lib/logger"`
@@ -28,6 +40,40 @@ tRPC context adds:
 - `requestId` (from `x-request-id` or generated)
 - `logger` (child logger with request/user metadata)
 
+## Redaction and Safety
+- Never log raw secrets or private material (private keys, JWTs, API keys, callback secrets, auth headers).
+- Prefer boolean/shape indicators over raw payload dumps for sensitive inputs (ex: `hasTwitter`, `tokenMediaSource`).
+- Keep log payloads concise; avoid large arrays/objects in hot paths unless needed for diagnostics.
+
 ## Extension Points
 - Replace the transport via `setTransport` to write logs to a database or external service.
 - Keep the console transport for local dev and fallback.
+
+## Grafana Loki (Production-only)
+- Runtime logs can be shipped directly from `lib/logger.ts` to Grafana Loki.
+- Required env vars (Railway production): `LOKI_ENABLED=true`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_API_TOKEN`.
+- Loki transport is gated to production and does not replace console output; console JSON remains enabled as fallback.
+- Use low-cardinality labels (`service`, `env`, `level`); keep high-cardinality fields in payload.
+
+## Railway Setup
+- Set Loki env vars only on Railway production environment in this rollout.
+- Use a Grafana access policy token with logs write scope.
+- Keep staging disabled until production behavior is verified.
+
+## Verification
+- Trigger representative traffic (tRPC request, background worker tick, handled error).
+- In Grafana Explore, query by labels first and then filter payload text.
+- Example query:
+  - `{service="sollabs-web",env="production"} |= "error"`
+  - `{service="sollabs-web",env="production",level="warn"}`
+- Additional useful query examples:
+  - `{service="sollabs-web",env="production"} |= "\"requestId\""`
+  - `{service="volume-bot-worker",env="production"} |= "reclaim"`
+  - `{service="wallet",env="production",level="error"}`
+- Production verification checklist:
+  - Confirm console JSON logs still appear on Railway service logs.
+  - Confirm Loki receives new events after deployment with `LOKI_ENABLED=true`.
+  - Confirm transport outages do not break request handling or worker loops.
+
+## Deferred Backlog
+- DB retention/maintenance jobs (pruning/archive/cron strategy) are intentionally deferred to reduce current complexity.

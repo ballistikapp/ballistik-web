@@ -5,6 +5,7 @@ This directory contains detailed implementation documentation for all features i
 ## Overview
 
 - [Project Overview](./project-overview.md) — high-level purpose, architecture, and conventions
+- [Auth Implementation](./auth-implementation.md) — access/refresh token model and session lifecycle
 
 ## Core Features
 
@@ -38,6 +39,7 @@ This directory contains detailed implementation documentation for all features i
 
 - [Config Implementation](./config-implementation.md) — configuration and env parsing
 - [Logging Implementation](./logging-implementation.md) — structured logging setup
+- [API Abuse Protection](./api-abuse-protection.md) — request identity, rate-limit tiers, and endpoint hardening
 
 ## Related Documentation
 

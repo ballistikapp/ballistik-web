@@ -71,7 +71,11 @@ server/
 - `SOLANA_RPC_URL` — required, Solana RPC endpoint
 - `SHYFT_API_KEY` — optional, enables Shyft REST APIs, callbacks, and DeFi APIs
 - `SHYFT_GRPC_TOKEN` — optional, x-token for gRPC streaming authentication (falls back to `SHYFT_API_KEY`)
-- `SHYFT_CALLBACK_SECRET` — optional, validates incoming Shyft webhook requests
+- `SHYFT_CALLBACK_SECRET` — required in production for Shyft webhook authentication
+- `JWT_SECRET` — required in production for token signing/verification
+- `JWT_EXPIRATION` — optional access token TTL (defaults to `12h`)
+- `REFRESH_TOKEN_TTL_DAYS` — required in production, refresh token lifetime
+- `SESSION_MAX_TTL_DAYS` — optional absolute session lifetime cap
 - `PINATA_JWT` — optional, enables Pinata uploads for persisted token media
 - `PINATA_GATEWAY_URL` — optional, custom Pinata gateway base URL (defaults to `https://gateway.pinata.cloud`)
 - `APP_URL` — optional, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
@@ -93,6 +97,14 @@ server/
 - Run `npm run lint` before deploys
 - Run `next build` for production builds
 
+## Logging Policy
+
+- Domain/audit timelines remain in main Postgres (`LaunchLog`, `HoldingExitLog`, `VolumeBotLog`) because product workflows read them directly.
+- Operational/runtime logs use structured logger output and should be routed to an external sink when enabled.
+- Required structured fields for production diagnostics: `requestId` (or job/session id), `service`, and `durationMs` when applicable.
+- Sensitive values must not be logged (private keys, JWTs, API keys, secrets, auth headers).
+- Retention automation and Loki shipping are tracked as deferred backlog items and are not part of the current hardening pass.
+
 ## Auth Model
 
 - Users are identified by the main wallet (`User.mainWallet`)
@@ -103,6 +115,10 @@ server/
   lookup and redirect to `/auth` when unauthenticated
 - `/auth` layout redirects to `/` when a valid user is present
 - Auth cookies use `secure` only for non-local hosts (including private IPs)
+- Auth uses short-lived access JWTs and DB-backed opaque refresh tokens
+- Refresh tokens are rotated on use and sessions are revocable per device
+- tRPC abuse protection uses per-user/per-IP rate-limit tiers and request identity
+  values from context (`requestId`, `clientIp`, `userAgent`)
 
 ## Docs Discipline
 

@@ -5,6 +5,10 @@ export const tokenListPaginationSchema = z.object({
   pageSize: z.number().int().min(1).max(100).optional(),
 });
 
+export const tokenPublicKeySchema = z.object({
+  publicKey: z.string(),
+});
+
 export const createTokenSchema = z.object({
   tokenName: z
     .string()
@@ -26,3 +30,4 @@ export const createTokenSchema = z.object({
 
 export type CreateTokenInput = z.infer<typeof createTokenSchema>;
 export type TokenListPaginationInput = z.infer<typeof tokenListPaginationSchema>;
+export type TokenPublicKeyInput = z.infer<typeof tokenPublicKeySchema>;

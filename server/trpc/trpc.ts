@@ -4,6 +4,7 @@ import superjson from "superjson";
 import { ZodError } from "zod";
 import { isAppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
+import { ensureRateLimit, type RateLimitTier } from "@/server/security/api-abuse";
 
 /**
  * Initialize tRPC with context
@@ -64,6 +65,7 @@ const errorMapperMiddleware = t.middleware(async ({ next, ctx, path }) => {
         401: "UNAUTHORIZED",
         403: "FORBIDDEN",
         404: "NOT_FOUND",
+        429: "TOO_MANY_REQUESTS",
         409: "CONFLICT",
         500: "INTERNAL_SERVER_ERROR",
       };
@@ -89,17 +91,68 @@ const errorMapperMiddleware = t.middleware(async ({ next, ctx, path }) => {
   }
 });
 
-export const protectedProcedure = t.procedure
-  .use(({ ctx, next }) => {
-    if (!ctx.user) {
-      throw new TRPCError({ code: "UNAUTHORIZED" });
+const rateLimitMiddleware = (tier: RateLimitTier) =>
+  t.middleware(async ({ next, ctx, path }) => {
+    const actor =
+      ctx.user?.id ??
+      (ctx.clientIp && ctx.clientIp !== "unknown"
+        ? `ip:${ctx.clientIp}`
+        : `rid:${ctx.requestId}`);
+    const key = `${actor}:${path}`;
+
+    try {
+      ensureRateLimit({ tier, key });
+    } catch (error) {
+      const requestLogger = ctx?.logger ?? logger;
+      requestLogger.warn("tRPC rate limit exceeded", {
+        path,
+        tier,
+        actor,
+      });
+      throw error;
     }
-    return next({
-      ctx: {
-        user: ctx.user,
-      },
-    });
-  })
+
+    return await next();
+  });
+
+const requireAuthMiddleware = t.middleware(({ ctx, next }) => {
+  if (!ctx.user) {
+    throw new TRPCError({ code: "UNAUTHORIZED" });
+  }
+  return next({
+    ctx: {
+      ...ctx,
+      user: ctx.user,
+    },
+  });
+});
+
+export const protectedProcedure = t.procedure
+  .use(requireAuthMiddleware)
+  .use(rateLimitMiddleware("protected"))
+  .use(errorMapperMiddleware);
+
+export const publicRateLimitedProcedure = t.procedure
+  .use(rateLimitMiddleware("public"))
+  .use(errorMapperMiddleware);
+
+export const authRateLimitedProcedure = t.procedure
+  .use(rateLimitMiddleware("auth"))
+  .use(errorMapperMiddleware);
+
+export const protectedRateLimitedProcedure = t.procedure
+  .use(requireAuthMiddleware)
+  .use(rateLimitMiddleware("protected"))
+  .use(errorMapperMiddleware);
+
+export const expensiveProtectedProcedure = t.procedure
+  .use(requireAuthMiddleware)
+  .use(rateLimitMiddleware("expensiveMutation"))
+  .use(errorMapperMiddleware);
+
+export const sensitiveProcedure = t.procedure
+  .use(requireAuthMiddleware)
+  .use(rateLimitMiddleware("sensitiveMutation"))
   .use(errorMapperMiddleware);
 
 /**

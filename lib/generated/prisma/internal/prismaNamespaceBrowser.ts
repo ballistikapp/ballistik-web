@@ -53,6 +53,8 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  AuthSession: 'AuthSession',
+  RefreshToken: 'RefreshToken',
   Wallet: 'Wallet',
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
@@ -107,6 +109,35 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const AuthSessionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  ip: 'ip',
+  userAgent: 'userAgent',
+  lastSeenAt: 'lastSeenAt',
+  expiresAt: 'expiresAt',
+  revokedAt: 'revokedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AuthSessionScalarFieldEnum = (typeof AuthSessionScalarFieldEnum)[keyof typeof AuthSessionScalarFieldEnum]
+
+
+export const RefreshTokenScalarFieldEnum = {
+  id: 'id',
+  sessionId: 'sessionId',
+  tokenHash: 'tokenHash',
+  expiresAt: 'expiresAt',
+  usedAt: 'usedAt',
+  revokedAt: 'revokedAt',
+  replacedById: 'replacedById',
+  createdAt: 'createdAt'
+} as const
+
+export type RefreshTokenScalarFieldEnum = (typeof RefreshTokenScalarFieldEnum)[keyof typeof RefreshTokenScalarFieldEnum]
 
 
 export const WalletScalarFieldEnum = {

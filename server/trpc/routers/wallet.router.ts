@@ -1,4 +1,9 @@
-import { router, protectedProcedure } from "../trpc";
+import {
+  expensiveProtectedProcedure,
+  protectedRateLimitedProcedure,
+  router,
+  sensitiveProcedure,
+} from "../trpc";
 import { walletService } from "@/server/services/wallet.service";
 import {
   getWalletByTokenSchema,
@@ -14,7 +19,7 @@ import {
 } from "@/server/schemas/wallet.schema";
 
 export const walletRouter = router({
-  getOperationalByToken: protectedProcedure
+  getOperationalByToken: protectedRateLimitedProcedure
     .input(getOperationalWalletsByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await walletService.getOperationalWalletsByToken(
@@ -23,7 +28,7 @@ export const walletRouter = router({
         { page: input.page, pageSize: input.pageSize }
       );
     }),
-  getDevByToken: protectedProcedure
+  getDevByToken: protectedRateLimitedProcedure
     .input(getDevWalletByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await walletService.getDevWalletByToken(
@@ -31,12 +36,12 @@ export const walletRouter = router({
         ctx.user.id
       );
     }),
-  getMain: protectedProcedure
+  getMain: protectedRateLimitedProcedure
     .input(getMainWalletSchema)
     .query(async ({ ctx }) => {
       return await walletService.getMainWallet(ctx.user.id);
     }),
-  getByPublicKey: protectedProcedure
+  getByPublicKey: protectedRateLimitedProcedure
     .input(getWalletByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await walletService.getWalletByToken(
@@ -45,7 +50,7 @@ export const walletRouter = router({
         ctx.user.id
       );
     }),
-  getPrivateKey: protectedProcedure
+  getPrivateKey: sensitiveProcedure
     .input(getWalletPrivateKeySchema)
     .mutation(async ({ input, ctx }) => {
       return await walletService.getWalletPrivateKey(
@@ -54,12 +59,12 @@ export const walletRouter = router({
         ctx.user.id
       );
     }),
-  getMainPrivateKey: protectedProcedure
+  getMainPrivateKey: sensitiveProcedure
     .input(getMainWalletPrivateKeySchema)
     .mutation(async ({ ctx }) => {
       return await walletService.getMainWalletPrivateKey(ctx.user.id);
     }),
-  refreshBalances: protectedProcedure
+  refreshBalances: expensiveProtectedProcedure
     .input(refreshWalletBalancesSchema)
     .mutation(async ({ input, ctx }) => {
       return await walletService.refreshWalletBalances(
@@ -69,12 +74,12 @@ export const walletRouter = router({
         input.force
       );
     }),
-  refreshMainBalance: protectedProcedure
+  refreshMainBalance: expensiveProtectedProcedure
     .input(refreshMainWalletBalanceSchema)
     .mutation(async ({ ctx }) => {
       return await walletService.refreshMainWalletBalance(ctx.user.id);
     }),
-  sendSol: protectedProcedure
+  sendSol: sensitiveProcedure
     .input(sendSolSchema)
     .mutation(async ({ input, ctx }) => {
       return await walletService.sendSolFromMainWallet(
@@ -84,7 +89,7 @@ export const walletRouter = router({
         input.amountSol
       );
     }),
-  returnSol: protectedProcedure
+  returnSol: sensitiveProcedure
     .input(returnSolSchema)
     .mutation(async ({ input, ctx }) => {
       return await walletService.returnSolToMainWallet(

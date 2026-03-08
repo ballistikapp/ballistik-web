@@ -8,6 +8,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import type { Prisma } from "@/lib/generated/prisma/client";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { rpcLimiter } from "@/lib/solana/rpc-limiter";
@@ -29,6 +30,7 @@ import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { walletService } from "@/server/services/wallet.service";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { dashboardEvents } from "@/server/events/dashboard-events";
+import { persistVolumeBotLog } from "@/server/services/log-persistence.service";
 
 type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
@@ -61,6 +63,7 @@ const randomBetween = (min: number, max: number) =>
 const FEE_BUFFER_LAMPORTS = 3_000_000;
 const SELL_RATIO_BPS = 10_000;
 const FEE_TOP_UP_SOL = 0.005;
+const log = logger.child({ service: "volume-bot-worker" });
 
 const inFlightTrades = new Set<string>();
 const slippageFailures = new Map<string, number>();
@@ -177,44 +180,46 @@ export const processVolumeBotWalletRange = async (
 ): Promise<Date | null> => {
   const walletId = volumeWallet.id;
   const walletPk = volumeWallet.walletPublicKey.slice(0, 8);
-  console.log(`[Worker] Processing wallet ${walletPk} range ${rangeIndex} (${walletId})`);
+  log.info(`Processing wallet ${walletPk} range ${rangeIndex} (${walletId})`);
 
   const session = volumeWallet.session;
   if (session.status !== "RUNNING") {
-    console.log(
+    log.info(
       `[Worker] Skipping ${walletPk}: session not RUNNING (${session.status})`
     );
     return null;
   }
 
   if (session.scheduledStopAt && session.scheduledStopAt <= new Date()) {
-    console.log(`[Worker] Session ${session.id} scheduled stop reached`);
+    log.info(`[Worker] Session ${session.id} scheduled stop reached`);
     await stopVolumeBotSession(session.id);
     return null;
   }
 
   if (volumeWallet.status !== "ACTIVE") {
-    console.log(
+    log.info(
       `[Worker] Skipping ${walletPk}: wallet not ACTIVE (${volumeWallet.status})`
     );
     return null;
   }
   if (volumeWallet.wallet.type === "DEV") {
-    console.log(`[Worker] Skipping ${walletPk}: DEV wallet not allowed`);
+    log.info(`[Worker] Skipping ${walletPk}: DEV wallet not allowed`);
     return null;
   }
 
   const config = session.config as StoredVolumeBotConfig;
   const range = config.ranges[rangeIndex];
   if (!range) {
-    console.log(`[Worker] ${walletPk}: Range ${rangeIndex} not found`);
+    log.info(`[Worker] ${walletPk}: Range ${rangeIndex} not found`);
     return null;
   }
 
   const nextTickAt = computeNextTickAt(range);
 
   if (inFlightTrades.has(walletId)) {
-    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Skipping, trade already in flight`);
+    log.info(
+      `[Worker] ${walletPk} range ${rangeIndex}: Skipping, trade already in flight`
+    );
     return nextTickAt;
   }
 
@@ -223,12 +228,12 @@ export const processVolumeBotWalletRange = async (
 
   const tradeAmountSol = selectTradeAmountSol(range);
   if (!Number.isFinite(tradeAmountSol) || tradeAmountSol <= 0) {
-    console.log(`[Worker] ${walletPk} range ${rangeIndex}: Invalid trade amount`);
+    log.info(`[Worker] ${walletPk} range ${rangeIndex}: Invalid trade amount`);
     return nextTickAt;
   }
 
   const action = selectDirection(range);
-  console.log(
+  log.info(
     `[Worker] ${walletPk} range ${rangeIndex}: Selected action=${action} (range=${range.solMin}-${range.solMax}, interval=${range.intervalMin}-${range.intervalMax})`
   );
 
@@ -319,19 +324,17 @@ export const processVolumeBotWalletRange = async (
   }
 
   if (!eligible || !eligibility) {
-    await prisma.volumeBotLog.create({
+    await persistVolumeBotLog({
+      sessionId: session.id,
+      level: "WARN",
+      type: "eligibility",
+      message: "Wallet not eligible for trade",
+      walletPublicKey: volumeWallet.walletPublicKey,
       data: {
-        sessionId: session.id,
-        level: "WARN",
-        type: "eligibility",
-        message: "Wallet not eligible for trade",
-        walletPublicKey: volumeWallet.walletPublicKey,
-        data: {
-          reasons: eligibility?.reasons ?? [],
-          action,
-          tradeAmountSol,
-          rangeIndex,
-        },
+        reasons: eligibility?.reasons ?? [],
+        action,
+        tradeAmountSol,
+        rangeIndex,
       },
     });
     return nextTickAt;
@@ -355,7 +358,7 @@ export const processVolumeBotWalletRange = async (
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(`[Worker] ${walletPk}: Fee top-up failed: ${message}`);
+      log.warn(`[Worker] ${walletPk}: Fee top-up failed: ${message}`);
       return false;
     }
   };
@@ -390,7 +393,7 @@ export const processVolumeBotWalletRange = async (
         tokenAmount = buyQuote.tokensOut;
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(
+        log.warn(
           `[Worker] ${walletPk}: Slippage quote failed (buy): ${message}`
         );
       }
@@ -420,7 +423,7 @@ export const processVolumeBotWalletRange = async (
             if (toppedUp) continue;
           }
           if (isBlockHeightExceeded(error) && attempt < maxRetries) {
-            console.log(
+            log.warn(
               `[Worker] ${walletPk}: Block height exceeded, retry ${attempt + 1}/${maxRetries}`
             );
             await sleep(1000);
@@ -431,15 +434,13 @@ export const processVolumeBotWalletRange = async (
       }
     } else {
       if (tokenBalance <= BigInt(0)) {
-        await prisma.volumeBotLog.create({
-          data: {
-            sessionId: session.id,
-            level: "WARN",
-            type: "sell_skipped",
-            message: "Sell skipped: no tokens",
-            walletPublicKey: volumeWallet.walletPublicKey,
-            data: { rangeIndex },
-          },
+        await persistVolumeBotLog({
+          sessionId: session.id,
+          level: "WARN",
+          type: "sell_skipped",
+          message: "Sell skipped: no tokens",
+          walletPublicKey: volumeWallet.walletPublicKey,
+          data: { rangeIndex },
         });
         return nextTickAt;
       }
@@ -465,7 +466,7 @@ export const processVolumeBotWalletRange = async (
       ) {
         tokenAmount = tokenBalance;
         sellMode = "partial_all";
-        console.log(
+        log.info(
           `[Worker] ${walletPk}: Partial sell, target ${tradeAmountSol} SOL, selling all tokens`
         );
       } else {
@@ -477,21 +478,19 @@ export const processVolumeBotWalletRange = async (
           (tokenBalance * BigInt(Math.floor(fallbackRatio * SELL_RATIO_BPS))) /
           BigInt(SELL_RATIO_BPS);
         sellMode = "fallback_ratio";
-        console.log(
+        log.info(
           `[Worker] ${walletPk}: Fallback ratio sell, target ${tradeAmountSol} SOL`
         );
       }
 
       if (tokenAmount <= BigInt(0)) {
-        await prisma.volumeBotLog.create({
-          data: {
-            sessionId: session.id,
-            level: "WARN",
-            type: "sell_skipped",
-            message: "Sell skipped: no tokens",
-            walletPublicKey: volumeWallet.walletPublicKey,
-            data: { rangeIndex },
-          },
+        await persistVolumeBotLog({
+          sessionId: session.id,
+          level: "WARN",
+          type: "sell_skipped",
+          message: "Sell skipped: no tokens",
+          walletPublicKey: volumeWallet.walletPublicKey,
+          data: { rangeIndex },
         });
         return nextTickAt;
       }
@@ -506,7 +505,7 @@ export const processVolumeBotWalletRange = async (
         const sellQuote = computeSellQuote(quoteState, tokenAmount);
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(
+        log.warn(
           `[Worker] ${walletPk}: Slippage quote failed (sell): ${message}`
         );
       }
@@ -535,7 +534,7 @@ export const processVolumeBotWalletRange = async (
             if (toppedUp) continue;
           }
           if (isBlockHeightExceeded(error) && attempt < maxRetries) {
-            console.log(
+            log.warn(
               `[Worker] ${walletPk}: Block height exceeded, retry ${attempt + 1}/${maxRetries}`
             );
             await sleep(1000);
@@ -604,18 +603,16 @@ export const processVolumeBotWalletRange = async (
           lastTickAt: now,
         },
       });
-      await prisma.volumeBotLog.create({
+      await persistVolumeBotLog({
+        sessionId: session.id,
+        level: "WARN",
+        type: "slippage_pause",
+        message: "Wallet paused due to high slippage",
+        walletPublicKey: volumeWallet.walletPublicKey,
         data: {
-          sessionId: session.id,
-          level: "WARN",
-          type: "slippage_pause",
-          message: "Wallet paused due to high slippage",
-          walletPublicKey: volumeWallet.walletPublicKey,
-          data: {
-            tradeAmountSol,
-            actualSol: actualSolAbs,
-            rangeIndex,
-          },
+          tradeAmountSol,
+          actualSol: actualSolAbs,
+          rangeIndex,
         },
       });
       return null;
@@ -648,22 +645,20 @@ export const processVolumeBotWalletRange = async (
       },
     });
 
-    await prisma.volumeBotLog.create({
+    await persistVolumeBotLog({
+      sessionId: session.id,
+      level: "TRADE",
+      type: action.toLowerCase(),
+      message: "Trade executed",
+      walletPublicKey: volumeWallet.walletPublicKey,
+      signature,
       data: {
-        sessionId: session.id,
-        level: "TRADE",
-        type: action.toLowerCase(),
-        message: "Trade executed",
-        walletPublicKey: volumeWallet.walletPublicKey,
-        signature,
-        data: {
-          tradeAmountSol,
-          actualSol: actualSolAbs,
-          tokenAmount: tokenAmount.toString(),
-          netSolChangeSol: appliedNetSolChange,
-          sellMode,
-          rangeIndex,
-        },
+        tradeAmountSol,
+        actualSol: actualSolAbs,
+        tokenAmount: tokenAmount.toString(),
+        netSolChangeSol: appliedNetSolChange,
+        sellMode,
+        rangeIndex,
       },
     });
 
@@ -680,19 +675,17 @@ export const processVolumeBotWalletRange = async (
     return nextTickAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(`[Worker] ${walletPk} range ${rangeIndex}: ERROR - ${message}`);
+    log.error(`[Worker] ${walletPk} range ${rangeIndex}: ERROR - ${message}`);
     if (error instanceof Error && error.stack) {
-      console.error(`[Worker] ${walletPk} range ${rangeIndex}: Stack:`, error.stack);
+      log.error(`[Worker] ${walletPk} range ${rangeIndex}: Stack:`, error.stack);
     }
-    await prisma.volumeBotLog.create({
-      data: {
-        sessionId: session.id,
-        level: "ERROR",
-        type: "tick",
-        message,
-        walletPublicKey: volumeWallet.walletPublicKey,
-        data: { rangeIndex },
-      },
+    await persistVolumeBotLog({
+      sessionId: session.id,
+      level: "ERROR",
+      type: "tick",
+      message,
+      walletPublicKey: volumeWallet.walletPublicKey,
+      data: { rangeIndex },
     });
     return nextTickAt;
   } finally {
@@ -701,17 +694,17 @@ export const processVolumeBotWalletRange = async (
 };
 
 export const stopVolumeBotSession = async (sessionId: string) => {
-  console.log(`[Worker] stopVolumeBotSession called for ${sessionId}`);
+  log.info(`[Worker] stopVolumeBotSession called for ${sessionId}`);
   const session = await prisma.volumeBotSession.findUnique({
     where: { id: sessionId },
   });
   if (!session || ["STOPPED", "FAILED"].includes(session.status)) {
-    console.log(
+    log.info(
       `[Worker] Session ${sessionId} not found or already stopped/failed`
     );
     return;
   }
-  console.log(
+  log.info(
     `[Worker] Stopping session ${sessionId}, status=${session.status}`
   );
 
@@ -741,16 +734,14 @@ export const stopVolumeBotSession = async (sessionId: string) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.warn(
+    log.warn(
       `[Worker] SOL reclaim failed during stop (non-fatal): ${message}`
     );
-    await prisma.volumeBotLog.create({
-      data: {
-        sessionId: session.id,
-        level: "WARN",
-        type: "reclaim_failed",
-        message: `SOL reclaim failed during stop: ${message}`,
-      },
+    await persistVolumeBotLog({
+      sessionId: session.id,
+      level: "WARN",
+      type: "reclaim_failed",
+      message: `SOL reclaim failed during stop: ${message}`,
     });
   }
 
@@ -774,20 +765,16 @@ export const stopVolumeBotSession = async (sessionId: string) => {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(
+      log.error(
         `[Worker] DB update after successful reclaim failed: ${message}`
       );
-      await prisma.volumeBotLog.create({
+      await persistVolumeBotLog({
+        sessionId: session.id,
+        level: "ERROR",
+        type: "reclaim",
+        message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
         data: {
-          sessionId: session.id,
-          level: "ERROR",
-          type: "reclaim",
-          message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
-          data: {
-            signatures: reclaimResults.results.map(
-              (r) => r.signature ?? null
-            ),
-          },
+          signatures: reclaimResults.results.map((r) => r.signature ?? null),
         },
       });
     }
@@ -842,28 +829,24 @@ export const reclaimVolumeBotSession = async (sessionId: string) => {
     );
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    console.error(
+    log.error(
       `[Worker] DB update after successful reclaim failed: ${message}`
     );
-    await prisma.volumeBotLog.create({
-      data: {
-        sessionId: session.id,
-        level: "ERROR",
-        type: "reclaim",
-        message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
-        data: { signatures },
-      },
+    await persistVolumeBotLog({
+      sessionId: session.id,
+      level: "ERROR",
+      type: "reclaim",
+      message: `SOL was reclaimed on-chain but wallet status update failed: ${message}`,
+      data: { signatures },
     });
   }
 
-  await prisma.volumeBotLog.create({
-    data: {
-      sessionId: session.id,
-      level: "INFO",
-      type: "reclaim",
-      message: "Reclaim requested",
-      data: { signatures },
-    },
+  await persistVolumeBotLog({
+    sessionId: session.id,
+    level: "INFO",
+    type: "reclaim",
+    message: "Reclaim requested",
+    data: { signatures },
   });
 
   for (const publicKey of walletPublicKeys) {

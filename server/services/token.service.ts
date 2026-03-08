@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import type { Prisma } from "@/lib/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { getServerUser } from "@/lib/utils/auth";
 import type { CreateTokenInput } from "@/server/schemas/token.schema";
@@ -14,6 +15,21 @@ import type { TokenListPaginationInput } from "@/server/schemas/token.schema";
 const DEFAULT_TOKEN_PAGE = 1;
 const DEFAULT_TOKEN_PAGE_SIZE = 50;
 const MAX_TOKEN_PAGE_SIZE = 100;
+
+const tokenPublicSelect = {
+  publicKey: true,
+  status: true,
+  name: true,
+  symbol: true,
+  description: true,
+  imageUrl: true,
+  websiteUrl: true,
+  twitterUrl: true,
+  telegramUrl: true,
+  createdAt: true,
+  updatedAt: true,
+  userId: true,
+} satisfies Prisma.TokenSelect;
 
 export const tokenService = {
   async getUserTokens(
@@ -47,6 +63,7 @@ export const tokenService = {
       const [items, totalCount] = await Promise.all([
         prisma.token.findMany({
           where,
+          select: tokenPublicSelect,
           orderBy: { createdAt: "desc" },
           skip,
           take: pageSize,
@@ -92,6 +109,7 @@ export const tokenService = {
       const [items, totalCount] = await Promise.all([
         prisma.token.findMany({
           where,
+          select: tokenPublicSelect,
           orderBy: { createdAt: "desc" },
           skip,
           take: pageSize,
@@ -134,6 +152,7 @@ export const tokenService = {
           websiteUrl: input.website || null,
           userId,
         },
+        select: tokenPublicSelect,
       });
 
       const { SHYFT_API_KEY, APP_URL } = getEnv();
@@ -186,6 +205,7 @@ export const tokenService = {
   async getTokenByPublicKey(publicKey: string, userId: string) {
     const token = await prisma.token.findFirst({
       where: { publicKey, userId },
+      select: tokenPublicSelect,
     });
 
     if (!token) {
@@ -193,6 +213,19 @@ export const tokenService = {
     }
 
     return token;
+  },
+
+  async getTokenPrivateKeyByPublicKey(publicKey: string, userId: string) {
+    const token = await prisma.token.findFirst({
+      where: { publicKey, userId },
+      select: { privateKey: true },
+    });
+
+    if (!token) {
+      throw new AppError("Token not found", 404);
+    }
+
+    return { privateKey: token.privateKey };
   },
 };
 
