@@ -10,6 +10,8 @@
  */
 export type * from './models/TestTable'
 export type * from './models/User'
+export type * from './models/AuthSession'
+export type * from './models/RefreshToken'
 export type * from './models/Wallet'
 export type * from './models/Token'
 export type * from './models/TokenDevWallet'

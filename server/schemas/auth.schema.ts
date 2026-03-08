@@ -27,6 +27,8 @@ export const loginWithPrivateKeySchema = z.object({
   privateKey: z.string().min(32, "Invalid private key"),
 });
 
+export const refreshSessionSchema = z.object({});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginWithPrivateKeyInput = z.infer<
   typeof loginWithPrivateKeySchema

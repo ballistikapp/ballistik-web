@@ -28,6 +28,16 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model AuthSession
+ * 
+ */
+export type AuthSession = Prisma.AuthSessionModel
+/**
+ * Model RefreshToken
+ * 
+ */
+export type RefreshToken = Prisma.RefreshTokenModel
+/**
  * Model Wallet
  * 
  */

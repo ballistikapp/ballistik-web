@@ -6,6 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { transactionService } from "@/server/services/transaction.service";
 import type { RefreshScope } from "@/lib/generated/prisma/enums";
+import { checkReplayWindow, ensureRateLimit } from "@/server/security/api-abuse";
 
 type ShyftCallbackPayload = {
   type?: string;
@@ -159,20 +160,84 @@ async function resolveTokenPublicKeys(payload: ShyftCallbackPayload) {
   return tokenPublicKeys;
 }
 
+function resolveClientIp(headers: Headers): string {
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const first = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean);
+    if (first) {
+      return first;
+    }
+  }
+  const realIp = headers.get("x-real-ip");
+  if (realIp) {
+    return realIp.trim();
+  }
+  return "unknown";
+}
+
 export async function POST(request: Request) {
   try {
     const env = getEnv();
     const callbackSecret = env.SHYFT_CALLBACK_SECRET;
+    const clientIp = resolveClientIp(request.headers);
 
-    if (callbackSecret) {
-      const apiKeyHeader = request.headers.get("x-api-key");
-      if (apiKeyHeader !== callbackSecret) {
-        logger.warn("Shyft callback: invalid x-api-key header");
-        return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-      }
+    ensureRateLimit({
+      tier: "webhook",
+      key: `${clientIp}:shyft`,
+    });
+
+    const maxPayloadBytes = 250_000;
+    const contentLengthHeader = request.headers.get("content-length");
+    const contentLength = contentLengthHeader ? Number(contentLengthHeader) : 0;
+    if (contentLength > maxPayloadBytes) {
+      logger.warn("Shyft callback: payload too large", {
+        clientIp,
+        contentLength,
+      });
+      return NextResponse.json({ error: "Payload too large" }, { status: 413 });
+    }
+
+    if (process.env.NODE_ENV === "production" && !callbackSecret) {
+      logger.error("Shyft callback: SHYFT_CALLBACK_SECRET missing in production");
+      return NextResponse.json(
+        { error: "Callback auth not configured" },
+        { status: 500 }
+      );
+    }
+
+    const apiKeyHeader = request.headers.get("x-api-key");
+    if (!callbackSecret || apiKeyHeader !== callbackSecret) {
+      logger.warn("Shyft callback: invalid x-api-key header", {
+        clientIp,
+      });
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
     const payload = (await request.json()) as ShyftCallbackPayload;
+    const replayCandidates =
+      payload.signatures && payload.signatures.length > 0
+        ? payload.signatures
+        : [
+            `${payload.type ?? "unknown"}:${payload.timestamp ?? "none"}:${payload.fee_payer ?? "none"}`,
+          ];
+    const isReplay = replayCandidates.some(
+      (value) =>
+        !checkReplayWindow({
+          scope: "shyft-callback",
+          value,
+          windowMs: 5 * 60_000,
+        })
+    );
+    if (isReplay) {
+      logger.warn("Shyft callback: replay detected", {
+        clientIp,
+      });
+      return NextResponse.json({ error: "Duplicate callback" }, { status: 409 });
+    }
+
     const walletAddresses = extractAffectedAddresses(payload);
     const tokenAddresses = await resolveTokenPublicKeys(payload);
     const signatures = Array.from(new Set(payload.signatures ?? []));

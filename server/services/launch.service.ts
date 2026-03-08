@@ -34,6 +34,7 @@ import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { storageService } from "@/server/services/storage.service";
+import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -1923,18 +1924,46 @@ export const launchService = {
   },
 
   async startLaunch(input: LaunchTokenInput, userId: string) {
-    const launch = await prisma.launch.create({
-      data: {
-        userId,
-        status: "PENDING",
-        input,
-      },
+    const idempotencyKey = [
+      "launch-start",
+      userId,
+      input.tokenName.trim().toLowerCase(),
+      normalizeSymbol(input.tokenSymbol),
+    ].join(":");
+    const actionKey = `launch:start:${userId}`;
+
+    return await withActionLock(actionKey, async () => {
+      return await withIdempotency({
+        key: idempotencyKey,
+        ttlMs: 15_000,
+        execute: async () => {
+          const existing = await prisma.launch.findFirst({
+            where: {
+              userId,
+              status: { in: ["PENDING", "RUNNING"] },
+            },
+            orderBy: { createdAt: "desc" },
+            select: { id: true },
+          });
+          if (existing) {
+            return { launchId: existing.id };
+          }
+
+          const launch = await prisma.launch.create({
+            data: {
+              userId,
+              status: "PENDING",
+              input,
+            },
+          });
+
+          appendLog(launch.id, "STEP", "Launch queued", "queue");
+          void this.runLaunchJob(launch.id);
+
+          return { launchId: launch.id };
+        },
+      });
     });
-
-    appendLog(launch.id, "STEP", "Launch queued", "queue");
-    void this.runLaunchJob(launch.id);
-
-    return { launchId: launch.id };
   },
 
   async getLaunchStatus(launchId: string, userId: string) {

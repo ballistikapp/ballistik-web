@@ -21,6 +21,7 @@ model User {
   mainWalletPublicKey String @unique
   mainWallet Wallet @relation("UserMainWallet", fields: [mainWalletPublicKey], references: [publicKey])
   wallets Wallet[] @relation("WalletUser")
+  authSessions AuthSession[] @relation("AuthSessionUser")
   tokens Token[] @relation("TokenUser")
   launches Launch[] @relation("LaunchUser")
   holdingExits HoldingExit[] @relation("HoldingExitUser")
@@ -31,6 +32,42 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
+}
+
+model AuthSession {
+  id String @id @default(cuid())
+  userId String
+  user User @relation("AuthSessionUser", fields: [userId], references: [id])
+  ip String?
+  userAgent String?
+  lastSeenAt DateTime @default(now())
+  expiresAt DateTime
+  revokedAt DateTime?
+  refreshTokens RefreshToken[] @relation("AuthSessionRefreshTokens")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([userId, createdAt])
+  @@index([userId, revokedAt])
+  @@index([expiresAt])
+  @@map("AuthSession")
+}
+
+model RefreshToken {
+  id String @id @default(cuid())
+  sessionId String
+  session AuthSession @relation("AuthSessionRefreshTokens", fields: [sessionId], references: [id])
+  tokenHash String @unique
+  expiresAt DateTime
+  usedAt DateTime?
+  revokedAt DateTime?
+  replacedById String?
+  replacedBy RefreshToken? @relation("RefreshTokenRotation", fields: [replacedById], references: [id])
+  replaces RefreshToken[] @relation("RefreshTokenRotation")
+  createdAt DateTime @default(now())
+  @@index([sessionId, createdAt])
+  @@index([sessionId, revokedAt])
+  @@index([expiresAt])
+  @@map("RefreshToken")
 }
 
 model Wallet {

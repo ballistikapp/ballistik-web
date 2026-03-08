@@ -6,6 +6,30 @@ import { randomUUID } from "crypto";
 import { initVolumeBotTimers } from "@/lib/volume-bot-init";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 
+function resolveClientIp(headers: Headers | undefined): string {
+  if (!headers) {
+    return "unknown";
+  }
+
+  const forwarded = headers.get("x-forwarded-for");
+  if (forwarded) {
+    const firstIp = forwarded
+      .split(",")
+      .map((part) => part.trim())
+      .find(Boolean);
+    if (firstIp) {
+      return firstIp;
+    }
+  }
+
+  const realIp = headers.get("x-real-ip");
+  if (realIp) {
+    return realIp.trim();
+  }
+
+  return "unknown";
+}
+
 export async function createContext(opts?: FetchCreateContextFnOptions) {
   void initVolumeBotTimers().catch((error) => {
     const message = error instanceof Error ? error.message : String(error);
@@ -29,8 +53,12 @@ export async function createContext(opts?: FetchCreateContextFnOptions) {
 
   const requestId =
     opts?.req.headers.get("x-request-id") ?? randomUUID();
+  const clientIp = resolveClientIp(opts?.req.headers);
+  const userAgent = opts?.req.headers.get("user-agent") ?? "unknown";
   const requestLogger = logger.child({
     requestId,
+    clientIp,
+    userAgent,
     ...(user?.id ? { userId: user.id } : {}),
   });
 
@@ -38,6 +66,8 @@ export async function createContext(opts?: FetchCreateContextFnOptions) {
     user,
     headers: opts?.req.headers,
     requestId,
+    clientIp,
+    userAgent,
     logger: requestLogger,
   };
 }

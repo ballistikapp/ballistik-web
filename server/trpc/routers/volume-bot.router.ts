@@ -1,4 +1,9 @@
-import { router, protectedProcedure } from "../trpc";
+import {
+  expensiveProtectedProcedure,
+  protectedRateLimitedProcedure,
+  router,
+  sensitiveProcedure,
+} from "../trpc";
 import { volumeBotService } from "@/server/services/volume-bot.service";
 import { volumeBotPresetService } from "@/server/services/volume-bot-presets.service";
 import {
@@ -16,62 +21,62 @@ import {
 } from "@/server/schemas/volume-bot.schema";
 
 export const volumeBotRouter = router({
-  start: protectedProcedure
+  start: expensiveProtectedProcedure
     .input(startVolumeBotSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotService.startSession(input, ctx.user.id);
     }),
-  status: protectedProcedure
+  status: protectedRateLimitedProcedure
     .input(volumeBotStatusSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.getStatus(input, ctx.user.id);
     }),
-  stop: protectedProcedure
+  stop: expensiveProtectedProcedure
     .input(stopVolumeBotSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotService.stopSession(input.sessionId, ctx.user.id);
     }),
-  reclaim: protectedProcedure
+  reclaim: sensitiveProcedure
     .input(reclaimVolumeBotSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotService.reclaimFunds(input, ctx.user.id);
     }),
-  closeAccounts: protectedProcedure
+  closeAccounts: sensitiveProcedure
     .input(closeVolumeBotAccountsSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotService.closeTokenAccounts(input, ctx.user.id);
     }),
-  listSessions: protectedProcedure
+  listSessions: protectedRateLimitedProcedure
     .input(listVolumeBotSessionsSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.listSessions(input, ctx.user.id);
     }),
-  eligibleWallets: protectedProcedure
+  eligibleWallets: protectedRateLimitedProcedure
     .input(volumeBotEligibleWalletsSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.listEligibleWallets(input, ctx.user.id);
     }),
-  selectionSummary: protectedProcedure
+  selectionSummary: protectedRateLimitedProcedure
     .input(volumeBotSelectionSummarySchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.getSelectionSummary(input, ctx.user.id);
     }),
-  logs: protectedProcedure
+  logs: protectedRateLimitedProcedure
     .input(stopVolumeBotSchema)
     .query(async ({ input, ctx }) => {
       return await volumeBotService.getLogs(input.sessionId, ctx.user.id);
     }),
-  listPresets: protectedProcedure
+  listPresets: protectedRateLimitedProcedure
     .input(listVolumeBotPresetsSchema)
     .query(async ({ ctx }) => {
       return await volumeBotPresetService.listPresets(ctx.user.id);
     }),
-  savePreset: protectedProcedure
+  savePreset: expensiveProtectedProcedure
     .input(saveVolumeBotPresetSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotPresetService.savePreset(input, ctx.user.id);
     }),
-  deletePreset: protectedProcedure
+  deletePreset: expensiveProtectedProcedure
     .input(deleteVolumeBotPresetSchema)
     .mutation(async ({ input, ctx }) => {
       return await volumeBotPresetService.deletePreset(input.presetId, ctx.user.id);

@@ -29,6 +29,7 @@ import type {
   ExitStatusInput,
   StartExitInput,
 } from "@/server/schemas/holding.schema";
+import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
 const cancelledExits = new Set<string>();
 
@@ -942,34 +943,45 @@ async function runExitFlow(exitId: string) {
 
 export const holdingExitService = {
   async startExit(input: StartExitInput, userId: string) {
-    const existing = await prisma.holdingExit.findFirst({
-      where: {
-        userId,
-        tokenPublicKey: input.tokenPublicKey,
-        status: { in: ["PENDING", "RUNNING"] },
-      },
-      orderBy: { createdAt: "desc" },
+    const actionKey = `holding-exit:start:${userId}:${input.tokenPublicKey}`;
+    const idempotencyKey = `holding-exit:${userId}:${input.tokenPublicKey}`;
+
+    return await withActionLock(actionKey, async () => {
+      return await withIdempotency({
+        key: idempotencyKey,
+        ttlMs: 15_000,
+        execute: async () => {
+          const existing = await prisma.holdingExit.findFirst({
+            where: {
+              userId,
+              tokenPublicKey: input.tokenPublicKey,
+              status: { in: ["PENDING", "RUNNING"] },
+            },
+            orderBy: { createdAt: "desc" },
+          });
+
+          if (existing) {
+            return { exitId: existing.id };
+          }
+
+          const exit = await prisma.holdingExit.create({
+            data: {
+              userId,
+              tokenPublicKey: input.tokenPublicKey,
+              status: "PENDING",
+              progress: 0,
+              currentStep: "Queued",
+              input,
+            },
+          });
+
+          await appendExitLog(exit.id, "STEP", "Exit queued", "queue");
+          void runExitFlow(exit.id);
+
+          return { exitId: exit.id };
+        },
+      });
     });
-
-    if (existing) {
-      return { exitId: existing.id };
-    }
-
-    const exit = await prisma.holdingExit.create({
-      data: {
-        userId,
-        tokenPublicKey: input.tokenPublicKey,
-        status: "PENDING",
-        progress: 0,
-        currentStep: "Queued",
-        input,
-      },
-    });
-
-    await appendExitLog(exit.id, "STEP", "Exit queued", "queue");
-    void runExitFlow(exit.id);
-
-    return { exitId: exit.id };
   },
 
   async getExitStatus(input: ExitStatusInput, userId: string) {

@@ -5,7 +5,6 @@ const publicRoutes = [
   "/",
   "/auth",
   "/api/trpc",
-  "/api/wallets/refresh",
   "/api/webhooks/",
 ];
 

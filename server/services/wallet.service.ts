@@ -17,6 +17,7 @@ import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
+import { withActionLock } from "@/server/security/api-abuse";
 
 export const walletService = {
   async getOperationalWalletsByToken(
@@ -542,6 +543,8 @@ export const walletService = {
     walletPublicKeys: string[],
     amountSol: number
   ): Promise<WalletTransferResult> {
+    const actionKey = `wallet:send-sol:${userId}:${tokenPublicKey}`;
+    return await withActionLock(actionKey, async () => {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
       select: { publicKey: true },
@@ -714,6 +717,7 @@ export const walletService = {
       skippedCount,
       results,
     };
+    });
   },
 
   async returnSolToMainWallet(
@@ -723,6 +727,8 @@ export const walletService = {
     amountSol?: number,
     useMax?: boolean
   ): Promise<WalletTransferResult> {
+    const actionKey = `wallet:return-sol:${userId}:${tokenPublicKey}`;
+    return await withActionLock(actionKey, async () => {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
       select: { publicKey: true },
@@ -939,6 +945,7 @@ export const walletService = {
       skippedCount,
       results,
     };
+    });
   },
 };
 

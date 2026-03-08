@@ -1,4 +1,9 @@
-import { router, protectedProcedure } from "../trpc";
+import {
+  expensiveProtectedProcedure,
+  protectedRateLimitedProcedure,
+  router,
+  sensitiveProcedure,
+} from "../trpc";
 import { launchService } from "@/server/services/launch.service";
 import {
   launchRecoverSolByTokenSchema,
@@ -10,30 +15,30 @@ import {
 } from "@/server/schemas/launch.schema";
 
 export const launchRouter = router({
-  start: protectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
+  start: expensiveProtectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
     return await launchService.startLaunch(input, ctx.user.id);
   }),
-  status: protectedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
+  status: protectedRateLimitedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
     return await launchService.getLaunchStatus(input.launchId, ctx.user.id);
   }),
-  cancel: protectedProcedure.input(launchStatusSchema).mutation(async ({ input, ctx }) => {
+  cancel: expensiveProtectedProcedure.input(launchStatusSchema).mutation(async ({ input, ctx }) => {
     return await launchService.cancelLaunch(input.launchId, ctx.user.id);
   }),
-  getActive: protectedProcedure.query(async ({ ctx }) => {
+  getActive: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getActiveLaunch(ctx.user.id);
   }),
-  getFailedLaunches: protectedProcedure.query(async ({ ctx }) => {
+  getFailedLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getFailedLaunches(ctx.user.id);
   }),
-  getUserLaunches: protectedProcedure.query(async ({ ctx }) => {
+  getUserLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getUserLaunches(ctx.user.id);
   }),
-  recoveryWallets: protectedProcedure
+  recoveryWallets: protectedRateLimitedProcedure
     .input(launchRecoverySchema)
     .query(async ({ input, ctx }) => {
       return await launchService.getRecoveryWallets(input.launchId, ctx.user.id);
     }),
-  recoveryWalletsByToken: protectedProcedure
+  recoveryWalletsByToken: protectedRateLimitedProcedure
     .input(launchRecoveryByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await launchService.getRecoveryWalletsByToken(
@@ -41,7 +46,7 @@ export const launchRouter = router({
         ctx.user.id
       );
     }),
-  recoverSol: protectedProcedure
+  recoverSol: sensitiveProcedure
     .input(launchRecoverSolSchema)
     .mutation(async ({ input, ctx }) => {
       return await launchService.recoverSol(
@@ -50,7 +55,7 @@ export const launchRouter = router({
         input.walletPublicKeys
       );
     }),
-  recoverSolByToken: protectedProcedure
+  recoverSolByToken: sensitiveProcedure
     .input(launchRecoverSolByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await launchService.recoverSolByToken(

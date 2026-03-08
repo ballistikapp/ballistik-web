@@ -27,6 +27,7 @@ import {
   computeSellQuote,
   fetchPumpQuoteState,
 } from "@/server/solana/pump-quotes";
+import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -380,6 +381,14 @@ const resolveEligibleWallets = async (
 
 export const volumeBotService = {
   async startSession(input: StartVolumeBotInput, userId: string) {
+    const actionKey = `volume-bot:start:${userId}:${input.tokenPublicKey}`;
+    const idempotencyKey = `volume-bot:start:${userId}:${input.tokenPublicKey}`;
+
+    return await withActionLock(actionKey, async () =>
+      withIdempotency({
+        key: idempotencyKey,
+        ttlMs: 15_000,
+        execute: async () => {
     const { token, wallets: eligibleWallets } = await resolveEligibleWallets(
       input.tokenPublicKey,
       userId
@@ -611,6 +620,9 @@ export const volumeBotService = {
       scheduledStartAt,
       scheduledStopAt,
     };
+        },
+      })
+    );
   },
 
   async getStatus(input: VolumeBotStatusInput, userId: string) {

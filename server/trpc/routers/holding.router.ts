@@ -1,4 +1,9 @@
-import { router, protectedProcedure } from "../trpc";
+import {
+  expensiveProtectedProcedure,
+  protectedRateLimitedProcedure,
+  router,
+  sensitiveProcedure,
+} from "../trpc";
 import { holdingService } from "@/server/services/holding.service";
 import { holdingExitService } from "@/server/services/holding-exit.service";
 import {
@@ -12,37 +17,37 @@ import {
 } from "@/server/schemas/holding.schema";
 
 export const holdingRouter = router({
-  listByToken: protectedProcedure
+  listByToken: protectedRateLimitedProcedure
     .input(listHoldingsByTokenSchema)
     .query(async ({ input, ctx }) => {
       return await holdingService.listByToken(input, ctx.user.id);
     }),
-  refreshByToken: protectedProcedure
+  refreshByToken: expensiveProtectedProcedure
     .input(refreshHoldingsByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingService.refreshByToken(input, ctx.user.id);
     }),
-  sellByToken: protectedProcedure
+  sellByToken: sensitiveProcedure
     .input(sellHoldingsByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingService.sellByToken(input, ctx.user.id);
     }),
-  startExit: protectedProcedure
+  startExit: expensiveProtectedProcedure
     .input(startExitSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingExitService.startExit(input, ctx.user.id);
     }),
-  exitStatus: protectedProcedure
+  exitStatus: protectedRateLimitedProcedure
     .input(exitStatusSchema)
     .query(async ({ input, ctx }) => {
       return await holdingExitService.getExitStatus(input, ctx.user.id);
     }),
-  getActiveExit: protectedProcedure
+  getActiveExit: protectedRateLimitedProcedure
     .input(activeExitSchema)
     .query(async ({ input, ctx }) => {
       return await holdingExitService.getActiveExit(input, ctx.user.id);
     }),
-  cancelExit: protectedProcedure
+  cancelExit: expensiveProtectedProcedure
     .input(cancelExitSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingExitService.cancelExit(input, ctx.user.id);
