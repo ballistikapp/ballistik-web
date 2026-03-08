@@ -51,47 +51,62 @@ import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog"
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
 
-const formSchema = z.object({
-  tokenName: z
-    .string()
-    .min(1, "Token name is required")
-    .max(32, "Token name must be at most 32 characters"),
-  tokenSymbol: z
-    .string()
-    .min(1, "Token symbol is required")
-    .max(10, "Token symbol must be at most 10 characters"),
-  description: z
-    .string()
-    .max(500, "Description must be at most 500 characters"),
-  tokenImage: z.string().min(1, "Main image or video is required"),
-  tokenBanner: z.string(),
-  twitter: z.string(),
-  telegram: z.string(),
-  website: z.string(),
-  devWalletOption: z.enum(["import", "generate", "use_main"]),
-  importedDevWalletKey: z.string(),
-  devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
-  jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
-  bundleBuyEnabled: z.boolean(),
-  vanityMint: z.boolean(),
-  bundlerWalletCount: z
-    .number()
-    .int()
-    .min(0, "Bundler wallet count must be 0 or more")
-    .max(10, "Bundler wallet count must be 10 or less"),
-  bundlerBuyAmountSol: z
-    .number()
-    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
-  bundlerBuyVariancePercent: z
-    .number()
-    .min(0, "Bundler buy variance must be 0 or more")
-    .max(50, "Bundler buy variance must be 50 or less"),
-  distributionWalletMultiplier: z
-    .number()
-    .int()
-    .min(1, "Distribution multiplier must be at least 1")
-    .max(5, "Distribution multiplier must be 5 or less"),
-});
+const formSchema = z
+  .object({
+    tokenName: z
+      .string()
+      .min(1, "Token name is required")
+      .max(32, "Token name must be at most 32 characters"),
+    tokenSymbol: z
+      .string()
+      .min(1, "Token symbol is required")
+      .max(10, "Token symbol must be at most 10 characters"),
+    description: z
+      .string()
+      .max(500, "Description must be at most 500 characters"),
+    tokenImage: z.string().min(1, "Main image or video is required"),
+    tokenBanner: z.string(),
+    twitter: z.string(),
+    telegram: z.string(),
+    website: z.string(),
+    devWalletOption: z.enum(["import", "generate", "use_main"]),
+    importedDevWalletKey: z.string(),
+    devBuyAmountSol: z
+      .number()
+      .positive("Dev buy amount must be greater than 0"),
+    jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
+    bundleBuyEnabled: z.boolean(),
+    vanityMint: z.boolean(),
+    bundlerWalletCount: z
+      .number()
+      .int()
+      .min(0, "Bundler wallet count must be 0 or more")
+      .max(10, "Bundler wallet count must be 10 or less"),
+    bundlerBuyAmountSol: z
+      .number()
+      .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+    bundlerBuyVariancePercent: z
+      .number()
+      .min(0, "Bundler buy variance must be 0 or more")
+      .max(50, "Bundler buy variance must be 50 or less"),
+    distributionWalletMultiplier: z
+      .number()
+      .int()
+      .min(1, "Distribution multiplier must be at least 1")
+      .max(5, "Distribution multiplier must be 5 or less"),
+  })
+  .superRefine((values, ctx) => {
+    if (
+      values.devWalletOption === "import" &&
+      !values.importedDevWalletKey.trim()
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["importedDevWalletKey"],
+        message: "Dev wallet private key is required",
+      });
+    }
+  });
 
 const MAIN_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"];
 const MAIN_VIDEO_MIME_TYPES = ["video/mp4"];
@@ -367,6 +382,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       const result = reader.result as string;
       setImagePreview(result);
       form.setFieldValue("tokenImage", result);
+      revalidateAfterSubmitAttempt();
     };
     reader.onerror = () => {
       toast.error("Failed to read file", {
@@ -425,6 +441,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       const result = reader.result as string;
       setBannerPreview(result);
       form.setFieldValue("tokenBanner", result);
+      revalidateAfterSubmitAttempt();
     };
     reader.onerror = () => {
       toast.error("Failed to read banner file", {
@@ -439,12 +456,14 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     setImagePreview(null);
     form.setFieldValue("tokenImage", "");
     resetMainMediaInput();
+    revalidateAfterSubmitAttempt();
   };
 
   const removeBanner = () => {
     setBannerPreview(null);
     form.setFieldValue("tokenBanner", "");
     resetBannerInput();
+    revalidateAfterSubmitAttempt();
   };
 
   const defaults = {
@@ -500,6 +519,22 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
   });
 
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
+  const showSubmitErrors = form.state.submissionAttempts > 0;
+  const getIsInvalid = (field: {
+    state: {
+      meta: {
+        isTouched: boolean;
+        errors: Array<{ message?: string } | undefined>;
+      };
+    };
+  }) =>
+    (field.state.meta.isTouched || showSubmitErrors) &&
+    field.state.meta.errors.length > 0;
+  const revalidateAfterSubmitAttempt = () => {
+    if (showSubmitErrors) {
+      form.validateAllFields("submit");
+    }
+  };
 
   const handleConfirmLaunch = async () => {
     const values = form.state.values;
@@ -538,7 +573,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         id="launch-form"
         onSubmit={(e) => {
           e.preventDefault();
-          form.handleSubmit();
+          form.validateAllFields("submit");
+          void form.handleSubmit();
         }}
         className="space-y-0"
       >
@@ -550,8 +586,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 <div className="space-y-4">
                   <form.Field name="tokenName">
                     {(field) => {
-                      const isInvalid =
-                        field.state.meta.isTouched && !field.state.meta.isValid;
+                      const isInvalid = getIsInvalid(field);
                       return (
                         <Field data-invalid={isInvalid}>
                           <FieldLabel htmlFor={field.name}>
@@ -564,7 +599,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             onBlur={field.handleBlur}
                             onChange={(e) => field.handleChange(e.target.value)}
                             aria-invalid={isInvalid}
-                            placeholder="My Awesome Token"
+                            placeholder="My Token"
                             autoComplete="off"
                           />
                           {isInvalid && (
@@ -576,8 +611,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   </form.Field>
                   <form.Field name="tokenSymbol">
                     {(field) => {
-                      const isInvalid =
-                        field.state.meta.isTouched && !field.state.meta.isValid;
+                      const isInvalid = getIsInvalid(field);
                       return (
                         <Field data-invalid={isInvalid}>
                           <FieldLabel htmlFor={field.name}>
@@ -592,7 +626,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               field.handleChange(e.target.value.toUpperCase())
                             }
                             aria-invalid={isInvalid}
-                            placeholder="MAT"
+                            placeholder="MTK"
                             autoComplete="off"
                           />
                           {isInvalid && (
@@ -627,18 +661,21 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   </div>
                   <form.Field name="description">
                     {(field) => {
-                      const isInvalid =
-                        field.state.meta.isTouched && !field.state.meta.isValid;
+                      const isInvalid = getIsInvalid(field);
                       return (
                         <Field data-invalid={isInvalid}>
-                          <FieldLabel htmlFor={field.name}>Description</FieldLabel>
+                          <FieldLabel htmlFor={field.name}>
+                            Description
+                          </FieldLabel>
                           <InputGroup>
                             <InputGroupTextarea
                               id={field.name}
                               name={field.name}
                               value={field.state.value}
                               onBlur={field.handleBlur}
-                              onChange={(e) => field.handleChange(e.target.value)}
+                              onChange={(e) =>
+                                field.handleChange(e.target.value)
+                              }
                               placeholder="Describe your token and its purpose..."
                               rows={4}
                               className="min-h-24 resize-none"
@@ -657,14 +694,106 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       );
                     }}
                   </form.Field>
+                </div>
+                <div className="space-y-6">
+                  <form.Field name="tokenImage">
+                    {(field) => {
+                      const isInvalid = getIsInvalid(field);
+                      return (
+                        <Field data-invalid={isInvalid}>
+                          <FieldLabel>Main Image</FieldLabel>
+                          <div className="flex items-start gap-4">
+                            <div
+                              className={cn(
+                                "relative flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
+                                imagePreview
+                                  ? "border-transparent"
+                                  : "border-muted-foreground/25 hover:border-muted-foreground/50",
+                                isInvalid &&
+                                  !imagePreview &&
+                                  "border-destructive hover:border-destructive"
+                              )}
+                            >
+                              {imagePreview ? (
+                                <>
+                                  {isVideoPreview ? (
+                                    <video
+                                      src={imagePreview}
+                                      className="h-full w-full rounded-xl object-cover"
+                                      muted
+                                      loop
+                                      playsInline
+                                      autoPlay
+                                    />
+                                  ) : (
+                                    <img
+                                      src={imagePreview}
+                                      alt="Main media preview"
+                                      className="h-full w-full rounded-xl object-cover"
+                                    />
+                                  )}
+                                  <button
+                                    type="button"
+                                    onClick={removeMainMedia}
+                                    className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
+                                  >
+                                    <X className="h-3.5 w-3.5" />
+                                  </button>
+                                </>
+                              ) : (
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    mainMediaInputRef.current?.click()
+                                  }
+                                  className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground"
+                                  aria-invalid={isInvalid}
+                                >
+                                  <ImagePlus className="h-6 w-6" />
+                                  <span className="text-xs">Upload</span>
+                                </button>
+                              )}
+                            </div>
+                            <input
+                              ref={mainMediaInputRef}
+                              type="file"
+                              accept="image/png, image/jpeg, image/gif, video/mp4"
+                              onChange={handleMainMediaUpload}
+                              className="hidden"
+                            />
+                            <div className="space-y-1 text-sm text-muted-foreground">
+                              <p className="font-medium text-foreground">
+                                File size and type
+                              </p>
+                              <p>
+                                Image - max 15MB. &quot;.jpg&quot;,
+                                &quot;.gif&quot; or &quot;.png&quot; recommended
+                              </p>
+                              <p>
+                                Video - max 30MB. &quot;.mp4&quot; recommended
+                              </p>
+                              <p className="pt-2 font-medium text-foreground">
+                                Resolution and aspect ratio
+                              </p>
+                              <p>
+                                Image - 1:1 square recommended (1000x1000px+)
+                              </p>
+                              <p>Video - 16:9 or 9:16, 1080p+ recommended</p>
+                              {isInvalid && (
+                                <FieldError errors={field.state.meta.errors} />
+                              )}
+                            </div>
+                          </div>
+                        </Field>
+                      );
+                    }}
+                  </form.Field>
                   <div className="pt-2">
                     <p className="text-sm font-medium mb-3">Social Links</p>
                     <div className="grid grid-cols-3 gap-4">
                       <form.Field name="twitter">
                         {(field) => {
-                          const isInvalid =
-                            field.state.meta.isTouched &&
-                            !field.state.meta.isValid;
+                          const isInvalid = getIsInvalid(field);
                           return (
                             <Field data-invalid={isInvalid}>
                               <FieldLabel htmlFor={field.name}>
@@ -691,9 +820,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       </form.Field>
                       <form.Field name="telegram">
                         {(field) => {
-                          const isInvalid =
-                            field.state.meta.isTouched &&
-                            !field.state.meta.isValid;
+                          const isInvalid = getIsInvalid(field);
                           return (
                             <Field data-invalid={isInvalid}>
                               <FieldLabel htmlFor={field.name}>
@@ -720,12 +847,12 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       </form.Field>
                       <form.Field name="website">
                         {(field) => {
-                          const isInvalid =
-                            field.state.meta.isTouched &&
-                            !field.state.meta.isValid;
+                          const isInvalid = getIsInvalid(field);
                           return (
                             <Field data-invalid={isInvalid}>
-                              <FieldLabel htmlFor={field.name}>Website</FieldLabel>
+                              <FieldLabel htmlFor={field.name}>
+                                Website
+                              </FieldLabel>
                               <Input
                                 id={field.name}
                                 name={field.name}
@@ -747,81 +874,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       </form.Field>
                     </div>
                   </div>
-                </div>
-                <div className="space-y-6">
-                  <Field>
-                    <FieldLabel>Main Image</FieldLabel>
-                    <div className="flex items-start gap-4">
-                    <div
-                      className={cn(
-                        "relative flex h-24 w-24 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
-                        imagePreview
-                          ? "border-transparent"
-                          : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                      )}
-                    >
-                      {imagePreview ? (
-                        <>
-                          {isVideoPreview ? (
-                            <video
-                              src={imagePreview}
-                              className="h-full w-full rounded-xl object-cover"
-                              muted
-                              loop
-                              playsInline
-                              autoPlay
-                            />
-                          ) : (
-                            <img
-                              src={imagePreview}
-                              alt="Main media preview"
-                              className="h-full w-full rounded-xl object-cover"
-                            />
-                          )}
-                          <button
-                            type="button"
-                            onClick={removeMainMedia}
-                            className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
-                          >
-                            <X className="h-3.5 w-3.5" />
-                          </button>
-                        </>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => mainMediaInputRef.current?.click()}
-                          className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground"
-                        >
-                          <ImagePlus className="h-6 w-6" />
-                          <span className="text-xs">Upload</span>
-                        </button>
-                      )}
-                    </div>
-                    <input
-                      ref={mainMediaInputRef}
-                      type="file"
-                      accept="image/png, image/jpeg, image/gif, video/mp4"
-                      onChange={handleMainMediaUpload}
-                      className="hidden"
-                    />
-                    <div className="text-sm text-muted-foreground space-y-1">
-                      <p className="font-medium text-foreground">
-                        File size and type
-                      </p>
-                      <p>
-                        Image - max 15MB. &quot;.jpg&quot;, &quot;.gif&quot; or
-                        &quot;.png&quot; recommended
-                      </p>
-                      <p>Video - max 30MB. &quot;.mp4&quot; recommended</p>
-                      <p className="pt-2 font-medium text-foreground">
-                        Resolution and aspect ratio
-                      </p>
-                      <p>Image - 1:1 square recommended (1000x1000px+)</p>
-                      <p>Video - 16:9 or 9:16, 1080p+ recommended</p>
-                    </div>
-                    </div>
-                  </Field>
-                  <Field>
+                  {/* <Field>
                     <FieldLabel>Banner</FieldLabel>
                     <div className="flex items-start gap-4">
                     <div
@@ -886,7 +939,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       <p>3:1 aspect ratio, 1500x500px recommended</p>
                     </div>
                     </div>
-                  </Field>
+                  </Field> */}
                 </div>
               </div>
             </div>
@@ -963,16 +1016,28 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                     <div className="mt-2 h-9">
                       {devWalletOption === "import" && (
                         <form.Field name="importedDevWalletKey">
-                          {(field) => (
-                            <Input
-                              className="font-mono text-sm"
-                              placeholder="Enter private key..."
-                              value={field.state.value}
-                              onChange={(e) =>
-                                field.handleChange(e.target.value)
-                              }
-                            />
-                          )}
+                          {(field) => {
+                            const isInvalid = getIsInvalid(field);
+                            return (
+                              <Field data-invalid={isInvalid}>
+                                <Input
+                                  className="font-mono text-sm"
+                                  placeholder="Enter private key..."
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(e.target.value)
+                                  }
+                                  aria-invalid={isInvalid}
+                                />
+                                {isInvalid && (
+                                  <FieldError
+                                    errors={field.state.meta.errors}
+                                  />
+                                )}
+                              </Field>
+                            );
+                          }}
                         </form.Field>
                       )}
                       {devWalletOption === "generate" && (
@@ -991,37 +1056,44 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
               </Field>
 
               <form.Field name="devBuyAmountSol">
-                {(field) => (
-                  <Field>
-                    <div className="flex items-center gap-2 mb-1">
-                      <FieldLabel htmlFor={field.name}>
-                        Dev Buy Amount (SOL)
-                      </FieldLabel>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Amount of SOL the dev wallet will use to buy tokens
-                        </TooltipContent>
-                      </Tooltip>
-                    </div>
-                    <Input
-                      id={field.name}
-                      type="number"
-                      step="0.0001"
-                      min="0.05"
-                      max="100"
-                      value={field.state.value}
-                      onChange={(e) =>
-                        field.handleChange(e.target.valueAsNumber || 0)
-                      }
-                      placeholder="0"
-                    />
-                  </Field>
-                )}
+                {(field) => {
+                  const isInvalid = getIsInvalid(field);
+                  return (
+                    <Field data-invalid={isInvalid}>
+                      <div className="flex items-center gap-2 mb-1">
+                        <FieldLabel htmlFor={field.name}>
+                          Dev Buy Amount (SOL)
+                        </FieldLabel>
+                        <Tooltip>
+                          <TooltipTrigger>
+                            <Info className="h-4 w-4 text-muted-foreground" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Amount of SOL the dev wallet will use to buy tokens
+                          </TooltipContent>
+                        </Tooltip>
+                      </div>
+                      <Input
+                        id={field.name}
+                        type="number"
+                        step="0.0001"
+                        min="0.05"
+                        max="100"
+                        value={field.state.value}
+                        onBlur={field.handleBlur}
+                        onChange={(e) =>
+                          field.handleChange(e.target.valueAsNumber || 0)
+                        }
+                        placeholder="0"
+                        aria-invalid={isInvalid}
+                      />
+                      {isInvalid && (
+                        <FieldError errors={field.state.meta.errors} />
+                      )}
+                    </Field>
+                  );
+                }}
               </form.Field>
-
             </div>
           </PageSection>
         </section>
@@ -1054,54 +1126,75 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                     <div className="space-y-6">
                       <div className="grid grid-cols-2 gap-6">
                         <form.Field name="bundlerWalletCount">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={field.name}>
-                                Number of Wallets
-                              </FieldLabel>
-                              <Input
-                                id={field.name}
-                                type="number"
-                                min="1"
-                                max="10"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.valueAsNumber || 0
-                                  )
-                                }
-                                placeholder="5"
-                              />
-                              <FieldDescription>
-                                How many wallets to use for bundle buy (max 10)
-                              </FieldDescription>
-                            </Field>
-                          )}
+                          {(field) => {
+                            const isInvalid = getIsInvalid(field);
+                            return (
+                              <Field data-invalid={isInvalid}>
+                                <FieldLabel htmlFor={field.name}>
+                                  Number of Wallets
+                                </FieldLabel>
+                                <Input
+                                  id={field.name}
+                                  type="number"
+                                  min="1"
+                                  max="10"
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(
+                                      e.target.valueAsNumber || 0
+                                    )
+                                  }
+                                  placeholder="5"
+                                  aria-invalid={isInvalid}
+                                />
+                                <FieldDescription>
+                                  How many wallets to use for bundle buy (max
+                                  10)
+                                </FieldDescription>
+                                {isInvalid && (
+                                  <FieldError
+                                    errors={field.state.meta.errors}
+                                  />
+                                )}
+                              </Field>
+                            );
+                          }}
                         </form.Field>
                         <form.Field name="bundlerBuyAmountSol">
-                          {(field) => (
-                            <Field>
-                              <FieldLabel htmlFor={field.name}>
-                                Buy Amount per Wallet (SOL)
-                              </FieldLabel>
-                              <Input
-                                id={field.name}
-                                type="number"
-                                step="0.001"
-                                min="0.1"
-                                value={field.state.value}
-                                onChange={(e) =>
-                                  field.handleChange(
-                                    e.target.valueAsNumber || 0
-                                  )
-                                }
-                                placeholder="0.1"
-                              />
-                              <FieldDescription>
-                                Base SOL amount each wallet will spend
-                              </FieldDescription>
-                            </Field>
-                          )}
+                          {(field) => {
+                            const isInvalid = getIsInvalid(field);
+                            return (
+                              <Field data-invalid={isInvalid}>
+                                <FieldLabel htmlFor={field.name}>
+                                  Buy Amount per Wallet (SOL)
+                                </FieldLabel>
+                                <Input
+                                  id={field.name}
+                                  type="number"
+                                  step="0.001"
+                                  min="0.1"
+                                  value={field.state.value}
+                                  onBlur={field.handleBlur}
+                                  onChange={(e) =>
+                                    field.handleChange(
+                                      e.target.valueAsNumber || 0
+                                    )
+                                  }
+                                  placeholder="0.1"
+                                  aria-invalid={isInvalid}
+                                />
+                                <FieldDescription>
+                                  Base SOL amount each wallet will spend
+                                </FieldDescription>
+                                {isInvalid && (
+                                  <FieldError
+                                    errors={field.state.meta.errors}
+                                  />
+                                )}
+                              </Field>
+                            );
+                          }}
                         </form.Field>
                       </div>
 
@@ -1119,91 +1212,121 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           <div className="space-y-6">
                             <div className="grid grid-cols-2 gap-6">
                               <form.Field name="bundlerBuyVariancePercent">
-                                {(field) => (
-                                  <Field>
-                                    <FieldLabel htmlFor={field.name}>
-                                      Buy Amount Variance (%)
-                                    </FieldLabel>
+                                {(field) => {
+                                  const isInvalid = getIsInvalid(field);
+                                  return (
+                                    <Field data-invalid={isInvalid}>
+                                      <FieldLabel htmlFor={field.name}>
+                                        Buy Amount Variance (%)
+                                      </FieldLabel>
+                                      <Input
+                                        id={field.name}
+                                        type="number"
+                                        min="0"
+                                        max="50"
+                                        value={field.state.value}
+                                        onBlur={field.handleBlur}
+                                        onChange={(e) =>
+                                          field.handleChange(
+                                            e.target.valueAsNumber || 0
+                                          )
+                                        }
+                                        placeholder="20"
+                                        aria-invalid={isInvalid}
+                                      />
+                                      <FieldDescription>
+                                        Random variance applied to each buy
+                                        (0-50%)
+                                      </FieldDescription>
+                                      {isInvalid && (
+                                        <FieldError
+                                          errors={field.state.meta.errors}
+                                        />
+                                      )}
+                                    </Field>
+                                  );
+                                }}
+                              </form.Field>
+                              <form.Field name="distributionWalletMultiplier">
+                                {(field) => {
+                                  const isInvalid = getIsInvalid(field);
+                                  return (
+                                    <Field data-invalid={isInvalid}>
+                                      <FieldLabel htmlFor={field.name}>
+                                        Distribution Multiplier
+                                      </FieldLabel>
+                                      <Input
+                                        id={field.name}
+                                        type="number"
+                                        min="1"
+                                        max="5"
+                                        value={field.state.value}
+                                        onBlur={field.handleBlur}
+                                        onChange={(e) =>
+                                          field.handleChange(
+                                            e.target.valueAsNumber || 1
+                                          )
+                                        }
+                                        placeholder="1"
+                                        aria-invalid={isInvalid}
+                                      />
+                                      <FieldDescription>
+                                        Multiply wallets after launch (1 = no
+                                        distribution)
+                                      </FieldDescription>
+                                      {isInvalid && (
+                                        <FieldError
+                                          errors={field.state.meta.errors}
+                                        />
+                                      )}
+                                    </Field>
+                                  );
+                                }}
+                              </form.Field>
+                            </div>
+                            <form.Field name="jitoTipAmountSol">
+                              {(field) => {
+                                const isInvalid = getIsInvalid(field);
+                                return (
+                                  <Field data-invalid={isInvalid}>
+                                    <div className="flex items-center gap-2 mb-1">
+                                      <FieldLabel htmlFor={field.name}>
+                                        Jito Tip Amount (SOL)
+                                      </FieldLabel>
+                                      <Tooltip>
+                                        <TooltipTrigger>
+                                          <Info className="h-4 w-4 text-muted-foreground" />
+                                        </TooltipTrigger>
+                                        <TooltipContent>
+                                          Priority fee for faster transaction
+                                          confirmation
+                                        </TooltipContent>
+                                      </Tooltip>
+                                    </div>
                                     <Input
                                       id={field.name}
                                       type="number"
+                                      step="0.0001"
                                       min="0"
-                                      max="50"
+                                      max="1"
                                       value={field.state.value}
+                                      onBlur={field.handleBlur}
                                       onChange={(e) =>
                                         field.handleChange(
                                           e.target.valueAsNumber || 0
                                         )
                                       }
-                                      placeholder="20"
+                                      placeholder="0.001"
+                                      aria-invalid={isInvalid}
                                     />
-                                    <FieldDescription>
-                                      Random variance applied to each buy
-                                      (0-50%)
-                                    </FieldDescription>
+                                    {isInvalid && (
+                                      <FieldError
+                                        errors={field.state.meta.errors}
+                                      />
+                                    )}
                                   </Field>
-                                )}
-                              </form.Field>
-                              <form.Field name="distributionWalletMultiplier">
-                                {(field) => (
-                                  <Field>
-                                    <FieldLabel htmlFor={field.name}>
-                                      Distribution Multiplier
-                                    </FieldLabel>
-                                    <Input
-                                      id={field.name}
-                                      type="number"
-                                      min="1"
-                                      max="5"
-                                      value={field.state.value}
-                                      onChange={(e) =>
-                                        field.handleChange(
-                                          e.target.valueAsNumber || 1
-                                        )
-                                      }
-                                      placeholder="1"
-                                    />
-                                    <FieldDescription>
-                                      Multiply wallets after launch (1 = no
-                                      distribution)
-                                    </FieldDescription>
-                                  </Field>
-                                )}
-                              </form.Field>
-                            </div>
-                            <form.Field name="jitoTipAmountSol">
-                              {(field) => (
-                                <Field>
-                                  <div className="flex items-center gap-2 mb-1">
-                                    <FieldLabel htmlFor={field.name}>
-                                      Jito Tip Amount (SOL)
-                                    </FieldLabel>
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Info className="h-4 w-4 text-muted-foreground" />
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        Priority fee for faster transaction
-                                        confirmation
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </div>
-                                  <Input
-                                    id={field.name}
-                                    type="number"
-                                    step="0.0001"
-                                    min="0"
-                                    max="1"
-                                    value={field.state.value}
-                                    onChange={(e) =>
-                                      field.handleChange(
-                                        e.target.valueAsNumber || 0
-                                      )
-                                    }
-                                    placeholder="0.001"
-                                  />
-                                </Field>
-                              )}
+                                );
+                              }}
                             </form.Field>
                           </div>
                         </CollapsibleContent>
@@ -1427,49 +1550,51 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       </div>
 
                       <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
-                        <div className="flex items-center justify-between gap-8">
-                          <div className="flex items-center gap-10">
-                            <div className="space-y-1">
-                              <div className="text-xs text-muted-foreground">
-                                Dev buy
+                        <div className="space-y-4">
+                          <div className="flex items-center justify-between gap-8">
+                            <div className="flex items-center gap-10">
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">
+                                  Dev buy
+                                </div>
+                                <div className="text-2xl font-light tabular-nums">
+                                  {values.devBuyAmountSol.toFixed(4)}
+                                  <span className="ml-1 text-sm text-muted-foreground">
+                                    SOL
+                                  </span>
+                                </div>
                               </div>
-                              <div className="text-2xl font-light tabular-nums">
-                                {values.devBuyAmountSol.toFixed(4)}
-                                <span className="ml-1 text-sm text-muted-foreground">
-                                  SOL
-                                </span>
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">
+                                  Distribution wallets
+                                </div>
+                                <div className="text-2xl font-light tabular-nums">
+                                  {values.bundleBuyEnabled
+                                    ? distributionWallets
+                                    : 0}
+                                </div>
+                              </div>
+                              <div className="space-y-1">
+                                <div className="text-xs text-muted-foreground">
+                                  Total cost
+                                </div>
+                                <div className="text-2xl font-light tabular-nums">
+                                  {totalCostSol.toFixed(4)}
+                                  <span className="ml-1 text-sm text-muted-foreground">
+                                    SOL
+                                  </span>
+                                </div>
                               </div>
                             </div>
-                            <div className="space-y-1">
-                              <div className="text-xs text-muted-foreground">
-                                Distribution wallets
-                              </div>
-                              <div className="text-2xl font-light tabular-nums">
-                                {values.bundleBuyEnabled
-                                  ? distributionWallets
-                                  : 0}
-                              </div>
-                            </div>
-                            <div className="space-y-1">
-                              <div className="text-xs text-muted-foreground">
-                                Total cost
-                              </div>
-                              <div className="text-2xl font-light tabular-nums">
-                                {totalCostSol.toFixed(4)}
-                                <span className="ml-1 text-sm text-muted-foreground">
-                                  SOL
-                                </span>
-                              </div>
-                            </div>
+                            <Button
+                              size="lg"
+                              type="submit"
+                              form="launch-form"
+                              className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
+                            >
+                              LAUNCH TOKEN
+                            </Button>
                           </div>
-                          <Button
-                            size="lg"
-                            type="submit"
-                            form="launch-form"
-                            className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
-                          >
-                            LAUNCH TOKEN
-                          </Button>
                         </div>
                       </div>
                     </div>

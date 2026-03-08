@@ -954,6 +954,202 @@ async function loadUserWithMainWallet(userId: string) {
   return user;
 }
 
+type LaunchFundingPlan = {
+  fundingTargets: { publicKey: PublicKey; requiredLamports: bigint }[];
+  mainReserveLamports: bigint;
+  tipLamports: bigint;
+  devFundingLamports: bigint;
+  bundlerFundingLamports: bigint;
+  creatorTargetLamports: bigint;
+  ataRentLamports: bigint;
+  userVolumeAccumulatorRentLamports: bigint;
+  buyRentLamports: bigint;
+  distributionAtaLamports: bigint;
+  maxBundlerBuySol: number;
+};
+
+async function buildLaunchFundingPlan(params: {
+  input: LaunchTokenInput;
+  bundlerWalletCount: number;
+  bundlerBuyAmountSol: number;
+  bundlerBuyVariancePercent: number;
+  distributionWalletMultiplier: number;
+  devBuyAmountSol: number;
+  jitoTipAmountSol: number;
+  mainWalletPublicKey: string;
+  devWalletPublicKey: string;
+  bundlerWalletPublicKeys: PublicKey[];
+  createFeeBufferLamports: number;
+  minCreatorBalanceLamports: bigint;
+}) {
+  const connection = getSolanaConnection();
+  const ataRentLamports = BigInt(
+    await connection.getMinimumBalanceForRentExemption(165)
+  );
+  const userVolumeAccumulatorRentLamports = BigInt(
+    await connection.getMinimumBalanceForRentExemption(74)
+  );
+  const buyRentLamports = ataRentLamports + userVolumeAccumulatorRentLamports;
+  const distributionWalletsPerBundler =
+    params.distributionWalletMultiplier > 1
+      ? params.distributionWalletMultiplier - 1
+      : 0;
+  const distributionAtaLamports =
+    distributionWalletsPerBundler > 0
+      ? ataRentLamports * BigInt(distributionWalletsPerBundler)
+      : BigInt(0);
+  const maxBundlerBuySol =
+    params.bundlerBuyAmountSol *
+    (1 + Math.max(0, params.bundlerBuyVariancePercent) / 100);
+  const requiredCreatorLamports = requiredBuyLamports(
+    params.devBuyAmountSol,
+    params.createFeeBufferLamports,
+    buyRentLamports
+  );
+  const creatorTargetLamports =
+    requiredCreatorLamports > params.minCreatorBalanceLamports
+      ? requiredCreatorLamports
+      : params.minCreatorBalanceLamports;
+  const devFundingLamports =
+    params.devWalletPublicKey === params.mainWalletPublicKey
+      ? BigInt(0)
+      : creatorTargetLamports;
+  const bundlerFundingLamports = requiredBuyLamports(
+    maxBundlerBuySol,
+    0,
+    buyRentLamports + distributionAtaLamports
+  );
+  const tipLamports = params.input.bundleBuyEnabled
+    ? BigInt(Math.floor(params.jitoTipAmountSol * LAMPORTS_PER_SOL))
+    : BigInt(0);
+  const mainReserveLamports =
+    tipLamports +
+    (params.devWalletPublicKey === params.mainWalletPublicKey
+      ? creatorTargetLamports
+      : BigInt(0));
+  const fundingTargets = [
+    ...(devFundingLamports > BigInt(0)
+      ? [
+          {
+            publicKey: new PublicKey(params.devWalletPublicKey),
+            requiredLamports: devFundingLamports,
+          },
+        ]
+      : []),
+    ...params.bundlerWalletPublicKeys.map((publicKey) => ({
+      publicKey,
+      requiredLamports: bundlerFundingLamports,
+    })),
+  ];
+
+  return {
+    fundingTargets,
+    mainReserveLamports,
+    tipLamports,
+    devFundingLamports,
+    bundlerFundingLamports,
+    creatorTargetLamports,
+    ataRentLamports,
+    userVolumeAccumulatorRentLamports,
+    buyRentLamports,
+    distributionAtaLamports,
+    maxBundlerBuySol,
+  } satisfies LaunchFundingPlan;
+}
+
+async function resolvePreflightDevWalletBalance(params: {
+  input: LaunchTokenInput;
+  mainWalletPublicKey: string;
+}) {
+  if (params.input.devWalletOption !== "import") {
+    return {
+      devWalletPublicKey:
+        params.input.devWalletOption === "use_main"
+          ? params.mainWalletPublicKey
+          : Keypair.generate().publicKey.toBase58(),
+      currentLamports: BigInt(0),
+    };
+  }
+
+  if (!params.input.importedDevWalletKey?.trim()) {
+    throw new AppError("Dev wallet private key is required", 400);
+  }
+
+  const devWalletKeypair = keypairFromPrivateKey(
+    params.input.importedDevWalletKey.trim()
+  );
+  const devWalletPublicKey = devWalletKeypair.publicKey.toBase58();
+  if (devWalletPublicKey === params.mainWalletPublicKey) {
+    return { devWalletPublicKey, currentLamports: BigInt(0) };
+  }
+
+  const connection = getSolanaConnection();
+  const currentLamports = BigInt(
+    await connection.getBalance(devWalletKeypair.publicKey, "confirmed")
+  );
+
+  return { devWalletPublicKey, currentLamports };
+}
+
+async function ensureLaunchFundingAvailable(input: LaunchTokenInput, userId: string) {
+  const {
+    bundlerWalletCount,
+    bundlerBuyAmountSol,
+    bundlerBuyVariancePercent,
+    devBuyAmountSol,
+    distributionWalletMultiplier,
+    jitoTipAmountSol,
+  } = validateLaunchInput(input);
+  const {
+    createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+    minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+  } = getLaunchConfig();
+  const user = await loadUserWithMainWallet(userId);
+  const connection = getSolanaConnection();
+  const mainWalletPublicKey = user.mainWallet.publicKey;
+  const { devWalletPublicKey, currentLamports: importedDevCurrentLamports } =
+    await resolvePreflightDevWalletBalance({
+      input,
+      mainWalletPublicKey,
+    });
+  const bundlerWalletPublicKeys =
+    input.bundleBuyEnabled && bundlerWalletCount > 0
+      ? Array.from({ length: bundlerWalletCount }, () => Keypair.generate().publicKey)
+      : [];
+  const fundingPlan = await buildLaunchFundingPlan({
+    input,
+    bundlerWalletCount,
+    bundlerBuyAmountSol,
+    bundlerBuyVariancePercent,
+    distributionWalletMultiplier,
+    devBuyAmountSol,
+    jitoTipAmountSol,
+    mainWalletPublicKey,
+    devWalletPublicKey,
+    bundlerWalletPublicKeys,
+    createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+    minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+  });
+  const mainBalanceLamports = BigInt(
+    await connection.getBalance(new PublicKey(mainWalletPublicKey), "confirmed")
+  );
+  const totalLamports = fundingPlan.fundingTargets.reduce((total, target) => {
+    const currentLamports =
+      target.publicKey.toBase58() === devWalletPublicKey
+        ? importedDevCurrentLamports
+        : BigInt(0);
+    const topUpLamports = target.requiredLamports - currentLamports;
+    return topUpLamports > BigInt(0) ? total + topUpLamports : total;
+  }, BigInt(0));
+
+  if (mainBalanceLamports < totalLamports + fundingPlan.mainReserveLamports) {
+    throw new AppError(
+      `Main wallet requires ${lamportsToSol(totalLamports + fundingPlan.mainReserveLamports).toFixed(4)} SOL to fund launch wallets`,
+      400
+    );
+  }
+}
+
 async function resolveDevWallet(
   input: LaunchTokenInput,
   userId: string,
@@ -1952,6 +2148,8 @@ export const launchService = {
             return { launchId: existing.id };
           }
 
+          await ensureLaunchFundingAvailable(input, userId);
+
           const launch = await prisma.launch.create({
             data: {
               userId,
@@ -2512,64 +2710,34 @@ export const launchService = {
       }
 
       await setStep(launchId, 12, "funding", "Funding wallets");
-      const connection = getSolanaConnection();
-      const ataRentLamports = BigInt(
-        await connection.getMinimumBalanceForRentExemption(165)
-      );
-      const userVolumeAccumulatorRentLamports = BigInt(
-        await connection.getMinimumBalanceForRentExemption(74)
-      );
-      const buyRentLamports =
-        ataRentLamports + userVolumeAccumulatorRentLamports;
-      const distributionWalletsPerBundler =
-        distributionWalletMultiplier > 1 ? distributionWalletMultiplier - 1 : 0;
-      const distributionAtaLamports =
-        distributionWalletsPerBundler > 0
-          ? ataRentLamports * BigInt(distributionWalletsPerBundler)
-          : BigInt(0);
-      const maxBundlerBuySol =
-        bundlerBuyAmountSol *
-        (1 + Math.max(0, bundlerBuyVariancePercent) / 100);
-      const requiredCreatorLamports = requiredBuyLamports(
-        devBuyAmountSol,
-        CREATE_FEE_BUFFER_LAMPORTS,
-        buyRentLamports
-      );
-      const creatorTargetLamports =
-        requiredCreatorLamports > MIN_CREATOR_BALANCE_LAMPORTS
-          ? requiredCreatorLamports
-          : MIN_CREATOR_BALANCE_LAMPORTS;
-      const devFundingLamports =
-        devWalletPublicKey === user.mainWallet.publicKey
-          ? BigInt(0)
-          : creatorTargetLamports;
-      const bundlerFundingLamports = requiredBuyLamports(
+      const {
+        ataRentLamports,
+        userVolumeAccumulatorRentLamports,
+        buyRentLamports,
+        distributionAtaLamports,
         maxBundlerBuySol,
-        0,
-        buyRentLamports + distributionAtaLamports
-      );
-      const tipLamports = input.bundleBuyEnabled
-        ? BigInt(Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL))
-        : BigInt(0);
-      const mainReserveLamports =
-        tipLamports +
-        (devWalletPublicKey === user.mainWallet.publicKey
-          ? creatorTargetLamports
-          : BigInt(0));
-      const fundingTargets = [
-        ...(devFundingLamports > BigInt(0)
-          ? [
-              {
-                publicKey: devWalletKeypair.publicKey,
-                requiredLamports: devFundingLamports,
-              },
-            ]
-          : []),
-        ...bundlerWalletKeypairs.map((wallet) => ({
-          publicKey: wallet.publicKey,
-          requiredLamports: bundlerFundingLamports,
-        })),
-      ];
+        creatorTargetLamports,
+        devFundingLamports,
+        bundlerFundingLamports,
+        mainReserveLamports,
+        tipLamports,
+        fundingTargets,
+      } = await buildLaunchFundingPlan({
+        input,
+        bundlerWalletCount,
+        bundlerBuyAmountSol,
+        bundlerBuyVariancePercent,
+        distributionWalletMultiplier,
+        devBuyAmountSol,
+        jitoTipAmountSol,
+        mainWalletPublicKey: user.mainWallet.publicKey,
+        devWalletPublicKey,
+        bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
+          (wallet) => wallet.publicKey
+        ),
+        createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+        minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+      });
       await appendLog(launchId, "INFO", "Funding plan prepared", "funding", {
         targetsCount: fundingTargets.length,
         devFundingLamports: devFundingLamports.toString(),

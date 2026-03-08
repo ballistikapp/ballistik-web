@@ -206,7 +206,7 @@ export function LaunchOverviewDialog({
           </div>
 
           <div className="border-t pt-4">
-            <div className="flex justify-between items-center text-sm">
+            <div className="flex items-center justify-between text-sm">
               <span className="font-medium">Total Cost</span>
               <span className="text-lg font-bold">
                 {totalCost.toFixed(4)} SOL

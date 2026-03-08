@@ -12,14 +12,17 @@
 ## Core Flow
 
 1. UI submits launch input via `trpc.launch.start`.
-2. Server creates a `Launch` record and starts an async job.
-3. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
-4. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-5. Cancellation sets `cancelRequestedAt`; job checks between steps.
+2. Server performs synchronous input and funding preflight checks before queueing.
+3. If the main wallet cannot cover required launch funding, `launch.start` throws the exact user-facing error and no `Launch` record is created.
+4. When preflight passes, server creates a `Launch` record and starts an async job.
+5. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
+6. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+7. Cancellation sets `cancelRequestedAt`; job checks between steps.
 
 ## tRPC Endpoints
 
-- `launch.start` (mutation): creates launch and starts async job.
+- `launch.start` (mutation): runs synchronous validation/funding preflight, then creates launch and starts async job.
+  - Insufficient-funds failures return immediately and do not enqueue a launch.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.

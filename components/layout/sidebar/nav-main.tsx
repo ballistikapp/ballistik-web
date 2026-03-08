@@ -3,10 +3,12 @@
 import * as React from "react";
 import {
   type Icon,
-  IconBolt,
+  IconArrowsRightLeft,
+  IconCoins,
   IconLayoutDashboard,
-  IconListDetails,
-  IconRocket,
+  IconList,
+  IconPlus,
+  IconRobot,
   IconUserCircle,
   IconWallet,
 } from "@tabler/icons-react";
@@ -39,13 +41,13 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
   {
     title: "Holdings",
     url: "/holdings",
-    icon: IconListDetails,
+    icon: IconCoins,
     scope: "token",
   },
   {
     title: "Transactions",
     url: "/transactions",
-    icon: IconListDetails,
+    icon: IconArrowsRightLeft,
     scope: "token",
   },
   {
@@ -57,7 +59,7 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
   {
     title: "Volume Bot",
     url: "/volume-bot",
-    icon: IconBolt,
+    icon: IconRobot,
     scope: "token",
   },
 ];
@@ -66,13 +68,13 @@ export const buildAndManageRoutes: NavMainItem[] = [
   {
     title: "Launch",
     url: "/launch",
-    icon: IconRocket,
+    icon: IconPlus,
     scope: "global",
   },
   {
     title: "My Tokens",
     url: "/tokens",
-    icon: IconListDetails,
+    icon: IconList,
     scope: "global",
   },
   {
