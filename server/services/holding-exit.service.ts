@@ -4,6 +4,7 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { walletService } from "@/server/services/wallet.service";
+import { persistHoldingExitLog } from "@/server/services/log-persistence.service";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
 import {
@@ -78,6 +79,7 @@ const WALLETS_PER_CHUNK = 20;
 const CLEANUP_WALLET_CONCURRENCY = 3;
 const MIN_RENT_LAMPORTS = 2_100_000;
 const FUND_AMOUNT_LAMPORTS = 5_000_000;
+const EXIT_LOG_WINDOW = 200;
 
 async function appendExitLog(
   exitId: string,
@@ -86,14 +88,12 @@ async function appendExitLog(
   step?: string,
   data?: Record<string, unknown>
 ) {
-  await prisma.holdingExitLog.create({
-    data: {
-      exitId,
-      level,
-      message,
-      step: step ?? null,
-      data: data ? (data as Prisma.InputJsonValue) : Prisma.JsonNull,
-    },
+  await persistHoldingExitLog({
+    exitId,
+    level,
+    message,
+    step: step ?? null,
+    data: data ? (data as Prisma.InputJsonValue) : Prisma.JsonNull,
   });
 }
 
@@ -987,12 +987,21 @@ export const holdingExitService = {
   async getExitStatus(input: ExitStatusInput, userId: string) {
     const exit = await prisma.holdingExit.findFirst({
       where: { id: input.exitId, userId },
-      include: { logs: { orderBy: { createdAt: "asc" } } },
     });
     if (!exit) {
       throw new AppError("Exit not found", 404);
     }
-    return exit;
+
+    const logsDesc = await prisma.holdingExitLog.findMany({
+      where: { exitId: exit.id },
+      orderBy: { createdAt: "desc" },
+      take: EXIT_LOG_WINDOW,
+    });
+
+    return {
+      ...exit,
+      logs: logsDesc.reverse(),
+    };
   },
 
   async getActiveExit(input: ActiveExitInput, userId: string) {
@@ -1003,9 +1012,21 @@ export const holdingExitService = {
         status: { in: ["PENDING", "RUNNING"] },
       },
       orderBy: { createdAt: "desc" },
-      include: { logs: { orderBy: { createdAt: "asc" } } },
     });
-    return exit ?? null;
+    if (!exit) {
+      return null;
+    }
+
+    const logsDesc = await prisma.holdingExitLog.findMany({
+      where: { exitId: exit.id },
+      orderBy: { createdAt: "desc" },
+      take: EXIT_LOG_WINDOW,
+    });
+
+    return {
+      ...exit,
+      logs: logsDesc.reverse(),
+    };
   },
 
   async cancelExit(input: CancelExitInput, userId: string) {

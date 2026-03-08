@@ -13,11 +13,14 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { cacheConfig } from "@/lib/config/cache.config";
+import { logger } from "@/lib/logger";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
 import { withActionLock } from "@/server/security/api-abuse";
+
+const log = logger.child({ service: "wallet" });
 
 export const walletService = {
   async getOperationalWalletsByToken(
@@ -648,7 +651,7 @@ export const walletService = {
                   retryError instanceof Error
                     ? retryError.message
                     : String(retryError);
-                console.error("[WalletService] Retry transfer failed", message);
+                log.error("Retry transfer failed", { errorMessage: message });
                 return {
                   publicKey,
                   status: "FAILED" as const,
@@ -659,7 +662,7 @@ export const walletService = {
             }
             const message =
               error instanceof Error ? error.message : String(error);
-            console.error("[WalletService] Transfer failed", message);
+            log.error("Transfer failed", { errorMessage: message });
             return {
               publicKey,
               status: "FAILED" as const,
@@ -697,9 +700,7 @@ export const walletService = {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.warn(
-        `[WalletService] Post-send balance refresh failed: ${message}`
-      );
+      log.warn("Post-send balance refresh failed", { errorMessage: message });
     }
 
     const submittedCount = results.filter(
@@ -885,7 +886,7 @@ export const walletService = {
                 retryError instanceof Error
                   ? retryError.message
                   : String(retryError);
-              console.error("[WalletService] Retry transfer failed", message);
+              log.error("Retry transfer failed", { errorMessage: message });
               return {
                 publicKey: wallet.publicKey,
                 status: "FAILED" as const,
@@ -896,7 +897,7 @@ export const walletService = {
           }
           const message =
             error instanceof Error ? error.message : String(error);
-          console.error("[WalletService] Transfer failed", message);
+          log.error("Transfer failed", { errorMessage: message });
           return {
             publicKey: wallet.publicKey,
             status: "FAILED" as const,
@@ -923,9 +924,7 @@ export const walletService = {
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        console.warn(
-          `[WalletService] Post-return balance refresh failed: ${message}`
-        );
+        log.warn("Post-return balance refresh failed", { errorMessage: message });
       }
     }
 

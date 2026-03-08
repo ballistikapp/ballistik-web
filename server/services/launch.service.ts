@@ -33,11 +33,13 @@ import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
+import { persistLaunchLog } from "@/server/services/log-persistence.service";
 import { storageService } from "@/server/services/storage.service";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
+const LAUNCH_LOG_WINDOW = 200;
 
 function toLamports(amount: number) {
   return BigInt(Math.floor(amount * LAMPORTS_PER_SOL));
@@ -483,14 +485,15 @@ async function appendLog(
   step?: string,
   data?: Prisma.InputJsonValue
 ) {
-  await prisma.launchLog.create({
-    data: {
-      launchId,
-      level,
-      message,
-      step,
-      data,
-    },
+  const logData: Prisma.LaunchLogUncheckedCreateInput = {
+    launchId,
+    level,
+    message,
+    step: step ?? null,
+    ...(data === undefined ? {} : { data }),
+  };
+  await persistLaunchLog({
+    ...logData,
   });
   const context: Record<string, unknown> = {
     launchId,
@@ -1969,18 +1972,22 @@ export const launchService = {
   async getLaunchStatus(launchId: string, userId: string) {
     const launch = await prisma.launch.findFirst({
       where: { id: launchId, userId },
-      include: {
-        logs: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
     });
 
     if (!launch) {
       throw new AppError("Launch not found", 404);
     }
 
-    return await markLaunchStaleIfNeeded(launch);
+    const logsDesc = await prisma.launchLog.findMany({
+      where: { launchId: launch.id },
+      orderBy: { createdAt: "desc" },
+      take: LAUNCH_LOG_WINDOW,
+    });
+
+    return await markLaunchStaleIfNeeded({
+      ...launch,
+      logs: logsDesc.reverse(),
+    });
   },
 
   async getActiveLaunch(userId: string) {
@@ -1990,16 +1997,21 @@ export const launchService = {
         status: { in: ["PENDING", "RUNNING"] },
       },
       orderBy: { createdAt: "desc" },
-      include: {
-        logs: {
-          orderBy: { createdAt: "asc" },
-        },
-      },
     });
     if (!launch) {
       return null;
     }
-    return await markLaunchStaleIfNeeded(launch);
+
+    const logsDesc = await prisma.launchLog.findMany({
+      where: { launchId: launch.id },
+      orderBy: { createdAt: "desc" },
+      take: LAUNCH_LOG_WINDOW,
+    });
+
+    return await markLaunchStaleIfNeeded({
+      ...launch,
+      logs: logsDesc.reverse(),
+    });
   },
   async getRecoveryWallets(launchId: string, userId: string) {
     const {

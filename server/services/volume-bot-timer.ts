@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
+import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { mapWithConcurrency } from "@/lib/utils/async";
@@ -11,10 +12,12 @@ import {
   stopVolumeBotSession,
 } from "@/server/services/volume-bot-worker";
 import { walletService } from "@/server/services/wallet.service";
+import { persistVolumeBotLog } from "@/server/services/log-persistence.service";
 
 const MAX_TIMEOUT_MS = 2_147_483_647;
 const RECOVERY_CONCURRENCY = 5;
 const WATCHDOG_INTERVAL_MS = 5 * 60 * 1000; // Check every 5 minutes
+const log = logger.child({ service: "volume-bot-timer" });
 
 type WalletRangeSchedule = {
   walletId: string;
@@ -141,22 +144,24 @@ class VolumeBotTimerManager {
   }
 
   async requestStop(sessionId: string) {
-    console.log(`[TimerManager] requestStop called for session ${sessionId}`);
-    console.log(`[TimerManager] Current tracked sessions: ${Array.from(this.sessionToWalletRanges.keys()).join(", ") || "none"}`);
+    log.info(`[TimerManager] requestStop called for session ${sessionId}`);
+    log.info(
+      `[TimerManager] Current tracked sessions: ${Array.from(this.sessionToWalletRanges.keys()).join(", ") || "none"}`
+    );
     this.cancelSession(sessionId);
     try {
       await stopVolumeBotSession(sessionId);
-      console.log(`[TimerManager] stopVolumeBotSession completed for ${sessionId}`);
+      log.info(`[TimerManager] stopVolumeBotSession completed for ${sessionId}`);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      console.error(`[TimerManager] stopVolumeBotSession failed for ${sessionId}: ${message}`);
-      await prisma.volumeBotLog.create({
-        data: {
-          sessionId,
-          level: "ERROR",
-          type: "stop",
-          message,
-        },
+      log.error(
+        `[TimerManager] stopVolumeBotSession failed for ${sessionId}: ${message}`
+      );
+      await persistVolumeBotLog({
+        sessionId,
+        level: "ERROR",
+        type: "stop",
+        message,
       });
     }
   }
@@ -231,7 +236,7 @@ class VolumeBotTimerManager {
 
   private startWatchdog() {
     if (this.watchdogTimer || this.shuttingDown) return;
-    console.log("[TimerManager] Starting orphaned session watchdog");
+    log.info("[TimerManager] Starting orphaned session watchdog");
     this.watchdogTimer = setInterval(() => {
       void this.checkOrphanedSessions();
     }, WATCHDOG_INTERVAL_MS);
@@ -263,27 +268,25 @@ class VolumeBotTimerManager {
 
     if (orphanedSessions.length === 0) return;
 
-    console.log(
+    log.warn(
       `[Watchdog] Found ${orphanedSessions.length} orphaned session(s), stopping...`
     );
 
     for (const session of orphanedSessions) {
       const lastActivity = session.lastTickAt ?? session.startedAt;
-      console.log(
+      log.warn(
         `[Watchdog] Stopping orphaned session ${session.id} (last activity: ${lastActivity?.toISOString() ?? "never"})`
       );
-      await prisma.volumeBotLog.create({
-        data: {
-          sessionId: session.id,
-          level: "WARN",
-          type: "watchdog",
-          message: `Session auto-stopped by watchdog (no activity for ${Math.round(config.orphanedSessionTimeoutMs / 60000)} minutes)`,
-        },
+      await persistVolumeBotLog({
+        sessionId: session.id,
+        level: "WARN",
+        type: "watchdog",
+        message: `Session auto-stopped by watchdog (no activity for ${Math.round(config.orphanedSessionTimeoutMs / 60000)} minutes)`,
       });
       try {
         await this.requestStop(session.id);
       } catch (error) {
-        console.error(
+        log.error(
           `[Watchdog] Failed to stop session ${session.id}:`,
           error
         );
@@ -385,7 +388,7 @@ class VolumeBotTimerManager {
 
     if (generatedWalletPublicKeys.length > 0) {
       const amount = Math.max(config.walletConfig.fundingPerGeneratedWallet, 0);
-      console.log(
+      log.info(
         `[TimerManager] Funding ${generatedWalletPublicKeys.length} generated wallets with ${amount} SOL`
       );
       await walletService.sendSolFromMainWallet(
@@ -405,7 +408,7 @@ class VolumeBotTimerManager {
           );
           const balanceSol = balanceLamports / 1_000_000_000;
           if (balanceSol >= config.walletConfig.topUpAmount) {
-            console.log(
+            log.info(
               `[TimerManager] Wallet ${walletPublicKey} has sufficient balance (${balanceSol} SOL)`
             );
             return;
@@ -414,7 +417,7 @@ class VolumeBotTimerManager {
           if (topUpSol <= 0) {
             return;
           }
-          console.log(
+          log.info(
             `[TimerManager] Topping up wallet ${walletPublicKey} by ${topUpSol} SOL`
           );
           await walletService.sendSolFromMainWallet(
@@ -458,13 +461,11 @@ class VolumeBotTimerManager {
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
-      await prisma.volumeBotLog.create({
-        data: {
-          sessionId: session.id,
-          level: "ERROR",
-          type: "start",
-          message,
-        },
+      await persistVolumeBotLog({
+        sessionId: session.id,
+        level: "ERROR",
+        type: "start",
+        message,
       });
       await prisma.volumeBotSession.update({
         where: { id: session.id },
@@ -485,7 +486,7 @@ class VolumeBotTimerManager {
       if (!volumeBotGrpc.isConnected()) {
         const connected = await volumeBotGrpc.connect();
         if (!connected) {
-          console.log(
+          log.warn(
             `[TimerManager] gRPC not available for session ${sessionId}, using RPC fallback`
           );
           return;
@@ -508,11 +509,11 @@ class VolumeBotTimerManager {
         bondingCurve.toBase58()
       );
 
-      console.log(
+      log.info(
         `[TimerManager] Subscribed session ${sessionId} to gRPC with ${walletPubkeys.length} wallets`
       );
     } catch (error) {
-      console.error(
+      log.error(
         `[TimerManager] Failed to subscribe session ${sessionId} to gRPC:`,
         error instanceof Error ? error.message : String(error)
       );

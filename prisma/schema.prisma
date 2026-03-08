@@ -247,6 +247,7 @@ model LaunchLog {
   step String?
   data Json?
   createdAt DateTime @default(now())
+  @@index([launchId, createdAt])
   @@map("LaunchLog")
 }
 
