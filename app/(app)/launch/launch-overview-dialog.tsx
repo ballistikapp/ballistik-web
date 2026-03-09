@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
 
 interface LaunchOverviewDialogProps {
   open: boolean;
@@ -51,12 +52,20 @@ export function LaunchOverviewDialog({
   isLoading = false,
 }: LaunchOverviewDialogProps) {
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
+  const usageFees = calculateLaunchUsageFees({
+    devWalletOption: launchInput.devWalletOption,
+    bundleBuyEnabled: launchInput.bundleBuyEnabled,
+    bundlerWalletCount: launchInput.bundlerWalletCount,
+    distributionWalletMultiplier: launchInput.distributionWalletMultiplier,
+    vanityMint: launchInput.vanityMint,
+  });
   const totalCost =
     launchInput.devBuyAmountSol +
     (launchInput.bundleBuyEnabled
       ? launchInput.bundlerWalletCount * launchInput.bundlerBuyAmountSol
       : 0) +
-    launchInput.jitoTipAmountSol;
+    launchInput.jitoTipAmountSol +
+    usageFees.totalFeeSol;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -202,6 +211,39 @@ export function LaunchOverviewDialog({
                   <span className="text-green-600">Enabled</span>
                 </div>
               )}
+              <div className="grid grid-cols-[140px_1fr] gap-2">
+                <span className="text-muted-foreground">Usage Fees</span>
+                <span>{usageFees.totalFeeSol.toFixed(4)} SOL</span>
+              </div>
+            </div>
+          </div>
+
+          <div className="border-t pt-4 space-y-2 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">
+                Generated wallets ({usageFees.generatedWalletCount})
+              </span>
+              <span className="tabular-nums">
+                {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Vanity mint fee</span>
+              <span className="tabular-nums">
+                {usageFees.vanityMintFeeSol.toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Launch fee</span>
+              <span className="tabular-nums">
+                {usageFees.launchFeeSol.toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="font-medium">Total usage fees</span>
+              <span className="tabular-nums font-medium">
+                {usageFees.totalFeeSol.toFixed(4)} SOL
+              </span>
             </div>
           </div>
 

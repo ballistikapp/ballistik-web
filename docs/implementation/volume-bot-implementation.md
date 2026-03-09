@@ -504,6 +504,13 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 - `SOLANA_RPC_URL` — Solana RPC endpoint (required)
 - `SHYFT_GRPC_TOKEN` — Shyft gRPC x-token for streaming (optional, recommended; falls back to `SHYFT_API_KEY`)
 - `DATABASE_URL` — PostgreSQL connection string (required)
+- `FEE_COLLECTOR_WALLET_ADDRESS` — collector wallet used for usage-fee transfers (required for fee-charged starts)
+
+## Usage Fees
+
+- Fee schedule and scope rules are defined in `docs/implementation/pricing-implementation.md`.
+- Volume bot start applies generated-wallet usage fees (`generatedWalletCount * 0.02 SOL`).
+- Preflight/summary responses include usage-fee totals for UI visibility.
 
 ## Logging
 

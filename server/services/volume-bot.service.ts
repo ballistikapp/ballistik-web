@@ -28,6 +28,8 @@ import {
   fetchPumpQuoteState,
 } from "@/server/solana/pump-quotes";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
+import { calculateVolumeBotUsageFees } from "@/lib/config/usage-fees.config";
+import { usageFeeService } from "@/server/services/usage-fee.service";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -425,6 +427,9 @@ export const volumeBotService = {
     }
     const totalWalletCount =
       selectedWallets.length + input.config.walletConfig.generatedWalletCount;
+    const usageFees = calculateVolumeBotUsageFees(
+      input.config.walletConfig.generatedWalletCount
+    );
     validateSchedule(
       input.config,
       input.scheduledStartAt,
@@ -484,6 +489,11 @@ export const volumeBotService = {
         })
       )
     );
+    await usageFeeService.collectFromMainWallet({
+      userId,
+      totalFeeSol: usageFees.totalFeeSol,
+      reason: "volume-bot.start",
+    });
 
     const session = await prisma.$transaction(async (tx) => {
       const configSnapshot = {
@@ -899,6 +909,9 @@ export const volumeBotService = {
     const totalWalletCount =
       input.config.walletConfig.generatedWalletCount +
       selectedWalletPublicKeys.length;
+    const usageFees = calculateVolumeBotUsageFees(
+      input.config.walletConfig.generatedWalletCount
+    );
     const netSolDirection = computeNetSolDirection(input.config.ranges);
     const hasSellRanges = input.config.ranges.some(
       (range) => range.direction !== "buy"
@@ -981,6 +994,17 @@ export const volumeBotService = {
       totalSellableValue: priceUnavailable ? null : totalSellableValue,
       sellWarning,
       priceUnavailable,
+      usageFees,
+      estimatedFundingSol:
+        input.config.walletConfig.generatedWalletCount *
+        input.config.walletConfig.fundingPerGeneratedWallet,
+      estimatedTopUpMaxSol:
+        selectedWalletPublicKeys.length * input.config.walletConfig.topUpAmount,
+      estimatedTotalOutflowSol:
+        usageFees.totalFeeSol +
+        input.config.walletConfig.generatedWalletCount *
+          input.config.walletConfig.fundingPerGeneratedWallet +
+        selectedWalletPublicKeys.length * input.config.walletConfig.topUpAmount,
     };
   },
 

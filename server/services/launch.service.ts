@@ -5,6 +5,7 @@ import { logger } from "@/lib/logger";
 import type { LaunchTokenInput } from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
+import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
 import { getEnv } from "@/lib/config/env";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
@@ -35,6 +36,7 @@ import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { persistLaunchLog } from "@/server/services/log-persistence.service";
 import { storageService } from "@/server/services/storage.service";
+import { usageFeeService } from "@/server/services/usage-fee.service";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
@@ -1133,6 +1135,14 @@ async function ensureLaunchFundingAvailable(input: LaunchTokenInput, userId: str
   const mainBalanceLamports = BigInt(
     await connection.getBalance(new PublicKey(mainWalletPublicKey), "confirmed")
   );
+  const usageFees = calculateLaunchUsageFees({
+    devWalletOption: input.devWalletOption,
+    bundleBuyEnabled: input.bundleBuyEnabled,
+    bundlerWalletCount,
+    distributionWalletMultiplier,
+    vanityMint: input.vanityMint,
+  });
+  const usageFeeLamports = BigInt(toLamports(usageFees.totalFeeSol));
   const totalLamports = fundingPlan.fundingTargets.reduce((total, target) => {
     const currentLamports =
       target.publicKey.toBase58() === devWalletPublicKey
@@ -1141,10 +1151,12 @@ async function ensureLaunchFundingAvailable(input: LaunchTokenInput, userId: str
     const topUpLamports = target.requiredLamports - currentLamports;
     return topUpLamports > BigInt(0) ? total + topUpLamports : total;
   }, BigInt(0));
+  const requiredMainLamports =
+    totalLamports + fundingPlan.mainReserveLamports + usageFeeLamports;
 
-  if (mainBalanceLamports < totalLamports + fundingPlan.mainReserveLamports) {
+  if (mainBalanceLamports < requiredMainLamports) {
     throw new AppError(
-      `Main wallet requires ${lamportsToSol(totalLamports + fundingPlan.mainReserveLamports).toFixed(4)} SOL to fund launch wallets`,
+      `Main wallet requires ${lamportsToSol(requiredMainLamports).toFixed(4)} SOL to fund launch wallets and usage fees`,
       400
     );
   }
@@ -2149,6 +2161,18 @@ export const launchService = {
           }
 
           await ensureLaunchFundingAvailable(input, userId);
+          const usageFees = calculateLaunchUsageFees({
+            devWalletOption: input.devWalletOption,
+            bundleBuyEnabled: input.bundleBuyEnabled,
+            bundlerWalletCount: input.bundlerWalletCount,
+            distributionWalletMultiplier: input.distributionWalletMultiplier,
+            vanityMint: input.vanityMint,
+          });
+          await usageFeeService.collectFromMainWallet({
+            userId,
+            totalFeeSol: usageFees.totalFeeSol,
+            reason: "launch.start",
+          });
 
           const launch = await prisma.launch.create({
             data: {
@@ -2573,6 +2597,13 @@ export const launchService = {
     let persistedTokenPublicKey: string | null = null;
 
     try {
+      const usageFees = calculateLaunchUsageFees({
+        devWalletOption: input.devWalletOption,
+        bundleBuyEnabled: input.bundleBuyEnabled,
+        bundlerWalletCount: input.bundlerWalletCount,
+        distributionWalletMultiplier: input.distributionWalletMultiplier,
+        vanityMint: input.vanityMint,
+      });
       const tokenMediaSource = input.tokenImage
         ? input.tokenImage.startsWith("data:")
           ? "inline"
@@ -2602,6 +2633,11 @@ export const launchService = {
         bundlerBuyVariancePercent: input.bundlerBuyVariancePercent,
         distributionWalletMultiplier: input.distributionWalletMultiplier,
         jitoTipAmountSol: input.jitoTipAmountSol,
+        usageFeeTotalSol: usageFees.totalFeeSol,
+        usageFeeGeneratedWallets: usageFees.generatedWalletCount,
+        usageFeeGeneratedWalletFeeSol: usageFees.generatedWalletFeeSol,
+        usageFeeVanityFeeSol: usageFees.vanityMintFeeSol,
+        usageFeeLaunchFeeSol: usageFees.launchFeeSol,
         tokenMediaSource,
         tokenMediaType,
         tokenBannerSource,

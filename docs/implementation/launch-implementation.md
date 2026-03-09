@@ -179,10 +179,18 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Environment Requirements
 
 - `SOLANA_RPC_URL` must be set for on-chain operations.
+- `FEE_COLLECTOR_WALLET_ADDRESS` must be set for usage-fee collection.
 - Jito block engine URLs are defined in `lib/config/jito.config.ts`.
 - `SHYFT_GRPC_TOKEN` (or `SHYFT_API_KEY` fallback) is optional but recommended for faster gRPC-assisted confirmation; launch confirmation still has RPC polling fallback.
 - `PINATA_JWT` is optional; when set, token media is uploaded to Pinata and persisted as a gateway URL.
 - `PINATA_GATEWAY_URL` is optional and defaults to `https://gateway.pinata.cloud`.
+
+## Launch Usage Fees
+
+- Launch usage fees are documented centrally in `docs/implementation/pricing-implementation.md`.
+- Launch computes and displays usage-fee breakdowns before confirmation.
+- Server preflight includes usage fees in required main-wallet balance checks.
+- Server collects launch usage fees from main wallet to collector wallet when launch starts.
 
 ## On-chain Confirmation Timeouts
 

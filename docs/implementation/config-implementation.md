@@ -31,6 +31,7 @@
 - `PINATA_JWT` is optional and enables token media uploads to Pinata during token persistence
 - `PINATA_GATEWAY_URL` is optional (must be a valid URL) and sets the base gateway used for stored IPFS media URLs (defaults to `https://gateway.pinata.cloud`)
 - `APP_URL` is optional (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`). Required for automatic callback registration on token and wallet creation.
+- `FEE_COLLECTOR_WALLET_ADDRESS` is required for usage-fee collection flows (launch and volume bot generated-wallet fees)
 - `DATABASE_URL` is used for Prisma connections when set (one value per Railway environment)
 - `getDatabaseUrl()` currently reads only `DATABASE_URL`
 - `DEV_STORAGE_POSTGRES_URL` / `PROD_STORAGE_POSTGRES_URL` may still appear in legacy error messaging, but are not part of `env.ts` parsing today

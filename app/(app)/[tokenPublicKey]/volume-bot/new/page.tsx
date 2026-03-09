@@ -62,6 +62,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
+import { calculateVolumeBotUsageFees } from "@/lib/config/usage-fees.config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -519,6 +520,10 @@ export default function VolumeBotStartPage() {
     () => selectedWalletPublicKeys.length * topUpAmount,
     [selectedWalletPublicKeys.length, topUpAmount]
   );
+  const localUsageFees = useMemo(
+    () => calculateVolumeBotUsageFees(generatedWalletCount),
+    [generatedWalletCount]
+  );
 
   const localPreflight = useMemo(() => {
     if (
@@ -614,6 +619,10 @@ export default function VolumeBotStartPage() {
 
   const selectionSummary = selectionSummaryQuery.data;
   const effectivePreflight = selectionSummary ?? localPreflight;
+  const usageFees = selectionSummary?.usageFees ?? localUsageFees;
+  const estimatedTotalOutflowSol =
+    selectionSummary?.estimatedTotalOutflowSol ??
+    usageFees.totalFeeSol + totalFunding + totalTopUp;
   const netSolDirection = effectivePreflight?.netSolDirection ?? 0;
   const netDirectionLabel =
     netSolDirection > 0
@@ -1814,6 +1823,29 @@ export default function VolumeBotStartPage() {
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">
+                Generated wallet fee
+              </div>
+              <div className="text-sm tabular-nums">
+                {usageFees.generatedWalletCount} x 0.02 ={" "}
+                {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">Total usage fee</div>
+              <div className="text-sm tabular-nums">
+                {usageFees.totalFeeSol.toFixed(4)} SOL
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">
+                Est. total outflow
+              </div>
+              <div className="text-sm tabular-nums">
+                {estimatedTotalOutflowSol.toFixed(4)} SOL
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">
                 Net Δ SOL / min
               </div>
               <div className="text-sm tabular-nums">
@@ -1940,6 +1972,24 @@ export default function VolumeBotStartPage() {
                 </div>
               </div>
               <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Usage fee</div>
+                <div className="text-2xl font-light tabular-nums">
+                  {usageFees.totalFeeSol.toFixed(2)}
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    SOL
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Total outflow</div>
+                <div className="text-2xl font-light tabular-nums">
+                  {estimatedTotalOutflowSol.toFixed(2)}
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    SOL
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1">
                 <div className="text-xs text-muted-foreground">Duration</div>
                 <div className="text-2xl font-light">
                   {formatDuration(targetDurationSeconds)}
@@ -1979,6 +2029,18 @@ export default function VolumeBotStartPage() {
               <span className="text-muted-foreground">Duration</span>
               <span className="font-semibold">
                 {formatDuration(targetDurationSeconds)}
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Usage fee</span>
+              <span className="font-semibold">
+                {usageFees.totalFeeSol.toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Total outflow</span>
+              <span className="font-semibold">
+                {estimatedTotalOutflowSol.toFixed(4)} SOL
               </span>
             </div>
             {scheduledStartEnabled && scheduledStartDate && (

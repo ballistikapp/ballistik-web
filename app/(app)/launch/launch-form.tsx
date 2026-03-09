@@ -50,6 +50,7 @@ import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog"
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
+import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
 
 const formSchema = z
   .object({
@@ -154,22 +155,34 @@ const readVideoDimensions = (file: File) =>
   });
 
 function calculateLaunchTotals(values: {
+  devWalletOption: "import" | "generate" | "use_main";
   devBuyAmountSol: number;
   jitoTipAmountSol: number;
   bundleBuyEnabled: boolean;
   bundlerWalletCount: number;
   bundlerBuyAmountSol: number;
+  vanityMint: boolean;
   distributionWalletMultiplier: number;
 }) {
   const bundleBuyTotal = values.bundleBuyEnabled
     ? values.bundlerWalletCount * values.bundlerBuyAmountSol
     : 0;
+  const usageFees = calculateLaunchUsageFees({
+    devWalletOption: values.devWalletOption,
+    bundleBuyEnabled: values.bundleBuyEnabled,
+    bundlerWalletCount: values.bundlerWalletCount,
+    distributionWalletMultiplier: values.distributionWalletMultiplier,
+    vanityMint: values.vanityMint,
+  });
   const totalCostSol =
-    values.devBuyAmountSol + bundleBuyTotal + values.jitoTipAmountSol;
+    values.devBuyAmountSol +
+    bundleBuyTotal +
+    values.jitoTipAmountSol +
+    usageFees.totalFeeSol;
   const distributionWallets =
     values.bundlerWalletCount * values.distributionWalletMultiplier;
 
-  return { bundleBuyTotal, totalCostSol, distributionWallets };
+  return { bundleBuyTotal, totalCostSol, distributionWallets, usageFees };
 }
 
 type LaunchFormProps = {
@@ -1390,7 +1403,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
             <div>
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => {
-                  const { totalCostSol, distributionWallets } =
+                  const { totalCostSol, distributionWallets, usageFees } =
                     calculateLaunchTotals(values);
                   return (
                     <div className="space-y-6">
@@ -1546,11 +1559,52 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               <span className="text-green-600">Enabled</span>
                             </div>
                           )}
+                          <div className="grid grid-cols-[140px_1fr] gap-2">
+                            <span className="text-muted-foreground">
+                              Usage Fees
+                            </span>
+                            <span>{usageFees.totalFeeSol.toFixed(4)} SOL</span>
+                          </div>
                         </div>
                       </div>
 
                       <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
                         <div className="space-y-4">
+                          <div className="grid grid-cols-2 gap-3 text-sm">
+                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
+                              <span className="text-muted-foreground">
+                                Generated wallets ({usageFees.generatedWalletCount}
+                                )
+                              </span>
+                              <span className="tabular-nums">
+                                {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
+                              <span className="text-muted-foreground">
+                                Vanity mint fee
+                              </span>
+                              <span className="tabular-nums">
+                                {usageFees.vanityMintFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
+                              <span className="text-muted-foreground">
+                                Launch fee
+                              </span>
+                              <span className="tabular-nums">
+                                {usageFees.launchFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
+                              <span className="text-muted-foreground">
+                                Total usage fees
+                              </span>
+                              <span className="tabular-nums font-medium">
+                                {usageFees.totalFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                          </div>
                           <div className="flex items-center justify-between gap-8">
                             <div className="flex items-center gap-10">
                               <div className="space-y-1">
