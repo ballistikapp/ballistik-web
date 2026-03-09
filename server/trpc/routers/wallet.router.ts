@@ -16,6 +16,7 @@ import {
   refreshMainWalletBalanceSchema,
   returnSolSchema,
   sendSolSchema,
+  withdrawMainSolSchema,
 } from "@/server/schemas/wallet.schema";
 
 export const walletRouter = router({
@@ -96,6 +97,16 @@ export const walletRouter = router({
         input.tokenPublicKey,
         ctx.user.id,
         input.walletPublicKeys,
+        input.amountSol,
+        input.useMax
+      );
+    }),
+  withdrawMainSol: sensitiveProcedure
+    .input(withdrawMainSolSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await walletService.withdrawMainSol(
+        ctx.user.id,
+        input.destinationPublicKey,
         input.amountSol,
         input.useMax
       );

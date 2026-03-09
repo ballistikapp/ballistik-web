@@ -2,6 +2,8 @@
 
 import * as React from "react";
 import {
+  IconArrowDownLeft,
+  IconArrowUpRight,
   IconDotsVertical,
   IconLogout,
   IconUser,
@@ -30,8 +32,12 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Spinner } from "@/components/ui/spinner";
+import { MainWalletDepositDialog } from "@/components/wallets/main-wallet-deposit-dialog";
+import { MainWalletWithdrawDialog } from "@/components/wallets/main-wallet-withdraw-dialog";
 
 export function AuthButton() {
+  const [depositDialogOpen, setDepositDialogOpen] = React.useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = React.useState(false);
   const { data: currentUser, isLoading } = trpc.auth.me.useQuery();
 
   const isLoggedIn = currentUser !== null && currentUser !== undefined;
@@ -78,7 +84,7 @@ export function AuthButton() {
     try {
       await refreshMainBalance.mutateAsync({});
       toast.success("Wallet balance refreshed", { id: toastId, icon: null });
-    } catch (error) {
+    } catch {
       toast.error("Failed to refresh wallet balance", {
         id: toastId,
         icon: null,
@@ -106,108 +112,139 @@ export function AuthButton() {
   }
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="ghost"
-          size="default"
-          className="h-12 gap-3 px-3 rounded-xl hover:bg-muted/10"
-        >
-          <span className="flex size-8 items-center justify-center rounded-full bg-muted">
-            <IconWallet className="size-4" />
-          </span>
-          <span className="hidden sm:flex flex-col items-start leading-none">
-            <span className="text-sm font-medium">
-              {currentUser.name || "User"}
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="default"
+            className="h-12 gap-3 px-3 rounded-xl hover:bg-muted/10"
+          >
+            <span className="flex size-8 items-center justify-center rounded-full bg-muted">
+              <IconWallet className="size-4" />
             </span>
-            <span className="text-xs text-muted-foreground">
-              {mainWalletBalanceSol.toFixed(4)} SOL
+            <span className="hidden sm:flex flex-col items-start leading-none">
+              <span className="text-sm font-medium">
+                {currentUser.name || "User"}
+              </span>
+              <span className="text-xs text-muted-foreground">
+                {mainWalletBalanceSol.toFixed(4)} SOL
+              </span>
             </span>
-          </span>
-          <IconDotsVertical className="size-4 ml-4 text-muted-foreground" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-56">
-        <DropdownMenuGroup>
-          <DropdownMenuItem className="cursor-default data-highlighted:bg-transparent data-highlighted:text-foreground">
-            <div className="flex w-full items-center justify-between gap-3">
-              <div className="flex min-w-0 flex-col gap-1">
-                <span className="truncate text-sm font-medium">
-                  {currentUser.name || "Wallet"}
-                </span>
-                <span className="text-muted-foreground truncate text-xs font-mono">
-                  {truncateAddress(currentUser.mainWalletPublicKey)}
-                </span>
+            <IconDotsVertical className="size-4 ml-4 text-muted-foreground" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuGroup>
+            <DropdownMenuItem className="cursor-default data-highlighted:bg-transparent data-highlighted:text-foreground">
+              <div className="flex w-full items-center justify-between gap-3">
+                <div className="flex min-w-0 flex-col gap-1">
+                  <span className="truncate text-sm font-medium">
+                    {currentUser.name || "Wallet"}
+                  </span>
+                  <span className="text-muted-foreground truncate text-xs font-mono">
+                    {truncateAddress(currentUser.mainWalletPublicKey)}
+                  </span>
+                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                      onClick={async (event) => {
+                        event.preventDefault();
+                        event.stopPropagation();
+                        await copyToClipboard(
+                          currentUser.mainWalletPublicKey,
+                          "Public Key"
+                        );
+                      }}
+                    >
+                      <IconCopy className="size-4" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy Wallet Public Key</TooltipContent>
+                </Tooltip>
               </div>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                    onClick={async (event) => {
-                      event.preventDefault();
-                      event.stopPropagation();
-                      await copyToClipboard(
-                        currentUser.mainWalletPublicKey,
-                        "Public Key"
-                      );
-                    }}
-                  >
-                    <IconCopy className="size-4" />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Copy Wallet Public Key</TooltipContent>
-              </Tooltip>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel className="flex items-center justify-between gap-3">
+            <div className="flex flex-col">
+              <span className="text-xs text-muted-foreground">Balance</span>
+              <span className="text-lg font-mono font-semibold">
+                {mainWalletBalanceSol.toFixed(4)} SOL
+              </span>
             </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
+                  disabled={refreshMainBalance.isPending}
+                  onClick={handleRefreshMainBalance}
+                >
+                  {refreshMainBalance.isPending ? (
+                    <Spinner className="size-4" />
+                  ) : (
+                    <IconRefresh className="size-4" />
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Refresh</TooltipContent>
+            </Tooltip>
+          </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setDepositDialogOpen(true);
+              }}
+            >
+              <IconArrowDownLeft />
+              Deposit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setWithdrawDialogOpen(true);
+              }}
+            >
+              <IconArrowUpRight />
+              Withdraw
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/account">
+                <IconUser />
+                My Account
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onClick={handleLogout}>
+            <IconLogout />
+            Log out
           </DropdownMenuItem>
-        </DropdownMenuGroup>
+        </DropdownMenuContent>
+      </DropdownMenu>
 
-        <DropdownMenuSeparator />
-
-        <DropdownMenuLabel className="flex items-center justify-between gap-3">
-          <div className="flex flex-col">
-            <span className="text-xs text-muted-foreground">Balance</span>
-            <span className="text-lg font-mono font-semibold">
-              {mainWalletBalanceSol.toFixed(4)} SOL
-            </span>
-          </div>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                disabled={refreshMainBalance.isPending}
-                onClick={handleRefreshMainBalance}
-              >
-                {refreshMainBalance.isPending ? (
-                  <Spinner className="size-4" />
-                ) : (
-                  <IconRefresh className="size-4" />
-                )}
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Refresh</TooltipContent>
-          </Tooltip>
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-
-        <DropdownMenuGroup>
-          <DropdownMenuItem asChild>
-            <Link href="/account">
-              <IconUser />
-              My Account
-            </Link>
-          </DropdownMenuItem>
-        </DropdownMenuGroup>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={handleLogout}>
-          <IconLogout />
-          Log out
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+      <MainWalletDepositDialog
+        open={depositDialogOpen}
+        onOpenChange={setDepositDialogOpen}
+        publicKey={currentUser.mainWalletPublicKey}
+      />
+      <MainWalletWithdrawDialog
+        open={withdrawDialogOpen}
+        onOpenChange={setWithdrawDialogOpen}
+        balanceSol={mainWalletBalanceSol}
+      />
+    </>
   );
 }

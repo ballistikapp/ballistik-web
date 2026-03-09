@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { PublicKey } from "@solana/web3.js";
 
 export const getOperationalWalletsByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
@@ -80,6 +81,44 @@ export const returnSolSchema = z
   });
 
 export type ReturnSolInput = z.infer<typeof returnSolSchema>;
+
+const destinationPublicKeySchema = z
+  .string()
+  .min(1, "Destination wallet public key is required")
+  .refine((value) => {
+    try {
+      new PublicKey(value);
+      return true;
+    } catch {
+      return false;
+    }
+  }, "Invalid destination wallet public key");
+
+export const withdrawMainSolSchema = z
+  .object({
+    destinationPublicKey: destinationPublicKeySchema,
+    amountSol: z.number().positive().optional(),
+    useMax: z.boolean().optional(),
+  })
+  .superRefine((data, ctx) => {
+    if (!data.useMax && !data.amountSol) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "Amount in SOL is required",
+        path: ["amountSol"],
+      });
+    }
+  });
+
+export type WithdrawMainSolInput = z.infer<typeof withdrawMainSolSchema>;
+
+export const withdrawMainSolResultSchema = z.object({
+  signature: z.string(),
+  amountSol: z.number().positive(),
+  destinationPublicKey: z.string(),
+});
+
+export type WithdrawMainSolResult = z.infer<typeof withdrawMainSolResultSchema>;
 
 export const walletTransferStatusSchema = z.enum([
   "SUBMITTED",
