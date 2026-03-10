@@ -38,6 +38,7 @@ This directory contains detailed implementation documentation for all features i
 ### System Configuration
 
 - [Config Implementation](./config-implementation.md) — configuration and env parsing
+- [Pricing Implementation](./pricing-implementation.md) — usage-fee schedule, scope rules, and enforcement model
 - [Logging Implementation](./logging-implementation.md) — structured logging setup
 - [API Abuse Protection](./api-abuse-protection.md) — request identity, rate-limit tiers, and endpoint hardening
 

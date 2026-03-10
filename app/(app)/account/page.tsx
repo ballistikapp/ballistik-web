@@ -5,6 +5,7 @@ import Link from "next/link";
 import { toast } from "sonner";
 import {
   IconArrowUpRight,
+  IconArrowDownLeft,
   IconCheck,
   IconCopy,
   IconExternalLink,
@@ -37,6 +38,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { AccountSendDialog } from "@/components/wallets/account-send-dialog";
+import { MainWalletDepositDialog } from "@/components/wallets/main-wallet-deposit-dialog";
+import { MainWalletWithdrawDialog } from "@/components/wallets/main-wallet-withdraw-dialog";
 
 export default function AccountPage() {
   const utils = trpc.useUtils();
@@ -61,6 +64,8 @@ export default function AccountPage() {
   const [privateKeyDialogOpen, setPrivateKeyDialogOpen] = useState(false);
   const [privateKey, setPrivateKey] = useState<string | null>(null);
   const [sendDialogOpen, setSendDialogOpen] = useState(false);
+  const [depositDialogOpen, setDepositDialogOpen] = useState(false);
+  const [withdrawDialogOpen, setWithdrawDialogOpen] = useState(false);
 
   const wallet = mainWalletQuery.data;
   const balanceSol = Number(wallet?.balanceSol ?? 0);
@@ -290,7 +295,23 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="">
+        <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setDepositDialogOpen(true)}
+          >
+            <IconArrowDownLeft className="size-4" />
+            Deposit
+          </Button>
+          <Button
+            variant="outline"
+            size="lg"
+            onClick={() => setWithdrawDialogOpen(true)}
+          >
+            <IconArrowUpRight className="size-4" />
+            Withdraw
+          </Button>
           <Button
             variant="outline"
             size="lg"
@@ -361,6 +382,16 @@ export default function AccountPage() {
       <AccountSendDialog
         open={sendDialogOpen}
         onOpenChange={setSendDialogOpen}
+      />
+      <MainWalletDepositDialog
+        open={depositDialogOpen}
+        onOpenChange={setDepositDialogOpen}
+        publicKey={currentUser.mainWalletPublicKey}
+      />
+      <MainWalletWithdrawDialog
+        open={withdrawDialogOpen}
+        onOpenChange={setWithdrawDialogOpen}
+        balanceSol={balanceSol}
       />
     </div>
   );

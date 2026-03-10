@@ -103,7 +103,7 @@ server/
 - Operational/runtime logs use structured logger output and should be routed to an external sink when enabled.
 - Required structured fields for production diagnostics: `requestId` (or job/session id), `service`, and `durationMs` when applicable.
 - Sensitive values must not be logged (private keys, JWTs, API keys, secrets, auth headers).
-- Retention automation and Loki shipping are tracked as deferred backlog items and are not part of the current hardening pass.
+- Retention automation and external log shipping are tracked as deferred backlog items and are not part of the current hardening pass.
 
 ## Auth Model
 

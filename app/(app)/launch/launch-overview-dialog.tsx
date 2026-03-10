@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { trpc } from "@/lib/trpc/client";
 
 interface LaunchOverviewDialogProps {
   open: boolean;
@@ -27,6 +28,7 @@ interface LaunchOverviewDialogProps {
     telegram: string;
     website: string;
     devWalletOption: "import" | "generate" | "use_main";
+    importedDevWalletKey: string;
     devBuyAmountSol: number;
     jitoTipAmountSol: number;
     bundleBuyEnabled: boolean;
@@ -51,12 +53,35 @@ export function LaunchOverviewDialog({
   isLoading = false,
 }: LaunchOverviewDialogProps) {
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
-  const totalCost =
-    launchInput.devBuyAmountSol +
-    (launchInput.bundleBuyEnabled
-      ? launchInput.bundlerWalletCount * launchInput.bundlerBuyAmountSol
-      : 0) +
-    launchInput.jitoTipAmountSol;
+  const previewInput = React.useMemo(
+    () => ({
+      devWalletOption: launchInput.devWalletOption,
+      importedDevWalletKey:
+        launchInput.devWalletOption === "import"
+          ? launchInput.importedDevWalletKey
+          : undefined,
+      devBuyAmountSol: launchInput.devBuyAmountSol,
+      jitoTipAmountSol: launchInput.jitoTipAmountSol,
+      bundleBuyEnabled: launchInput.bundleBuyEnabled,
+      vanityMint: launchInput.vanityMint,
+      bundlerWalletCount: launchInput.bundlerWalletCount,
+      bundlerBuyAmountSol: launchInput.bundlerBuyAmountSol,
+      bundlerBuyVariancePercent: launchInput.bundlerBuyVariancePercent,
+      distributionWalletMultiplier: launchInput.distributionWalletMultiplier,
+    }),
+    [launchInput]
+  );
+  const previewCostsQuery = trpc.launch.previewCosts.useQuery(previewInput, {
+    enabled: open,
+    refetchOnWindowFocus: false,
+  });
+  const preview = previewCostsQuery.data;
+  const quoteLoading = previewCostsQuery.isLoading || previewCostsQuery.isFetching;
+  const quoteError = previewCostsQuery.error?.message ?? null;
+  const canConfirm =
+    preview?.hasSufficientMainWallet === true &&
+    !quoteLoading &&
+    !isLoading;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -206,12 +231,101 @@ export function LaunchOverviewDialog({
           </div>
 
           <div className="border-t pt-4">
-            <div className="flex justify-between items-center text-sm">
-              <span className="font-medium">Total Cost</span>
-              <span className="text-lg font-bold">
-                {totalCost.toFixed(4)} SOL
-              </span>
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-medium">Pre-Launch Cost Breakdown</div>
+              <div className="text-xs text-muted-foreground">Based on current balances</div>
             </div>
+            {quoteLoading && (
+              <p className="text-sm text-muted-foreground">
+                Calculating latest breakdown...
+              </p>
+            )}
+            {!quoteLoading && quoteError && (
+              <p className="text-sm text-destructive">
+                Could not calculate launch costs. Please retry.
+              </p>
+            )}
+            {!quoteLoading && preview && (
+              <div className="space-y-2 text-sm">
+                <div className="rounded-md border bg-muted/30 p-3 mb-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Main wallet balance</span>
+                    <span className="tabular-nums">
+                      {preview.mainWalletBalanceSol.toFixed(4)} SOL
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-muted-foreground">Required at start</span>
+                    <span className="tabular-nums">
+                      {preview.requiredMainWalletSol.toFixed(4)} SOL
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Main wallet charged now</span>
+                  <span className="tabular-nums">
+                    {preview.chargedNowSol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Temporary wallet funding</span>
+                  <span className="tabular-nums">
+                    {preview.temporaryFundingSol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Expected returned later</span>
+                  <span className="tabular-nums">
+                    {preview.expectedReturnSol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-muted-foreground">Permanent spend</span>
+                  <span className="tabular-nums">
+                    {preview.permanentSpendSol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <div className="flex items-center justify-between pt-2 border-t">
+                  <span className="font-medium">
+                    Estimated final main-wallet spend
+                  </span>
+                  <span className="tabular-nums font-medium">
+                    {preview.netMainWalletDeltaAfterCleanupSol.toFixed(4)} SOL
+                  </span>
+                </div>
+                <div className="rounded-md border bg-muted/30 p-3 mt-2 space-y-1">
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Bundle variance reserve
+                    </span>
+                    <span className="tabular-nums">
+                      {preview.lineItems.bundleBuyVarianceReserveSol.toFixed(4)}{" "}
+                      SOL
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-muted-foreground">Usage fees</span>
+                    <span className="tabular-nums">
+                      {preview.lineItems.usageFeesSol.toFixed(4)} SOL
+                    </span>
+                  </div>
+                </div>
+                {preview.riskNotes.length > 0 && (
+                  <div className="rounded-md border bg-muted/30 p-3 mt-2 space-y-1">
+                    {preview.riskNotes.map((note) => (
+                      <p key={note} className="text-xs text-muted-foreground">
+                        - {note}
+                      </p>
+                    ))}
+                  </div>
+                )}
+                {!preview.hasSufficientMainWallet && (
+                  <p className="text-xs text-destructive mt-1">
+                    Main wallet is below the required start amount.
+                  </p>
+                )}
+              </div>
+            )}
           </div>
         </div>
         <DialogFooter>
@@ -222,8 +336,14 @@ export function LaunchOverviewDialog({
           >
             Cancel
           </Button>
-          <Button onClick={onConfirm} disabled={isLoading}>
-            {isLoading ? "Launching..." : "Confirm Launch"}
+          <Button onClick={onConfirm} disabled={!canConfirm}>
+            {isLoading
+              ? "Launching..."
+              : quoteLoading
+                ? "Calculating..."
+                : preview && !preview.hasSufficientMainWallet
+                  ? "Insufficient balance"
+                : "Confirm Launch"}
           </Button>
         </DialogFooter>
       </DialogContent>

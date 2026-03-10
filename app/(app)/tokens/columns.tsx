@@ -22,6 +22,7 @@ import {
   IconBrandTelegram,
   IconWorld,
   IconRecycle,
+  IconKey,
 } from "@tabler/icons-react";
 import { GalleryVerticalEnd } from "lucide-react";
 
@@ -44,6 +45,7 @@ export type TokenTableRow = {
 
 type TokenColumnsOptions = {
   onReclaim?: (row: TokenTableRow) => void;
+  onShowPrivateKey?: (row: TokenTableRow) => void;
 };
 
 function truncateAddress(address: string) {
@@ -308,6 +310,14 @@ export const createColumns = (
               >
                 <IconCopy className="size-4" />
                 Copy Address
+              </DropdownMenuItem>
+            )}
+            {hasPublicKey && options.onShowPrivateKey && (
+              <DropdownMenuItem
+                onClick={() => options.onShowPrivateKey?.(item)}
+              >
+                <IconKey className="size-4" />
+                Show Private Key
               </DropdownMenuItem>
             )}
             {isFailed && options.onReclaim && (

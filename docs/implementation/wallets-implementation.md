@@ -97,6 +97,7 @@ Service rules:
 - Default token reads are sanitized (`token.getUserTokens`, `token.getAllUserTokens`, `token.getByPublicKey`) and return only non-sensitive token metadata.
 - Token private keys are available only through explicit user-triggered retrieval using `token.getPrivateKey`.
 - `token.getPrivateKey` is a protected mutation intended for on-demand access checks; consumers should avoid background/prefetch patterns for this call.
+- The My Tokens table includes a row action (`Show Private Key`) that opens a confirmation dialog and fetches the token private key only after the user clicks `Get private key`.
 
 ## UI Behavior
 
@@ -190,6 +191,37 @@ The account page uses `AccountSendDialog` to send SOL from the main wallet to to
 2. Wallets for the selected token are loaded (`wallet.getOperationalByToken` + `wallet.getDevByToken`).
 3. User selects wallet(s) via checkboxes, enters amount per wallet.
 4. Submit calls existing `wallet.sendSol` with the selected `tokenPublicKey` and `walletPublicKeys`.
+
+### Deposit & Withdraw (User-Scoped Main Wallet)
+
+The account page and auth dropdown also expose user-scoped main wallet actions:
+
+- **Deposit**: informational only (no mutation). Shows the main wallet public key, copy action, and QR code. Users fund this wallet to use app features.
+- **Withdraw**: sends SOL from the user's main wallet to any external wallet address.
+
+Withdraw behavior:
+
+1. User enters destination wallet address.
+2. User either enters `amountSol` or chooses `Max`.
+3. UI requires a review step and then a final destructive confirmation before submit.
+4. Submit calls `wallet.withdrawMainSol`.
+
+### Main Withdraw API Contract
+
+- `wallet.withdrawMainSol` is user-scoped and does not require `tokenPublicKey`.
+- Input:
+  - `destinationPublicKey: string`
+  - `amountSol?: number`
+  - `useMax?: boolean`
+- Validation:
+  - destination must be a valid Solana public key
+  - either `amountSol` or `useMax` must be provided
+- Service:
+  - recomputes spendable lamports from live RPC state
+  - for `useMax`, subtracts estimated network fee
+  - rejects non-positive transfer amounts
+  - submits one transfer transaction and refreshes main wallet balance
+  - returns `signature` and effective `amountSol`
 
 ### Cache Invalidation
 

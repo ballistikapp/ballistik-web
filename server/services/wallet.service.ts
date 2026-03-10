@@ -17,7 +17,10 @@ import { logger } from "@/lib/logger";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
-import type { WalletTransferResult } from "@/server/schemas/wallet.schema";
+import type {
+  WalletTransferResult,
+  WithdrawMainSolResult,
+} from "@/server/schemas/wallet.schema";
 import { withActionLock } from "@/server/security/api-abuse";
 
 const log = logger.child({ service: "wallet" });
@@ -193,6 +196,130 @@ export const walletService = {
       balanceSol,
       balanceRefreshedAt: now,
     };
+  },
+
+  async withdrawMainSol(
+    userId: string,
+    destinationPublicKey: string,
+    amountSol?: number,
+    useMax?: boolean
+  ): Promise<WithdrawMainSolResult> {
+    const actionKey = `wallet:withdraw-main-sol:${userId}`;
+    return await withActionLock(actionKey, async () => {
+      const user = await prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          mainWallet: {
+            select: {
+              publicKey: true,
+              privateKey: true,
+            },
+          },
+        },
+      });
+
+      const mainWallet = user?.mainWallet;
+      if (!mainWallet) {
+        throw new AppError("Main wallet not found", 400);
+      }
+
+      const sender = Keypair.fromSecretKey(bs58.decode(mainWallet.privateKey));
+      const destination = new PublicKey(destinationPublicKey);
+      const connection = getSolanaConnection();
+
+      const submitTransfer = async () => {
+        const { blockhash, lastValidBlockHeight } = await retryRpcWithTimeout(
+          () => connection.getLatestBlockhash("confirmed"),
+          rpcConfig.tuning.rpcTimeoutMs
+        );
+
+        const [balanceLamports, feeInfo] = await Promise.all([
+          retryRpcWithTimeout(
+            () => connection.getBalance(sender.publicKey),
+            rpcConfig.tuning.rpcTimeoutMs
+          ),
+          retryRpcWithTimeout(() => {
+            const feeTransaction = new Transaction().add(
+              SystemProgram.transfer({
+                fromPubkey: sender.publicKey,
+                toPubkey: destination,
+                lamports: 1,
+              })
+            );
+            feeTransaction.recentBlockhash = blockhash;
+            feeTransaction.lastValidBlockHeight = lastValidBlockHeight;
+            feeTransaction.feePayer = sender.publicKey;
+            return connection.getFeeForMessage(
+              feeTransaction.compileMessage(),
+              "confirmed"
+            );
+          }, rpcConfig.tuning.rpcTimeoutMs),
+        ]);
+
+        const feeLamports = feeInfo.value ?? 5000;
+        const requestedLamports = useMax
+          ? balanceLamports - feeLamports
+          : Math.floor((amountSol ?? 0) * 1_000_000_000);
+
+        if (requestedLamports <= 0) {
+          throw new AppError("Insufficient balance to withdraw", 400);
+        }
+
+        if (!useMax && requestedLamports + feeLamports > balanceLamports) {
+          throw new AppError("Insufficient balance to cover amount and fee", 400);
+        }
+
+        const transaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: sender.publicKey,
+            toPubkey: destination,
+            lamports: requestedLamports,
+          })
+        );
+        transaction.recentBlockhash = blockhash;
+        transaction.lastValidBlockHeight = lastValidBlockHeight;
+        transaction.feePayer = sender.publicKey;
+
+        const signature = await retryRpcWithTimeout(
+          () =>
+            sendAndConfirmTransaction(connection, transaction, [sender], {
+              commitment: "confirmed",
+            }),
+          rpcConfig.tuning.confirmTimeoutMs
+        );
+
+        return {
+          signature,
+          amountSol: requestedLamports / 1_000_000_000,
+        };
+      };
+
+      let submitted: { signature: string; amountSol: number };
+      try {
+        submitted = await submitTransfer();
+      } catch (error) {
+        if (error instanceof TransactionExpiredBlockheightExceededError) {
+          submitted = await submitTransfer();
+        } else {
+          throw error;
+        }
+      }
+
+      try {
+        await walletService.refreshMainWalletBalance(userId);
+      } catch (error) {
+        const message = error instanceof Error ? error.message : String(error);
+        log.warn("Post-withdraw main wallet refresh failed", {
+          errorMessage: message,
+        });
+      }
+
+      return {
+        signature: submitted.signature,
+        amountSol: submitted.amountSol,
+        destinationPublicKey,
+      };
+    });
   },
 
   async getWalletByToken(

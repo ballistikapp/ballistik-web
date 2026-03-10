@@ -6,6 +6,7 @@ import { LaunchForm } from "./launch-form";
 import { CloneTokenDialog } from "./clone-token-dialog";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
+import { trpc } from "@/lib/trpc/client";
 
 export default function LaunchPage() {
   const [cloneDialogOpen, setCloneDialogOpen] = React.useState(false);
@@ -14,6 +15,9 @@ export default function LaunchPage() {
     unknown
   > | null>(null);
   const [formKey, setFormKey] = React.useState(0);
+  const { data: launches } = trpc.launch.getUserLaunches.useQuery();
+
+  const hasTokens = launches?.some((launch) => Boolean(launch.tokenPublicKey)) ?? false;
 
   const handleClone = (input: Record<string, unknown>) => {
     setCloneValues(input);
@@ -25,14 +29,16 @@ export default function LaunchPage() {
       <PageHeader
         title="New Token Launch"
         actions={
-          <Button
-            size="lg"
-            variant="outline"
-            onClick={() => setCloneDialogOpen(true)}
-          >
-            <Copy className="size-4 mr-2 text-primary" />
-            Clone Token
-          </Button>
+          hasTokens ? (
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => setCloneDialogOpen(true)}
+            >
+              <Copy className="size-4 mr-2 text-primary" />
+              Clone Token
+            </Button>
+          ) : null
         }
       />
 

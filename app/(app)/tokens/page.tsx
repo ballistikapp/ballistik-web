@@ -3,7 +3,9 @@
 import Link from "next/link";
 import * as React from "react";
 import { Plus } from "lucide-react";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { copyToClipboard } from "@/lib/utils";
 import {
   DataTable,
   DataTablePagination,
@@ -12,6 +14,16 @@ import {
 } from "@/components/data-table";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Spinner } from "@/components/ui/spinner";
 import {
   createColumns,
   type TokenTableRow,
@@ -29,11 +41,16 @@ const LAUNCH_STATUS_MAP: Record<string, TokenRowStatus> = {
 
 export default function ManageTokensPage() {
   const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery();
+  const getPrivateKeyMutation = trpc.token.getPrivateKey.useMutation();
 
   const [reclaimTarget, setReclaimTarget] = React.useState<{
     tokenPublicKey?: string;
     launchId?: string;
   } | null>(null);
+  const [privateKeyDialogOpen, setPrivateKeyDialogOpen] = React.useState(false);
+  const [privateKey, setPrivateKey] = React.useState<string | null>(null);
+  const [privateKeyTarget, setPrivateKeyTarget] =
+    React.useState<TokenTableRow | null>(null);
 
   const tableRows: TokenTableRow[] = React.useMemo(() => {
     if (!launches) return [];
@@ -53,6 +70,30 @@ export default function ManageTokensPage() {
     }));
   }, [launches]);
 
+  const handlePrivateKeyDialogChange = (open: boolean) => {
+    setPrivateKeyDialogOpen(open);
+    if (!open) {
+      setPrivateKey(null);
+      setPrivateKeyTarget(null);
+      getPrivateKeyMutation.reset();
+    }
+  };
+
+  const handleGetPrivateKey = async () => {
+    const tokenPublicKey = privateKeyTarget?.publicKey;
+    if (!tokenPublicKey) return;
+    try {
+      const result = await getPrivateKeyMutation.mutateAsync({
+        publicKey: tokenPublicKey,
+      });
+      setPrivateKey(result.privateKey);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : "Failed to fetch private key";
+      toast.error(message);
+    }
+  };
+
   const columns = React.useMemo(
     () =>
       createColumns({
@@ -62,6 +103,10 @@ export default function ManageTokensPage() {
           } else {
             setReclaimTarget({ launchId: row.launchId });
           }
+        },
+        onShowPrivateKey: (row) => {
+          setPrivateKeyTarget(row);
+          setPrivateKeyDialogOpen(true);
         },
       }),
     []
@@ -111,6 +156,59 @@ export default function ManageTokensPage() {
         tokenPublicKey={reclaimTarget?.tokenPublicKey ?? null}
         launchId={reclaimTarget?.launchId ?? null}
       />
+      <Dialog
+        open={privateKeyDialogOpen}
+        onOpenChange={handlePrivateKeyDialogChange}
+      >
+        <DialogContent className="sm:max-w-lg">
+          <DialogHeader>
+            <DialogTitle>Private key</DialogTitle>
+            <DialogDescription>
+              Fetch and copy the private key for this token.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-3">
+            {privateKey ? (
+              <Textarea
+                readOnly
+                rows={4}
+                value={privateKey}
+                className="font-mono text-xs"
+              />
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Click get private key to fetch it from the server.
+              </div>
+            )}
+          </div>
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => handlePrivateKeyDialogChange(false)}
+              disabled={getPrivateKeyMutation.isPending}
+            >
+              Close
+            </Button>
+            {privateKey ? (
+              <Button onClick={() => copyToClipboard(privateKey, "Private key")}>
+                Copy private key
+              </Button>
+            ) : (
+              <Button
+                onClick={handleGetPrivateKey}
+                disabled={
+                  getPrivateKeyMutation.isPending || !privateKeyTarget?.publicKey
+                }
+              >
+                {getPrivateKeyMutation.isPending && (
+                  <Spinner className="mr-2 size-4" />
+                )}
+                Get private key
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

@@ -25,13 +25,15 @@
 ## Environment Variables
 
 - `SOLANA_RPC_URL` is required and validated when `getEnv()` is called
-- `SHYFT_API_KEY` is optional and enables Shyft REST APIs, callback management, and DeFi APIs
-- `SHYFT_GRPC_TOKEN` is optional and provides the x-token for gRPC authentication (falls back to `SHYFT_API_KEY`)
+- `SHYFT_API_KEY` is required and enables Shyft REST APIs, callback management, and DeFi APIs
+- `SHYFT_GRPC_TOKEN` is required and provides the x-token for gRPC authentication
 - `SHYFT_CALLBACK_SECRET` is optional and used to validate incoming Shyft webhook requests
-- `PINATA_JWT` is optional and enables token media uploads to Pinata during token persistence
-- `PINATA_GATEWAY_URL` is optional (must be a valid URL) and sets the base gateway used for stored IPFS media URLs (defaults to `https://gateway.pinata.cloud`)
+- `REFRESH_TOKEN_TTL_DAYS` defaults to `7` days when unset and must be a positive integer when provided
+- `PINATA_JWT` is required and enables token media uploads to Pinata during token persistence
+- `PINATA_GATEWAY_URL` is required (must be a valid URL) and sets the base gateway used for stored IPFS media URLs
 - `APP_URL` is optional (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`). Required for automatic callback registration on token and wallet creation.
-- `DATABASE_URL` is used for Prisma connections when set (one value per Railway environment)
+- `FEE_COLLECTOR_WALLET_ADDRESS` is required for usage-fee collection flows (launch and volume bot generated-wallet fees)
+- `DATABASE_URL` is required for Prisma connections (one value per Railway environment)
 - `getDatabaseUrl()` currently reads only `DATABASE_URL`
 - `DEV_STORAGE_POSTGRES_URL` / `PROD_STORAGE_POSTGRES_URL` may still appear in legacy error messaging, but are not part of `env.ts` parsing today
 
@@ -52,23 +54,13 @@
 - Use `logger.setTransport()` to route logs to another destination later
 - Runtime log records should include stable context keys (`requestId` or job/session id, `service`, `durationMs` when relevant)
 - Never emit secrets in logs (private keys, JWTs/tokens, API keys, auth headers)
-- Grafana Loki transport envs are optional: `LOKI_ENABLED`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_API_TOKEN`
-- Loki shipping is enabled only in production when `LOKI_ENABLED=true` and all required Loki envs are present
 - Next.js request logging is disabled via `next.config.ts` (`logging.incomingRequests = false`)
 - BigInt native binding warnings are suppressed to avoid console noise
 
 ### Deferred Logging Work
 
+- External log shipping transport selection is deferred to a future observability pass
 - DB retention/maintenance jobs are deferred (no pruning cron in the current pass)
-
-### Railway Production Loki Setup
-
-- Configure only on Railway production:
-  - `LOKI_ENABLED=true`
-  - `LOKI_URL`
-  - `LOKI_USERNAME`
-  - `LOKI_API_TOKEN`
-- Leave Loki envs unset in staging/local for this rollout.
 
 ## Cache Config
 

@@ -6,6 +6,7 @@ import {
 } from "../trpc";
 import { launchService } from "@/server/services/launch.service";
 import {
+  launchPreviewCostsSchema,
   launchRecoverSolByTokenSchema,
   launchRecoverySchema,
   launchRecoveryByTokenSchema,
@@ -15,6 +16,11 @@ import {
 } from "@/server/schemas/launch.schema";
 
 export const launchRouter = router({
+  previewCosts: protectedRateLimitedProcedure
+    .input(launchPreviewCostsSchema)
+    .query(async ({ input, ctx }) => {
+      return await launchService.previewCosts(input, ctx.user.id);
+    }),
   start: expensiveProtectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
     return await launchService.startLaunch(input, ctx.user.id);
   }),

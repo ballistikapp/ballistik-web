@@ -4,7 +4,7 @@
 - Centralize server-side logging
 - Keep runtime output console-first for now
 - Keep audit timelines in main Postgres only where product flows require it
-- Make it easy to add external transports later (Loki planned later)
+- Keep transport simple and console-only for now
 
 ## Current Logger
 - Location: `lib/logger.ts`
@@ -49,31 +49,16 @@ tRPC context adds:
 - Replace the transport via `setTransport` to write logs to a database or external service.
 - Keep the console transport for local dev and fallback.
 
-## Grafana Loki (Production-only)
-- Runtime logs can be shipped directly from `lib/logger.ts` to Grafana Loki.
-- Required env vars (Railway production): `LOKI_ENABLED=true`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_API_TOKEN`.
-- Loki transport is gated to production and does not replace console output; console JSON remains enabled as fallback.
-- Use low-cardinality labels (`service`, `env`, `level`); keep high-cardinality fields in payload.
-
-## Railway Setup
-- Set Loki env vars only on Railway production environment in this rollout.
-- Use a Grafana access policy token with logs write scope.
-- Keep staging disabled until production behavior is verified.
+## Transport Policy
+- Runtime logs remain console JSON output in all environments.
+- Additional shipping transports are intentionally deferred to future observability work.
 
 ## Verification
 - Trigger representative traffic (tRPC request, background worker tick, handled error).
-- In Grafana Explore, query by labels first and then filter payload text.
-- Example query:
-  - `{service="sollabs-web",env="production"} |= "error"`
-  - `{service="sollabs-web",env="production",level="warn"}`
-- Additional useful query examples:
-  - `{service="sollabs-web",env="production"} |= "\"requestId\""`
-  - `{service="volume-bot-worker",env="production"} |= "reclaim"`
-  - `{service="wallet",env="production",level="error"}`
-- Production verification checklist:
-  - Confirm console JSON logs still appear on Railway service logs.
-  - Confirm Loki receives new events after deployment with `LOKI_ENABLED=true`.
-  - Confirm transport outages do not break request handling or worker loops.
+- Confirm JSON log lines include `timestamp`, `level`, `message`, and expected context fields.
+- Confirm request-scoped entries include `requestId` and relevant identifiers.
+- Confirm handled errors include structured error metadata (`errorName`, `errorMessage`, optional `errorStack`).
 
 ## Deferred Backlog
+- External log shipping transport decisions are deferred to a future observability pass.
 - DB retention/maintenance jobs (pruning/archive/cron strategy) are intentionally deferred to reduce current complexity.

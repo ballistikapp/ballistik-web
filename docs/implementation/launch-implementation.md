@@ -12,14 +12,18 @@
 ## Core Flow
 
 1. UI submits launch input via `trpc.launch.start`.
-2. Server creates a `Launch` record and starts an async job.
-3. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
-4. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-5. Cancellation sets `cancelRequestedAt`; job checks between steps.
+2. Server performs synchronous input and funding preflight checks before queueing.
+3. If the main wallet cannot cover required launch funding, `launch.start` throws the exact user-facing error and no `Launch` record is created.
+4. When preflight passes, server creates a `Launch` record and starts an async job.
+5. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
+6. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+7. Cancellation sets `cancelRequestedAt`; job checks between steps.
 
 ## tRPC Endpoints
 
-- `launch.start` (mutation): creates launch and starts async job.
+- `launch.start` (mutation): runs synchronous validation/funding preflight, then creates launch and starts async job.
+  - Insufficient-funds failures return immediately and do not enqueue a launch.
+- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
@@ -176,10 +180,50 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Environment Requirements
 
 - `SOLANA_RPC_URL` must be set for on-chain operations.
+- `FEE_COLLECTOR_WALLET_ADDRESS` must be set for usage-fee collection.
 - Jito block engine URLs are defined in `lib/config/jito.config.ts`.
 - `SHYFT_GRPC_TOKEN` (or `SHYFT_API_KEY` fallback) is optional but recommended for faster gRPC-assisted confirmation; launch confirmation still has RPC polling fallback.
 - `PINATA_JWT` is optional; when set, token media is uploaded to Pinata and persisted as a gateway URL.
 - `PINATA_GATEWAY_URL` is optional and defaults to `https://gateway.pinata.cloud`.
+
+## Launch Usage Fees
+
+- Launch usage fees are documented centrally in `docs/implementation/pricing-implementation.md`.
+- Launch computes and displays usage-fee breakdowns before confirmation.
+- Server preflight includes usage fees in required main-wallet balance checks.
+- Server collects launch usage fees from main wallet to collector wallet when launch starts.
+
+## Launch Cost Quote Model
+
+Launch uses a hybrid quote model:
+
+- Edit-time estimate in the form for responsive feedback.
+- Confirm-time server quote (`launch.previewCosts`) as the source of truth.
+
+The server quote groups values into:
+
+- `chargedNowSol`: immediate debit from main wallet when launch starts.
+- `temporaryFundingSol`: operational wallet funding and reserves expected to return later.
+- `expectedReturnSol`: estimated SOL returned after post-launch cleanup.
+- `permanentSpendSol`: expected non-recoverable spend.
+- `netMainWalletDeltaNowSol`: immediate impact.
+- `netMainWalletDeltaAfterCleanupSol`: expected final impact after return.
+
+### Quote Categories
+
+`launch.previewCosts` includes line items for:
+
+- Usage fees (launch fee, vanity fee, generated-wallet fee).
+- Dev buy and bundle-buy funding requirements (including variance reserve).
+- Jito tip (when bundle buy is enabled).
+- Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
+- Operational buffers (`createFeeBufferLamports`, `fundingBufferLamports`, `transferFeeBufferLamports`) and creator/main reserves.
+
+### Return and Residual Handling
+
+- Post-launch cleanup attempts to return excess SOL from managed launch wallets back to main wallet.
+- If some SOL cannot be returned during cleanup, launch result metadata records actual returned and residual amounts so UI can show the difference between expected and realized post-cleanup deltas.
+- Residual SOL remains recoverable through reclaim paths and should be displayed explicitly as reclaimable balance.
 
 ## On-chain Confirmation Timeouts
 
