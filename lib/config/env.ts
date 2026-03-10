@@ -17,13 +17,6 @@ const envSchema = z.object({
     .optional()
     .transform((value) => value !== "false"),
   APP_URL: z.string().url().optional(),
-  LOKI_ENABLED: z
-    .string()
-    .optional()
-    .transform((value) => value === "true"),
-  LOKI_URL: z.string().url().optional(),
-  LOKI_USERNAME: z.string().min(1).optional(),
-  LOKI_API_TOKEN: z.string().min(1).optional(),
   FEE_COLLECTOR_WALLET_ADDRESS: z.string().min(1).optional(),
 });
 
@@ -74,10 +67,6 @@ export const getEnv = (): Env => {
     PINATA_GATEWAY_URL: process.env.PINATA_GATEWAY_URL,
     MONITORING_PIPELINE_V2: process.env.MONITORING_PIPELINE_V2,
     APP_URL: process.env.APP_URL,
-    LOKI_ENABLED: process.env.LOKI_ENABLED,
-    LOKI_URL: process.env.LOKI_URL,
-    LOKI_USERNAME: process.env.LOKI_USERNAME,
-    LOKI_API_TOKEN: process.env.LOKI_API_TOKEN,
     FEE_COLLECTOR_WALLET_ADDRESS: process.env.FEE_COLLECTOR_WALLET_ADDRESS,
   });
   if (process.env.NODE_ENV === "production") {

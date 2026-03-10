@@ -53,23 +53,13 @@
 - Use `logger.setTransport()` to route logs to another destination later
 - Runtime log records should include stable context keys (`requestId` or job/session id, `service`, `durationMs` when relevant)
 - Never emit secrets in logs (private keys, JWTs/tokens, API keys, auth headers)
-- Grafana Loki transport envs are optional: `LOKI_ENABLED`, `LOKI_URL`, `LOKI_USERNAME`, `LOKI_API_TOKEN`
-- Loki shipping is enabled only in production when `LOKI_ENABLED=true` and all required Loki envs are present
 - Next.js request logging is disabled via `next.config.ts` (`logging.incomingRequests = false`)
 - BigInt native binding warnings are suppressed to avoid console noise
 
 ### Deferred Logging Work
 
+- External log shipping transport selection is deferred to a future observability pass
 - DB retention/maintenance jobs are deferred (no pruning cron in the current pass)
-
-### Railway Production Loki Setup
-
-- Configure only on Railway production:
-  - `LOKI_ENABLED=true`
-  - `LOKI_URL`
-  - `LOKI_USERNAME`
-  - `LOKI_API_TOKEN`
-- Leave Loki envs unset in staging/local for this rollout.
 
 ## Cache Config
 
