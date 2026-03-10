@@ -2,7 +2,10 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { AppError, isAppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
-import type { LaunchTokenInput } from "@/server/schemas/launch.schema";
+import type {
+  LaunchPreviewCostsInput,
+  LaunchTokenInput,
+} from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
 import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
@@ -86,6 +89,7 @@ type SolReturnResult = {
   status: "returned" | "skipped" | "failed";
   signature?: string;
   amountSol?: number;
+  remainingBalanceSol?: number;
   error?: string;
 };
 
@@ -93,6 +97,20 @@ type DistributionWallet = {
   parentIndex: number;
   wallet: Keypair;
 };
+
+type LaunchCostInput = Pick<
+  LaunchTokenInput,
+  | "devWalletOption"
+  | "importedDevWalletKey"
+  | "devBuyAmountSol"
+  | "jitoTipAmountSol"
+  | "bundleBuyEnabled"
+  | "vanityMint"
+  | "bundlerWalletCount"
+  | "bundlerBuyAmountSol"
+  | "bundlerBuyVariancePercent"
+  | "distributionWalletMultiplier"
+>;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -892,7 +910,7 @@ async function fundWalletsFromMain(
   return { fundedCount: fundingPlan.length, totalLamports, signatures };
 }
 
-function validateLaunchInput(input: LaunchTokenInput) {
+function validateLaunchInput(input: LaunchCostInput) {
   const {
     minBuyAmountSol: MIN_BUY_AMOUNT_SOL,
     maxBundleWallets: MAX_BUNDLE_WALLETS,
@@ -970,8 +988,45 @@ type LaunchFundingPlan = {
   maxBundlerBuySol: number;
 };
 
+type LaunchCostPreview = {
+  mainWalletBalanceSol: number;
+  mainWalletBalanceLamports: string;
+  requiredMainWalletSol: number;
+  requiredMainWalletLamports: string;
+  hasSufficientMainWallet: boolean;
+  chargedNowSol: number;
+  temporaryFundingSol: number;
+  expectedReturnSol: number;
+  permanentSpendSol: number;
+  netMainWalletDeltaNowSol: number;
+  netMainWalletDeltaAfterCleanupSol: number;
+  lineItems: {
+    usageFeesSol: number;
+    launchFeeSol: number;
+    vanityMintFeeSol: number;
+    generatedWalletFeeSol: number;
+    devBuySol: number;
+    bundleBuyBaseSol: number;
+    bundleBuyMaxSol: number;
+    bundleBuyVarianceReserveSol: number;
+    jitoTipSol: number;
+    walletFundingTopUpSol: number;
+    mainReserveSol: number;
+    creatorTargetSol: number;
+    devFundingSol: number;
+    bundlerFundingPerWalletSol: number;
+    totalBundlerFundingSol: number;
+    ataRentSol: number;
+    userVolumeAccumulatorRentSol: number;
+    buyRentPerWalletSol: number;
+    distributionAtaPerBundlerSol: number;
+    totalDistributionAtaSol: number;
+  };
+  riskNotes: string[];
+};
+
 async function buildLaunchFundingPlan(params: {
-  input: LaunchTokenInput;
+  input: LaunchCostInput;
   bundlerWalletCount: number;
   bundlerBuyAmountSol: number;
   bundlerBuyVariancePercent: number;
@@ -1060,7 +1115,7 @@ async function buildLaunchFundingPlan(params: {
 }
 
 async function resolvePreflightDevWalletBalance(params: {
-  input: LaunchTokenInput;
+  input: LaunchCostInput;
   mainWalletPublicKey: string;
 }) {
   if (params.input.devWalletOption !== "import") {
@@ -1093,7 +1148,20 @@ async function resolvePreflightDevWalletBalance(params: {
   return { devWalletPublicKey, currentLamports };
 }
 
-async function ensureLaunchFundingAvailable(input: LaunchTokenInput, userId: string) {
+async function ensureLaunchFundingAvailable(input: LaunchCostInput, userId: string) {
+  const preview = await calculateLaunchCostPreview(input, userId);
+  if (!preview.hasSufficientMainWallet) {
+    throw new AppError(
+      `Main wallet requires ${preview.requiredMainWalletSol.toFixed(4)} SOL to fund launch wallets and usage fees`,
+      400
+    );
+  }
+}
+
+async function calculateLaunchCostPreview(
+  input: LaunchCostInput,
+  userId: string
+): Promise<LaunchCostPreview> {
   const {
     bundlerWalletCount,
     bundlerBuyAmountSol,
@@ -1153,13 +1221,86 @@ async function ensureLaunchFundingAvailable(input: LaunchTokenInput, userId: str
   }, BigInt(0));
   const requiredMainLamports =
     totalLamports + fundingPlan.mainReserveLamports + usageFeeLamports;
-
-  if (mainBalanceLamports < requiredMainLamports) {
-    throw new AppError(
-      `Main wallet requires ${lamportsToSol(requiredMainLamports).toFixed(4)} SOL to fund launch wallets and usage fees`,
-      400
+  const bundleBuyBaseSol = input.bundleBuyEnabled
+    ? bundlerWalletCount * bundlerBuyAmountSol
+    : 0;
+  const bundleBuyMaxSol = input.bundleBuyEnabled
+    ? bundlerWalletCount * fundingPlan.maxBundlerBuySol
+    : 0;
+  const bundleBuyVarianceReserveSol = Math.max(
+    0,
+    bundleBuyMaxSol - bundleBuyBaseSol
+  );
+  const jitoTipSol = input.bundleBuyEnabled ? jitoTipAmountSol : 0;
+  const totalBundlerFundingLamports =
+    fundingPlan.bundlerFundingLamports * BigInt(bundlerWalletCount);
+  const expectedReturnLamports = totalLamports
+    ? totalLamports -
+      toLamports(devBuyAmountSol) -
+      toLamports(bundleBuyMaxSol) -
+      fundingPlan.tipLamports
+    : BigInt(0);
+  const expectedReturnSol = Math.max(0, lamportsToSol(expectedReturnLamports));
+  const chargedNowSol = lamportsToSol(requiredMainLamports);
+  const permanentSpendSol =
+    usageFees.totalFeeSol + devBuyAmountSol + bundleBuyMaxSol + jitoTipSol;
+  const riskNotes: string[] = [];
+  if (bundleBuyVarianceReserveSol > 0) {
+    riskNotes.push(
+      "Bundle buy includes variance reserve. Actual spend can be lower than the reserved maximum."
     );
   }
+  riskNotes.push(
+    "Network and protocol execution fees can change at runtime and may affect the final wallet delta."
+  );
+
+  return {
+    mainWalletBalanceSol: lamportsToSol(mainBalanceLamports),
+    mainWalletBalanceLamports: mainBalanceLamports.toString(),
+    requiredMainWalletSol: lamportsToSol(requiredMainLamports),
+    requiredMainWalletLamports: requiredMainLamports.toString(),
+    hasSufficientMainWallet: mainBalanceLamports >= requiredMainLamports,
+    chargedNowSol,
+    temporaryFundingSol: lamportsToSol(totalLamports),
+    expectedReturnSol,
+    permanentSpendSol,
+    netMainWalletDeltaNowSol: chargedNowSol,
+    netMainWalletDeltaAfterCleanupSol: Math.max(
+      0,
+      chargedNowSol - expectedReturnSol
+    ),
+    lineItems: {
+      usageFeesSol: usageFees.totalFeeSol,
+      launchFeeSol: usageFees.launchFeeSol,
+      vanityMintFeeSol: usageFees.vanityMintFeeSol,
+      generatedWalletFeeSol: usageFees.generatedWalletFeeSol,
+      devBuySol: devBuyAmountSol,
+      bundleBuyBaseSol,
+      bundleBuyMaxSol,
+      bundleBuyVarianceReserveSol,
+      jitoTipSol,
+      walletFundingTopUpSol: lamportsToSol(totalLamports),
+      mainReserveSol: lamportsToSol(fundingPlan.mainReserveLamports),
+      creatorTargetSol: lamportsToSol(fundingPlan.creatorTargetLamports),
+      devFundingSol: lamportsToSol(fundingPlan.devFundingLamports),
+      bundlerFundingPerWalletSol: lamportsToSol(
+        fundingPlan.bundlerFundingLamports
+      ),
+      totalBundlerFundingSol: lamportsToSol(totalBundlerFundingLamports),
+      ataRentSol: lamportsToSol(fundingPlan.ataRentLamports),
+      userVolumeAccumulatorRentSol: lamportsToSol(
+        fundingPlan.userVolumeAccumulatorRentLamports
+      ),
+      buyRentPerWalletSol: lamportsToSol(fundingPlan.buyRentLamports),
+      distributionAtaPerBundlerSol: lamportsToSol(
+        fundingPlan.distributionAtaLamports
+      ),
+      totalDistributionAtaSol: lamportsToSol(
+        fundingPlan.distributionAtaLamports * BigInt(bundlerWalletCount)
+      ),
+    },
+    riskNotes,
+  };
 }
 
 async function resolveDevWallet(
@@ -1710,6 +1851,8 @@ async function returnExcessSolToMain(
   const startedAt = Date.now();
   const connection = getSolanaConnection();
   const mainPublicKey = new PublicKey(mainWalletPublicKey);
+  const rentExemptReserveLamports =
+    await connection.getMinimumBalanceForRentExemption(0);
   const uniqueSourceWallets = sourceWallets.filter(
     (wallet, index, all) =>
       !wallet.publicKey.equals(mainPublicKey) &&
@@ -1732,12 +1875,16 @@ async function returnExcessSolToMain(
   let totalReturnedLamports = BigInt(0);
   for (const sourceWallet of uniqueSourceWallets) {
     const balanceLamports = await connection.getBalance(sourceWallet.publicKey);
-    const lamportsToSend = balanceLamports - TRANSFER_FEE_BUFFER_LAMPORTS;
+    const lamportsToSend =
+      balanceLamports -
+      TRANSFER_FEE_BUFFER_LAMPORTS -
+      rentExemptReserveLamports;
     if (lamportsToSend <= 0) {
       results.push({
         publicKey: sourceWallet.publicKey.toBase58(),
         status: "skipped",
-        error: "Insufficient balance",
+        remainingBalanceSol: balanceLamports / LAMPORTS_PER_SOL,
+        error: "Insufficient balance after fee and rent reserve",
       });
       continue;
     }
@@ -1761,11 +1908,18 @@ async function returnExcessSolToMain(
         status: "returned",
         signature,
         amountSol: lamportsToSol(BigInt(lamportsToSend)),
+        remainingBalanceSol:
+          (TRANSFER_FEE_BUFFER_LAMPORTS + rentExemptReserveLamports) /
+          LAMPORTS_PER_SOL,
       });
     } catch (error) {
+      const remainingBalanceLamports = await connection.getBalance(
+        sourceWallet.publicKey
+      );
       results.push({
         publicKey: sourceWallet.publicKey.toBase58(),
         status: "failed",
+        remainingBalanceSol: remainingBalanceLamports / LAMPORTS_PER_SOL,
         error: getErrorMessage(error) || "Return failed",
       });
     }
@@ -1999,13 +2153,13 @@ async function resolveFailedLaunchByToken(
     where: {
       userId,
       tokenPublicKey,
-      status: { in: ["FAILED", "CANCELED"] },
+      status: { in: ["FAILED", "CANCELED", "SUCCEEDED"] },
     },
     orderBy: { createdAt: "desc" },
     select: { id: true },
   });
   if (!launch) {
-    throw new AppError("No failed launch found for token", 404);
+    throw new AppError("No launch found for token", 404);
   }
   return launch.id;
 }
@@ -2036,6 +2190,10 @@ export type UserLaunchRow = {
 };
 
 export const launchService = {
+  async previewCosts(input: LaunchPreviewCostsInput, userId: string) {
+    return await calculateLaunchCostPreview(input, userId);
+  },
+
   async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
     const launches = await prisma.launch.findMany({
       where: { userId },
@@ -2245,7 +2403,11 @@ export const launchService = {
       excludedDevWalletPublicKey,
     } = await loadLaunchRecoveryInfo(launchId, userId);
 
-    if (launch.status !== "FAILED" && launch.status !== "CANCELED") {
+    if (
+      launch.status !== "FAILED" &&
+      launch.status !== "CANCELED" &&
+      launch.status !== "SUCCEEDED"
+    ) {
       throw new AppError("Launch is not eligible for recovery", 400);
     }
 
@@ -2337,7 +2499,11 @@ export const launchService = {
       walletPublicKeys: recoveryWallets,
     } = await loadLaunchRecoveryInfo(launchId, userId);
 
-    if (launch.status !== "FAILED" && launch.status !== "CANCELED") {
+    if (
+      launch.status !== "FAILED" &&
+      launch.status !== "CANCELED" &&
+      launch.status !== "SUCCEEDED"
+    ) {
       throw new AppError("Launch is not eligible for recovery", 400);
     }
 

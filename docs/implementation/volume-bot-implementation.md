@@ -239,6 +239,33 @@ Then:
 
 The UI pre-fills `fundingPerGeneratedWallet` with `suggestedFunding` and warns if the user sets a lower value.
 
+## Volume Bot Cost Quote Model
+
+Volume bot uses a hybrid quote model:
+
+- Edit-time estimate while users adjust ranges and wallet settings.
+- Confirm-time live server quote from preflight summary endpoints as the authoritative wallet-impact view before start.
+
+Pre-operation quote values use shared semantics:
+
+- `chargedNowSol`: immediate debit from main wallet when session starts.
+- `temporaryFundingSol`: generated-wallet funding and selected-wallet top-up amounts that move into operational wallets.
+- `expectedReturnSol`: expected reclaimable SOL after stop/reclaim operations.
+- `permanentSpendSol`: expected non-recoverable costs (usage fees plus runtime execution costs where applicable).
+- `netMainWalletDeltaNowSol`: immediate impact at start.
+- `netMainWalletDeltaAfterCleanupSol`: expected impact after reclaim.
+
+### Confirm-Time Breakdown Requirements
+
+The start confirmation quote should expose, at minimum:
+
+- Generated wallet funding total.
+- Selected wallet top-up total from current live balances (delta-to-target, not `count * target`).
+- Usage-fee line items and total.
+- Immediate debit (`chargedNowSol`).
+- Expected reclaimable SOL and final expected net delta after reclaim.
+- Runtime-sensitive caveats for trade execution/network fees and optional priority fee settings.
+
 ## Worker Workflow (Event-Based)
 
 ### Lifecycle Operations
@@ -409,6 +436,7 @@ All endpoints require authentication (`protectedProcedure`).
 - `volumeBot.listSessions` — list recent sessions by token/user (max 50)
 - `volumeBot.eligibleWallets` — list eligible wallets with token balances and SOL estimates
 - `volumeBot.selectionSummary` — preflight estimates and wallet warnings
+  - Serves as the confirm-time cost quote source (exact live funding/top-up line items + wallet-impact totals).
 - `volumeBot.logs` — return recent session logs (last 40 entries)
 - `volumeBot.listPresets` — list saved presets for the user
 - `volumeBot.savePreset` — create/update preset by name

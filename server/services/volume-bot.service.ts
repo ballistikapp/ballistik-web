@@ -891,6 +891,20 @@ export const volumeBotService = {
       );
     }
     const mintPublicKey = new PublicKey(token.publicKey);
+    const connection = getSolanaConnection();
+    const selectedSolBalances = await Promise.all(
+      selectedWalletPublicKeys.map(async (walletPublicKey) => {
+        const lamports = await connection.getBalance(new PublicKey(walletPublicKey));
+        return {
+          walletPublicKey,
+          balanceSol: lamports / 1_000_000_000,
+        };
+      })
+    );
+    const exactTopUpRequiredSol = selectedSolBalances.reduce((sum, wallet) => {
+      const deficit = input.config.walletConfig.topUpAmount - wallet.balanceSol;
+      return deficit > 0 ? sum + deficit : sum;
+    }, 0);
     let balances: Awaited<ReturnType<typeof fetchTokenBalances>>["balances"] =
       [];
     let tokenDecimals = 0;
@@ -971,6 +985,15 @@ export const volumeBotService = {
       !priceUnavailable &&
       totalSellableValue > 0 &&
       estimatedSellVolume > totalSellableValue * 0.5;
+    const generatedFundingSol =
+      input.config.walletConfig.generatedWalletCount *
+      input.config.walletConfig.fundingPerGeneratedWallet;
+    const chargedNowSol =
+      usageFees.totalFeeSol + generatedFundingSol + exactTopUpRequiredSol;
+    const temporaryFundingSol = generatedFundingSol + exactTopUpRequiredSol;
+    const expectedReturnSol = temporaryFundingSol;
+    const runtimeFeeRiskNote =
+      "Runtime trade execution fees and priority fees can change final net wallet delta.";
 
     return {
       token,
@@ -995,16 +1018,22 @@ export const volumeBotService = {
       sellWarning,
       priceUnavailable,
       usageFees,
-      estimatedFundingSol:
-        input.config.walletConfig.generatedWalletCount *
-        input.config.walletConfig.fundingPerGeneratedWallet,
+      estimatedFundingSol: generatedFundingSol,
       estimatedTopUpMaxSol:
         selectedWalletPublicKeys.length * input.config.walletConfig.topUpAmount,
-      estimatedTotalOutflowSol:
-        usageFees.totalFeeSol +
-        input.config.walletConfig.generatedWalletCount *
-          input.config.walletConfig.fundingPerGeneratedWallet +
-        selectedWalletPublicKeys.length * input.config.walletConfig.topUpAmount,
+      exactTopUpRequiredSol,
+      estimatedTotalOutflowSol: chargedNowSol,
+      quote: {
+        chargedNowSol,
+        temporaryFundingSol,
+        expectedReturnSol,
+        permanentSpendSol: usageFees.totalFeeSol,
+        netMainWalletDeltaNowSol: chargedNowSol,
+        netMainWalletDeltaAfterCleanupSol: usageFees.totalFeeSol,
+        generatedFundingSol,
+        selectedWalletTopUpSol: exactTopUpRequiredSol,
+        runtimeFeeRiskNote,
+      },
     };
   },
 

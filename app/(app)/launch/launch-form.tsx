@@ -1630,7 +1630,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               </div>
                               <div className="space-y-1">
                                 <div className="text-xs text-muted-foreground">
-                                  Total cost
+                                  Draft estimate
                                 </div>
                                 <div className="text-2xl font-light tabular-nums">
                                   {totalCostSol.toFixed(4)}

@@ -23,6 +23,7 @@
 
 - `launch.start` (mutation): runs synchronous validation/funding preflight, then creates launch and starts async job.
   - Insufficient-funds failures return immediately and do not enqueue a launch.
+- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
@@ -191,6 +192,38 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Launch computes and displays usage-fee breakdowns before confirmation.
 - Server preflight includes usage fees in required main-wallet balance checks.
 - Server collects launch usage fees from main wallet to collector wallet when launch starts.
+
+## Launch Cost Quote Model
+
+Launch uses a hybrid quote model:
+
+- Edit-time estimate in the form for responsive feedback.
+- Confirm-time server quote (`launch.previewCosts`) as the source of truth.
+
+The server quote groups values into:
+
+- `chargedNowSol`: immediate debit from main wallet when launch starts.
+- `temporaryFundingSol`: operational wallet funding and reserves expected to return later.
+- `expectedReturnSol`: estimated SOL returned after post-launch cleanup.
+- `permanentSpendSol`: expected non-recoverable spend.
+- `netMainWalletDeltaNowSol`: immediate impact.
+- `netMainWalletDeltaAfterCleanupSol`: expected final impact after return.
+
+### Quote Categories
+
+`launch.previewCosts` includes line items for:
+
+- Usage fees (launch fee, vanity fee, generated-wallet fee).
+- Dev buy and bundle-buy funding requirements (including variance reserve).
+- Jito tip (when bundle buy is enabled).
+- Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
+- Operational buffers (`createFeeBufferLamports`, `fundingBufferLamports`, `transferFeeBufferLamports`) and creator/main reserves.
+
+### Return and Residual Handling
+
+- Post-launch cleanup attempts to return excess SOL from managed launch wallets back to main wallet.
+- If some SOL cannot be returned during cleanup, launch result metadata records actual returned and residual amounts so UI can show the difference between expected and realized post-cleanup deltas.
+- Residual SOL remains recoverable through reclaim paths and should be displayed explicitly as reclaimable balance.
 
 ## On-chain Confirmation Timeouts
 

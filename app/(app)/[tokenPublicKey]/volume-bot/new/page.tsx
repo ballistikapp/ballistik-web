@@ -620,9 +620,16 @@ export default function VolumeBotStartPage() {
   const selectionSummary = selectionSummaryQuery.data;
   const effectivePreflight = selectionSummary ?? localPreflight;
   const usageFees = selectionSummary?.usageFees ?? localUsageFees;
+  const confirmQuote = selectionSummary?.quote;
   const estimatedTotalOutflowSol =
+    confirmQuote?.chargedNowSol ??
     selectionSummary?.estimatedTotalOutflowSol ??
     usageFees.totalFeeSol + totalFunding + totalTopUp;
+  const temporaryFundingSol =
+    confirmQuote?.temporaryFundingSol ?? totalFunding + totalTopUp;
+  const expectedReturnSol = confirmQuote?.expectedReturnSol ?? temporaryFundingSol;
+  const finalNetDeltaSol =
+    confirmQuote?.netMainWalletDeltaAfterCleanupSol ?? usageFees.totalFeeSol;
   const netSolDirection = effectivePreflight?.netSolDirection ?? 0;
   const netDirectionLabel =
     netSolDirection > 0
@@ -639,6 +646,9 @@ export default function VolumeBotStartPage() {
       : false;
   const sellWarning = selectionSummary?.sellWarning ?? false;
   const totalSellableValue = selectionSummary?.totalSellableValue ?? null;
+  const confirmQuoteReady =
+    !selectionSummaryEnabled ||
+    (Boolean(selectionSummary) && !selectionSummaryQuery.isFetching);
 
   useEffect(() => {
     if (fundingTouched) {
@@ -1567,11 +1577,15 @@ export default function VolumeBotStartPage() {
               </InputGroup>
               {selectedWalletPublicKeys.length > 0 && topUpAmount > 0 && (
                 <div className="text-xs text-muted-foreground tabular-nums">
-                  {selectedWalletPublicKeys.length} × {topUpAmount} ={" "}
+                  {selectionSummary
+                    ? "Exact top-up from live balances:"
+                    : `${selectedWalletPublicKeys.length} × ${topUpAmount} =`}{" "}
                   <span className="text-foreground font-medium">
-                    {totalTopUp.toFixed(2)} SOL
+                    {(
+                      selectionSummary?.exactTopUpRequiredSol ?? totalTopUp
+                    ).toFixed(4)} SOL
                   </span>{" "}
-                  max
+                  {selectionSummary ? "" : "max"}
                 </div>
               )}
             </div>
@@ -1838,10 +1852,18 @@ export default function VolumeBotStartPage() {
             </div>
             <div className="space-y-1">
               <div className="text-xs text-muted-foreground">
-                Est. total outflow
+                Charged now
               </div>
               <div className="text-sm tabular-nums">
                 {estimatedTotalOutflowSol.toFixed(4)} SOL
+              </div>
+            </div>
+            <div className="space-y-1">
+              <div className="text-xs text-muted-foreground">
+                Expected return
+              </div>
+              <div className="text-sm tabular-nums">
+                {expectedReturnSol.toFixed(4)} SOL
               </div>
             </div>
             <div className="space-y-1">
@@ -1962,10 +1984,10 @@ export default function VolumeBotStartPage() {
               </div>
               <div className="space-y-1">
                 <div className="text-xs text-muted-foreground">
-                  Total funding
+                  Temporary funding
                 </div>
                 <div className="text-2xl font-light tabular-nums">
-                  {(totalFunding + totalTopUp).toFixed(2)}
+                  {temporaryFundingSol.toFixed(2)}
                   <span className="ml-1 text-sm text-muted-foreground">
                     SOL
                   </span>
@@ -1981,9 +2003,18 @@ export default function VolumeBotStartPage() {
                 </div>
               </div>
               <div className="space-y-1">
-                <div className="text-xs text-muted-foreground">Total outflow</div>
+                <div className="text-xs text-muted-foreground">Charged now</div>
                 <div className="text-2xl font-light tabular-nums">
                   {estimatedTotalOutflowSol.toFixed(2)}
+                  <span className="ml-1 text-sm text-muted-foreground">
+                    SOL
+                  </span>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <div className="text-xs text-muted-foreground">Final net delta</div>
+                <div className="text-2xl font-light tabular-nums">
+                  {finalNetDeltaSol.toFixed(2)}
                   <span className="ml-1 text-sm text-muted-foreground">
                     SOL
                   </span>
@@ -2017,6 +2048,9 @@ export default function VolumeBotStartPage() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <div className="space-y-3 text-sm">
+            <div className="text-xs text-muted-foreground">
+              Live pre-operation quote
+            </div>
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Ranges</span>
               <span className="font-semibold">{ranges.length}</span>
@@ -2038,11 +2072,44 @@ export default function VolumeBotStartPage() {
               </span>
             </div>
             <div className="flex items-center justify-between">
-              <span className="text-muted-foreground">Total outflow</span>
+              <span className="text-muted-foreground">Generated funding</span>
+              <span className="font-semibold">
+                {(confirmQuote?.generatedFundingSol ?? totalFunding).toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Selected wallet top-up</span>
+              <span className="font-semibold">
+                {(confirmQuote?.selectedWalletTopUpSol ?? totalTopUp).toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Charged now</span>
               <span className="font-semibold">
                 {estimatedTotalOutflowSol.toFixed(4)} SOL
               </span>
             </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Temporary funding</span>
+              <span className="font-semibold">
+                {temporaryFundingSol.toFixed(4)} SOL
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">Expected return</span>
+              <span className="font-semibold">{expectedReturnSol.toFixed(4)} SOL</span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-muted-foreground">
+                Final net delta after reclaim
+              </span>
+              <span className="font-semibold">{finalNetDeltaSol.toFixed(4)} SOL</span>
+            </div>
+            {confirmQuote?.runtimeFeeRiskNote && (
+              <p className="text-xs text-muted-foreground">
+                {confirmQuote.runtimeFeeRiskNote}
+              </p>
+            )}
             {scheduledStartEnabled && scheduledStartDate && (
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Scheduled start</span>
@@ -2056,9 +2123,13 @@ export default function VolumeBotStartPage() {
             <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction
               onClick={handleConfirmStart}
-              disabled={startMutation.isPending}
+              disabled={startMutation.isPending || !confirmQuoteReady}
             >
-              {startMutation.isPending ? "Starting..." : "Start bot"}
+              {startMutation.isPending
+                ? "Starting..."
+                : !confirmQuoteReady
+                  ? "Refreshing quote..."
+                  : "Start bot"}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

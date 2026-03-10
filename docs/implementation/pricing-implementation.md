@@ -60,6 +60,23 @@ Total usage fee is:
 - Volume bot preflight/confirmation surfaces must show generated wallet fee and total usage fee.
 - UI breakdown values should be derived from the same shared fee constants used by server logic.
 
+## Operation Cost Quote Semantics
+
+All pre-operation quotes use a shared vocabulary across launch and volume bot:
+
+- `chargedNowSol`: amount debited from main wallet immediately when the operation starts.
+- `temporaryFundingSol`: amount moved into operational wallets/rent reserves that is expected to be reclaimed later.
+- `expectedReturnSol`: expected amount returned to main wallet after cleanup/reclaim.
+- `permanentSpendSol`: expected non-recoverable spend (usage fees, protocol/network spend, tips, execution costs).
+- `netMainWalletDeltaNowSol`: same value as `chargedNowSol` for immediate wallet impact.
+- `netMainWalletDeltaAfterCleanupSol`: expected final main-wallet delta after return/reclaim.
+
+### Precision Rules
+
+- **Edit-time estimate**: fast client-side estimate used while users edit forms. This can be conservative.
+- **Confirm-time quote**: server-generated live quote using current balances and rent values. This is the authoritative amount shown before user confirmation.
+- Runtime-sensitive categories (for example trade execution fees and variable bundle buys) must be labeled as ranges or caveats when they cannot be exact at confirm time.
+
 ## Related Files
 
 - `lib/config/env.ts`
