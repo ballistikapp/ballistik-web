@@ -11,12 +11,7 @@ const globalForPrisma = globalThis as unknown as {
 
 // Create connection pool
 // Vercel uses prefixed env vars: DEV_STORAGE_* for dev/preview, PROD_STORAGE_* for production
-const connectionString = getDatabaseUrl() ?? undefined;
-if (!connectionString) {
-  console.warn(
-    "[Prisma] Missing database connection string. Set DATABASE_URL, DEV_STORAGE_POSTGRES_URL, or PROD_STORAGE_POSTGRES_URL."
-  );
-}
+const connectionString = getDatabaseUrl();
 
 const pool = new Pool({
   connectionString,

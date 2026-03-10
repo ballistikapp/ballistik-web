@@ -2,16 +2,17 @@ import { config as loadEnv } from "dotenv";
 import { z } from "zod";
 
 const envSchema = z.object({
+  DATABASE_URL: z.string().min(1),
   SOLANA_RPC_URL: z.string().min(1),
-  SHYFT_API_KEY: z.string().min(1).optional(),
-  SHYFT_GRPC_TOKEN: z.string().min(1).optional(),
+  SHYFT_API_KEY: z.string().min(1),
+  SHYFT_GRPC_TOKEN: z.string().min(1),
   SHYFT_CALLBACK_SECRET: z.string().min(1).optional(),
-  JWT_SECRET: z.string().min(1).optional(),
+  JWT_SECRET: z.string().min(1),
   JWT_EXPIRATION: z.string().min(1).optional(),
-  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().optional(),
+  REFRESH_TOKEN_TTL_DAYS: z.coerce.number().int().positive().default(7),
   SESSION_MAX_TTL_DAYS: z.coerce.number().int().positive().optional(),
-  PINATA_JWT: z.string().min(1).optional(),
-  PINATA_GATEWAY_URL: z.string().url().optional(),
+  PINATA_JWT: z.string().min(1),
+  PINATA_GATEWAY_URL: z.string().url(),
   MONITORING_PIPELINE_V2: z
     .string()
     .optional()
@@ -21,7 +22,7 @@ const envSchema = z.object({
 });
 
 const dbEnvSchema = z.object({
-  DATABASE_URL: z.string().min(1).optional(),
+  DATABASE_URL: z.string().min(1),
 });
 
 let cachedEnv: Env | null = null;
@@ -55,6 +56,7 @@ export const getEnv = (): Env => {
   }
   loadEnvFiles();
   cachedEnv = envSchema.parse({
+    DATABASE_URL: process.env.DATABASE_URL,
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
     SHYFT_API_KEY: process.env.SHYFT_API_KEY,
     SHYFT_GRPC_TOKEN: process.env.SHYFT_GRPC_TOKEN,
@@ -69,20 +71,12 @@ export const getEnv = (): Env => {
     APP_URL: process.env.APP_URL,
     FEE_COLLECTOR_WALLET_ADDRESS: process.env.FEE_COLLECTOR_WALLET_ADDRESS,
   });
-  if (process.env.NODE_ENV === "production") {
-    if (!cachedEnv.JWT_SECRET) {
-      throw new Error("JWT_SECRET must be set in production.");
-    }
-    if (!cachedEnv.REFRESH_TOKEN_TTL_DAYS) {
-      throw new Error("REFRESH_TOKEN_TTL_DAYS must be set in production.");
-    }
-  }
   return cachedEnv;
 };
 
 export type Env = z.infer<typeof envSchema>;
 
-export const getDatabaseUrl = (): string | undefined => {
+export const getDatabaseUrl = (): string => {
   loadEnvFiles();
   if (cachedDbEnv) {
     return cachedDbEnv.DATABASE_URL;
