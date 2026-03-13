@@ -1,6 +1,7 @@
 export const generatedWalletFeeSol = 0.02;
 export const vanityMintFeeSol = 0.1;
-export const launchFeeSol = 0.1;
+export const descriptionAttributionRemovalFeeSol = 0.1;
+export const bundleBuyFeeSol = 0.1;
 
 export type LaunchUsageFeeInput = {
   devWalletOption: "import" | "generate" | "use_main";
@@ -8,13 +9,15 @@ export type LaunchUsageFeeInput = {
   bundlerWalletCount: number;
   distributionWalletMultiplier: number;
   vanityMint: boolean;
+  removeAttribution: boolean;
 };
 
 export type LaunchUsageFeeBreakdown = {
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
   vanityMintFeeSol: number;
-  launchFeeSol: number;
+  descriptionAttributionRemovalFeeSol: number;
+  bundleBuyFeeSol: number;
   totalFeeSol: number;
 };
 
@@ -54,12 +57,21 @@ export function calculateLaunchUsageFees(
   const generatedWalletCount = calculateLaunchGeneratedWalletCount(input);
   const generatedWalletFeeValue = generatedWalletCount * generatedWalletFeeSol;
   const vanityFeeValue = input.vanityMint ? vanityMintFeeSol : 0;
-  const totalFeeSol = generatedWalletFeeValue + vanityFeeValue + launchFeeSol;
+  const attributionRemovalFeeValue = input.removeAttribution
+    ? descriptionAttributionRemovalFeeSol
+    : 0;
+  const bundleBuyFeeValue = input.bundleBuyEnabled ? bundleBuyFeeSol : 0;
+  const totalFeeSol =
+    generatedWalletFeeValue +
+    vanityFeeValue +
+    attributionRemovalFeeValue +
+    bundleBuyFeeValue;
   return {
     generatedWalletCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     vanityMintFeeSol: vanityFeeValue,
-    launchFeeSol,
+    descriptionAttributionRemovalFeeSol: attributionRemovalFeeValue,
+    bundleBuyFeeSol: bundleBuyFeeValue,
     totalFeeSol,
   };
 }

@@ -10,14 +10,16 @@
 
 - `0.02 SOL` per generated wallet
 - `0.1 SOL` for vanity token mint
-- `0.1 SOL` for token launch
+- `0.1 SOL` to remove launch attribution text from token description
+- `0.1 SOL` when bundle buy is enabled
 
 ## Scope Rules
 
 - Generated-wallet fee applies to generated wallets created by feature workflows (launch and volume bot).
 - Auth/signup generated main wallets are excluded from usage-fee charging.
-- Launch fee applies to each launch start.
 - Vanity mint fee applies only when vanity mint is enabled for launch.
+- Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
+- Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
 
 ## Configuration
 
@@ -34,7 +36,8 @@ Total launch usage fee is the sum of:
 
 1. `generatedWalletCount * 0.02`
 2. `0.1` when vanity mint is enabled
-3. `0.1` launch base fee
+3. `0.1` when attribution removal is enabled
+4. `0.1` when bundle buy is enabled
 
 Generated wallet count for launch:
 
@@ -59,6 +62,9 @@ Total usage fee is:
 - Launch review and confirmation surfaces must show line-item usage fees and final totals.
 - Volume bot preflight/confirmation surfaces must show generated wallet fee and total usage fee.
 - UI breakdown values should be derived from the same shared fee constants used by server logic.
+- Launch surfaces must show attribution-removal fee and bundle-buy fee as separate line items.
+- Launch review and confirmation fee panels must always render all launch fee line items, even when a fee is not active.
+- Inactive fee rows should be visually de-emphasized while still displaying nominal fee amounts.
 
 ## Operation Cost Quote Semantics
 

@@ -50,7 +50,12 @@ import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog"
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
-import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
+import {
+  bundleBuyFeeSol,
+  calculateLaunchUsageFees,
+  descriptionAttributionRemovalFeeSol,
+  vanityMintFeeSol,
+} from "@/lib/config/usage-fees.config";
 
 const formSchema = z
   .object({
@@ -78,6 +83,7 @@ const formSchema = z
     jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
     bundleBuyEnabled: z.boolean(),
     vanityMint: z.boolean(),
+    removeAttribution: z.boolean(),
     bundlerWalletCount: z
       .number()
       .int()
@@ -122,6 +128,7 @@ const BANNER_ASPECT_TOLERANCE = 0.05;
 const MAIN_IMAGE_ASPECT_TOLERANCE = 0.1;
 const VIDEO_ASPECT_TOLERANCE = 0.1;
 const VIDEO_RECOMMENDED_MIN = 1080;
+const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
 
 const readImageDimensions = (file: File) =>
   new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -162,6 +169,7 @@ function calculateLaunchTotals(values: {
   bundlerWalletCount: number;
   bundlerBuyAmountSol: number;
   vanityMint: boolean;
+  removeAttribution: boolean;
   distributionWalletMultiplier: number;
 }) {
   const bundleBuyTotal = values.bundleBuyEnabled
@@ -173,6 +181,7 @@ function calculateLaunchTotals(values: {
     bundlerWalletCount: values.bundlerWalletCount,
     distributionWalletMultiplier: values.distributionWalletMultiplier,
     vanityMint: values.vanityMint,
+    removeAttribution: values.removeAttribution,
   });
   const totalCostSol =
     values.devBuyAmountSol +
@@ -183,6 +192,20 @@ function calculateLaunchTotals(values: {
     values.bundlerWalletCount * values.distributionWalletMultiplier;
 
   return { bundleBuyTotal, totalCostSol, distributionWallets, usageFees };
+}
+
+function getReviewDescription(
+  description: string,
+  removeAttribution: boolean
+): string {
+  const baseDescription = description.trim();
+  if (removeAttribution) {
+    return baseDescription || "-";
+  }
+  if (!baseDescription) {
+    return LAUNCH_ATTRIBUTION_TEXT;
+  }
+  return `${baseDescription}\n\n${LAUNCH_ATTRIBUTION_TEXT}`;
 }
 
 type LaunchFormProps = {
@@ -494,7 +517,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     jitoTipAmountSol: 0.001,
     bundleBuyEnabled: true,
     vanityMint: true,
-    bundlerWalletCount: 5,
+    removeAttribution: false,
+    bundlerWalletCount: 10,
     bundlerBuyAmountSol: 0.1,
     bundlerBuyVariancePercent: 20,
     distributionWalletMultiplier: 1,
@@ -573,6 +597,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       jitoTipAmountSol: values.jitoTipAmountSol,
       bundleBuyEnabled: values.bundleBuyEnabled,
       vanityMint: values.vanityMint,
+      removeAttribution: values.removeAttribution,
       bundlerWalletCount: values.bundlerWalletCount,
       bundlerBuyAmountSol: values.bundlerBuyAmountSol,
       bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
@@ -666,7 +691,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           <Info className="h-4 w-4 text-muted-foreground" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          Generate a custom token address starting with
+                          Generate a custom token address ending with
                           &quot;pump&quot;
                         </TooltipContent>
                       </Tooltip>
@@ -707,6 +732,32 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       );
                     }}
                   </form.Field>
+                  <div className="flex items-center space-x-3 pt-1">
+                    <form.Field name="removeAttribution">
+                      {(field) => (
+                        <Switch
+                          id="remove-attribution"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      )}
+                    </form.Field>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="remove-attribution">
+                        Remove Ballistik attribution (+0.1 SOL)
+                      </Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          By default, token descriptions include &quot;Launched
+                          with ballistik.app&quot; at the end. Enable this to
+                          remove that attribution for +0.1 SOL.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
                 </div>
                 <div className="space-y-6">
                   <form.Field name="tokenImage">
@@ -973,7 +1024,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       <Info className="h-4 w-4 text-muted-foreground" />
                     </TooltipTrigger>
                     <TooltipContent>
-                      The wallet that will make the dev buy
+                      Wallet that owns the token and will make the dev buy
                     </TooltipContent>
                   </Tooltip>
                 </div>
@@ -1118,16 +1169,28 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
             <PageSectionHeader
               title="Bundler Settings"
               meta={
-                <form.Field name="bundleBuyEnabled">
-                  {(field) => (
-                    <Switch
-                      id="bundle-buy"
-                      size="lg"
-                      checked={field.state.value}
-                      onCheckedChange={field.handleChange}
-                    />
-                  )}
-                </form.Field>
+                <div className="flex items-center gap-2 mb-1 mr-auto ml-4">
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      Enable bundler to buy tokens within the same transaction
+                      with the token creation. Enabling this feature costs 0.1
+                      SOL.
+                    </TooltipContent>
+                  </Tooltip>
+                  <form.Field name="bundleBuyEnabled">
+                    {(field) => (
+                      <Switch
+                        id="bundle-buy"
+                        size="lg"
+                        checked={field.state.value}
+                        onCheckedChange={field.handleChange}
+                      />
+                    )}
+                  </form.Field>
+                </div>
               }
             />
             <div>
@@ -1405,250 +1468,280 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 {(values) => {
                   const { totalCostSol, distributionWallets, usageFees } =
                     calculateLaunchTotals(values);
+                  const vanityFeeDisplaySol = values.vanityMint
+                    ? usageFees.vanityMintFeeSol
+                    : vanityMintFeeSol;
+                  const attributionFeeDisplaySol = values.removeAttribution
+                    ? usageFees.descriptionAttributionRemovalFeeSol
+                    : descriptionAttributionRemovalFeeSol;
+                  const bundleFeeDisplaySol = values.bundleBuyEnabled
+                    ? usageFees.bundleBuyFeeSol
+                    : bundleBuyFeeSol;
+                  const reviewDescription = getReviewDescription(
+                    values.description,
+                    values.removeAttribution
+                  );
                   return (
-                    <div className="space-y-6">
-                      <div className="flex items-start gap-4">
-                        {imagePreview ? (
-                          isVideoPreview ? (
-                            <video
-                              src={imagePreview}
-                              className="h-16 w-16 rounded-xl object-cover"
-                              muted
-                              loop
-                              playsInline
-                              autoPlay
-                            />
+                    <div className="space-y-8">
+                      <div className="space-y-6">
+                        <div className="flex items-start gap-4">
+                          {imagePreview ? (
+                            isVideoPreview ? (
+                              <video
+                                src={imagePreview}
+                                className="h-16 w-16 rounded-xl object-cover"
+                                muted
+                                loop
+                                playsInline
+                                autoPlay
+                              />
+                            ) : (
+                              <img
+                                src={imagePreview}
+                                alt="Token"
+                                className="h-16 w-16 rounded-xl object-cover"
+                              />
+                            )
                           ) : (
-                            <img
-                              src={imagePreview}
-                              alt="Token"
-                              className="h-16 w-16 rounded-xl object-cover"
-                            />
-                          )
-                        ) : (
-                          <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center">
-                            <ImagePlus className="h-6 w-6 text-muted-foreground" />
-                          </div>
-                        )}
-                        <div>
-                          <p className="text-lg font-semibold">
-                            {values.tokenName || "Token Name"}
-                          </p>
-                          <p className="text-sm text-muted-foreground">
-                            ${values.tokenSymbol || "SYMBOL"}
-                          </p>
-                        </div>
-                      </div>
-                      {bannerPreview && (
-                        <div className="rounded-xl overflow-hidden border">
-                          <img
-                            src={bannerPreview}
-                            alt="Banner"
-                            className="h-24 w-full object-cover"
-                          />
-                        </div>
-                      )}
-
-                      <div className="grid gap-3 text-sm">
-                        <div className="grid grid-cols-[140px_1fr] gap-2">
-                          <span className="text-muted-foreground">
-                            Description
-                          </span>
-                          <span className="text-foreground line-clamp-2">
-                            {values.description || "-"}
-                          </span>
-                        </div>
-                        {(values.twitter ||
-                          values.telegram ||
-                          values.website) && (
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Social Links
-                            </span>
-                            <div className="flex gap-2">
-                              {values.twitter && (
-                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                  Twitter
-                                </span>
-                              )}
-                              {values.telegram && (
-                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                  Telegram
-                                </span>
-                              )}
-                              {values.website && (
-                                <span className="text-xs bg-muted px-2 py-0.5 rounded">
-                                  Website
-                                </span>
-                              )}
+                            <div className="h-16 w-16 rounded-xl bg-muted flex items-center justify-center">
+                              <ImagePlus className="h-6 w-6 text-muted-foreground" />
                             </div>
+                          )}
+                          <div>
+                            <p className="text-lg font-semibold">
+                              {values.tokenName || "Token Name"}
+                            </p>
+                            <p className="text-sm text-muted-foreground">
+                              ${values.tokenSymbol || "SYMBOL"}
+                            </p>
+                          </div>
+                        </div>
+                        {bannerPreview && (
+                          <div className="rounded-xl overflow-hidden border">
+                            <img
+                              src={bannerPreview}
+                              alt="Banner"
+                              className="h-24 w-full object-cover"
+                            />
                           </div>
                         )}
-                      </div>
 
-                      <div className="border-t pt-4">
-                        <div className="text-sm font-medium mb-3">
-                          Launch Configuration
-                        </div>
                         <div className="grid gap-3 text-sm">
                           <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Dev Wallet
-                            </span>
-                            <span>
-                              {values.devWalletOption === "import"
-                                ? "Imported wallet"
-                                : values.devWalletOption === "generate"
-                                  ? "Will be generated"
-                                  : "Main wallet"}
+                            <span className="text-muted-foreground">Description</span>
+                            <span className="text-foreground line-clamp-3 whitespace-pre-line">
+                              {reviewDescription}
                             </span>
                           </div>
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Dev Buy
-                            </span>
-                            <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
+                          {(values.twitter || values.telegram || values.website) && (
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">
+                                Social Links
+                              </span>
+                              <div className="flex gap-2">
+                                {values.twitter && (
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                    Twitter
+                                  </span>
+                                )}
+                                {values.telegram && (
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                    Telegram
+                                  </span>
+                                )}
+                                {values.website && (
+                                  <span className="text-xs bg-muted px-2 py-0.5 rounded">
+                                    Website
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid gap-6 border-t pt-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+                        <div>
+                          <div className="text-sm font-medium mb-3">
+                            Launch Configuration
                           </div>
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Jito Tip
-                            </span>
-                            <span>
-                              {values.jitoTipAmountSol.toFixed(4)} SOL
-                            </span>
-                          </div>
-                          {values.bundleBuyEnabled && (
-                            <>
+                          <div className="grid gap-3 text-sm">
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">Dev Wallet</span>
+                              <span>
+                                {values.devWalletOption === "import"
+                                  ? "Imported wallet"
+                                  : values.devWalletOption === "generate"
+                                    ? "Will be generated"
+                                    : "Main wallet"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">Dev Buy</span>
+                              <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
+                            </div>
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">Jito Tip</span>
+                              <span>{values.jitoTipAmountSol.toFixed(4)} SOL</span>
+                            </div>
+                            {values.bundleBuyEnabled && (
+                              <>
+                                <div className="grid grid-cols-[140px_1fr] gap-2">
+                                  <span className="text-muted-foreground">
+                                    Bundle Buy
+                                  </span>
+                                  <span>
+                                    {values.bundlerWalletCount} wallets ×{" "}
+                                    {values.bundlerBuyAmountSol} SOL (±
+                                    {values.bundlerBuyVariancePercent}%)
+                                  </span>
+                                </div>
+                                {values.distributionWalletMultiplier > 1 && (
+                                  <div className="grid grid-cols-[140px_1fr] gap-2">
+                                    <span className="text-muted-foreground">
+                                      Distribution
+                                    </span>
+                                    <span>
+                                      {distributionWallets} wallets after ×
+                                      {values.distributionWalletMultiplier} distribution
+                                    </span>
+                                  </div>
+                                )}
+                              </>
+                            )}
+                            {!values.bundleBuyEnabled && (
                               <div className="grid grid-cols-[140px_1fr] gap-2">
                                 <span className="text-muted-foreground">
                                   Bundle Buy
                                 </span>
-                                <span>
-                                  {values.bundlerWalletCount} wallets ×{" "}
-                                  {values.bundlerBuyAmountSol} SOL (±
-                                  {values.bundlerBuyVariancePercent}%)
-                                </span>
+                                <span>Disabled</span>
                               </div>
-                              {values.distributionWalletMultiplier > 1 && (
-                                <div className="grid grid-cols-[140px_1fr] gap-2">
-                                  <span className="text-muted-foreground">
-                                    Distribution
-                                  </span>
-                                  <span>
-                                    {distributionWallets} wallets after ×
-                                    {values.distributionWalletMultiplier}{" "}
-                                    distribution
-                                  </span>
-                                </div>
-                              )}
-                            </>
-                          )}
-                          {!values.bundleBuyEnabled && (
-                            <div className="grid grid-cols-[140px_1fr] gap-2">
-                              <span className="text-muted-foreground">
-                                Bundle Buy
-                              </span>
-                              <span>Disabled</span>
-                            </div>
-                          )}
-                          {values.vanityMint && (
+                            )}
                             <div className="grid grid-cols-[140px_1fr] gap-2">
                               <span className="text-muted-foreground">
                                 Vanity Address
                               </span>
-                              <span className="text-green-600">Enabled</span>
+                              <span>{values.vanityMint ? "Enabled" : "Disabled"}</span>
                             </div>
-                          )}
-                          <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">
-                              Usage Fees
-                            </span>
-                            <span>{usageFees.totalFeeSol.toFixed(4)} SOL</span>
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">
+                                Attribution
+                              </span>
+                              <span>
+                                {values.removeAttribution
+                                  ? "Removed"
+                                  : "Included by default"}
+                              </span>
+                            </div>
                           </div>
                         </div>
-                      </div>
 
-                      <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
-                        <div className="space-y-4">
-                          <div className="grid grid-cols-2 gap-3 text-sm">
-                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
-                              <span className="text-muted-foreground">
-                                Generated wallets ({usageFees.generatedWalletCount}
-                                )
-                              </span>
-                              <span className="tabular-nums">
-                                {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
-                              <span className="text-muted-foreground">
-                                Vanity mint fee
-                              </span>
-                              <span className="tabular-nums">
-                                {usageFees.vanityMintFeeSol.toFixed(4)} SOL
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
-                              <span className="text-muted-foreground">
-                                Launch fee
-                              </span>
-                              <span className="tabular-nums">
-                                {usageFees.launchFeeSol.toFixed(4)} SOL
-                              </span>
-                            </div>
-                            <div className="flex items-center justify-between rounded-md border bg-background/60 px-3 py-2">
-                              <span className="text-muted-foreground">
-                                Total usage fees
-                              </span>
+                        <div className="h-fit rounded-xl border bg-muted/30 p-4">
+                          <div className="space-y-3 text-sm">
+                            <div className="flex items-center justify-between border-b pb-3">
+                              <span className="font-medium">Total fees</span>
                               <span className="tabular-nums font-medium">
                                 {usageFees.totalFeeSol.toFixed(4)} SOL
                               </span>
                             </div>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between",
+                                usageFees.generatedWalletCount === 0 &&
+                                  "opacity-50 line-through"
+                              )}
+                            >
+                              <div className="text-muted-foreground">
+                                Generated wallets fee
+                                <span className="ml-2 text-xs">
+                                  ({usageFees.generatedWalletCount} wallets)
+                                </span>
+                              </div>
+                              <span className="tabular-nums">
+                                {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between",
+                                !values.vanityMint && "opacity-50 line-through"
+                              )}
+                            >
+                              <div className="text-muted-foreground">Vanity mint fee</div>
+                              <span className="tabular-nums">
+                                {vanityFeeDisplaySol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between",
+                                !values.removeAttribution && "opacity-50 line-through"
+                              )}
+                            >
+                              <div className="text-muted-foreground">
+                                Attribution removal fee
+                              </div>
+                              <span className="tabular-nums">
+                                {attributionFeeDisplaySol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between",
+                                !values.bundleBuyEnabled && "opacity-50 line-through"
+                              )}
+                            >
+                              <div className="text-muted-foreground">Bundler fee</div>
+                              <span className="tabular-nums">
+                                {bundleFeeDisplaySol.toFixed(4)} SOL
+                              </span>
+                            </div>
                           </div>
-                          <div className="flex items-center justify-between gap-8">
-                            <div className="flex items-center gap-10">
-                              <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">
-                                  Dev buy
-                                </div>
-                                <div className="text-2xl font-light tabular-nums">
-                                  {values.devBuyAmountSol.toFixed(4)}
-                                  <span className="ml-1 text-sm text-muted-foreground">
-                                    SOL
-                                  </span>
-                                </div>
+                        </div>
+                      </div>
+
+                      <div className="-mx-6 -mb-14 mt-8 border-t bg-muted/30 px-6 py-14">
+                        <div className="flex items-center justify-between gap-8">
+                          <div className="flex items-center gap-10">
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Total fees
                               </div>
-                              <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">
-                                  Distribution wallets
-                                </div>
-                                <div className="text-2xl font-light tabular-nums">
-                                  {values.bundleBuyEnabled
-                                    ? distributionWallets
-                                    : 0}
-                                </div>
-                              </div>
-                              <div className="space-y-1">
-                                <div className="text-xs text-muted-foreground">
-                                  Draft estimate
-                                </div>
-                                <div className="text-2xl font-light tabular-nums">
-                                  {totalCostSol.toFixed(4)}
-                                  <span className="ml-1 text-sm text-muted-foreground">
-                                    SOL
-                                  </span>
-                                </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {usageFees.totalFeeSol.toFixed(4)}
+                                <span className="ml-1 text-sm text-muted-foreground">
+                                  SOL
+                                </span>
                               </div>
                             </div>
-                            <Button
-                              size="lg"
-                              type="submit"
-                              form="launch-form"
-                              className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
-                            >
-                              LAUNCH TOKEN
-                            </Button>
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Total generated wallets
+                              </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {usageFees.generatedWalletCount}
+                              </div>
+                            </div>
+                            <div className="space-y-1">
+                              <div className="text-xs text-muted-foreground">
+                                Estimated main-wallet spend
+                              </div>
+                              <div className="text-2xl font-light tabular-nums">
+                                {totalCostSol.toFixed(4)}
+                                <span className="ml-1 text-sm text-muted-foreground">
+                                  SOL
+                                </span>
+                              </div>
+                            </div>
                           </div>
+                          <Button
+                            size="lg"
+                            type="submit"
+                            form="launch-form"
+                            className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
+                          >
+                            LAUNCH TOKEN
+                          </Button>
                         </div>
                       </div>
                     </div>

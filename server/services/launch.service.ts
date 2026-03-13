@@ -58,6 +58,19 @@ function normalizeSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
 }
 
+const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
+
+function composeTokenDescription(input: LaunchTokenInput) {
+  const baseDescription = input.description?.trim() || "";
+  if (input.removeAttribution) {
+    return baseDescription;
+  }
+  if (!baseDescription) {
+    return LAUNCH_ATTRIBUTION_TEXT;
+  }
+  return `${baseDescription}\n\n${LAUNCH_ATTRIBUTION_TEXT}`;
+}
+
 const MAIN_IMAGE_MIME_TYPES = new Set([
   "image/jpeg",
   "image/png",
@@ -110,6 +123,7 @@ type LaunchCostInput = Pick<
   | "bundlerBuyAmountSol"
   | "bundlerBuyVariancePercent"
   | "distributionWalletMultiplier"
+  | "removeAttribution"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -415,7 +429,7 @@ function buildTokenMetadata(
   const metadata: PumpMetadataUpload = {
     name: input.tokenName.trim(),
     symbol: normalizeSymbol(input.tokenSymbol),
-    description: input.description?.trim() || "",
+    description: composeTokenDescription(input),
     file,
   };
 
@@ -1002,7 +1016,8 @@ type LaunchCostPreview = {
   netMainWalletDeltaAfterCleanupSol: number;
   lineItems: {
     usageFeesSol: number;
-    launchFeeSol: number;
+    descriptionAttributionRemovalFeeSol: number;
+    bundleBuyFeeSol: number;
     vanityMintFeeSol: number;
     generatedWalletFeeSol: number;
     devBuySol: number;
@@ -1209,6 +1224,7 @@ async function calculateLaunchCostPreview(
     bundlerWalletCount,
     distributionWalletMultiplier,
     vanityMint: input.vanityMint,
+    removeAttribution: input.removeAttribution,
   });
   const usageFeeLamports = BigInt(toLamports(usageFees.totalFeeSol));
   const totalLamports = fundingPlan.fundingTargets.reduce((total, target) => {
@@ -1271,7 +1287,9 @@ async function calculateLaunchCostPreview(
     ),
     lineItems: {
       usageFeesSol: usageFees.totalFeeSol,
-      launchFeeSol: usageFees.launchFeeSol,
+      descriptionAttributionRemovalFeeSol:
+        usageFees.descriptionAttributionRemovalFeeSol,
+      bundleBuyFeeSol: usageFees.bundleBuyFeeSol,
       vanityMintFeeSol: usageFees.vanityMintFeeSol,
       generatedWalletFeeSol: usageFees.generatedWalletFeeSol,
       devBuySol: devBuyAmountSol,
@@ -1760,7 +1778,7 @@ async function persistTokenPending(
           status: "PENDING",
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
-          description: input.description?.trim() || null,
+          description: composeTokenDescription(input) || null,
           imageUrl: tokenImageUrl,
           twitterUrl: input.twitter?.trim() || null,
           telegramUrl: input.telegram?.trim() || null,
@@ -2325,6 +2343,7 @@ export const launchService = {
             bundlerWalletCount: input.bundlerWalletCount,
             distributionWalletMultiplier: input.distributionWalletMultiplier,
             vanityMint: input.vanityMint,
+            removeAttribution: input.removeAttribution,
           });
           await usageFeeService.collectFromMainWallet({
             userId,
@@ -2769,6 +2788,7 @@ export const launchService = {
         bundlerWalletCount: input.bundlerWalletCount,
         distributionWalletMultiplier: input.distributionWalletMultiplier,
         vanityMint: input.vanityMint,
+        removeAttribution: input.removeAttribution,
       });
       const tokenMediaSource = input.tokenImage
         ? input.tokenImage.startsWith("data:")
@@ -2803,7 +2823,9 @@ export const launchService = {
         usageFeeGeneratedWallets: usageFees.generatedWalletCount,
         usageFeeGeneratedWalletFeeSol: usageFees.generatedWalletFeeSol,
         usageFeeVanityFeeSol: usageFees.vanityMintFeeSol,
-        usageFeeLaunchFeeSol: usageFees.launchFeeSol,
+        usageFeeBundleBuyFeeSol: usageFees.bundleBuyFeeSol,
+        usageFeeDescriptionAttributionRemovalFeeSol:
+          usageFees.descriptionAttributionRemovalFeeSol,
         tokenMediaSource,
         tokenMediaType,
         tokenBannerSource,

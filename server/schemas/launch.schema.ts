@@ -24,6 +24,7 @@ export const launchTokenSchema = z.object({
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
+  removeAttribution: z.boolean(),
   bundlerWalletCount: z
     .number()
     .int()
@@ -54,6 +55,7 @@ export const launchPreviewCostsSchema = z.object({
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
+  removeAttribution: z.boolean(),
   bundlerWalletCount: z
     .number()
     .int()

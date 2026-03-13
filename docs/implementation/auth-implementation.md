@@ -102,6 +102,13 @@ Server persistence:
 - Procedure-level checks and service-level session state are authoritative.
 - Session creation/rotation/revocation operations are service-owned.
 
+## Return-Target Redirects
+
+- Protected-route auth redirects preserve the original in-app destination via `redirect` query param (for example `/auth?redirect=%2Flaunch%3Fpreset%3Dfree`).
+- Post-auth client navigation resolves destination from `redirect` and falls back to `/` when missing.
+- Redirect validation only allows same-origin relative paths beginning with `/`.
+- External URLs, protocol-relative values, and malformed targets are rejected to prevent open redirects.
+
 ## Environment Requirements
 
 - `JWT_SECRET` required in production.

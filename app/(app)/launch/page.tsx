@@ -7,8 +7,19 @@ import { CloneTokenDialog } from "./clone-token-dialog";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/lib/trpc/client";
+import {
+  getLaunchPresetName,
+  getLaunchPresetValues,
+} from "@/lib/config/launch-presets.config";
+import { useSearchParams } from "next/navigation";
 
 export default function LaunchPage() {
+  const searchParams = useSearchParams();
+  const presetName = getLaunchPresetName(searchParams.get("preset"));
+  const presetValues = React.useMemo(
+    () => getLaunchPresetValues(presetName),
+    [presetName]
+  );
   const [cloneDialogOpen, setCloneDialogOpen] = React.useState(false);
   const [cloneValues, setCloneValues] = React.useState<Record<
     string,
@@ -23,6 +34,10 @@ export default function LaunchPage() {
     setCloneValues(input);
     setFormKey((k) => k + 1);
   };
+  const initialValues = React.useMemo(
+    () => ({ ...presetValues, ...(cloneValues ?? {}) }),
+    [presetValues, cloneValues]
+  );
 
   return (
     <div className="flex flex-col gap-12">
@@ -42,7 +57,7 @@ export default function LaunchPage() {
         }
       />
 
-      <LaunchForm key={formKey} initialValues={cloneValues} />
+      <LaunchForm key={`${presetName}-${formKey}`} initialValues={initialValues} />
 
       <CloneTokenDialog
         open={cloneDialogOpen}

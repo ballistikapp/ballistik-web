@@ -131,6 +131,10 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
 6. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+   - Metadata description appends `Launched with ballistik.app` by default.
+   - Attribution is appended after two line breaks when user description exists.
+   - If description is empty, metadata uses only `Launched with ballistik.app`.
+   - Attribution is removed only when paid removal is enabled.
    - Vanity reservation retries up to 3 random candidates.
    - Candidates that already exist on-chain are released and skipped.
 7. **Persist Pending Token**: create Token with `PENDING` status and link wallets before on-chain create.
@@ -153,6 +157,21 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
 - Reclaim actions are owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true) and not by the launch progress dialog.
 - Failed launch progress surfaces a short CTA to open Manage Tokens with failed status filtering.
+
+### Review and Confirm Surfaces
+
+- The in-page Review section keeps token metadata full-width at the top.
+- Under token metadata, the lower block is a 2-column layout:
+  - Left column: launch configuration.
+  - Right column: usage-fee panel with `Total fees` followed by all fee line items.
+- Fee line items are always rendered, including inactive items.
+  - Inactive items are visually de-emphasized (reduced opacity + strikethrough) while still showing nominal fee amounts.
+- The submit strip at the bottom of the Review step shows only:
+  - Total fees
+  - Total generated wallets
+  - Estimated main-wallet spend
+- The previous `Draft estimate` wording is replaced with `Estimated main-wallet spend`.
+- The launch overview dialog mirrors the same fee-panel structure for consistency with the in-page Review step.
 
 ### Media Inputs
 
@@ -192,6 +211,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Launch computes and displays usage-fee breakdowns before confirmation.
 - Server preflight includes usage fees in required main-wallet balance checks.
 - Server collects launch usage fees from main wallet to collector wallet when launch starts.
+- Launch usage fees are generated-wallet fee, vanity fee, optional attribution-removal fee, and a bundle-buy fee when `bundleBuyEnabled` is true.
+- A launch can be free when bundle buy is disabled, `devWalletOption` is not `generate`, vanity mint is disabled, and attribution removal is disabled.
 
 ## Launch Cost Quote Model
 
@@ -213,7 +234,7 @@ The server quote groups values into:
 
 `launch.previewCosts` includes line items for:
 
-- Usage fees (launch fee, vanity fee, generated-wallet fee).
+- Usage fees (bundle-buy fee, attribution-removal fee, vanity fee, generated-wallet fee).
 - Dev buy and bundle-buy funding requirements (including variance reserve).
 - Jito tip (when bundle buy is enabled).
 - Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
@@ -329,6 +350,14 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - `app/(app)/launch/clone-token-dialog.tsx`
 - `app/(app)/launch/page.tsx`
 - `app/(app)/launch/launch-form.tsx`
+
+## Launch Presets
+
+- Launch supports URL-driven presets via the `preset` query parameter.
+- `preset=free` initializes a free configuration (`devWalletOption = use_main`, bundle buy disabled, vanity disabled, attribution removal disabled).
+- Missing or unknown `preset` values default to the regular preset (`devWalletOption = generate`, bundle buy enabled, `bundlerWalletCount = 10`, vanity enabled, attribution removal disabled).
+- Preset values are applied before clone values; cloning overrides preset initialization.
+- Unauthenticated visits preserve preset URLs through auth redirects using the `redirect` query param (for example `/launch?preset=free` -> `/auth?redirect=%2Flaunch%3Fpreset%3Dfree` -> back to `/launch?preset=free` after login/signup).
 
 ## Balance Refresh Strategy
 
