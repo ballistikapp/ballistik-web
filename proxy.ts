@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import {
+  buildAuthRedirectPath,
+  getSafeRedirectPath,
+} from "@/lib/utils/auth-redirect";
 
 const publicRoutes = [
   "/",
@@ -10,7 +14,12 @@ const publicRoutes = [
 
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth-token")?.value;
-  const { pathname } = request.nextUrl;
+  const { pathname, searchParams } = request.nextUrl;
+
+  if (pathname.startsWith("/auth") && token) {
+    const redirectTarget = getSafeRedirectPath(searchParams.get("redirect"));
+    return NextResponse.redirect(new URL(redirectTarget, request.url));
+  }
 
   const isPublicRoute = publicRoutes.some((route) =>
     route === "/" ? pathname === "/" : pathname.startsWith(route)
@@ -21,7 +30,10 @@ export function proxy(request: NextRequest) {
   }
 
   if (!token) {
-    return NextResponse.redirect(new URL("/auth", request.url));
+    const returnTo = `${request.nextUrl.pathname}${request.nextUrl.search}`;
+    return NextResponse.redirect(
+      new URL(buildAuthRedirectPath(returnTo), request.url)
+    );
   }
 
   return NextResponse.next();

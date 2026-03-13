@@ -3,7 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "motion/react";
-import { ChevronRightIcon, CheckIcon } from "lucide-react";
+import { ChevronRightIcon } from "lucide-react";
 import { Spotlight } from "@/components/ui/spotlight";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
@@ -17,7 +17,7 @@ export function LandingPage() {
       </div>
       <header className="mx-auto flex w-full items-center justify-between p-6 md:px-12 py-8">
         <motion.p
-          className="text-3xl font-bold text-foreground"
+          className="text-2xl md:text-3xl font-bold text-foreground"
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeInOut" }}
@@ -29,20 +29,17 @@ export function LandingPage() {
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeInOut", delay: 0.15 }}
         >
-          <HoverBorderGradient
-            as={Link}
+          <Link
             href="/auth"
-            containerClassName="group rounded-lg"
-            className="bg-background flex items-center gap-8 px-2.5 py-1.5 font-medium text-foreground"
-            highlight="radial-gradient(75% 181.15942028985506% at 50% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)"
+            className="bg-black/30 hover:bg-black/60 transition-all duration-300 rounded-lg border-2 border-white/10 hover:border-white/30 flex items-center gap-4 md:gap-8 px-2.5 py-1.5 font-medium text-foreground"
           >
             <span>GO TO DAPP</span>
             <ChevronRightIcon className="h-5 w-5" />
-          </HoverBorderGradient>
+          </Link>
         </motion.div>
       </header>
 
-      <main className="flex flex-col items-center justify-center gap-20 pt-12">
+      <main className="flex flex-col items-center justify-center gap-20 pt-6">
         <section
           id="hero"
           className="relative w-full flex flex-col items-center"
@@ -50,7 +47,7 @@ export function LandingPage() {
           <ContainerScroll
             cardAnimationDelay={1.5}
             titleComponent={
-              <div className="flex flex-col items-center gap-6">
+              <div className="flex flex-col items-center gap-2">
                 <motion.h1
                   className="text-[3rem] sm:text-[3rem] md:text-[4rem] flex flex-col sm:flex-row font-medium items-center justify-center gap-1 sm:gap-6 bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50 leading-tight"
                   initial={{ opacity: 0, y: 30 }}
@@ -59,7 +56,7 @@ export function LandingPage() {
                 >
                   <span>Launch,</span>
                   <span>Automate,</span>
-                  <span>Exit.</span>
+                  <span>Grow.</span>
                 </motion.h1>
                 <motion.p
                   className="text-neutral-500 text-sm sm:text-lg md:text-xl text-center px-4"
@@ -70,6 +67,23 @@ export function LandingPage() {
                   Jito-powered token launch, automated volume bots, and full
                   wallet control.
                 </motion.p>
+                <motion.div
+                  initial={{ opacity: 0, y: 16 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 1, ease: "easeInOut", delay: 1.1 }}
+                  className="mt-12"
+                >
+                  <HoverBorderGradient
+                    as={Link}
+                    href="/launch?preset=free"
+                    containerClassName="group rounded-lg"
+                    className="bg-background flex items-center gap-5 px-4 py-2 text-lg md:text-xl font-medium text-foreground"
+                    highlight="radial-gradient(75% 181.15942028985506% at 50% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)"
+                  >
+                    <span>Launch Your Token for Free</span>
+                    <ChevronRightIcon className="h-6 w-6" />
+                  </HoverBorderGradient>
+                </motion.div>
               </div>
             }
           >
@@ -97,7 +111,7 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            Everything from mint to exit.
+            Everything you need to grow your token.
           </motion.h2>
 
           <motion.p

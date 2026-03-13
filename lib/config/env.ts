@@ -17,8 +17,8 @@ const envSchema = z.object({
     .string()
     .optional()
     .transform((value) => value !== "false"),
-  APP_URL: z.string().url().optional(),
-  FEE_COLLECTOR_WALLET_ADDRESS: z.string().min(1).optional(),
+  APP_URL: z.string().url(),
+  FEE_COLLECTOR_WALLET_ADDRESS: z.string().min(1),
 });
 
 const dbEnvSchema = z.object({

@@ -69,16 +69,17 @@ server/
 
 - `DATABASE_URL` — Prisma connection string
 - `SOLANA_RPC_URL` — required, Solana RPC endpoint
-- `SHYFT_API_KEY` — optional, enables Shyft REST APIs, callbacks, and DeFi APIs
-- `SHYFT_GRPC_TOKEN` — optional, x-token for gRPC streaming authentication (falls back to `SHYFT_API_KEY`)
+- `SHYFT_API_KEY` — required, enables Shyft REST APIs, callbacks, and DeFi APIs
+- `SHYFT_GRPC_TOKEN` — required, x-token for gRPC streaming authentication
 - `SHYFT_CALLBACK_SECRET` — required in production for Shyft webhook authentication
-- `JWT_SECRET` — required in production for token signing/verification
+- `JWT_SECRET` — required for token signing/verification
 - `JWT_EXPIRATION` — optional access token TTL (defaults to `12h`)
-- `REFRESH_TOKEN_TTL_DAYS` — required in production, refresh token lifetime
+- `REFRESH_TOKEN_TTL_DAYS` — optional, refresh token lifetime in days (defaults to `7`)
 - `SESSION_MAX_TTL_DAYS` — optional absolute session lifetime cap
-- `PINATA_JWT` — optional, enables Pinata uploads for persisted token media
-- `PINATA_GATEWAY_URL` — optional, custom Pinata gateway base URL (defaults to `https://gateway.pinata.cloud`)
-- `APP_URL` — optional, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
+- `PINATA_JWT` — required, enables Pinata uploads for persisted token media
+- `PINATA_GATEWAY_URL` — required, custom Pinata gateway base URL
+- `APP_URL` — required, base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
+- `FEE_COLLECTOR_WALLET_ADDRESS` — required, usage-fee collector wallet address
 - `NEXT_PUBLIC_*` as needed for client-only configuration
 
 ## Deployment Environments

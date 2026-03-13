@@ -34,6 +34,7 @@ import {
   FieldDescription,
 } from "@/components/ui/field";
 import { useRouter, useSearchParams } from "next/navigation";
+import { getSafeRedirectPath } from "@/lib/utils/auth-redirect";
 
 type WalletMode = "connect" | "generate";
 
@@ -290,6 +291,10 @@ export default function AuthPage() {
   const searchParams = useSearchParams();
   const initialView =
     searchParams.get("view") === "login" ? "signin" : "register";
+  const postAuthRedirect = React.useMemo(
+    () => getSafeRedirectPath(searchParams.get("redirect")),
+    [searchParams]
+  );
   const defaultWalletMode = "generate" as WalletMode;
 
   const [view, setView] = React.useState<"register" | "signin">(initialView);
@@ -348,7 +353,7 @@ export default function AuthPage() {
         setShowKeysDialog(true);
       } else {
         resetForms();
-        router.push("/");
+        router.push(postAuthRedirect);
       }
     },
     onError: (error) => {
@@ -361,7 +366,7 @@ export default function AuthPage() {
       onSuccess: () => {
         toast.success("Signed in successfully!");
         resetForms();
-        router.push("/");
+        router.push(postAuthRedirect);
       },
       onError: (error) => {
         toast.error(error.message || "Failed to sign in");
@@ -692,7 +697,7 @@ export default function AuthPage() {
         privateKey={generatedWallet?.privateKey || ""}
         onComplete={() => {
           resetForms();
-          router.push("/");
+          router.push(postAuthRedirect);
         }}
       />
     </div>

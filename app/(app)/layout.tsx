@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { headers } from "next/headers";
 import type { Metadata } from "next";
 import { AppSidebar } from "@/components/layout/sidebar/app-sidebar";
 import { SiteHeader } from "@/components/layout/site-header";
@@ -6,6 +7,7 @@ import { SidebarInset, SidebarProvider } from "@/components/ui/sidebar";
 import { tokenService } from "@/server/services/token.service";
 import { TokenProvider } from "@/contexts/token-context";
 import { getServerUser } from "@/lib/utils/auth";
+import { buildAuthRedirectPath } from "@/lib/utils/auth-redirect";
 
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
@@ -22,7 +24,13 @@ export default async function MainLayout({
 }>) {
   const user = await getServerUser();
   if (!user) {
-    redirect("/auth");
+    const requestHeaders = await headers();
+    const invokePath = requestHeaders.get("x-invoke-path");
+    const invokeQuery = requestHeaders.get("x-invoke-query");
+    const returnTo = invokePath
+      ? `${invokePath}${invokeQuery ? `?${invokeQuery}` : ""}`
+      : "/";
+    redirect(buildAuthRedirectPath(returnTo));
   }
 
   const { items: tokens } = await tokenService.getUserTokens(user.id);
