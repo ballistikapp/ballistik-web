@@ -138,8 +138,9 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - Vanity reservation retries up to 3 random candidates.
    - Candidates that already exist on-chain are released and skipped.
 7. **Persist Pending Token**: create Token with `PENDING` status and link wallets before on-chain create.
-   - `tokenImage` is uploaded to Pinata when `PINATA_JWT` is configured, and the resulting gateway URL is stored in `Token.imageUrl`.
-   - If Pinata is not configured, the existing base64 data URL fallback behavior is preserved.
+   - Launch input media is normalized before persistence: `tokenImage`/`tokenBanner` data URLs are uploaded to Pinata and replaced with gateway URLs in `Launch.input`.
+   - If media upload cannot produce a URL, launch queueing fails and no launch record is created.
+   - `Token.imageUrl` stores the same normalized media URL.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
    - Vanity mint is consumed only after this confirmation succeeds.
@@ -156,7 +157,16 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - User can request cancellation.
 - Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
 - Reclaim actions are owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true) and not by the launch progress dialog.
-- Failed launch progress surfaces a short CTA to open Manage Tokens with failed status filtering.
+- During long bundle confirmation, the progress dialog surfaces helper copy that confirmation can take a couple of minutes during congestion.
+- Failed launch progress surfaces retry and manage-tokens actions.
+- Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
+
+### Retry Model (Failed Launches)
+
+- Retry uses `launch.retry` and creates a new linked `Launch` record from the failed attempt's saved input.
+- The failed launch remains immutable history; new execution logs are written to the new attempt.
+- Retry does not recollect launch usage fees.
+- Retry still runs funding availability checks before queueing.
 
 ### Review and Confirm Surfaces
 
@@ -178,7 +188,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Main media (`tokenImage`): JPG/PNG/GIF up to 15MB or MP4 up to 30MB.
 - Client recommends 1:1 for images and 16:9 or 9:16 / 1080p+ for video.
 - Banner (`tokenBanner`, optional): JPG/PNG/GIF up to 4.3MB, recommended 1500x500 (3:1).
-- Launch input still carries data URLs from the form, but token persistence stores a Pinata gateway URL in `Token.imageUrl` when Pinata is enabled.
+- The launch form still submits data URLs, but persisted `Launch.input` stores URL references for media fields (no base64 blobs).
 - Banner can only be set during creation and is sent with the metadata upload.
 - Metadata upload posts `file` (main) and optional `banner` to `https://pump.fun/api/ipfs` alongside socials.
 
@@ -210,7 +220,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Launch usage fees are documented centrally in `docs/implementation/pricing-implementation.md`.
 - Launch computes and displays usage-fee breakdowns before confirmation.
 - Server preflight includes usage fees in required main-wallet balance checks.
-- Server collects launch usage fees from main wallet to collector wallet when launch starts.
+- Server collects launch usage fees from main wallet to collector wallet only after launch success (`SUCCEEDED`).
+- Failed or canceled launches do not charge usage fees.
 - Launch usage fees are generated-wallet fee, vanity fee, optional attribution-removal fee, and a bundle-buy fee when `bundleBuyEnabled` is true.
 - A launch can be free when bundle buy is disabled, `devWalletOption` is not `generate`, vanity mint is disabled, and attribution removal is disabled.
 
@@ -248,9 +259,9 @@ The server quote groups values into:
 
 ## On-chain Confirmation Timeouts
 
-- Bundle CREATE confirmation timeout is set to 5 minutes in `server/solana/jito-bundle.ts`.
+- Bundle CREATE confirmation timeout is set to 2 minutes (`120_000ms`) in `server/solana/jito-bundle.ts`.
 - Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
-- These longer windows reduce false launch failures during network congestion and delayed status propagation.
+- Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 2-minute window.
 
 ## Bundle Launch
 

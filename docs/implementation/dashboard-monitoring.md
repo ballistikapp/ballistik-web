@@ -16,7 +16,7 @@ All transaction-based metrics (volumes, P&L, price history, recent activity) use
 The dashboard supports two data refresh modes controlled by a floating "Monitoring Panel":
 
 - **Monitoring OFF** (default for tokens launched >1 hour ago): Polls `dashboard.getStats` every 30 seconds.
-- **Monitoring ON** (default for tokens launched <1 hour ago): Subscribes to SSE streams (gRPC balance/transaction updates + volume bot trade events) and refetches dashboard data on every event, with a 2-second debounce.
+- **Monitoring ON** (default for tokens launched <1 hour ago): Subscribes to SSE streams for live transaction/activity signals and refetches dashboard data on events. Holdings freshness is maintained via automatic `holding.refreshByToken` runs triggered by monitoring events plus a bounded safety interval.
 
 ## Architecture
 
@@ -25,9 +25,11 @@ On-chain events (gRPC/Yellowstone) ─┐
                                      ├──► SSE Subscriptions ──► Dashboard Client
 Volume Bot Worker (trade events) ───┤    (tRPC)                 (debounced refetch)
                                      │
-                                     ├──► Server-side DB writes (balance updates)
                                      ├──► Ingestion Queue → transactionService (auto-ingest)
-                                     │    └──► onIngestionComplete SSE → Dashboard Client (second refetch)
+                                     │    └──► onIngestionComplete SSE
+                                     │
+                                     ├──► Dashboard-triggered holding.refreshByToken
+                                     │    (debounced + single-flight + freshness TTL)
                                      ├──► Stats Cache Invalidation
                                      │
                                      └──► 30s polling fallback (always active)
@@ -97,18 +99,19 @@ P&L = ownedSellVolume + holdingsValue - ownedBuyVolume
 ### Data Flow: Monitoring Mode ON
 
 1. `GrpcManager` streams on-chain account and transaction updates.
-2. `subscription.router.ts` filters relevant events, yields them via SSE, **and writes live data to DB**:
-   - `onBalanceUpdate`: subscribes all user-managed wallets for the token (operational + dev + main), updates `Wallet.balanceSol` in DB, awaits commit, then invalidates stats cache.
-   - `onTokenBalanceUpdate`: subscribes both managed wallet pubkeys and derived ATAs, updates `Holding.tokenBalance` in DB, creates a `Holding` row if one does not exist yet for that wallet/token pair, awaits commit, then invalidates stats cache.
-   - `onNewTransaction`: enqueues the signature for auto-ingestion via `ingestionQueue`, yields the event immediately (before ingestion completes).
-3. `ingestionQueue` (`server/services/ingestion-queue.service.ts`) batches signatures per token (500ms window), calls `transactionService.ingestTokenSignatures` to parse and insert `TokenTransaction` records, then invalidates stats cache and emits `ingestionComplete` via `dashboardEvents`.
-4. `subscription.router.ts` `onIngestionComplete` listens to the `ingestionComplete` event and yields to SSE, notifying the client that fresh transaction data is now in the DB.
-5. `volume-bot-worker.ts` emits `tradeComplete` events through `dashboardEvents` EventEmitter.
-6. `subscription.router.ts` `onVolumeBotUpdate` listens to the EventEmitter and yields to SSE.
-7. `dashboard-client.tsx` subscribes to `onNewTransaction`, `onBalanceUpdate`, `onTokenBalanceUpdate`, `onVolumeBotUpdate`, and `onIngestionComplete`.
-8. On any event, a debounced (2s) call to `refetchStats()` fires. For transactions, the initial `onNewTransaction` event may trigger a refetch before ingestion completes (balance/holding data is fresh but transactions may be stale), while the subsequent `onIngestionComplete` event triggers a second refetch with fully fresh data.
-9. 30-second polling remains active as a safety net.
-10. SSE errors and stale/idle conditions are tracked and surfaced in the Monitoring Panel as `Healthy`, `Degraded`, or `Disconnected`.
+2. `subscription.router.ts` filters relevant events and yields them via SSE:
+   - `onBalanceUpdate`: updates `Wallet.balanceSol` in DB and invalidates stats cache.
+   - `onTokenBalanceUpdate`: opportunistic account-event stream for telemetry and best-effort updates, but **not the required source of holdings truth**.
+   - `onNewTransaction`: enqueues signatures for auto-ingestion via `ingestionQueue`, yields immediately.
+3. `ingestionQueue` (`server/services/ingestion-queue.service.ts`) batches signatures per token (500ms window), calls `transactionService.ingestTokenSignatures`, invalidates stats cache, and emits `ingestionComplete` via `dashboardEvents`.
+4. `subscription.router.ts` `onIngestionComplete` listens to `ingestionComplete` and yields to SSE.
+5. `volume-bot-worker.ts` emits `tradeComplete` events through `dashboardEvents`; `onVolumeBotUpdate` yields these via SSE.
+6. `dashboard-client.tsx` subscribes to live events and:
+   - always debounces `refetchStats()` for low-latency UI updates
+   - triggers debounced `holding.monitoringRefreshByToken` on meaningful events (`onIngestionComplete`, `onVolumeBotUpdate`) plus a bounded safety interval while monitoring is ON.
+7. `holding.monitoringRefreshByToken` reuses `holding.refreshByToken` with per-user+token single-flight and freshness TTL guards, then invalidates stats cache after successful writes.
+8. 30-second polling remains active as a safety net.
+9. SSE errors and stale/idle conditions are tracked and surfaced in the Monitoring Panel as `Healthy`, `Degraded`, or `Disconnected`.
 
 ### Auto-Ingestion (`server/services/ingestion-queue.service.ts`)
 
@@ -135,7 +138,8 @@ Freshly detected signatures can briefly return `null` from `getParsedTransaction
 The stats cache (`Map<string, CachedStats>`, 10s TTL, keyed by `tokenPublicKey:userId`) is invalidated via `invalidateStatsCache(tokenPublicKey)` whenever:
 
 - A SOL balance update is written to DB (from `onBalanceUpdate`)
-- A token balance update is written to DB (from `onTokenBalanceUpdate`)
+- A token balance update is written to DB (best-effort `onTokenBalanceUpdate`)
+- Automatic holdings refresh completes (`holding.refreshByToken` / `holding.monitoringRefreshByToken`)
 - Transactions are auto-ingested (from `ingestionQueue.flush`)
 
 This ensures the next `getStats` call bypasses the cache and reads fresh DB data.
@@ -205,10 +209,10 @@ Token API security contract:
 
 This keeps response size bounded and avoids client-side pagination over large result sets.
 
-**Monitoring ON (healthy):** "Force re-read" — lightweight DB re-read only:
+**Monitoring ON (healthy):** "Re-read dashboard" — lightweight DB re-read only:
 
 1. Calls `refetchStats()` / `refetchToken()` / `refetchDefi()` to re-read current DB data.
-2. No RPC calls — gRPC is already writing live balances/transactions to DB, so the data is already fresh.
+2. No direct RPC call from this action — transactions are stream-driven and holdings are already auto-refreshed in the background by the hybrid pipeline.
 3. Shown as a small text link (not a prominent button) since it's rarely needed.
 
 The dashboard header's refresh button always performs a full chain refresh regardless of mode.
@@ -221,8 +225,8 @@ The dashboard header's refresh button always performs a full chain refresh regar
 - Two states: **expanded** (full controls) and **minimized** (small pill).
 - Four panel health states:
   - **Monitoring OFF**: "Refresh now" button (full chain refresh) + "Next in Xs" countdown.
-  - **Monitoring ON (healthy)**: "Force re-read" text link (lightweight DB re-read). No countdown — gRPC handles live updates.
-  - **Monitoring ON (degraded)**: "Refresh now" button + warning when stream is connected but data/event freshness exceeds threshold.
+  - **Monitoring ON (healthy)**: "Re-read dashboard" text link (lightweight DB re-read). No countdown.
+  - **Monitoring ON (degraded)**: "Refresh now" button + warning when stream freshness is delayed.
   - **Monitoring ON (disconnected)**: "Refresh now" button (full chain refresh) + disconnection warning.
 - Shows: monitoring mode toggle (switch), "Updated Xs ago", mode-appropriate refresh control.
 - Minimized state shows a small pill with status indicator (green=healthy, amber=degraded/disconnected, gray=off).
@@ -237,13 +241,13 @@ The dashboard header's refresh button always performs a full chain refresh regar
 
 Use these scenarios to validate correctness after changes:
 
-1. **Raw token account payload (no parsed info)**
-   - Trigger a token balance change for a monitored wallet.
-   - Expected: `onTokenBalanceUpdate` updates holdings without manual holdings-page refresh.
+1. **Hybrid holdings refresh on ingestion-complete**
+   - Trigger new transaction activity while monitoring is ON.
+   - Expected: dashboard logs show `holding-monitoring-refresh-*` and `holding-refresh-summary` without visiting the holdings page.
 
-2. **ATA-only update coverage**
-   - Trigger update on associated token account (ATA) where owner wallet pubkey is not directly in update account pubkey.
-   - Expected: event is still captured via ATA subscription and mapped to wallet holding.
+2. **Hybrid holdings refresh on volume-bot update**
+   - Trigger a volume-bot trade while monitoring is ON.
+   - Expected: a monitoring-triggered holdings refresh runs, cache invalidates, and dashboard holdings reflect new DB state.
 
 3. **Write failure handling**
    - Simulate DB write failure for balance/holding update.

@@ -11,6 +11,7 @@ import {
   cancelExitSchema,
   exitStatusSchema,
   listHoldingsByTokenSchema,
+  monitoringRefreshHoldingsByTokenSchema,
   refreshHoldingsByTokenSchema,
   sellHoldingsByTokenSchema,
   startExitSchema,
@@ -26,6 +27,14 @@ export const holdingRouter = router({
     .input(refreshHoldingsByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingService.refreshByToken(input, ctx.user.id);
+    }),
+  monitoringRefreshByToken: protectedRateLimitedProcedure
+    .input(monitoringRefreshHoldingsByTokenSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await holdingService.monitoringRefreshByToken(
+        { tokenPublicKey: input.tokenPublicKey, force: input.force },
+        ctx.user.id
+      );
     }),
   sellByToken: sensitiveProcedure
     .input(sellHoldingsByTokenSchema)

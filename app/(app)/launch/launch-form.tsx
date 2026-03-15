@@ -255,6 +255,22 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       });
     },
   });
+  const retryLaunchMutation = trpc.launch.retry.useMutation({
+    onSuccess: (data) => {
+      toast.message("Retry started", {
+        description: "A new launch attempt has been queued.",
+      });
+      setActiveLaunchId(data.launchId);
+      setIsProgressOpen(true);
+      setLaunchNotified(false);
+      router.push("/launch");
+    },
+    onError: (error) => {
+      toast.error("Failed to retry launch", {
+        description: error.message || "Unable to start a retry attempt.",
+      });
+    },
+  });
 
   const activeLaunchQuery = trpc.launch.getActive.useQuery();
   const refreshWalletBalancesMutation =
@@ -1782,6 +1798,14 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
             clearActiveLaunch();
           }
         }}
+        onRetry={() => {
+          const launch = launchStatusQuery.data ?? activeLaunchQuery.data ?? null;
+          if (!launch) {
+            return;
+          }
+          retryLaunchMutation.mutate({ launchId: launch.id });
+        }}
+        retryPending={retryLaunchMutation.isPending}
       />
     </div>
   );

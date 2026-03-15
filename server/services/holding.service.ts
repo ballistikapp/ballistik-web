@@ -28,6 +28,7 @@ import type {
   RefreshHoldingsByTokenInput,
   SellHoldingsByTokenInput,
 } from "@/server/schemas/holding.schema";
+import { invalidateStatsCache } from "@/server/services/dashboard.service";
 
 type WalletRecord = {
   publicKey: string;
@@ -45,11 +46,28 @@ const HOLDING_RPC_CONCURRENCY = 3;
 const HOLDING_MUTATION_CONCURRENCY = 3;
 const TOKEN_SUPPLY_CACHE_TTL_MS = 10_000;
 const TOKEN_SUPPLY_CACHE_MAX_SIZE = 200;
+const MONITORING_REFRESH_MIN_INTERVAL_MS = 12_000;
 
 const tokenSupplyCache = new Map<
   string,
   { value: number; cachedAt: number }
 >();
+const monitoringRefreshState = new Map<
+  string,
+  {
+    inFlight: Promise<void> | null;
+    lastCompletedAt: number;
+  }
+>();
+
+type MonitoringRefreshResult =
+  | { status: "refreshed"; startedAt: number; completedAt: number }
+  | {
+      status: "skipped-fresh";
+      lastCompletedAt: number;
+      minIntervalMs: number;
+    }
+  | { status: "joined-inflight" };
 
 async function getAllowedWallets(
   tokenPublicKey: string,
@@ -642,6 +660,57 @@ export const holdingService = {
       tokenPublicKey: token.publicKey,
       scope: "HOLDINGS",
     });
+    invalidateStatsCache(token.publicKey);
+  },
+
+  async monitoringRefreshByToken(
+    input: { tokenPublicKey: string; force?: boolean },
+    userId: string
+  ): Promise<MonitoringRefreshResult> {
+    const key = `${userId}:${input.tokenPublicKey}`;
+    const now = Date.now();
+    const existing = monitoringRefreshState.get(key);
+
+    if (existing?.inFlight) {
+      await existing.inFlight;
+      return { status: "joined-inflight" };
+    }
+
+    const lastCompletedAt = existing?.lastCompletedAt ?? 0;
+    const minIntervalMs = MONITORING_REFRESH_MIN_INTERVAL_MS;
+    if (!input.force && lastCompletedAt > 0 && now - lastCompletedAt < minIntervalMs) {
+      return { status: "skipped-fresh", lastCompletedAt, minIntervalMs };
+    }
+
+    const startedAt = Date.now();
+    const refreshPromise = this.refreshByToken(
+      { tokenPublicKey: input.tokenPublicKey },
+      userId
+    );
+    monitoringRefreshState.set(key, {
+      inFlight: refreshPromise,
+      lastCompletedAt,
+    });
+
+    try {
+      await refreshPromise;
+      const completedAt = Date.now();
+      monitoringRefreshState.set(key, {
+        inFlight: null,
+        lastCompletedAt: completedAt,
+      });
+      return {
+        status: "refreshed",
+        startedAt,
+        completedAt,
+      };
+    } catch (error) {
+      monitoringRefreshState.set(key, {
+        inFlight: null,
+        lastCompletedAt,
+      });
+      throw error;
+    }
   },
 
   async sellByToken(input: SellHoldingsByTokenInput, userId: string) {

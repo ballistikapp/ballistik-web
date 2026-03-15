@@ -27,12 +27,55 @@ const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
 const MAX_BLOCKHASH_REBUILDS = 2;
 
+export type BundleTelemetryEvent = {
+  type:
+    | "bundle_send_start"
+    | "bundle_sent"
+    | "bundle_confirm_start"
+    | "bundle_confirm_summary"
+    | "bundle_resend_triggered"
+    | "bundle_resent"
+    | "bundle_rebuild_triggered"
+    | "bundle_rebuilt"
+    | "bundle_status_check_error"
+    | "bundle_tip_escalated"
+    | "bundle_confirm_timeout";
+  data: Record<string, unknown>;
+};
+
+type BundleTelemetryHandler = (
+  event: BundleTelemetryEvent
+) => void | Promise<void>;
+
+type AdaptiveTipEscalationOptions = {
+  enabled?: boolean;
+  multiplier?: number;
+  maxEscalations?: number;
+};
+
+type SendJitoBundleOptions = {
+  onEvent?: BundleTelemetryHandler;
+  adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
+};
+
 export async function sendJitoBundle(
   txs: Transaction[],
   signers: Keypair[][],
   tipper: Keypair,
-  tipLamports: number
+  tipLamports: number,
+  options?: SendJitoBundleOptions
 ) {
+  const telemetry = options?.onEvent;
+  const adaptiveTipEnabled = options?.adaptiveTipEscalation?.enabled ?? false;
+  const tipEscalationMultiplier = Math.max(
+    1,
+    options?.adaptiveTipEscalation?.multiplier ?? 2
+  );
+  const maxTipEscalations = Math.max(
+    1,
+    options?.adaptiveTipEscalation?.maxEscalations ?? 1
+  );
+
   if (txs.length === 0) {
     throw new Error("No transactions provided for bundle");
   }
@@ -54,11 +97,24 @@ export async function sendJitoBundle(
     tipper: tipper.publicKey.toBase58(),
     rpcEndpoint: connection.rpcEndpoint,
   });
+  await emitBundleTelemetry(telemetry, {
+    type: "bundle_send_start",
+    data: {
+      txCount: txs.length,
+      signerGroupCount: signers.length,
+      tipLamports,
+      tipper: tipper.publicKey.toBase58(),
+      rpcEndpoint: connection.rpcEndpoint,
+      adaptiveTipEnabled,
+      tipEscalationMultiplier,
+      maxTipEscalations,
+    },
+  });
   const tipAccount = await getTipAccount();
   logger.info("Jito tip account resolved", {
     tipAccount: tipAccount.toBase58(),
   });
-  const bundleTxs = txs.map((tx) => {
+  const baseBundleTxs = txs.map((tx) => {
     const clone = new Transaction();
     clone.add(...tx.instructions);
     clone.feePayer = tx.feePayer;
@@ -66,31 +122,43 @@ export async function sendJitoBundle(
   });
   const feePayers = Array.from(
     new Set(
-      bundleTxs
+      baseBundleTxs
         .map((tx) => tx.feePayer?.toBase58())
         .filter((value): value is string => Boolean(value))
     )
   );
-  const lastIdx = bundleTxs.length - 1;
+  let currentTipLamports = tipLamports;
+  let tipEscalationCount = 0;
 
-  if (tipLamports > 0 && bundleTxs[lastIdx]) {
-    bundleTxs[lastIdx].add(
-      SystemProgram.transfer({
-        fromPubkey: tipper.publicKey,
-        toPubkey: tipAccount,
-        lamports: tipLamports,
-      })
-    );
+  function withTipTransactions(activeTipLamports: number) {
+    const txCopies = baseBundleTxs.map((tx) => {
+      const clone = new Transaction();
+      clone.add(...tx.instructions);
+      clone.feePayer = tx.feePayer;
+      return clone;
+    });
+    const lastIdx = txCopies.length - 1;
+    if (activeTipLamports > 0 && txCopies[lastIdx]) {
+      txCopies[lastIdx].add(
+        SystemProgram.transfer({
+          fromPubkey: tipper.publicKey,
+          toPubkey: tipAccount,
+          lamports: activeTipLamports,
+        })
+      );
+    }
+    return txCopies;
   }
 
   let blockhashFetchedAt = Date.now();
   let { blockhash } = await connection.getLatestBlockhash("confirmed");
   logger.info("Bundle blockhash fetched", { blockhash });
+  let currentBundleTxs = withTipTransactions(currentTipLamports);
   let currentBuild = buildVersionedTransactions(
-    bundleTxs,
+    currentBundleTxs,
     signers,
     tipper,
-    tipLamports,
+    currentTipLamports,
     blockhash
   );
   logger.info("Bundle versioned transactions built", {
@@ -180,6 +248,20 @@ export async function sendJitoBundle(
     bundleId: initialBundleId,
     signatureCount: currentBuild.signatures.length,
     endpoint: lastSendEndpoint,
+    tipLamports: currentTipLamports,
+  });
+  await emitBundleTelemetry(telemetry, {
+    type: "bundle_sent",
+    data: {
+      bundleId: initialBundleId,
+      signatureCount: currentBuild.signatures.length,
+      endpoint: lastSendEndpoint,
+      tipLamports: currentTipLamports,
+      signatures: currentBuild.signatures,
+      createSignature: currentBuild.signatures[0] ?? null,
+      blockhash,
+      blockhashFetchedAt,
+    },
   });
 
   let rebuilds = 0;
@@ -191,6 +273,33 @@ export async function sendJitoBundle(
     if (rebuilds >= MAX_BLOCKHASH_REBUILDS) {
       throw new Error(`Max blockhash rebuilds (${MAX_BLOCKHASH_REBUILDS}) exceeded`);
     }
+
+    if (
+      adaptiveTipEnabled &&
+      currentTipLamports > 0 &&
+      tipEscalationCount < maxTipEscalations
+    ) {
+      const previousTipLamports = currentTipLamports;
+      currentTipLamports = Math.floor(currentTipLamports * tipEscalationMultiplier);
+      tipEscalationCount += 1;
+      logger.info("Adaptive tip escalation applied", {
+        previousTipLamports,
+        escalatedTipLamports: currentTipLamports,
+        tipEscalationCount,
+        maxTipEscalations,
+      });
+      await emitBundleTelemetry(telemetry, {
+        type: "bundle_tip_escalated",
+        data: {
+          previousTipLamports,
+          escalatedTipLamports: currentTipLamports,
+          tipEscalationCount,
+          maxTipEscalations,
+          multiplier: tipEscalationMultiplier,
+        },
+      });
+    }
+
     rebuilds += 1;
 
     blockhashFetchedAt = Date.now();
@@ -201,13 +310,15 @@ export async function sendJitoBundle(
       rebuild: rebuilds,
       maxRebuilds: MAX_BLOCKHASH_REBUILDS,
       newBlockhash: blockhash,
+      tipLamports: currentTipLamports,
     });
 
+    currentBundleTxs = withTipTransactions(currentTipLamports);
     currentBuild = buildVersionedTransactions(
-      bundleTxs,
+      currentBundleTxs,
       signers,
       tipper,
-      tipLamports,
+      currentTipLamports,
       blockhash
     );
     currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
@@ -220,6 +331,19 @@ export async function sendJitoBundle(
       bundleId: newBundleId,
       signatureCount: currentBuild.signatures.length,
       newBlockhash: blockhash,
+      tipLamports: currentTipLamports,
+    });
+    await emitBundleTelemetry(telemetry, {
+      type: "bundle_rebuilt",
+      data: {
+        rebuild: rebuilds,
+        bundleId: newBundleId,
+        signatureCount: currentBuild.signatures.length,
+        newBlockhash: blockhash,
+        tipLamports: currentTipLamports,
+        signatures: currentBuild.signatures,
+        createSignature: currentBuild.signatures[0] ?? null,
+      },
     });
 
     return {
@@ -231,6 +355,7 @@ export async function sendJitoBundle(
 
   const confirmedBundleId = await confirmBundleOnChain({
     connection,
+    onEvent: telemetry,
     initialSignatures: currentBuild.signatures,
     accountKeys: feePayers,
     initialBlockhashFetchedAt: blockhashFetchedAt,
@@ -305,6 +430,7 @@ function sleep(ms: number) {
 
 async function confirmBundleOnChain({
   connection,
+  onEvent,
   initialSignatures,
   accountKeys,
   initialBlockhashFetchedAt,
@@ -313,6 +439,7 @@ async function confirmBundleOnChain({
   rebuildAndResend,
 }: {
   connection: ReturnType<typeof getSolanaConnection>;
+  onEvent?: BundleTelemetryHandler;
   initialSignatures: string[];
   accountKeys: string[];
   initialBlockhashFetchedAt: number;
@@ -341,6 +468,17 @@ async function confirmBundleOnChain({
     rpcEndpoint: connection.rpcEndpoint,
     fallbackRpcEndpoint: fallbackConnection?.rpcEndpoint ?? null,
     accountKeyCount: accountKeys.length,
+  });
+  await emitBundleTelemetry(onEvent, {
+    type: "bundle_confirm_start",
+    data: {
+      bundleId,
+      signatureCount: currentSignatures.length,
+      createSignature: currentSignatures[0] ?? null,
+      rpcEndpoint: connection.rpcEndpoint,
+      fallbackRpcEndpoint: fallbackConnection?.rpcEndpoint ?? null,
+      accountKeyCount: accountKeys.length,
+    },
   });
   const grpcState: {
     done: boolean;
@@ -437,6 +575,16 @@ async function confirmBundleOnChain({
             grpcActive: grpcState.active,
             ...summary,
           });
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_confirm_summary",
+            data: {
+              bundleId: currentBundleId,
+              elapsedMs: Date.now() - startedAt,
+              blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
+              grpcActive: grpcState.active,
+              ...summary,
+            },
+          });
           lastLoggedSummary = summaryKey;
         }
         if (summary.createError) {
@@ -463,6 +611,19 @@ async function confirmBundleOnChain({
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: blockhashAge,
+          });
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_rebuild_triggered",
+            data: {
+              bundleId: currentBundleId,
+              elapsedMs: Date.now() - startedAt,
+              blockhashAgeMs: blockhashAge,
+              createStatus: summary.createStatus,
+              foundCount: summary.foundCount,
+              confirmedCount: summary.confirmedCount,
+              failedCount: summary.failedCount,
+              notFoundCount: summary.notFoundCount,
+            },
           });
           try {
             const rebuilt = await rebuildAndResend();
@@ -492,11 +653,33 @@ async function confirmBundleOnChain({
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: blockhashAge,
           });
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_resend_triggered",
+            data: {
+              bundleId: currentBundleId,
+              elapsedMs: Date.now() - startedAt,
+              blockhashAgeMs: blockhashAge,
+              createStatus: summary.createStatus,
+              foundCount: summary.foundCount,
+              confirmedCount: summary.confirmedCount,
+              failedCount: summary.failedCount,
+              notFoundCount: summary.notFoundCount,
+            },
+          });
           const previousBundleId = currentBundleId;
           currentBundleId = await sendBundleWithRetries();
           logger.info("Bundle resent", {
             previousBundleId,
             bundleId: currentBundleId,
+          });
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_resent",
+            data: {
+              previousBundleId,
+              bundleId: currentBundleId,
+              elapsedMs: Date.now() - startedAt,
+              blockhashAgeMs: blockhashAge,
+            },
           });
           lastResendAt = Date.now();
         }
@@ -513,6 +696,14 @@ async function confirmBundleOnChain({
             bundleId: currentBundleId,
             error: lastStatusError,
             elapsedMs: Date.now() - startedAt,
+          });
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_status_check_error",
+            data: {
+              bundleId: currentBundleId,
+              error: lastStatusError,
+              elapsedMs: Date.now() - startedAt,
+            },
           });
           lastLoggedStatusError = lastStatusError;
         }
@@ -543,6 +734,23 @@ async function confirmBundleOnChain({
   const statusErrorText = lastStatusError
     ? ` statusError=${lastStatusError}`
     : "";
+  await emitBundleTelemetry(onEvent, {
+    type: "bundle_confirm_timeout",
+    data: {
+      bundleId: currentBundleId,
+      elapsedMs: Date.now() - startedAt,
+      summary: lastSummary
+        ? {
+            foundCount: lastSummary.foundCount,
+            confirmedCount: lastSummary.confirmedCount,
+            failedCount: lastSummary.failedCount,
+            notFoundCount: lastSummary.notFoundCount,
+            createStatus: lastSummary.createStatus,
+          }
+        : null,
+      statusError: lastStatusError,
+    },
+  });
   throw new Error(
     `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${statusErrorText})`
   );
@@ -652,4 +860,21 @@ function statusRank(status: SignatureStatus | null) {
   if (status.confirmationStatus === "finalized") return 2;
   if (status.confirmationStatus === "confirmed") return 1;
   return 0;
+}
+
+async function emitBundleTelemetry(
+  onEvent: BundleTelemetryHandler | undefined,
+  event: BundleTelemetryEvent
+) {
+  if (!onEvent) {
+    return;
+  }
+  try {
+    await onEvent(event);
+  } catch (error) {
+    logger.warn("Bundle telemetry handler failed", {
+      eventType: event.type,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
 }

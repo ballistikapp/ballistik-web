@@ -186,6 +186,7 @@ export type TokenDevWalletScalarFieldEnum = (typeof TokenDevWalletScalarFieldEnu
 export const LaunchScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  retriedFromLaunchId: 'retriedFromLaunchId',
   status: 'status',
   progress: 'progress',
   currentStep: 'currentStep',

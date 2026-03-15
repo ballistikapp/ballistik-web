@@ -48,6 +48,10 @@ export const launchStatusSchema = z.object({
   launchId: z.string().min(1),
 });
 
+export const launchRetrySchema = z.object({
+  launchId: z.string().min(1),
+});
+
 export const launchPreviewCostsSchema = z.object({
   devWalletOption: z.enum(["import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
@@ -96,6 +100,7 @@ export const launchRecoverSolByTokenSchema = z.object({
 export type LaunchTokenInput = z.infer<typeof launchTokenSchema>;
 export type LaunchPreviewCostsInput = z.infer<typeof launchPreviewCostsSchema>;
 export type LaunchStatusInput = z.infer<typeof launchStatusSchema>;
+export type LaunchRetryInput = z.infer<typeof launchRetrySchema>;
 export type LaunchRecoveryInput = z.infer<typeof launchRecoverySchema>;
 export type LaunchRecoveryByTokenInput = z.infer<
   typeof launchRecoveryByTokenSchema

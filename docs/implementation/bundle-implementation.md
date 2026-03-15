@@ -42,6 +42,24 @@ Transaction packing layout (max buyers):
 ### Jito Tip
 - If `jitoTipAmountSol > 0`, a SOL transfer is appended to the last transaction.
 - Tipper is the main wallet; the tip is sent to a Jito tip account.
+- If bundle signatures are still not found on-chain during confirmation, launch applies a one-time adaptive tip escalation by doubling the configured tip for subsequent rebuild/send attempts in the same launch attempt.
+
+### Delivery Hardening
+- Bundle confirmation timeout: `120_000ms` (`server/solana/jito-bundle.ts`).
+- Resend interval before blockhash expiry: `5_000ms` when signatures are still not found.
+- Blockhash max age before rebuild: `55_000ms`.
+- Maximum blockhash rebuilds: `2`.
+- Launch bundle execution is Jito-only with bounded retries (no fallback execution path).
+
+### Diagnostics Logging
+- Bundle send and confirmation telemetry is persisted to `LaunchLog` so operators can inspect delivery behavior in launch activity, including:
+  - endpoint
+  - bundle id
+  - create signature
+  - resend/rebuild counters
+  - blockhash age
+  - confirmation summary (`found/confirmed/failed/not_found`)
+  - normalized error/rejection messages
 
 ### Key Files
 - `server/solana/bundle-create-and-buy.ts`

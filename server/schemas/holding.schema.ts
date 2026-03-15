@@ -20,6 +20,15 @@ export type RefreshHoldingsByTokenInput = z.infer<
   typeof refreshHoldingsByTokenSchema
 >;
 
+export const monitoringRefreshHoldingsByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1, "Token public key is required"),
+  force: z.boolean().optional().default(false),
+});
+
+export type MonitoringRefreshHoldingsByTokenInput = z.infer<
+  typeof monitoringRefreshHoldingsByTokenSchema
+>;
+
 export const sellHoldingsByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   walletPublicKeys: z.array(z.string().min(1)).min(1),

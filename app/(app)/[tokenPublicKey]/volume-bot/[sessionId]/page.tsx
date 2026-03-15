@@ -40,10 +40,7 @@ import {
   getTransactionsColumns,
   type VolumeBotLogRow,
 } from "./transactions-columns";
-import {
-  getWalletColumns,
-  type SessionWalletRow,
-} from "./wallet-columns";
+import { getWalletColumns, type SessionWalletRow } from "./wallet-columns";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 
 type RangeConfig = VolumeBotConfigInput["ranges"][number];
@@ -129,7 +126,9 @@ export default function VolumeBotRunPage() {
       wallets.map((w) => ({
         id: w.id,
         walletPublicKey: w.walletPublicKey,
-        walletType: (w as unknown as { wallet: { type: string } }).wallet?.type ?? "VOLUME",
+        walletType:
+          (w as unknown as { wallet: { type: string } }).wallet?.type ??
+          "VOLUME",
         status: w.status,
         solBalance: Number(w.solBalance),
         tradesExecuted: w.tradesExecuted,
@@ -144,7 +143,9 @@ export default function VolumeBotRunPage() {
         .filter((log) => {
           const type = log.type.toLowerCase();
           const message = log.message.toLowerCase();
-          return !type.includes("eligibility") && !message.includes("eligibility");
+          return (
+            !type.includes("eligibility") && !message.includes("eligibility")
+          );
         })
         .map((log) => ({
           id: log.id,
@@ -251,7 +252,7 @@ export default function VolumeBotRunPage() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 mt-8">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4 py-8">
         <div className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm">
           <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
             Volume
@@ -332,9 +333,7 @@ export default function VolumeBotRunPage() {
         </div>
       </div>
 
-      <div className="-mx-6 my-14">
-        <Separator />
-      </div>
+      <div className="h-10" />
 
       <div className="space-y-5">
         <h2 className="text-2xl font-normal">Transactions</h2>
@@ -435,7 +434,8 @@ export default function VolumeBotRunPage() {
                         Trade Size
                       </p>
                       <p className="text-sm font-mono">
-                        {range.solMin.toFixed(3)} – {range.solMax.toFixed(3)} SOL
+                        {range.solMin.toFixed(3)} – {range.solMax.toFixed(3)}{" "}
+                        SOL
                       </p>
                     </div>
                     <div>

@@ -89,7 +89,9 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
   return (
     <Popover
       open={open}
-      onOpenChange={(nextOpen) => setOpen(isSidebarCollapsed ? false : nextOpen)}
+      onOpenChange={(nextOpen) =>
+        setOpen(isSidebarCollapsed ? false : nextOpen)
+      }
     >
       <PopoverTrigger asChild>
         <SidebarMenuButton
