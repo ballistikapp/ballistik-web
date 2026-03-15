@@ -21,6 +21,10 @@ const DEBOUNCE_MS = 2_000;
 const MONITORING_HOUR_THRESHOLD = 60 * 60 * 1000;
 const HEALTH_CHECK_INTERVAL = 30_000;
 const STALE_THRESHOLD_MS = 90_000;
+const HOLDINGS_REFRESH_DEBOUNCE_MS = 1_500;
+const MONITORING_HOLDINGS_SAFETY_INTERVAL_MS = 12_000;
+const MONITORING_ACTIVITY_WINDOW_MS = 60_000;
+const HOLDINGS_STALE_THRESHOLD_MS = 20_000;
 
 type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
@@ -66,6 +70,10 @@ export function DashboardClient() {
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const holdingsRefreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
+    null
+  );
+  const lastMonitoringActivityAtRef = useRef<number | null>(null);
 
   const {
     data: tokenData,
@@ -117,6 +125,14 @@ export function DashboardClient() {
   const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
     enabled: false,
   });
+  const { mutateAsync: refreshBalances } =
+    trpc.wallet.refreshBalances.useMutation();
+  const { mutateAsync: refreshHoldings } =
+    trpc.holding.refreshByToken.useMutation();
+  const { mutateAsync: monitoringRefreshHoldings } =
+    trpc.holding.monitoringRefreshByToken.useMutation();
+  const { mutateAsync: refreshTransactions } =
+    trpc.transaction.refreshByToken.useMutation();
 
   const handleToggleMonitoring = useCallback(
     async (enabled: boolean) => {
@@ -156,8 +172,21 @@ export function DashboardClient() {
   useEffect(() => {
     return () => {
       if (debounceRef.current) clearTimeout(debounceRef.current);
+      if (holdingsRefreshDebounceRef.current) {
+        clearTimeout(holdingsRefreshDebounceRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    if (!isMonitoring) {
+      lastMonitoringActivityAtRef.current = null;
+      if (holdingsRefreshDebounceRef.current) {
+        clearTimeout(holdingsRefreshDebounceRef.current);
+        holdingsRefreshDebounceRef.current = null;
+      }
+    }
+  }, [isMonitoring]);
 
   useEffect(() => {
     if (!isMonitoring) return;
@@ -187,13 +216,58 @@ export function DashboardClient() {
     };
   }, [grpcStatusQuery, isMonitoring]);
 
-  const handleSubscriptionData = useCallback(() => {
-    setSseError(false);
-    setLastSseEventAt(Date.now());
-    debouncedRefetch();
-  }, [debouncedRefetch]);
+  const runMonitoringHoldingsRefresh = useCallback(
+    async (source: string, force = false) => {
+      if (!tokenPublicKey || !isMonitoring) return;
+      try {
+        await monitoringRefreshHoldings({
+          tokenPublicKey,
+          force,
+        });
+      } catch (error) {
+        console.error("monitoring holdings refresh failed", { source, force, error });
+      } finally {
+        refetchStats();
+      }
+    },
+    [isMonitoring, monitoringRefreshHoldings, refetchStats, tokenPublicKey]
+  );
 
-  const handleSubscriptionError = useCallback(() => {
+  const scheduleMonitoringHoldingsRefresh = useCallback(
+    (source: string, force = false) => {
+      if (!tokenPublicKey || !isMonitoring) return;
+      if (holdingsRefreshDebounceRef.current) {
+        clearTimeout(holdingsRefreshDebounceRef.current);
+      }
+      holdingsRefreshDebounceRef.current = setTimeout(() => {
+        holdingsRefreshDebounceRef.current = null;
+        void runMonitoringHoldingsRefresh(source, force);
+      }, HOLDINGS_REFRESH_DEBOUNCE_MS);
+    },
+    [isMonitoring, runMonitoringHoldingsRefresh, tokenPublicKey]
+  );
+
+  const handleSubscriptionData = useCallback(
+    (
+      source: string,
+      _payload: unknown,
+      options?: { triggerHoldingsRefresh?: boolean; markActivity?: boolean }
+    ) => {
+      setSseError(false);
+      setLastSseEventAt(Date.now());
+      if (options?.markActivity) {
+        lastMonitoringActivityAtRef.current = Date.now();
+      }
+      if (options?.triggerHoldingsRefresh) {
+        scheduleMonitoringHoldingsRefresh(`event:${source}`);
+      }
+      debouncedRefetch();
+    },
+    [debouncedRefetch, scheduleMonitoringHoldingsRefresh]
+  );
+
+  const handleSubscriptionError = useCallback((source: string, error: unknown) => {
+    console.error("subscription error", { source, error });
     setSseError(true);
   }, []);
 
@@ -201,8 +275,11 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionData,
-      onError: handleSubscriptionError,
+      onData: (event) =>
+        handleSubscriptionData("onNewTransaction", event, {
+          markActivity: true,
+        }),
+      onError: (error) => handleSubscriptionError("onNewTransaction", error),
     }
   );
 
@@ -210,8 +287,11 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionData,
-      onError: handleSubscriptionError,
+      onData: (event) =>
+        handleSubscriptionData("onBalanceUpdate", event, {
+          markActivity: true,
+        }),
+      onError: (error) => handleSubscriptionError("onBalanceUpdate", error),
     }
   );
 
@@ -219,8 +299,11 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionData,
-      onError: handleSubscriptionError,
+      onData: (event) =>
+        handleSubscriptionData("onTokenBalanceUpdate", event, {
+          markActivity: true,
+        }),
+      onError: (error) => handleSubscriptionError("onTokenBalanceUpdate", error),
     }
   );
 
@@ -228,8 +311,12 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionData,
-      onError: handleSubscriptionError,
+      onData: (event) =>
+        handleSubscriptionData("onVolumeBotUpdate", event, {
+          triggerHoldingsRefresh: true,
+          markActivity: true,
+        }),
+      onError: (error) => handleSubscriptionError("onVolumeBotUpdate", error),
     }
   );
 
@@ -237,17 +324,15 @@ export function DashboardClient() {
     { tokenPublicKey: tokenPublicKey || "" },
     {
       enabled: !!tokenPublicKey && !!tokenData && isMonitoring,
-      onData: handleSubscriptionData,
-      onError: handleSubscriptionError,
+      onData: (event) =>
+        handleSubscriptionData("onIngestionComplete", event, {
+          triggerHoldingsRefresh: true,
+          markActivity: true,
+        }),
+      onError: (error) => handleSubscriptionError("onIngestionComplete", error),
     }
   );
 
-  const { mutateAsync: refreshBalances } =
-    trpc.wallet.refreshBalances.useMutation();
-  const { mutateAsync: refreshHoldings } =
-    trpc.holding.refreshByToken.useMutation();
-  const { mutateAsync: refreshTransactions } =
-    trpc.transaction.refreshByToken.useMutation();
   const startExitMutation = trpc.holding.startExit.useMutation();
   const cancelExitMutation = trpc.holding.cancelExit.useMutation();
   const activeExitQuery = trpc.holding.getActiveExit.useQuery(
@@ -299,12 +384,35 @@ export function DashboardClient() {
     refetchToken();
     refetchStats();
     refetchDefi();
-  }, [refetchToken, refetchStats, refetchDefi]);
+  }, [refetchDefi, refetchStats, refetchToken]);
 
   useEffect(() => {
     if (!isMonitoring || !monitoringInitialized) return;
     handleLightRefresh();
-  }, [isMonitoring, monitoringInitialized, handleLightRefresh]);
+    scheduleMonitoringHoldingsRefresh("monitoring-enabled", true);
+  }, [
+    isMonitoring,
+    monitoringInitialized,
+    handleLightRefresh,
+    scheduleMonitoringHoldingsRefresh,
+  ]);
+
+  useEffect(() => {
+    if (!isMonitoring || !tokenPublicKey) return;
+    const timer = setInterval(() => {
+      const now = Date.now();
+      const lastActivityAt = lastMonitoringActivityAtRef.current;
+      const hasRecentActivity =
+        lastActivityAt !== null &&
+        now - lastActivityAt <= MONITORING_ACTIVITY_WINDOW_MS;
+      const staleHoldings =
+        dataUpdatedAt === 0 || now - dataUpdatedAt > HOLDINGS_STALE_THRESHOLD_MS;
+      if (hasRecentActivity || staleHoldings) {
+        scheduleMonitoringHoldingsRefresh("safety-interval");
+      }
+    }, MONITORING_HOLDINGS_SAFETY_INTERVAL_MS);
+    return () => clearInterval(timer);
+  }, [dataUpdatedAt, isMonitoring, scheduleMonitoringHoldingsRefresh, tokenPublicKey]);
 
   const staleByStats = dataUpdatedAt > 0 && nowMs - dataUpdatedAt > STALE_THRESHOLD_MS;
   const staleByEvents =

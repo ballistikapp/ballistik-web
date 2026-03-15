@@ -237,12 +237,17 @@ export const subscriptionRouter = router({
 
       const removeListener = grpcManager.onAccountUpdate(
         (update: AccountUpdate) => {
-          if (!update.owner || !update.mint || update.tokenAmount === undefined)
+          if (!update.owner || !update.mint || update.tokenAmount === undefined) {
             return;
+          }
           const ownerOrAccountMatched =
             walletPubkeys.has(update.owner) || monitoredPubkeys.has(update.pubkey);
-          if (!ownerOrAccountMatched) return;
-          if (update.mint !== input.tokenPublicKey) return;
+          if (!ownerOrAccountMatched) {
+            return;
+          }
+          if (update.mint !== input.tokenPublicKey) {
+            return;
+          }
           const walletPublicKey = walletPubkeys.has(update.owner)
             ? update.owner
             : ataToOwner.get(update.pubkey) ?? update.owner;
@@ -395,7 +400,8 @@ export const subscriptionRouter = router({
             });
           }
           while (queue.length > 0) {
-            yield queue.shift()!;
+            const event = queue.shift()!;
+            yield event;
           }
         }
       } finally {
@@ -480,7 +486,8 @@ export const subscriptionRouter = router({
             });
           }
           while (queue.length > 0) {
-            yield queue.shift()!;
+            const event = queue.shift()!;
+            yield event;
           }
         }
       } finally {

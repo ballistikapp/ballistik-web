@@ -344,8 +344,11 @@ class GrpcManager {
             ping: undefined,
           },
           (err?: Error) => {
-            if (err) reject(err);
-            else resolve();
+            if (err) {
+              reject(err);
+            } else {
+              resolve();
+            }
           }
         );
       });

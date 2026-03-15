@@ -73,9 +73,9 @@ export function MonitoringPanel({
 
   const statusText =
     healthState === "healthy"
-      ? "Real-time"
+      ? "Hybrid live"
       : healthState === "degraded"
-        ? "Degraded"
+        ? "Hybrid delayed"
         : healthState === "failed"
           ? "Disconnected"
           : "Polling (30s)";
@@ -108,7 +108,7 @@ export function MonitoringPanel({
                 ? "Monitoring degraded"
                 : healthState === "failed"
                   ? "Monitoring disconnected"
-                  : "Monitoring active"
+                  : "Monitoring active (hybrid)"
               : "Monitoring off"}
           </TooltipContent>
         </Tooltip>
@@ -158,14 +158,20 @@ export function MonitoringPanel({
           {isMonitoring && healthState === "failed" && (
             <div className="flex items-center gap-2 text-xs text-amber-500">
               <AlertTriangle className="size-3.5 shrink-0" />
-              <span>SSE connection lost. Falling back to polling.</span>
+              <span>SSE lost. Transactions fallback to polling; holdings auto-refresh continues.</span>
             </div>
           )}
 
           {isMonitoring && healthState === "degraded" && (
             <div className="flex items-center gap-2 text-xs text-amber-500">
               <AlertTriangle className="size-3.5 shrink-0" />
-              <span>Live events are delayed. Use refresh for recovery.</span>
+              <span>Live transactions are delayed; holdings keep auto-refreshing.</span>
+            </div>
+          )}
+
+          {isMonitoring && healthState === "healthy" && (
+            <div className="text-xs text-muted-foreground">
+              Live transactions + auto-refreshing holdings
             </div>
           )}
 
@@ -210,7 +216,7 @@ export function MonitoringPanel({
               onClick={handleRefresh}
               disabled={isRefreshing}
             >
-              {isRefreshing ? "Refreshing..." : "Force re-read"}
+              {isRefreshing ? "Refreshing..." : "Re-read dashboard"}
             </button>
           )}
         </div>

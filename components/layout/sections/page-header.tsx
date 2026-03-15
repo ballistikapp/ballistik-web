@@ -19,7 +19,7 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex justify-between items-center gap-2 -m-6 px-6 py-14 border-b",
+        "flex justify-between items-center gap-2 -mx-6 px-6 pb-14 pt-10 border-b",
         className
       )}
     >
