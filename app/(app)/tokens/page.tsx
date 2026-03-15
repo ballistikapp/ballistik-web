@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -40,8 +41,22 @@ const LAUNCH_STATUS_MAP: Record<string, TokenRowStatus> = {
 };
 
 export default function ManageTokensPage() {
+  const router = useRouter();
   const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery();
   const getPrivateKeyMutation = trpc.token.getPrivateKey.useMutation();
+  const retryLaunchMutation = trpc.launch.retry.useMutation({
+    onSuccess: () => {
+      toast.message("Retry started", {
+        description: "A new launch attempt has been queued.",
+      });
+      router.push("/launch");
+    },
+    onError: (error) => {
+      toast.error("Failed to retry launch", {
+        description: error.message || "Unable to start retry launch.",
+      });
+    },
+  });
 
   const [reclaimTarget, setReclaimTarget] = React.useState<{
     tokenPublicKey?: string;
@@ -108,8 +123,11 @@ export default function ManageTokensPage() {
           setPrivateKeyTarget(row);
           setPrivateKeyDialogOpen(true);
         },
+        onRetry: (row) => {
+          retryLaunchMutation.mutate({ launchId: row.launchId });
+        },
       }),
-    []
+    [retryLaunchMutation]
   );
 
   return (

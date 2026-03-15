@@ -2,9 +2,10 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { AppError, isAppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
-import type {
-  LaunchPreviewCostsInput,
-  LaunchTokenInput,
+import {
+  launchTokenSchema,
+  type LaunchPreviewCostsInput,
+  type LaunchTokenInput,
 } from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -29,6 +30,7 @@ import {
 import bs58 from "bs58";
 import { PumpFunSDK, calculateWithSlippageBuy } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
+import type { BundleTelemetryEvent } from "@/server/solana/jito-bundle";
 import {
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
@@ -543,6 +545,55 @@ async function appendLog(
     logger.warn(message, context);
   } else {
     logger.info(message, context);
+  }
+}
+
+async function appendBundleTelemetryLog(
+  launchId: string,
+  event: BundleTelemetryEvent
+) {
+  const shared = {
+    source: "jito-bundle",
+    eventType: event.type,
+    ...event.data,
+  } as Prisma.InputJsonObject;
+
+  switch (event.type) {
+    case "bundle_tip_escalated":
+      await appendLog(launchId, "WARN", "Adaptive bundle tip escalation applied", "create", shared);
+      return;
+    case "bundle_rebuild_triggered":
+      await appendLog(launchId, "WARN", "Blockhash expired, rebuilding bundle", "create", shared);
+      return;
+    case "bundle_rebuilt":
+      await appendLog(launchId, "INFO", "Bundle rebuilt and resent", "create", shared);
+      return;
+    case "bundle_resend_triggered":
+      await appendLog(launchId, "WARN", "Bundle resend triggered", "create", shared);
+      return;
+    case "bundle_status_check_error":
+      await appendLog(launchId, "WARN", "Bundle status check error", "create", shared);
+      return;
+    case "bundle_confirm_timeout":
+      await appendLog(
+        launchId,
+        "ERROR",
+        "Bundle confirmation timed out before create landed",
+        "create",
+        shared
+      );
+      return;
+    case "bundle_confirm_summary":
+      await appendLog(launchId, "INFO", "Bundle confirmation summary", "create", shared);
+      return;
+    case "bundle_sent":
+      await appendLog(launchId, "INFO", "Jito bundle sent", "create", shared);
+      return;
+    case "bundle_resent":
+      await appendLog(launchId, "INFO", "Bundle resent", "create", shared);
+      return;
+    default:
+      return;
   }
 }
 
@@ -2195,6 +2246,8 @@ export type FailedLaunchRow = {
 export type UserLaunchRow = {
   id: string;
   status: string;
+  retriedFromLaunchId: string | null;
+  hasRetryAttempts: boolean;
   tokenPublicKey: string | null;
   tokenName: string;
   tokenSymbol: string;
@@ -2219,10 +2272,15 @@ export const launchService = {
       select: {
         id: true,
         status: true,
+        retriedFromLaunchId: true,
         input: true,
         tokenPublicKey: true,
         errorMessage: true,
         createdAt: true,
+        retryAttempts: {
+          select: { id: true },
+          take: 1,
+        },
         token: {
           select: {
             name: true,
@@ -2241,6 +2299,8 @@ export const launchService = {
       return {
         id: launch.id,
         status: launch.status,
+        retriedFromLaunchId: launch.retriedFromLaunchId,
+        hasRetryAttempts: launch.retryAttempts.length > 0,
         tokenPublicKey: launch.tokenPublicKey,
         tokenName:
           launch.token?.name ??
@@ -2365,6 +2425,79 @@ export const launchService = {
           return { launchId: launch.id };
         },
       });
+    });
+  },
+
+  async retryLaunch(launchId: string, userId: string) {
+    const actionKey = `launch:retry:${userId}:${launchId}`;
+    return await withActionLock(actionKey, async () => {
+      const existingActive = await prisma.launch.findFirst({
+        where: {
+          userId,
+          status: { in: ["PENDING", "RUNNING"] },
+        },
+        orderBy: { createdAt: "desc" },
+        select: { id: true },
+      });
+      if (existingActive) {
+        return { launchId: existingActive.id };
+      }
+
+      const sourceLaunch = await prisma.launch.findFirst({
+        where: {
+          id: launchId,
+          userId,
+          status: { in: ["FAILED", "CANCELED"] },
+        },
+        select: {
+          id: true,
+          userId: true,
+          input: true,
+          tokenPublicKey: true,
+          status: true,
+          token: {
+            select: {
+              status: true,
+            },
+          },
+        },
+      });
+      if (!sourceLaunch) {
+        throw new AppError("Failed launch not found", 404);
+      }
+
+      if (sourceLaunch.token?.status === "ACTIVE") {
+        throw new AppError("Launch cannot be retried after token activation", 400);
+      }
+
+      const parsedInput = launchTokenSchema.safeParse(sourceLaunch.input);
+      if (!parsedInput.success) {
+        throw new AppError(
+          "Launch retry is unavailable because original input is no longer valid",
+          400
+        );
+      }
+      const retryInput = parsedInput.data;
+
+      await ensureLaunchFundingAvailable(retryInput, userId);
+
+      const retryLaunch = await prisma.launch.create({
+        data: {
+          userId: sourceLaunch.userId,
+          status: "PENDING",
+          input: retryInput,
+          retriedFromLaunchId: sourceLaunch.id,
+        },
+      });
+
+      await appendLog(retryLaunch.id, "STEP", "Launch retry queued", "queue", {
+        retriedFromLaunchId: sourceLaunch.id,
+        sourceLaunchStatus: sourceLaunch.status,
+        feeRecollected: false,
+      });
+      void this.runLaunchJob(retryLaunch.id);
+
+      return { launchId: retryLaunch.id, retriedFromLaunchId: sourceLaunch.id };
     });
   },
 
@@ -3086,10 +3219,15 @@ export const launchService = {
           (total, target) => total + target.amountLamports,
           BigInt(0)
         );
+        const baseTipLamports = Math.max(
+          0,
+          Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL)
+        );
         await appendLog(launchId, "INFO", "Bundle buy prepared", "create", {
           buyers: buyerWallets.length,
           totalBuySol: lamportsToSol(totalBuyLamports).toFixed(4),
           totalBuyLamports: totalBuyLamports.toString(),
+          tipLamports: baseTipLamports.toString(),
         });
         const bundleResult = await createAndBuyInBundle({
           launchId,
@@ -3100,10 +3238,15 @@ export const launchService = {
           buyerWallets,
           buyAmountsLamport,
           tipper: mainWalletKeypair,
-          tipLamports: Math.max(
-            0,
-            Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL)
-          ),
+          tipLamports: baseTipLamports,
+          adaptiveTipEscalation: {
+            enabled: baseTipLamports > 0,
+            multiplier: 2,
+            maxEscalations: 1,
+          },
+          onBundleEvent: async (event) => {
+            await appendBundleTelemetryLog(launchId, event);
+          },
         });
         createSignature = bundleResult.signatures[0] ?? null;
         bundleId = bundleResult.bundleId;

@@ -156,7 +156,16 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - User can request cancellation.
 - Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
 - Reclaim actions are owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true) and not by the launch progress dialog.
-- Failed launch progress surfaces a short CTA to open Manage Tokens with failed status filtering.
+- During long bundle confirmation, the progress dialog surfaces helper copy that confirmation can take a couple of minutes during congestion.
+- Failed launch progress surfaces retry and manage-tokens actions.
+- Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
+
+### Retry Model (Failed Launches)
+
+- Retry uses `launch.retry` and creates a new linked `Launch` record from the failed attempt's saved input.
+- The failed launch remains immutable history; new execution logs are written to the new attempt.
+- Retry does not recollect launch usage fees.
+- Retry still runs funding availability checks before queueing.
 
 ### Review and Confirm Surfaces
 
@@ -248,9 +257,9 @@ The server quote groups values into:
 
 ## On-chain Confirmation Timeouts
 
-- Bundle CREATE confirmation timeout is set to 5 minutes in `server/solana/jito-bundle.ts`.
+- Bundle CREATE confirmation timeout is set to 2 minutes (`120_000ms`) in `server/solana/jito-bundle.ts`.
 - Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
-- These longer windows reduce false launch failures during network congestion and delayed status propagation.
+- Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 2-minute window.
 
 ## Bundle Launch
 

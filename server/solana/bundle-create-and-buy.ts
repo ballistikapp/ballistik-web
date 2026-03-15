@@ -6,7 +6,10 @@ import {
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { buildBundleTransactionsForCreateAndBuys } from "@/server/solana/bundle-transaction-builder";
-import { sendJitoBundle } from "@/server/solana/jito-bundle";
+import {
+  sendJitoBundle,
+  type BundleTelemetryEvent,
+} from "@/server/solana/jito-bundle";
 import {
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
@@ -22,6 +25,12 @@ type BundleLaunchInput = {
   buyAmountsLamport: bigint[];
   tipper: Keypair;
   tipLamports: number;
+  onBundleEvent?: (event: BundleTelemetryEvent) => void | Promise<void>;
+  adaptiveTipEscalation?: {
+    enabled?: boolean;
+    multiplier?: number;
+    maxEscalations?: number;
+  };
 };
 
 function buildBundleBuyers(
@@ -136,7 +145,11 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
       txs,
       signers,
       input.tipper,
-      input.tipLamports
+      input.tipLamports,
+      {
+        onEvent: input.onBundleEvent,
+        adaptiveTipEscalation: input.adaptiveTipEscalation,
+      }
     );
     logger.info("Bundle confirmed", {
       ...logContext,

@@ -47,6 +47,8 @@ interface LaunchProgressDialogProps {
   launch: LaunchStatusOutput | LaunchActiveOutput | null;
   onCancel: () => void;
   onClose: () => void;
+  onRetry?: () => void;
+  retryPending?: boolean;
 }
 
 export function LaunchProgressDialog({
@@ -55,6 +57,8 @@ export function LaunchProgressDialog({
   launch,
   onCancel,
   onClose,
+  onRetry,
+  retryPending = false,
 }: LaunchProgressDialogProps) {
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
@@ -62,6 +66,9 @@ export function LaunchProgressDialog({
   const canClose =
     status === "SUCCEEDED" || status === "FAILED" || status === "CANCELED";
   const currentStep = launch?.currentStep || "Preparing";
+  const showSlowConfirmHint =
+    status === "RUNNING" &&
+    currentStep.toLowerCase().includes("confirm");
   const tokenPublicKey = launch?.tokenPublicKey ?? "";
   const hasTokenPublicKey = Boolean(tokenPublicKey);
   const hasTokenLink = status === "SUCCEEDED" && hasTokenPublicKey;
@@ -83,6 +90,11 @@ export function LaunchProgressDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 min-w-0">
+          {showSlowConfirmHint && (
+            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
+              Confirmation can take a couple of minutes during network congestion.
+            </div>
+          )}
           <Progress value={progress} className="w-full" />
           <Separator />
           {hasTokenPublicKey && (
@@ -159,9 +171,21 @@ export function LaunchProgressDialog({
                 <div className="text-sm text-muted-foreground">
                   Manage reclaim from the Manage Tokens page.
                 </div>
-                <Button asChild size="sm" variant="outline">
-                  <Link href={failedTokensHref}>Go to Manage Tokens</Link>
-                </Button>
+                <div className="flex items-center gap-2">
+                  {onRetry && (
+                    <Button
+                      size="sm"
+                      onClick={onRetry}
+                      disabled={retryPending}
+                    >
+                      {retryPending && <Spinner className="mr-2 size-4" />}
+                      Retry launch
+                    </Button>
+                  )}
+                  <Button asChild size="sm" variant="outline">
+                    <Link href={failedTokensHref}>Go to Manage Tokens</Link>
+                  </Button>
+                </div>
               </div>
             </div>
           )}

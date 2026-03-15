@@ -24,7 +24,7 @@ import {
   IconRecycle,
   IconKey,
 } from "@tabler/icons-react";
-import { GalleryVerticalEnd } from "lucide-react";
+import { GalleryVerticalEnd, RotateCcw } from "lucide-react";
 
 export type TokenRowStatus = "PENDING" | "ACTIVE" | "FAILED";
 
@@ -46,6 +46,7 @@ export type TokenTableRow = {
 type TokenColumnsOptions = {
   onReclaim?: (row: TokenTableRow) => void;
   onShowPrivateKey?: (row: TokenTableRow) => void;
+  onRetry?: (row: TokenTableRow) => void;
 };
 
 function truncateAddress(address: string) {
@@ -326,6 +327,12 @@ export const createColumns = (
               >
                 <IconRecycle className="size-4" />
                 Reclaim SOL
+              </DropdownMenuItem>
+            )}
+            {isFailed && options.onRetry && (
+              <DropdownMenuItem onClick={() => options.onRetry?.(item)}>
+                <RotateCcw className="size-4" />
+                Retry launch
               </DropdownMenuItem>
             )}
             {hasPublicKey && (

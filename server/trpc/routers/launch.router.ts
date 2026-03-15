@@ -10,6 +10,7 @@ import {
   launchRecoverSolByTokenSchema,
   launchRecoverySchema,
   launchRecoveryByTokenSchema,
+  launchRetrySchema,
   launchRecoverSolSchema,
   launchTokenSchema,
   launchStatusSchema,
@@ -29,6 +30,9 @@ export const launchRouter = router({
   }),
   cancel: expensiveProtectedProcedure.input(launchStatusSchema).mutation(async ({ input, ctx }) => {
     return await launchService.cancelLaunch(input.launchId, ctx.user.id);
+  }),
+  retry: expensiveProtectedProcedure.input(launchRetrySchema).mutation(async ({ input, ctx }) => {
+    return await launchService.retryLaunch(input.launchId, ctx.user.id);
   }),
   getActive: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getActiveLaunch(ctx.user.id);

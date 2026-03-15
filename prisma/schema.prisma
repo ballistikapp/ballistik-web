@@ -220,6 +220,9 @@ model Launch {
   id String @id @default(cuid())
   userId String
   user User @relation("LaunchUser", fields: [userId], references: [id])
+  retriedFromLaunchId String?
+  retriedFromLaunch Launch? @relation("LaunchRetryLink", fields: [retriedFromLaunchId], references: [id])
+  retryAttempts Launch[] @relation("LaunchRetryLink")
   status LaunchStatus @default(PENDING)
   progress Int @default(0)
   currentStep String?
@@ -235,6 +238,7 @@ model Launch {
   recoveryWallets LaunchRecoveryWallet[] @relation("LaunchRecoveryWalletRecordLaunch")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
+  @@index([retriedFromLaunchId])
   @@map("Launch")
 }
 
