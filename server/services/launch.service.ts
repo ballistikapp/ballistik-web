@@ -2007,11 +2007,13 @@ async function returnExcessSolToMain(
 
 async function finalizeLaunch(
   launchId: string,
+  userId: string,
   tokenPublicKey: string,
   devWalletPublicKey: string,
   mainWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
   recovery: LaunchRecoveryData,
+  usageFeeTotalSol: number,
   jitoTipAmountSol: number,
   solReturn: {
     attempted: number;
@@ -2026,6 +2028,43 @@ async function finalizeLaunch(
   const finalStatus = (await isCancelRequested(launchId))
     ? "CANCELED"
     : "SUCCEEDED";
+
+  if (finalStatus === "SUCCEEDED" && usageFeeTotalSol > 0) {
+    try {
+      const usageFeeResult = await usageFeeService.collectFromMainWallet({
+        userId,
+        totalFeeSol: usageFeeTotalSol,
+        reason: "launch.success",
+      });
+      await appendLog(launchId, "INFO", "Usage fee collected", "fees", {
+        skipped: usageFeeResult.skipped,
+        amountSol: usageFeeResult.amountSol,
+        amountLamports: usageFeeResult.amountLamports,
+        signature: usageFeeResult.signature,
+        fromPublicKey: usageFeeResult.fromPublicKey,
+        toPublicKey: usageFeeResult.toPublicKey,
+        reason: usageFeeResult.reason,
+      });
+    } catch (error) {
+      const message = getErrorMessage(error) || "Failed to collect usage fee";
+      logger.warn("Launch usage fee collection on success failed", {
+        launchId,
+        userId,
+        message,
+      });
+      await appendLog(
+        launchId,
+        "WARN",
+        "Usage fee collection failed after successful launch",
+        "fees",
+        {
+          amountSol: usageFeeTotalSol,
+          errorMessage: message,
+          reason: "launch.success",
+        }
+      );
+    }
+  }
 
   await prisma.launch.update({
     where: { id: launchId },
@@ -2397,20 +2436,6 @@ export const launchService = {
           }
 
           await ensureLaunchFundingAvailable(input, userId);
-          const usageFees = calculateLaunchUsageFees({
-            devWalletOption: input.devWalletOption,
-            bundleBuyEnabled: input.bundleBuyEnabled,
-            bundlerWalletCount: input.bundlerWalletCount,
-            distributionWalletMultiplier: input.distributionWalletMultiplier,
-            vanityMint: input.vanityMint,
-            removeAttribution: input.removeAttribution,
-          });
-          await usageFeeService.collectFromMainWallet({
-            userId,
-            totalFeeSol: usageFees.totalFeeSol,
-            reason: "launch.start",
-          });
-
           const launch = await prisma.launch.create({
             data: {
               userId,
@@ -3465,6 +3490,7 @@ export const launchService = {
 
       await finalizeLaunch(
         launchId,
+        user.id,
         mintPublicKey,
         devWalletPublicKey,
         user.mainWallet.publicKey,
@@ -3477,6 +3503,7 @@ export const launchService = {
             bundlerWalletKeypairs,
             distributionWallets
           ),
+        usageFees.totalFeeSol,
         jitoTipAmountSol,
         {
           attempted: solReturn.attempted,

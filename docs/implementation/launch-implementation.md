@@ -219,7 +219,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Launch usage fees are documented centrally in `docs/implementation/pricing-implementation.md`.
 - Launch computes and displays usage-fee breakdowns before confirmation.
 - Server preflight includes usage fees in required main-wallet balance checks.
-- Server collects launch usage fees from main wallet to collector wallet when launch starts.
+- Server collects launch usage fees from main wallet to collector wallet only after launch success (`SUCCEEDED`).
+- Failed or canceled launches do not charge usage fees.
 - Launch usage fees are generated-wallet fee, vanity fee, optional attribution-removal fee, and a bundle-buy fee when `bundleBuyEnabled` is true.
 - A launch can be free when bundle buy is disabled, `devWalletOption` is not `generate`, vanity mint is disabled, and attribution removal is disabled.
 
