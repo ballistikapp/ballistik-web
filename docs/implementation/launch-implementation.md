@@ -138,8 +138,9 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - Vanity reservation retries up to 3 random candidates.
    - Candidates that already exist on-chain are released and skipped.
 7. **Persist Pending Token**: create Token with `PENDING` status and link wallets before on-chain create.
-   - `tokenImage` is uploaded to Pinata when `PINATA_JWT` is configured, and the resulting gateway URL is stored in `Token.imageUrl`.
-   - If Pinata is not configured, the existing base64 data URL fallback behavior is preserved.
+   - Launch input media is normalized before persistence: `tokenImage`/`tokenBanner` data URLs are uploaded to Pinata and replaced with gateway URLs in `Launch.input`.
+   - If media upload cannot produce a URL, launch queueing fails and no launch record is created.
+   - `Token.imageUrl` stores the same normalized media URL.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
    - Vanity mint is consumed only after this confirmation succeeds.
@@ -187,7 +188,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Main media (`tokenImage`): JPG/PNG/GIF up to 15MB or MP4 up to 30MB.
 - Client recommends 1:1 for images and 16:9 or 9:16 / 1080p+ for video.
 - Banner (`tokenBanner`, optional): JPG/PNG/GIF up to 4.3MB, recommended 1500x500 (3:1).
-- Launch input still carries data URLs from the form, but token persistence stores a Pinata gateway URL in `Token.imageUrl` when Pinata is enabled.
+- The launch form still submits data URLs, but persisted `Launch.input` stores URL references for media fields (no base64 blobs).
 - Banner can only be set during creation and is sent with the metadata upload.
 - Metadata upload posts `file` (main) and optional `banner` to `https://pump.fun/api/ipfs` alongside socials.
 

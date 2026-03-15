@@ -506,6 +506,44 @@ async function resolveBannerFile(tokenBanner: string, symbol: string) {
   });
 }
 
+async function normalizeLaunchInputMediaForStorage(
+  input: LaunchTokenInput
+): Promise<LaunchTokenInput> {
+  const normalizedInput: LaunchTokenInput = { ...input };
+  const symbol = normalizeSymbol(input.tokenSymbol);
+
+  if (normalizedInput.tokenImage.startsWith("data:")) {
+    const uploadedMainMedia = await storageService.uploadImage(
+      normalizedInput.tokenImage,
+      symbol
+    );
+    if (uploadedMainMedia.startsWith("data:")) {
+      throw new AppError(
+        "Media storage is unavailable. Configure PINATA_JWT and retry.",
+        500
+      );
+    }
+    normalizedInput.tokenImage = uploadedMainMedia;
+  }
+
+  const trimmedBanner = normalizedInput.tokenBanner?.trim() ?? "";
+  if (trimmedBanner.startsWith("data:")) {
+    const uploadedBannerMedia = await storageService.uploadImage(
+      trimmedBanner,
+      `${symbol}-banner`
+    );
+    if (uploadedBannerMedia.startsWith("data:")) {
+      throw new AppError(
+        "Media storage is unavailable. Configure PINATA_JWT and retry.",
+        500
+      );
+    }
+    normalizedInput.tokenBanner = uploadedBannerMedia;
+  }
+
+  return normalizedInput;
+}
+
 async function createPumpSdk(creator: Keypair) {
   const wallet = new NodeWallet(creator);
   const provider = new AnchorProvider(getSolanaConnection(), wallet, {
@@ -2435,12 +2473,13 @@ export const launchService = {
             return { launchId: existing.id };
           }
 
-          await ensureLaunchFundingAvailable(input, userId);
+          const normalizedInput = await normalizeLaunchInputMediaForStorage(input);
+          await ensureLaunchFundingAvailable(normalizedInput, userId);
           const launch = await prisma.launch.create({
             data: {
               userId,
               status: "PENDING",
-              input,
+              input: normalizedInput,
             },
           });
 
@@ -2503,7 +2542,6 @@ export const launchService = {
         );
       }
       const retryInput = parsedInput.data;
-
       await ensureLaunchFundingAvailable(retryInput, userId);
 
       const retryLaunch = await prisma.launch.create({
@@ -3192,10 +3230,7 @@ export const launchService = {
       const mintPublicKey = mintKeypair.publicKey.toBase58();
       const mintPrivateKey = bs58.encode(mintKeypair.secretKey);
       const persistStartedAt = Date.now();
-      const tokenImageUrl = await storageService.uploadImage(
-        input.tokenImage,
-        input.tokenSymbol
-      );
+      const tokenImageUrl = input.tokenImage;
       const { distributionWalletCount } = await persistTokenPending(
         input,
         tokenImageUrl || null,
