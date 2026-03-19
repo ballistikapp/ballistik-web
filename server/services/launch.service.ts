@@ -28,8 +28,9 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import bs58 from "bs58";
-import { PumpFunSDK, calculateWithSlippageBuy } from "pumpdotfun-sdk";
+import { PumpFunSDK } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
+import { appendLaunchDevBuyInstructions } from "@/server/solana/launch-dev-buy";
 import type { BundleTelemetryEvent } from "@/server/solana/jito-bundle";
 import {
   buildCreateTokenTransaction,
@@ -3324,22 +3325,14 @@ export const launchService = {
         );
         const connection = getSolanaConnection();
         if (devBuyAmountSol > 0) {
-          const globalAccount = await pumpSdk.getGlobalAccount("confirmed");
-          const buyAmount = globalAccount.getInitialBuyPrice(
-            toLamports(devBuyAmountSol)
-          );
-          const buyAmountWithSlippage = calculateWithSlippageBuy(
-            toLamports(devBuyAmountSol),
-            SLIPPAGE_BASIS_POINTS
-          );
-          const buyTx = await pumpSdk.getBuyInstructions(
-            devWalletKeypair.publicKey,
-            mintKeypair.publicKey,
-            globalAccount.feeRecipient,
-            buyAmount,
-            buyAmountWithSlippage
-          );
-          createTx.add(...buyTx.instructions);
+          await appendLaunchDevBuyInstructions({
+            createTx,
+            buyer: devWalletKeypair,
+            mint: mintKeypair.publicKey,
+            solAmountLamports: toLamports(devBuyAmountSol),
+            creator: devWalletKeypair.publicKey,
+            minTokensOut: 1n,
+          });
         }
         if (!createTx.feePayer) {
           createTx.feePayer = devWalletKeypair.publicKey;

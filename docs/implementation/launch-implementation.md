@@ -142,6 +142,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - If media upload cannot produce a URL, launch queueing fails and no launch record is created.
    - `Token.imageUrl` stores the same normalized media URL.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
+   - The non-bundled create-time dev buy uses the same raw `buy_exact_sol_in` transaction builder as the newer Pump flow, including the current volume accumulator accounts required by the on-chain program.
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
    - Vanity mint is consumed only after this confirmation succeeds.
 10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
