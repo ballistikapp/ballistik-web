@@ -3331,7 +3331,7 @@ export const launchService = {
             mint: mintKeypair.publicKey,
             solAmountLamports: toLamports(devBuyAmountSol),
             creator: devWalletKeypair.publicKey,
-            minTokensOut: 1n,
+            minTokensOut: BigInt(1),
           });
         }
         if (!createTx.feePayer) {

@@ -19,10 +19,10 @@ export async function appendLaunchDevBuyInstructions({
   mint,
   solAmountLamports,
   creator,
-  minTokensOut = 1n,
+  minTokensOut = BigInt(1),
   buildBuyTransaction = buildBuyTokenTransaction,
 }: AppendLaunchDevBuyInstructionsParams) {
-  if (solAmountLamports <= 0n) {
+  if (solAmountLamports <= BigInt(0)) {
     return createTx;
   }
 

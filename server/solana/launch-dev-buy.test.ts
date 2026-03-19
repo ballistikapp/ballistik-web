@@ -27,7 +27,7 @@ test("appends create-time dev buy instructions with creator fallback", async () 
     createTx,
     buyer,
     mint,
-    solAmountLamports: 100_000_000n,
+    solAmountLamports: BigInt(100_000_000),
     creator: buyer.publicKey,
     buildBuyTransaction: async (
       capturedBuyer,
@@ -54,7 +54,7 @@ test("appends create-time dev buy instructions with creator fallback", async () 
   assert.equal(createTx.instructions[0], appendedInstruction);
   assert.equal(captured?.buyer, buyer);
   assert.equal(captured?.mint, mint.toBase58());
-  assert.equal(captured?.solAmountLamports, 100_000_000n);
+  assert.equal(captured?.solAmountLamports, BigInt(100_000_000));
   assert.equal(captured?.creator, buyer.publicKey.toBase58());
-  assert.equal(captured?.minTokensOut, 1n);
+  assert.equal(captured?.minTokensOut, BigInt(1));
 });
