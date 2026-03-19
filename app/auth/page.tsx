@@ -33,8 +33,10 @@ import {
   FieldLabel,
   FieldDescription,
 } from "@/components/ui/field";
-import { useRouter, useSearchParams } from "next/navigation";
+import { Spinner } from "@/components/ui/spinner";
+import { useSearchParams } from "next/navigation";
 import { getSafeRedirectPath } from "@/lib/utils/auth-redirect";
+import { navigateAfterAuth } from "@/lib/utils/post-auth-navigation";
 
 type WalletMode = "connect" | "generate";
 
@@ -166,12 +168,14 @@ function WalletKeysDialog({
   onOpenChange,
   publicKey,
   privateKey,
+  isRedirecting,
   onComplete,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   publicKey: string;
   privateKey: string;
+  isRedirecting: boolean;
   onComplete: () => void;
 }) {
   const [copiedPublic, setCopiedPublic] = React.useState(false);
@@ -277,8 +281,16 @@ function WalletKeysDialog({
               onComplete();
             }}
             className="w-full h-10 mt-2"
+            disabled={isRedirecting}
           >
-            I&apos;ve Saved My Keys
+            {isRedirecting ? (
+              <>
+                <Spinner className="mr-2" />
+                Redirecting...
+              </>
+            ) : (
+              "Go To Application"
+            )}
           </Button>
         </div>
       </DialogContent>
@@ -287,7 +299,6 @@ function WalletKeysDialog({
 }
 
 export default function AuthPage() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const initialView =
     searchParams.get("view") === "login" ? "signin" : "register";
@@ -304,6 +315,17 @@ export default function AuthPage() {
     privateKey: string;
   } | null>(null);
   const [showKeysDialog, setShowKeysDialog] = React.useState(false);
+  const [isRedirecting, setIsRedirecting] = React.useState(false);
+
+  const redirectToPostAuthDestination = React.useCallback(
+    (redirectPath: string) => {
+      setIsRedirecting(true);
+      requestAnimationFrame(() => {
+        navigateAfterAuth(redirectPath);
+      });
+    },
+    []
+  );
 
   const registerForm = useForm({
     defaultValues: {
@@ -353,7 +375,7 @@ export default function AuthPage() {
         setShowKeysDialog(true);
       } else {
         resetForms();
-        router.push(postAuthRedirect);
+        redirectToPostAuthDestination(postAuthRedirect);
       }
     },
     onError: (error) => {
@@ -366,7 +388,7 @@ export default function AuthPage() {
       onSuccess: () => {
         toast.success("Signed in successfully!");
         resetForms();
-        router.push(postAuthRedirect);
+        redirectToPostAuthDestination(postAuthRedirect);
       },
       onError: (error) => {
         toast.error(error.message || "Failed to sign in");
@@ -669,9 +691,18 @@ export default function AuthPage() {
                 <Button
                   type="submit"
                   className="w-full h-10 text-sm"
-                  disabled={isLoading}
+                  disabled={isLoading || isRedirecting}
                 >
-                  {isLoading ? "Signing in..." : "Sign In"}
+                  {isRedirecting ? (
+                    <>
+                      <Spinner className="mr-2" />
+                      Redirecting...
+                    </>
+                  ) : isLoading ? (
+                    "Signing in..."
+                  ) : (
+                    "Sign In"
+                  )}
                 </Button>
               </form>
             )}
@@ -695,9 +726,10 @@ export default function AuthPage() {
         onOpenChange={setShowKeysDialog}
         publicKey={generatedWallet?.publicKey || ""}
         privateKey={generatedWallet?.privateKey || ""}
+        isRedirecting={isRedirecting}
         onComplete={() => {
           resetForms();
-          router.push(postAuthRedirect);
+          redirectToPostAuthDestination(postAuthRedirect);
         }}
       />
     </div>
