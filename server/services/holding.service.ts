@@ -6,6 +6,7 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
+import { computeRecoverableLamports } from "@/lib/utils/sol-recovery";
 import {
   Keypair,
   PublicKey,
@@ -241,6 +242,8 @@ async function returnSolToMainWallet(
   wallets: WalletWithKey[],
   mainWalletKeypair: Keypair
 ) {
+  const rentExemptMinimumLamports =
+    await connection.getMinimumBalanceForRentExemption(0, "confirmed");
   const results = await mapWithConcurrency(wallets, 2, async (wallet) => {
     if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
       return {
@@ -277,7 +280,11 @@ async function returnSolToMainWallet(
         "confirmed"
       );
       const feeLamports = fee.value ?? 5000;
-      const lamports = balanceLamports - feeLamports;
+      const lamports = computeRecoverableLamports({
+        balanceLamports,
+        feeLamports,
+        rentExemptMinimumLamports,
+      });
       if (lamports <= 0) {
         return {
           walletPublicKey: wallet.publicKey,
