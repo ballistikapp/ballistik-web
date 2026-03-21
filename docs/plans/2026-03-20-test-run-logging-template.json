@@ -1,0 +1,28 @@
+{
+  "quickRun": {
+    "runId": "2003262110",
+    "date": "2026-03-20",
+    "logFile": "logs/test-runs/2003262110.jsonl",
+    "beforeMainWalletSol": null,
+    "afterMainWalletSol": null,
+    "slippageSuspected": null,
+    "issues": [
+      {
+        "severity": "critical|high|medium|low",
+        "page": "dashboard|holdings|transactions|launch|volume-bot|other",
+        "title": "",
+        "notes": ""
+      }
+    ],
+    "finalVerdict": {
+      "readyForProduction": false,
+      "summary": ""
+    }
+  },
+  "deepDive": {
+    "useOnlyIfSomethingLooksWrong": true,
+    "notes": "",
+    "suspectedSlippage": "",
+    "logEvidence": []
+  }
+}

@@ -84,6 +84,10 @@ export default function TransactionsPage() {
 
   const { mutateAsync: refreshTransactions, isPending: isRefreshing } =
     trpc.transaction.refreshByToken.useMutation();
+  const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
+    enabled: !!tokenPublicKey,
+  });
+  const appendTestRunEvent = trpc.testRunLog.appendEvent.useMutation();
 
   const columns = useMemo(() => {
     if (!tokenPublicKey || !tokenData) return [];
@@ -98,6 +102,7 @@ export default function TransactionsPage() {
   const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
+  const lastSnapshotKeyRef = useRef<string | null>(null);
   const metrics = useMemo(() => {
     const buyRows = transactions.filter((tx) => tx.transactionType === "BUY");
     const sellRows = transactions.filter((tx) => tx.transactionType === "SELL");
@@ -183,6 +188,16 @@ export default function TransactionsPage() {
 
   const handleRefresh = async (options?: { showToast?: boolean }) => {
     if (!tokenPublicKey) return;
+    if (testRunLogConfig?.enabled) {
+      appendTestRunEvent.mutate({
+        eventType: "transactions_refresh",
+        tokenPublicKey,
+        page: "transactions",
+        source: "transactions-page",
+        action: "refresh",
+        status: "started",
+      });
+    }
     const showToast = options?.showToast !== false;
     const toastId = showToast
       ? toast.loading("Refreshing transactions...", {
@@ -192,11 +207,39 @@ export default function TransactionsPage() {
     try {
       await refreshTransactions({ tokenPublicKey });
       void utils.transaction.listByToken.invalidate();
+      const latestTransactions = await utils.transaction.listByToken.fetch({
+        tokenPublicKey,
+        page: pagination.pageIndex + 1,
+        pageSize: pagination.pageSize,
+      });
       await refetchRefreshCache();
+      if (testRunLogConfig?.enabled) {
+        appendTestRunEvent.mutate({
+          eventType: "transactions_refresh",
+          tokenPublicKey,
+          page: "transactions",
+          source: "transactions-page",
+          action: "refresh",
+          status: "completed",
+          actualValue: {
+            totalCount: latestTransactions.totalCount,
+          },
+        });
+      }
       if (toastId) {
         toast.success("Transactions refreshed", { id: toastId, icon: null });
       }
     } catch (error) {
+      if (testRunLogConfig?.enabled) {
+        appendTestRunEvent.mutate({
+          eventType: "run_issue",
+          tokenPublicKey,
+          page: "transactions",
+          source: "transactions-page",
+          action: "transactions-refresh",
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
       if (toastId) {
         toast.error("Failed to refresh transactions", {
           id: toastId,
@@ -224,6 +267,46 @@ export default function TransactionsPage() {
     refreshTimestamp,
     tokenData,
     tokenPublicKey,
+  ]);
+
+  useEffect(() => {
+    if (!tokenPublicKey || !transactionsData || !testRunLogConfig?.enabled) return;
+    const snapshotKey = [
+      pagination.pageIndex,
+      pagination.pageSize,
+      transactionsData.totalCount,
+      refreshTimestamp ?? "none",
+    ].join(":");
+    if (lastSnapshotKeyRef.current === snapshotKey) return;
+    lastSnapshotKeyRef.current = snapshotKey;
+    appendTestRunEvent.mutate({
+      eventType: "transactions_page_snapshot",
+      tokenPublicKey,
+      page: "transactions",
+      source: "transactions-page",
+      action: "rendered-transactions-page",
+      summary: {
+        pageIndex: pagination.pageIndex,
+        pageSize: pagination.pageSize,
+        totalCount: transactionsData.totalCount,
+        refreshTimestamp,
+        metrics,
+      },
+      snapshot: {
+        items: transactionsData.items,
+        metricCards,
+      },
+    });
+  }, [
+    appendTestRunEvent,
+    metricCards,
+    metrics,
+    pagination.pageIndex,
+    pagination.pageSize,
+    refreshTimestamp,
+    testRunLogConfig?.enabled,
+    tokenPublicKey,
+    transactionsData,
   ]);
 
   if (isLoading) {

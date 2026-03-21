@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { computeRecoverableLamports } from "./sol-recovery.ts";
+import { computeRecoverableLamports } from "./sol-recovery";
 
 test("leaves the rent reserve in the source wallet", () => {
   const recoverableLamports = computeRecoverableLamports({

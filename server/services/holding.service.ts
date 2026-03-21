@@ -24,6 +24,7 @@ import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 import type {
   ListHoldingsByTokenInput,
   RefreshHoldingsByTokenInput,
@@ -302,8 +303,23 @@ async function returnSolToMainWallet(
       );
       transferTx.recentBlockhash = latestBlockhash.blockhash;
       transferTx.feePayer = owner.publicKey;
-      await sendAndConfirmTransaction(connection, transferTx, [owner], {
+      const signature = await sendAndConfirmTransaction(connection, transferTx, [owner], {
         commitment: "confirmed",
+      });
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "holding.service",
+        action: "holding.returnSolToMainWallet",
+        wallets: [wallet.publicKey, mainWalletKeypair.publicKey.toBase58()],
+        signature,
+        status: "submitted",
+        expectedValue: {
+          recoverableLamports: lamports,
+        },
+        actualValue: {
+          walletPublicKey: wallet.publicKey,
+          recoveredLamports: lamports,
+        },
       });
 
       return {
@@ -765,6 +781,8 @@ export const holdingService = {
               walletPublicKey: wallet.publicKey,
               status: "SKIPPED",
               error: "No balance",
+              tokenBalanceBefore: balance.toString(),
+              sellAmount: "0",
             };
           }
 
@@ -774,8 +792,29 @@ export const holdingService = {
               walletPublicKey: wallet.publicKey,
               status: "SKIPPED",
               error: "Sell amount too small",
+              tokenBalanceBefore: balance.toString(),
+              sellAmount: sellAmount.toString(),
             };
           }
+
+          await testRunLogService.appendServerEvent({
+            eventType: "trade_attempt",
+            source: "holding.service",
+            tokenPublicKey: token.publicKey,
+            action: "holding.sellByToken",
+            userId,
+            wallets: [wallet.publicKey],
+            balancesBefore: {
+              walletPublicKey: wallet.publicKey,
+              tokenBalanceBefore: balance.toString(),
+            },
+            expectedValue: {
+              sellPercentage,
+              sellAmount: sellAmount.toString(),
+              closeAta: shouldCloseAta,
+              returnSolToMainWallet: shouldReturnSolToMainWallet,
+            },
+          });
 
           const seller = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
           const sellTx = await buildSellTransaction(
@@ -809,11 +848,31 @@ export const holdingService = {
               }),
             rpcConfig.tuning.confirmTimeoutMs
           );
+          await testRunLogService.appendServerEvent({
+            eventType: "wallet_transaction",
+            source: "holding.service",
+            tokenPublicKey: token.publicKey,
+            action: "holding.sellTransaction",
+            userId,
+            wallets: [wallet.publicKey],
+            signature,
+            status: "submitted",
+            expectedValue: {
+              sellAmount: sellAmount.toString(),
+              sellPercentage,
+            },
+            actualValue: {
+              feePayerPublicKey: feePayer.publicKey.toBase58(),
+            },
+          });
 
           return {
             walletPublicKey: wallet.publicKey,
             status: "SUBMITTED",
             signature,
+            tokenBalanceBefore: balance.toString(),
+            sellAmount: sellAmount.toString(),
+            feePayerPublicKey: feePayer.publicKey.toBase58(),
           };
         } catch (error) {
           const message =
@@ -825,6 +884,8 @@ export const holdingService = {
             walletPublicKey: wallet.publicKey,
             status: "FAILED",
             error: message,
+            tokenBalanceBefore: null,
+            sellAmount: null,
           };
         }
       }
@@ -884,8 +945,21 @@ export const holdingService = {
               feePayer.publicKey.toBase58() === owner.publicKey.toBase58()
                 ? [feePayer]
                 : [feePayer, owner];
-            await sendAndConfirmTransaction(connection, closeTx, signers, {
+            const signature = await sendAndConfirmTransaction(connection, closeTx, signers, {
               commitment: "confirmed",
+            });
+            await testRunLogService.appendServerEvent({
+              eventType: "wallet_transaction",
+              source: "holding.service",
+              tokenPublicKey: token.publicKey,
+              action: "holding.closeAta",
+              wallets: [wallet.publicKey],
+              signature,
+              status: "submitted",
+              actualValue: {
+                walletPublicKey: wallet.publicKey,
+                destination: destination.toBase58(),
+              },
             });
 
             return { walletPublicKey: wallet.publicKey, status: "CLOSED" };
@@ -922,7 +996,8 @@ export const holdingService = {
           token.publicKey,
           userId,
           refreshWalletPublicKeys,
-          true
+          true,
+          "holding.sellByToken"
         );
       } catch {}
     }
@@ -935,6 +1010,44 @@ export const holdingService = {
     const ataCloseFailed = ataCloseResults.filter(
       (result) => result.status === "FAILED"
     );
+
+    await testRunLogService.appendServerEvent({
+      eventType: "trade_result",
+      source: "holding.service",
+      tokenPublicKey: token.publicKey,
+      action: "holding.sellByToken",
+      userId,
+      wallets: wallets.map((wallet) => wallet.publicKey),
+      expectedValue: {
+        sellPercentage,
+        closeAta: shouldCloseAta,
+        returnSolToMainWallet: shouldReturnSolToMainWallet,
+      },
+      actualValue: {
+        submitted: submitted.length,
+        failed: failed.length,
+        ataClosed: ataClosed.length,
+        ataCloseFailed: ataCloseFailed.length,
+        recoveredWallets: solRecovery?.recovered ?? 0,
+        solRecoveryResults: solRecovery?.results ?? null,
+      },
+      balancesBefore: results.map((result) => ({
+        walletPublicKey: result.walletPublicKey,
+        tokenBalanceBefore: result.tokenBalanceBefore,
+        sellAmount: result.sellAmount,
+      })),
+      balancesAfter: null,
+      summary: {
+        resultCount: results.length,
+        ataClose: shouldCloseAta
+          ? {
+              closed: ataClosed.length,
+              failed: ataCloseFailed.length,
+            }
+          : null,
+        solRecovery,
+      },
+    });
 
     return {
       tokenPublicKey: token.publicKey,

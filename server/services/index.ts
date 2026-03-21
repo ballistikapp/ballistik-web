@@ -10,3 +10,4 @@ export * from "./launch.service";
 export * from "./holding.service";
 export * from "./transaction.service";
 export * from "./storage.service";
+export * from "./test-run-log.service";

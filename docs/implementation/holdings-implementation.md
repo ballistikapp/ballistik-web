@@ -63,3 +63,21 @@ The `refreshByToken` service is optimized for speed:
 - Sell dialog includes a "Return SOL to main wallet" toggle with a clear description that it sweeps only spendable SOL from processed wallets back to the main wallet while preserving the source wallet's rent reserve.
 - Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.
+
+## Test Run Logging
+
+Holdings instrumentation for the production-readiness run is defined in `docs/implementation/test-run-logging.md`.
+
+Holdings-specific logging must capture:
+
+- `holdings_refresh` events for manual and monitoring refresh paths
+- `holdings_page_snapshot` events describing the rows and totals shown to the user
+- `trade_result` and `funds_return` context for `holding.sellByToken`
+- Before/after wallet balance snapshots when sell flows optionally return SOL to the main wallet
+
+The automated log must be detailed enough to compare:
+
+- Holdings-page totals
+- Dashboard holdings aggregates
+- Per-wallet sell outcomes
+- Recovered SOL returned after sell flows

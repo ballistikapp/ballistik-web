@@ -9,6 +9,7 @@ import { priceService, type PriceResult } from "@/server/services/price.service"
 import { holdersService } from "@/server/services/holders.service";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
 import { shyftDefiService } from "@/server/services/shyft-defi.service";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 import { getEnv } from "@/lib/config/env";
 import { logger } from "@/lib/logger";
 
@@ -480,10 +481,12 @@ async function buildStatsResponse(
   const operations = results[3].status === "fulfilled" ? results[3].value : { botSessions: [] };
   const recentTransactions = results[4].status === "fulfilled" ? results[4].value : [];
   const priceHistory = results[5].status === "fulfilled" ? results[5].value : [];
+  const failedSubQueries: string[] = [];
 
   for (const [i, r] of results.entries()) {
     if (r.status === "rejected") {
       const names = ["treasury", "volumes", "holdings", "operations", "transactions", "priceHistory"];
+      failedSubQueries.push(names[i] ?? `unknown-${i}`);
       log.error(`Dashboard sub-query failed: ${names[i]}`, {
         tokenPublicKey,
         error: r.reason instanceof Error ? r.reason.message : r.reason,
@@ -497,6 +500,24 @@ async function buildStatsResponse(
   );
 
   const marketCapSol = round4(priceSol * tokenTotalSupply);
+
+  await testRunLogService.appendServerEvent({
+    eventType: "dashboard_query_result",
+    source: "dashboard.service",
+    tokenPublicKey,
+    action: "buildStatsResponse",
+    userId,
+    cache: { status: "miss" },
+    summary: {
+      failedSubQueries,
+      priceSol,
+      marketCapSol,
+      treasuryTotalSol: treasury.totalSol,
+      activityTransactions: volumes.totalTxCount,
+      ownedWalletCount: holdingsBreakdown.userWallets.length,
+      recentTransactionCount: recentTransactions.length,
+    },
+  });
 
   return {
     header: {
@@ -559,6 +580,23 @@ export const dashboardService = {
     const cacheKey = `${input.tokenPublicKey}:${userId}`;
     const cached = statsCache.get(cacheKey);
     if (cached && Date.now() - cached.cachedAt < STATS_CACHE_TTL_MS) {
+      await testRunLogService.appendServerEvent({
+        eventType: "dashboard_query_result",
+        source: "dashboard.service",
+        tokenPublicKey: input.tokenPublicKey,
+        action: "getStats",
+        userId,
+        cache: {
+          status: "hit",
+          ageMs: Date.now() - cached.cachedAt,
+        },
+        summary: {
+          priceSol: cached.data.header.priceSol,
+          marketCapSol: cached.data.header.marketCapSol,
+          transactionCount: cached.data.metrics.activity.transactionCount,
+          walletCount: cached.data.holdingsBreakdown.userWallets.length,
+        },
+      });
       return cached.data;
     }
 

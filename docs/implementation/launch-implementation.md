@@ -375,3 +375,17 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 - Balances are refreshed on demand only
 - Server enforces a 15-second debounce per wallet
+
+## Test Run Logging
+
+The production-readiness run logging design is documented in `docs/implementation/test-run-logging.md`.
+
+Launch-specific instrumentation for that run must add correlated JSONL events around:
+
+- Funding plan preparation and post-funding balances
+- Create-and-buy submission
+- Bundle telemetry relevant to timing or retries
+- Post-launch SOL sweep back to the main wallet
+- Final launch completion and residual balance state
+
+Launch logs should preserve enough data to compare expected main-wallet impact against actual before/after wallet balance snapshots during the test run.

@@ -11,3 +11,4 @@ export * from "./transaction.schema";
 export * from "./refresh-cache.schema";
 export * from "./volume-bot.schema";
 export * from "./dashboard.schema";
+export * from "./test-run-log.schema";

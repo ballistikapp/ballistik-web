@@ -550,6 +550,20 @@ The worker logs extensively with wallet prefix (first 8 chars of public key) for
 - Error details and retry attempts
 - Watchdog activity and orphan detection
 
+## Test Run Logging
+
+The production-readiness run logging design is documented in `docs/implementation/test-run-logging.md`.
+
+For that run, the volume bot must also emit correlated JSONL events that preserve:
+
+- Session start and stop context
+- Pre-trade balance snapshots
+- Quote-derived slippage inputs when available
+- Post-trade observed SOL and token deltas
+- Slippage pause decisions and repeated-failure counts
+
+These events are used for after-the-fact comparison against dashboard activity, holdings changes, and final wallet balances.
+
 ## Error Handling
 
 - Trade errors: logged to VolumeBotLog, wallet schedules next tick

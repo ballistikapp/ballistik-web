@@ -15,6 +15,7 @@ import { rpcConfig } from "@/lib/config/rpc.config";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { logger } from "@/lib/logger";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import type {
@@ -313,6 +314,23 @@ export const walletService = {
           errorMessage: message,
         });
       }
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "wallet.service",
+        action: "wallet.withdrawMainSol",
+        userId,
+        wallets: [sender.publicKey.toBase58(), destinationPublicKey],
+        signature: submitted.signature,
+        status: "submitted",
+        expectedValue: {
+          requestedAmountSol: amountSol ?? null,
+          useMax: Boolean(useMax),
+        },
+        actualValue: {
+          amountSol: submitted.amountSol,
+          destinationPublicKey,
+        },
+      });
 
       return {
         signature: submitted.signature,
@@ -501,7 +519,8 @@ export const walletService = {
     tokenPublicKey: string,
     userId: string,
     walletPublicKeys?: string[],
-    force = false
+    force = false,
+    reason?: string
   ) {
     const token = await prisma.token.findFirst({
       where: { publicKey: tokenPublicKey, userId },
@@ -520,27 +539,56 @@ export const walletService = {
           tokenPublicKey,
           type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
         },
-        select: { publicKey: true, balanceRefreshedAt: true },
+        select: {
+          publicKey: true,
+          balanceSol: true,
+          balanceRefreshedAt: true,
+          type: true,
+        },
       }),
       prisma.tokenDevWallet.findFirst({
         where: { tokenPublicKey },
         select: {
-          wallet: { select: { publicKey: true, balanceRefreshedAt: true } },
+          wallet: {
+            select: {
+              publicKey: true,
+              balanceSol: true,
+              balanceRefreshedAt: true,
+              type: true,
+            },
+          },
         },
       }),
       prisma.user.findUnique({
         where: { id: userId },
         select: {
-          mainWallet: { select: { publicKey: true, balanceRefreshedAt: true } },
+          mainWallet: {
+            select: {
+              publicKey: true,
+              balanceSol: true,
+              balanceRefreshedAt: true,
+              type: true,
+            },
+          },
         },
       }),
     ]);
 
-    const availableWallets = [
+    const availableWallets: Array<{
+      publicKey: string;
+      balanceSol: number;
+      balanceRefreshedAt: Date | null;
+      type: WalletType;
+    }> = [
       ...(user?.mainWallet ? [user.mainWallet] : []),
       ...(devWallet?.wallet ? [devWallet.wallet] : []),
       ...operationalWallets,
-    ];
+    ].map((wallet) => ({
+      publicKey: wallet.publicKey,
+      balanceSol: Number(wallet.balanceSol ?? 0),
+      balanceRefreshedAt: wallet.balanceRefreshedAt,
+      type: wallet.type,
+    }));
 
     const allowedWallets = new Map(
       availableWallets.map((wallet) => [wallet.publicKey, wallet])
@@ -555,15 +603,15 @@ export const walletService = {
     const requestedWallets = targeted
       ? requestedKeys
           .map((key) => allowedWallets.get(key))
-          .filter(
-            (
-              wallet
-            ): wallet is {
-              publicKey: string;
-              balanceRefreshedAt: Date | null;
-            } => !!wallet
-          )
+          .filter((wallet): wallet is (typeof availableWallets)[number] => !!wallet)
       : availableWallets;
+    const beforeSnapshot = requestedWallets.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      walletType: wallet.type,
+      balanceSol: wallet.balanceSol,
+      balanceRefreshedAt: wallet.balanceRefreshedAt?.toISOString() ?? null,
+      dataSource: "database-snapshot",
+    }));
 
     const now = new Date();
     const cooldownMs = cacheConfig.cooldownMs.walletBalances;
@@ -584,6 +632,26 @@ export const walletService = {
         );
 
     if (targetWallets.length === 0) {
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_balance_snapshot",
+        source: "wallet.service",
+        tokenPublicKey: token.publicKey,
+        action: reason ?? "wallet.refreshWalletBalances",
+        userId,
+        dataSource: "database-snapshot",
+        wallets: requestedKeys,
+        balancesBefore: beforeSnapshot,
+        balancesAfter: [],
+        summary: {
+          refreshedCount: 0,
+          skippedCooldownCount: skippedCooldown.length,
+          skippedNotAllowedCount: skippedNotAllowed.length,
+          requestedCount: requestedKeys.length,
+          targeted,
+          force,
+          status: "skipped",
+        },
+      });
       return {
         refreshed: [],
         skippedCooldown,
@@ -652,6 +720,30 @@ export const walletService = {
       tokenPublicKey: token.publicKey,
       scope: "WALLETS",
       refreshedAt: now,
+    });
+
+    await testRunLogService.appendServerEvent({
+      eventType: "wallet_balance_snapshot",
+      source: "wallet.service",
+      tokenPublicKey: token.publicKey,
+      action: reason ?? "wallet.refreshWalletBalances",
+      userId,
+      dataSource: "rpc",
+      wallets: requestedKeys,
+      balancesBefore: beforeSnapshot,
+      balancesAfter: balances.map((balance) => ({
+        ...balance,
+        balanceRefreshedAt: now.toISOString(),
+        dataSource: "rpc",
+      })),
+      summary: {
+        refreshedCount: balances.length,
+        skippedCooldownCount: skippedCooldown.length,
+        skippedNotAllowedCount: skippedNotAllowed.length,
+        requestedCount: requestedKeys.length,
+        targeted,
+        force,
+      },
     });
 
     return {
@@ -823,7 +915,8 @@ export const walletService = {
         tokenPublicKey,
         userId,
         refreshWalletPublicKeys,
-        true
+        true,
+        "wallet.sendSolFromMainWallet"
       );
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -838,6 +931,24 @@ export const walletService = {
     ).length;
     const skippedCount =
       walletPublicKeys.length - submittedCount - failedCount;
+    await Promise.all(
+      results.map(async (result) => {
+        await testRunLogService.appendServerEvent({
+          eventType: "wallet_transaction",
+          source: "wallet.service",
+          tokenPublicKey,
+          action: "wallet.sendSolFromMainWallet",
+          userId,
+          wallets: [mainWallet.publicKey, result.publicKey],
+          signature: result.signature ?? undefined,
+          status: result.status,
+          expectedValue: {
+            amountSol,
+          },
+          actualValue: result,
+        });
+      })
+    );
 
     return {
       submittedCount,
@@ -1047,7 +1158,8 @@ export const walletService = {
           tokenPublicKey,
           userId,
           refreshWalletPublicKeys,
-          true
+          true,
+          "wallet.returnSolToMainWallet"
         );
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
@@ -1064,6 +1176,25 @@ export const walletService = {
     const skippedCount = results.filter(
       (result) => result.status === "SKIPPED"
     ).length;
+    await Promise.all(
+      results.map(async (result) => {
+        await testRunLogService.appendServerEvent({
+          eventType: "wallet_transaction",
+          source: "wallet.service",
+          tokenPublicKey,
+          action: "wallet.returnSolToMainWallet",
+          userId,
+          wallets: [result.publicKey, mainWallet.publicKey],
+          signature: result.signature ?? undefined,
+          status: result.status,
+          expectedValue: {
+            amountSol: amountSol ?? null,
+            useMax: Boolean(useMax),
+          },
+          actualValue: result,
+        });
+      })
+    );
 
     return {
       submittedCount,

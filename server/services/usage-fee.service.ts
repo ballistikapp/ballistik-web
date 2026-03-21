@@ -14,6 +14,7 @@ import { AppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 
 type CollectUsageFeeInput = {
   userId: string;
@@ -144,6 +145,26 @@ export const usageFeeService = {
       amountLamports,
       signature,
       reason: input.reason,
+    });
+    await testRunLogService.appendServerEvent({
+      eventType: "wallet_transaction",
+      source: "usage-fee.service",
+      action: "usage-fee.collect",
+      userId: input.userId,
+      wallets: [sender.publicKey.toBase58(), collectorPublicKey.toBase58()],
+      signature,
+      status: "submitted",
+      expectedValue: {
+        amountSol: input.totalFeeSol,
+        amountLamports,
+        reason: input.reason,
+      },
+      actualValue: {
+        fromPublicKey: sender.publicKey.toBase58(),
+        toPublicKey: collectorPublicKey.toBase58(),
+        amountSol: input.totalFeeSol,
+        amountLamports,
+      },
     });
 
     return {

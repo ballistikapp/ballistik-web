@@ -31,6 +31,7 @@ import { walletService } from "@/server/services/wallet.service";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { dashboardEvents } from "@/server/events/dashboard-events";
 import { persistVolumeBotLog } from "@/server/services/log-persistence.service";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 
 type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
@@ -376,6 +377,24 @@ export const processVolumeBotWalletRange = async (
     config.behaviorConfig.maxRetries ?? globalConfig.defaultMaxRetries;
 
   try {
+    await testRunLogService.appendServerEvent({
+      eventType: "trade_attempt",
+      source: "volume-bot-worker",
+      tokenPublicKey: session.tokenPublicKey,
+      action: "volume-bot.trade",
+      userId: session.userId,
+      sessionId: session.id,
+      balancesBefore: {
+        walletPublicKey: volumeWallet.walletPublicKey,
+        solBalanceLamports,
+        tokenBalance: tokenBalance.toString(),
+      },
+      expectedValue: {
+        action,
+        tradeAmountSol,
+        slippageLimitBps: config.behaviorConfig.slippageBps,
+      },
+    });
     if (action === "BUY") {
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
       let minTokensOut = new BN(1);
@@ -545,6 +564,24 @@ export const processVolumeBotWalletRange = async (
       }
     }
 
+    if (signature) {
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "volume-bot-worker",
+        action: action === "BUY" ? "volume-bot.buy" : "volume-bot.sell",
+        userId: session.userId,
+        sessionId: session.id,
+        tokenPublicKey: session.tokenPublicKey,
+        wallets: [walletKeypair.publicKey.toBase58()],
+        signature,
+        status: "submitted",
+        expectedValue: {
+          tradeAmountSol,
+          tokenAmount: tokenAmount.toString(),
+        },
+      });
+    }
+
     const updatedSolLamports = await connection.getBalance(
       walletKeypair.publicKey
     );
@@ -558,8 +595,9 @@ export const processVolumeBotWalletRange = async (
     const now = new Date();
     const actualSolAbs = Math.abs(solDelta);
     let pauseWallet = false;
+    let slippage: number | null = null;
     if (tradeAmountSol > 0) {
-      const slippage = Math.abs(actualSolAbs - tradeAmountSol) / tradeAmountSol;
+      slippage = Math.abs(actualSolAbs - tradeAmountSol) / tradeAmountSol;
       if (slippage > config.behaviorConfig.slippageBps / 10000) {
         const nextCount = (slippageFailures.get(walletId) ?? 0) + 1;
         slippageFailures.set(walletId, nextCount);
@@ -615,6 +653,38 @@ export const processVolumeBotWalletRange = async (
           rangeIndex,
         },
       });
+      await testRunLogService.appendServerEvent({
+        eventType: "trade_result",
+        source: "volume-bot-worker",
+        tokenPublicKey: session.tokenPublicKey,
+        action: "volume-bot.trade",
+        userId: session.userId,
+        sessionId: session.id,
+        signature: signature ?? undefined,
+        status: "paused-high-slippage",
+        balancesBefore: {
+          walletPublicKey: volumeWallet.walletPublicKey,
+          solBalanceLamports,
+          tokenBalance: tokenBalance.toString(),
+        },
+        balancesAfter: {
+          walletPublicKey: volumeWallet.walletPublicKey,
+          solBalanceLamports: updatedSolLamports,
+          tokenBalance: updatedTokenBalance.toString(),
+        },
+        expectedValue: {
+          action,
+          tradeAmountSol,
+          slippageLimitBps: config.behaviorConfig.slippageBps,
+        },
+        actualValue: {
+          actualSol: actualSolAbs,
+          tokenAmount: tokenAmount.toString(),
+          slippageBps:
+            slippage === null ? null : Math.round(slippage * 10_000),
+          sellMode,
+        },
+      });
       return null;
     }
 
@@ -651,7 +721,7 @@ export const processVolumeBotWalletRange = async (
       type: action.toLowerCase(),
       message: "Trade executed",
       walletPublicKey: volumeWallet.walletPublicKey,
-      signature,
+      signature: signature ?? undefined,
       data: {
         tradeAmountSol,
         actualSol: actualSolAbs,
@@ -659,6 +729,38 @@ export const processVolumeBotWalletRange = async (
         netSolChangeSol: appliedNetSolChange,
         sellMode,
         rangeIndex,
+      },
+    });
+    await testRunLogService.appendServerEvent({
+      eventType: "trade_result",
+      source: "volume-bot-worker",
+      tokenPublicKey: session.tokenPublicKey,
+      action: "volume-bot.trade",
+      userId: session.userId,
+      sessionId: session.id,
+      signature: signature ?? undefined,
+      status: "submitted",
+      balancesBefore: {
+        walletPublicKey: volumeWallet.walletPublicKey,
+        solBalanceLamports,
+        tokenBalance: tokenBalance.toString(),
+      },
+      balancesAfter: {
+        walletPublicKey: volumeWallet.walletPublicKey,
+        solBalanceLamports: updatedSolLamports,
+        tokenBalance: updatedTokenBalance.toString(),
+      },
+      expectedValue: {
+        action,
+        tradeAmountSol,
+        slippageLimitBps: config.behaviorConfig.slippageBps,
+      },
+      actualValue: {
+        actualSol: actualSolAbs,
+        tokenAmount: tokenAmount.toString(),
+        netSolChangeSol: appliedNetSolChange,
+        slippageBps: slippage === null ? null : Math.round(slippage * 10_000),
+        sellMode,
       },
     });
 
@@ -897,7 +999,20 @@ export const closeVolumeBotAccounts = async (sessionId: string) => {
       tx.recentBlockhash = blockhash;
       tx.lastValidBlockHeight = lastValidBlockHeight;
       tx.feePayer = walletKeypair.publicKey;
-      await sendAndConfirmTransaction(connection, tx, [walletKeypair]);
+      const signature = await sendAndConfirmTransaction(connection, tx, [walletKeypair]);
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "volume-bot-worker",
+        action: "volume-bot.closeTokenAccount",
+        userId: session.userId,
+        sessionId: session.id,
+        wallets: [walletKeypair.publicKey.toBase58()],
+        signature,
+        status: "submitted",
+        actualValue: {
+          tokenAccount: account.pubkey.toBase58(),
+        },
+      });
     });
   });
 };

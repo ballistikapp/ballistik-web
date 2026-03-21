@@ -5,6 +5,7 @@ import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { walletService } from "@/server/services/wallet.service";
 import { persistHoldingExitLog } from "@/server/services/log-persistence.service";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
 import {
@@ -308,8 +309,20 @@ async function fundUnderfundedWallets({
     tx.feePayer = mainWallet.publicKey;
 
     try {
-      await sendAndConfirmTransaction(connection, tx, [mainWallet], {
+      const signature = await sendAndConfirmTransaction(connection, tx, [mainWallet], {
         commitment: "confirmed",
+      });
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "holding-exit.service",
+        action: "holding-exit.fundWalletBatch",
+        wallets: [mainWallet.publicKey.toBase58(), ...batch.map((item) => item.publicKey.toBase58())],
+        signature,
+        status: "submitted",
+        actualValue: {
+          batchSize: batch.length,
+          batchTotalLamports: batchTotal,
+        },
       });
       funded += batch.length;
       totalLamports += batchTotal;
@@ -523,10 +536,18 @@ async function closeAtasAndRecoverSol({
             );
             closeTx.recentBlockhash = latestBlockhash.blockhash;
             closeTx.feePayer = mainWallet.publicKey;
-            await sendAndConfirmTransaction(connection, closeTx, [
+            const signature = await sendAndConfirmTransaction(connection, closeTx, [
               mainWallet,
               owner,
             ]);
+            await testRunLogService.appendServerEvent({
+              eventType: "wallet_transaction",
+              source: "holding-exit.service",
+              action: "holding-exit.closeAta",
+              wallets: [wallet.publicKey],
+              signature,
+              status: "submitted",
+            });
             ataClosed = true;
           } catch (error) {
             const message =
@@ -573,8 +594,19 @@ async function closeAtasAndRecoverSol({
               );
               transferTx.recentBlockhash = latestBlockhash.blockhash;
               transferTx.feePayer = owner.publicKey;
-              await sendAndConfirmTransaction(connection, transferTx, [owner], {
+              const signature = await sendAndConfirmTransaction(connection, transferTx, [owner], {
                 commitment: "confirmed",
+              });
+              await testRunLogService.appendServerEvent({
+                eventType: "wallet_transaction",
+                source: "holding-exit.service",
+                action: "holding-exit.recoverSol",
+                wallets: [wallet.publicKey, mainWallet.publicKey.toBase58()],
+                signature,
+                status: "submitted",
+                expectedValue: {
+                  lamports,
+                },
               });
               solRecoveredLamports = lamports;
             }
@@ -767,6 +799,18 @@ async function runExitFlow(exitId: string) {
             mainKeypair,
             tipLamports
           );
+          await testRunLogService.appendServerEvent({
+            eventType: "wallet_transaction",
+            source: "holding-exit.service",
+            action: "holding-exit.sendBundle",
+            wallets: chunk.map((entry) => entry.wallet.publicKey),
+            status: "submitted",
+            actualValue: {
+              seller: seller.publicKey,
+              bundleId: bundleResult.bundleId,
+              signatures: bundleResult.signatures,
+            },
+          });
           await appendExitLog(
             exitId,
             "INFO",

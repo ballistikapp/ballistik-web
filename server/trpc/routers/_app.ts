@@ -10,6 +10,7 @@ import { refreshCacheRouter } from "./refresh-cache.router";
 import { volumeBotRouter } from "./volume-bot.router";
 import { subscriptionRouter } from "./subscription.router";
 import { dashboardRouter } from "./dashboard.router";
+import { testRunLogRouter } from "./test-run-log.router";
 
 const baseRouters = {
   auth: authRouter,
@@ -22,6 +23,7 @@ const baseRouters = {
   volumeBot: volumeBotRouter,
   subscription: subscriptionRouter,
   dashboard: dashboardRouter,
+  testRunLog: testRunLogRouter,
 };
 
 export const appRouter =

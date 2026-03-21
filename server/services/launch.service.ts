@@ -38,6 +38,7 @@ import {
 } from "@/server/solana/pump-transaction-builders";
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
+import { testRunLogService } from "@/server/services/test-run-log.service";
 import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { persistLaunchLog } from "@/server/services/log-persistence.service";
@@ -951,6 +952,12 @@ async function fundWalletsFromMain(
       };
     })
     .filter((target) => target.topUpLamports > BigInt(0));
+  const currentBalanceByPublicKey = new Map(
+    uniqueTargets.map((target, index) => [
+      target.publicKey.toBase58(),
+      targetBalances[index] ?? 0,
+    ])
+  );
 
   if (fundingPlan.length === 0) {
     await appendLog(launchId, "INFO", "Funding not required", "funding", {
@@ -998,8 +1005,31 @@ async function fundWalletsFromMain(
       [mainWalletKeypair],
       { commitment: "confirmed" }
     );
+    await testRunLogService.appendServerEvent({
+      eventType: "wallet_transaction",
+      source: "launch.service",
+      action: "launch.fundWalletBatch",
+      launchId,
+      wallets: [
+        mainWalletKeypair.publicKey.toBase58(),
+        ...batch.map((target) => target.publicKey.toBase58()),
+      ],
+      signature,
+      status: "submitted",
+      actualValue: {
+        batchSize: batch.length,
+        batchLamports: batch
+          .reduce((sum, target) => sum + target.topUpLamports, BigInt(0))
+          .toString(),
+      },
+    });
     signatures.push(signature);
   }
+
+  const [mainBalanceAfter, ...targetBalancesAfter] = await Promise.all([
+    connection.getBalance(mainWalletKeypair.publicKey, "confirmed"),
+    ...fundingPlan.map((target) => connection.getBalance(target.publicKey, "confirmed")),
+  ]);
 
   await appendLog(launchId, "INFO", "Wallets funded", "funding", {
     fundedCount: fundingPlan.length,
@@ -1009,6 +1039,51 @@ async function fundWalletsFromMain(
     signatures,
     reserveSol: lamportsToSol(mainReserveLamports).toFixed(4),
     durationMs: Date.now() - startedAt,
+  });
+
+  await testRunLogService.appendServerEvent({
+    eventType: "wallet_balance_snapshot",
+    source: "launch.service",
+    action: "launch.funding",
+    launchId,
+    balancesBefore: [
+      {
+        walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+        role: "main",
+        balanceSol: mainBalance / LAMPORTS_PER_SOL,
+        dataSource: "rpc",
+      },
+      ...fundingPlan.map((target, index) => ({
+        walletPublicKey: target.publicKey.toBase58(),
+        role: "launch-wallet",
+        balanceSol:
+          (currentBalanceByPublicKey.get(target.publicKey.toBase58()) ?? 0) /
+          LAMPORTS_PER_SOL,
+        topUpLamports: target.topUpLamports.toString(),
+        dataSource: "rpc",
+      })),
+    ],
+    balancesAfter: [
+      {
+        walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+        role: "main",
+        balanceSol: mainBalanceAfter / LAMPORTS_PER_SOL,
+        dataSource: "rpc",
+      },
+      ...fundingPlan.map((target, index) => ({
+        walletPublicKey: target.publicKey.toBase58(),
+        role: "launch-wallet",
+        balanceSol: (targetBalancesAfter[index] ?? 0) / LAMPORTS_PER_SOL,
+        topUpLamports: target.topUpLamports.toString(),
+        dataSource: "rpc",
+      })),
+    ],
+    summary: {
+      fundedCount: fundingPlan.length,
+      totalLamports: totalLamports.toString(),
+      signatureCount: signatures.length,
+      reserveLamports: mainReserveLamports.toString(),
+    },
   });
 
   return { fundedCount: fundingPlan.length, totalLamports, signatures };
@@ -1811,6 +1886,21 @@ async function distributeTokensToWallets(
           [sourceWallet],
           { commitment: "confirmed" }
         );
+        await testRunLogService.appendServerEvent({
+          eventType: "wallet_transaction",
+          source: "launch.service",
+          action: "launch.distributionTransfer",
+          launchId,
+          wallets: [
+            sourceWallet.publicKey.toBase58(),
+            destination.publicKey.toBase58(),
+          ],
+          signature,
+          status: "submitted",
+          actualValue: {
+            amountRaw: amountPerWallet.toString(),
+          },
+        });
         signatures.push(signature);
         transferCount += 1;
         totalTokensRaw += amountPerWallet;
@@ -2010,6 +2100,22 @@ async function returnExcessSolToMain(
         [sourceWallet],
         { commitment: "confirmed" }
       );
+      await testRunLogService.appendServerEvent({
+        eventType: "wallet_transaction",
+        source: "launch.service",
+        action: "launch.returnExcessSolToMain",
+        launchId,
+        wallets: [sourceWallet.publicKey.toBase58(), mainWalletPublicKey],
+        signature,
+        status: "submitted",
+        expectedValue: {
+          lamportsToSend,
+        },
+        actualValue: {
+          publicKey: sourceWallet.publicKey.toBase58(),
+          amountSol: lamportsToSol(BigInt(lamportsToSend)),
+        },
+      });
       totalReturnedLamports += BigInt(lamportsToSend);
       results.push({
         publicKey: sourceWallet.publicKey.toBase58(),
@@ -2821,6 +2927,20 @@ export const launchService = {
               [mainKeypair, sender],
               { commitment: "confirmed" }
             );
+            await testRunLogService.appendServerEvent({
+              eventType: "wallet_transaction",
+              source: "launch.service",
+              action: "launch.recoverSol",
+              launchId,
+              userId,
+              wallets: [wallet.publicKey, mainPublicKey.toBase58()],
+              signature,
+              status: "submitted",
+              actualValue: {
+                amountSol: lamportsToSol(BigInt(balanceLamports)),
+                walletPublicKey: wallet.publicKey,
+              },
+            });
             await prisma.launchRecoveryWallet.updateMany({
               where: { launchId, walletPublicKey: wallet.publicKey },
               data: {
@@ -3311,6 +3431,21 @@ export const launchService = {
         });
         createSignature = bundleResult.signatures[0] ?? null;
         bundleId = bundleResult.bundleId;
+        await testRunLogService.appendServerEvent({
+          eventType: "wallet_transaction",
+          source: "launch.service",
+          action: "launch.createAndBuyInBundle",
+          launchId,
+          wallets: [
+            devWalletKeypair.publicKey.toBase58(),
+            ...buyerWallets.map((wallet) => wallet.publicKey.toBase58()),
+          ],
+          status: "submitted",
+          actualValue: {
+            bundleId: bundleResult.bundleId,
+            signatures: bundleResult.signatures,
+          },
+        });
         await appendLog(launchId, "INFO", "Create submitted", "create", {
           bundleId: bundleResult.bundleId,
           signatures: bundleResult.signatures,
@@ -3346,6 +3481,16 @@ export const launchService = {
           [devWalletKeypair, mintKeypair],
           { commitment: "confirmed" }
         );
+        await testRunLogService.appendServerEvent({
+          eventType: "wallet_transaction",
+          source: "launch.service",
+          action: "launch.createToken",
+          launchId,
+          tokenPublicKey: mintPublicKey,
+          wallets: [devWalletKeypair.publicKey.toBase58()],
+          signature: createSignature,
+          status: "submitted",
+        });
         await appendLog(launchId, "INFO", "Create submitted", "create", {
           signature: createSignature,
           durationMs: Date.now() - createStartedAt,
@@ -3413,6 +3558,19 @@ export const launchService = {
                 commitment: "confirmed",
               }
             );
+            await testRunLogService.appendServerEvent({
+              eventType: "wallet_transaction",
+              source: "launch.service",
+              action: "launch.bundleBuy",
+              launchId,
+              tokenPublicKey: mintPublicKey,
+              wallets: [buyer.publicKey.toBase58()],
+              signature,
+              status: "submitted",
+              expectedValue: {
+                amountLamports: amountLamports.toString(),
+              },
+            });
             buySignatures.push(signature);
             executedCount += 1;
             totalBuyLamports += amountLamports;
@@ -3492,6 +3650,23 @@ export const launchService = {
           results: solReturn.results,
         }
       );
+      await testRunLogService.appendServerEvent({
+        eventType: "funds_return",
+        source: "launch.service",
+        tokenPublicKey: mintPublicKey,
+        action: "launch.cleanup",
+        launchId,
+        userId: user.id,
+        wallets: managedLaunchWallets.map((wallet) => wallet.publicKey.toBase58()),
+        actualValue: {
+          attempted: solReturn.attempted,
+          returned: solReturn.returned,
+          failed: solReturn.failed,
+          skipped: solReturn.skipped,
+          totalReturnedSol: solReturn.totalReturnedSol,
+        },
+        balancesAfter: solReturn.results,
+      });
 
       const returnedWalletPublicKeys = solReturn.results
         .filter((result) => result.status === "returned")
@@ -3505,7 +3680,8 @@ export const launchService = {
             mintPublicKey,
             user.id,
             refreshWalletPublicKeys,
-            true
+            true,
+            "launch.cleanup"
           );
         } catch (error) {
           logger.warn("Launch success post-sweep balance refresh failed", {

@@ -263,6 +263,19 @@ Use these scenarios to validate correctness after changes:
    - Restore stream but stop receiving events for threshold interval.
    - Expected: panel transitions to `Degraded`.
 
+## Test Run Logging
+
+The critical production-readiness logging design is documented in `docs/implementation/test-run-logging.md`.
+
+For the test run, dashboard instrumentation must emit:
+
+- `dashboard_summary` events after each meaningful refetch
+- `dashboard_full_snapshot` events at major milestones and when server results materially change
+- `dashboard_subscription_event` events for SSE activity and errors
+- `dashboard_query_result` events describing cache hit/miss behavior and partial-failure fallback paths
+
+Because dashboard correctness is the highest-risk area, client-visible state takes priority over raw server internals. Client routes should log the actual data rendered to the user, while the server logs why those values were produced.
+
 ### Dashboard Events (`server/events/dashboard-events.ts`)
 
 - Singleton `EventEmitter` that bridges server-side events to the subscription router.

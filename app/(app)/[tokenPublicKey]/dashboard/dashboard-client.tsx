@@ -15,6 +15,10 @@ import { DashboardDefiPools } from "./dashboard-defi-pools";
 import { PriceChart } from "./price-chart";
 import { MonitoringPanel } from "@/components/dashboard/monitoring-panel";
 import { HoldingExitDialog } from "@/components/holdings/holding-exit-dialog";
+import {
+  buildDashboardFullSnapshotPayload,
+  buildDashboardSummaryPayload,
+} from "./dashboard-log-payload";
 
 const POLL_INTERVAL = 30_000;
 const DEBOUNCE_MS = 2_000;
@@ -74,6 +78,8 @@ export function DashboardClient() {
     null
   );
   const lastMonitoringActivityAtRef = useRef<number | null>(null);
+  const lastDashboardTriggerRef = useRef("initial-load");
+  const lastLoggedStatsUpdateAtRef = useRef<number | null>(null);
 
   const {
     data: tokenData,
@@ -125,6 +131,10 @@ export function DashboardClient() {
   const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
     enabled: false,
   });
+  const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
+    enabled: !!tokenPublicKey,
+  });
+  const appendTestRunEvent = trpc.testRunLog.appendEvent.useMutation();
   const { mutateAsync: refreshBalances } =
     trpc.wallet.refreshBalances.useMutation();
   const { mutateAsync: refreshHoldings } =
@@ -153,18 +163,48 @@ export function DashboardClient() {
 
       setUserMonitoringOverride({ tokenPublicKey, enabled });
       setStoredMonitoringOverride(tokenPublicKey, enabled);
+      if (testRunLogConfig?.enabled) {
+        appendTestRunEvent.mutate({
+          eventType: "dashboard_subscription_event",
+          source: "dashboard-client",
+          tokenPublicKey,
+          page: "dashboard",
+          action: "toggle-monitoring",
+          status: enabled ? "enabled" : "disabled",
+        });
+      }
       if (!enabled) {
         setSseError(false);
         setLastSseEventAt(null);
         setGrpcConnected(null);
       }
     },
-    [tokenPublicKey, grpcStatusQuery]
+    [appendTestRunEvent, grpcStatusQuery, testRunLogConfig?.enabled, tokenPublicKey]
+  );
+
+  const logDashboardEvent = useCallback(
+    (
+      event: Parameters<typeof appendTestRunEvent.mutate>[0],
+      options?: { trigger?: string }
+    ) => {
+      if (!tokenPublicKey || !testRunLogConfig?.enabled) return;
+      if (options?.trigger) {
+        lastDashboardTriggerRef.current = options.trigger;
+      }
+      appendTestRunEvent.mutate({
+        tokenPublicKey,
+        page: "dashboard",
+        source: "dashboard-client",
+        ...event,
+      });
+    },
+    [appendTestRunEvent, testRunLogConfig?.enabled, tokenPublicKey]
   );
 
   const debouncedRefetch = useCallback(() => {
     if (debounceRef.current) clearTimeout(debounceRef.current);
     debounceRef.current = setTimeout(() => {
+      lastDashboardTriggerRef.current = "dashboard.debounced-refetch";
       refetchStats();
     }, DEBOUNCE_MS);
   }, [refetchStats]);
@@ -220,11 +260,31 @@ export function DashboardClient() {
     async (source: string, force = false) => {
       if (!tokenPublicKey || !isMonitoring) return;
       try {
-        await monitoringRefreshHoldings({
+        const result = await monitoringRefreshHoldings({
           tokenPublicKey,
           force,
         });
+        logDashboardEvent(
+          {
+            eventType: "dashboard_refresh",
+            action: "monitoring-holdings-refresh",
+            refreshMode: "monitoring",
+            trigger: source,
+            status: result.status,
+            actualValue: result,
+          },
+          { trigger: `monitoring-holdings:${source}` }
+        );
       } catch (error) {
+        logDashboardEvent({
+          eventType: "run_issue",
+          action: "monitoring-holdings-refresh",
+          trigger: source,
+          error:
+            error instanceof Error
+              ? { name: error.name, message: error.message }
+              : String(error),
+        });
         console.error("monitoring holdings refresh failed", { source, force, error });
       } finally {
         refetchStats();
@@ -258,18 +318,36 @@ export function DashboardClient() {
       if (options?.markActivity) {
         lastMonitoringActivityAtRef.current = Date.now();
       }
+      logDashboardEvent(
+        {
+          eventType: "dashboard_subscription_event",
+          action: source,
+          trigger: options?.triggerHoldingsRefresh ? "refresh-and-refetch" : "refetch",
+          actualValue: _payload,
+        },
+        { trigger: `sse:${source}` }
+      );
       if (options?.triggerHoldingsRefresh) {
         scheduleMonitoringHoldingsRefresh(`event:${source}`);
       }
       debouncedRefetch();
     },
-    [debouncedRefetch, scheduleMonitoringHoldingsRefresh]
+    [debouncedRefetch, logDashboardEvent, scheduleMonitoringHoldingsRefresh]
   );
 
   const handleSubscriptionError = useCallback((source: string, error: unknown) => {
     console.error("subscription error", { source, error });
+    logDashboardEvent({
+      eventType: "run_issue",
+      action: "subscription-error",
+      trigger: source,
+      error:
+        error instanceof Error
+          ? { name: error.name, message: error.message }
+          : String(error),
+    });
     setSseError(true);
-  }, []);
+  }, [logDashboardEvent]);
 
   trpc.subscription.onNewTransaction.useSubscription(
     { tokenPublicKey: tokenPublicKey || "" },
@@ -358,19 +436,42 @@ export function DashboardClient() {
   const handleFullRefresh = useCallback(async () => {
     if (!tokenPublicKey) return;
     setFullRefreshing(true);
+    logDashboardEvent(
+      {
+        eventType: "dashboard_refresh",
+        action: "handleFullRefresh",
+        refreshMode: "full",
+        status: "started",
+      },
+      { trigger: "full-refresh" }
+    );
+    let hasFailure = false;
+    let outcomes: string[] = [];
     try {
-      await Promise.allSettled([
+      const results = await Promise.allSettled([
         refreshBalances({ tokenPublicKey, force: true }),
         refreshHoldings({ tokenPublicKey }),
         refreshTransactions({ tokenPublicKey }),
       ]);
+      outcomes = results.map((result) => result.status);
+      hasFailure = results.some((result) => result.status === "rejected");
     } finally {
       refetchToken();
       refetchStats();
       refetchDefi();
+      logDashboardEvent({
+        eventType: "dashboard_refresh",
+        action: "handleFullRefresh",
+        refreshMode: "full",
+        status: hasFailure ? "failed" : "completed",
+        actualValue: {
+          outcomes,
+        },
+      });
       setFullRefreshing(false);
     }
   }, [
+    logDashboardEvent,
     tokenPublicKey,
     refreshBalances,
     refreshHoldings,
@@ -381,10 +482,19 @@ export function DashboardClient() {
   ]);
 
   const handleLightRefresh = useCallback(() => {
+    logDashboardEvent(
+      {
+        eventType: "dashboard_refresh",
+        action: "handleLightRefresh",
+        refreshMode: "light",
+        status: "started",
+      },
+      { trigger: "light-refresh" }
+    );
     refetchToken();
     refetchStats();
     refetchDefi();
-  }, [refetchDefi, refetchStats, refetchToken]);
+  }, [logDashboardEvent, refetchDefi, refetchStats, refetchToken]);
 
   useEffect(() => {
     if (!isMonitoring || !monitoringInitialized) return;
@@ -492,6 +602,91 @@ export function DashboardClient() {
     ).length ?? 0;
   const totalWallets = statsData?.holdingsBreakdown.userWallets.length ?? 0;
   const totalBalance = statsData?.holdingsBreakdown.userTotalTokens ?? 0;
+
+  useEffect(() => {
+    if (!tokenPublicKey || !testRunLogConfig?.enabled || !testRunLogConfig.runId) return;
+    if (typeof window === "undefined") return;
+    const storageKey = `test-run-started:${testRunLogConfig.runId}`;
+    if (window.sessionStorage.getItem(storageKey) === "true") return;
+    window.sessionStorage.setItem(storageKey, "true");
+    logDashboardEvent({
+      eventType: "run_started",
+      action: "dashboard-session-attached",
+      status: "started",
+      notes: {
+        runId: testRunLogConfig.runId,
+      },
+    });
+  }, [logDashboardEvent, testRunLogConfig?.enabled, testRunLogConfig?.runId, tokenPublicKey]);
+
+  useEffect(() => {
+    if (!tokenPublicKey || !testRunLogConfig?.enabled || !testRunLogConfig.runId) return;
+    if (!activeExitId || !exitStatus || exitStatus === "PENDING" || exitStatus === "RUNNING") {
+      return;
+    }
+    if (typeof window === "undefined") return;
+    const storageKey = `test-run-completed:${testRunLogConfig.runId}:${activeExitId}`;
+    if (window.sessionStorage.getItem(storageKey) === "true") return;
+    window.sessionStorage.setItem(storageKey, "true");
+    logDashboardEvent({
+      eventType: "run_completed",
+      action: "holding-exit-terminal-state",
+      status: exitStatus,
+      actualValue: exitData,
+    });
+  }, [
+    activeExitId,
+    exitData,
+    exitStatus,
+    logDashboardEvent,
+    testRunLogConfig?.enabled,
+    testRunLogConfig?.runId,
+    tokenPublicKey,
+  ]);
+
+  useEffect(() => {
+    if (!statsData || !tokenPublicKey || !testRunLogConfig?.enabled) return;
+    if (lastLoggedStatsUpdateAtRef.current === dataUpdatedAt) return;
+    lastLoggedStatsUpdateAtRef.current = dataUpdatedAt;
+    const trigger = lastDashboardTriggerRef.current;
+    logDashboardEvent({
+      eventType: "dashboard_summary",
+      action: "rendered-dashboard-summary",
+      trigger,
+      summary: buildDashboardSummaryPayload({
+        tokenPublicKey,
+        statsData,
+        monitoringHealthState,
+        isMonitoring,
+        trigger,
+        dataUpdatedAt,
+        defiData,
+      }),
+    });
+    if (trigger !== "query-update" && trigger !== "dashboard.debounced-refetch") {
+      logDashboardEvent({
+        eventType: "dashboard_full_snapshot",
+        action: "rendered-dashboard-full-snapshot",
+        trigger,
+        snapshot: buildDashboardFullSnapshotPayload({
+          statsData,
+          defiData,
+          monitoringHealthState,
+          isMonitoring,
+        }),
+      });
+    }
+    lastDashboardTriggerRef.current = "query-update";
+  }, [
+    dataUpdatedAt,
+    defiData,
+    isMonitoring,
+    logDashboardEvent,
+    monitoringHealthState,
+    statsData,
+    testRunLogConfig?.enabled,
+    tokenPublicKey,
+  ]);
 
   if (tokenLoading) {
     return <DashboardLoading />;
