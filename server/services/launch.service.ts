@@ -42,9 +42,12 @@ import { testRunLogService } from "@/server/services/test-run-log.service";
 import { walletService } from "@/server/services/wallet.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { persistLaunchLog } from "@/server/services/log-persistence.service";
+import { summarizeFailureRecoveryAttempt } from "@/server/services/launch-failure-recovery.helpers";
 import { storageService } from "@/server/services/storage.service";
 import { usageFeeService } from "@/server/services/usage-fee.service";
+import { retryLaunchDbWrite } from "@/server/services/launch-db.helpers";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
+import { computeFailedLaunchDrainLamports } from "@/server/services/launch-failure-recovery.helpers";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -355,73 +358,12 @@ async function persistLaunchRecoveryWallets(
   }
 }
 
-function parseLaunchRecoveryObject(
-  value: Record<string, unknown>
-): LaunchRecoveryData | null {
-  const mainWalletPublicKey =
-    typeof value.mainWalletPublicKey === "string"
-      ? value.mainWalletPublicKey
-      : "";
-  const devWalletPublicKey =
-    typeof value.devWalletPublicKey === "string"
-      ? value.devWalletPublicKey
-      : "";
-  const bundlerWallets = Array.isArray(value.bundlerWallets)
-    ? value.bundlerWallets.filter(
-        (item): item is string => typeof item === "string"
-      )
-    : [];
-  const distributionWallets = Array.isArray(value.distributionWallets)
-    ? value.distributionWallets.filter(
-        (item): item is string => typeof item === "string"
-      )
-    : [];
-  const usesMainWalletAsDev =
-    value.usesMainWalletAsDev === true ||
-    (Boolean(mainWalletPublicKey) &&
-      Boolean(devWalletPublicKey) &&
-      mainWalletPublicKey === devWalletPublicKey);
-  const devWalletManaged = value.devWalletManaged === true;
-  if (
-    !devWalletPublicKey &&
-    bundlerWallets.length === 0 &&
-    distributionWallets.length === 0
-  ) {
-    return null;
-  }
-  return {
-    mainWalletPublicKey,
-    devWalletPublicKey,
-    usesMainWalletAsDev,
-    devWalletManaged,
-    bundlerWallets,
-    distributionWallets,
-  };
-}
-
-function parseLaunchRecoveryData(result: Prisma.JsonValue | null) {
-  if (!result || !isRecord(result)) {
-    return null;
-  }
-  const recoveryValue = isRecord(result.recovery) ? result.recovery : null;
-  const parsedRecovery = recoveryValue
-    ? parseLaunchRecoveryObject(recoveryValue)
-    : null;
-  if (parsedRecovery) {
-    return parsedRecovery;
-  }
-  return parseLaunchRecoveryObject(result);
-}
-
 async function setLaunchRecovery(
   launchId: string,
   recovery: LaunchRecoveryData
 ) {
-  await prisma.launch.update({
-    where: { id: launchId },
-    data: {
-      result: { recovery },
-    },
+  await updateLaunchRecord(launchId, {
+    result: { recovery },
   });
 }
 
@@ -599,6 +541,23 @@ async function appendBundleTelemetryLog(
   } as Prisma.InputJsonObject;
 
   switch (event.type) {
+    case "bundle_transactions_profiled":
+      await appendLog(
+        launchId,
+        "INFO",
+        "Bundle transactions profiled",
+        "create",
+        shared
+      );
+      await testRunLogService.appendServerEvent({
+        eventType: "launch_step",
+        source: "jito-bundle",
+        action: "bundle.transactionsProfiled",
+        launchId,
+        status: "INFO",
+        actualValue: shared,
+      });
+      return;
     case "bundle_tip_escalated":
       await appendLog(launchId, "WARN", "Adaptive bundle tip escalation applied", "create", shared);
       return;
@@ -637,18 +596,51 @@ async function appendBundleTelemetryLog(
   }
 }
 
+async function updateLaunchRecord(
+  launchId: string,
+  data: Prisma.LaunchUpdateInput,
+  options?: { bestEffort?: boolean; context?: Record<string, unknown> }
+) {
+  try {
+    return await retryLaunchDbWrite(() =>
+      prisma.launch.update({
+        where: { id: launchId },
+        data,
+      })
+    );
+  } catch (error) {
+    if (!options?.bestEffort) {
+      throw error;
+    }
+
+    logger.warn("Best-effort launch update failed", {
+      launchId,
+      message: getErrorMessage(error),
+      ...(options.context ?? {}),
+    });
+    return null;
+  }
+}
+
 async function updateProgress(
   launchId: string,
   progress: number,
   currentStep?: string
 ) {
-  await prisma.launch.update({
-    where: { id: launchId },
-    data: {
+  await updateLaunchRecord(
+    launchId,
+    {
       progress,
       currentStep,
     },
-  });
+    {
+      bestEffort: true,
+      context: {
+        progress,
+        currentStep: currentStep ?? null,
+      },
+    }
+  );
 }
 
 async function markLaunchStaleIfNeeded<T extends LaunchRecord>(launch: T) {
@@ -667,13 +659,10 @@ async function markLaunchStaleIfNeeded<T extends LaunchRecord>(launch: T) {
   }
   const completedAt = new Date();
   const errorMessage = launch.errorMessage ?? LAUNCH_STALE_ERROR;
-  await prisma.launch.update({
-    where: { id: launch.id },
-    data: {
-      status: "FAILED",
-      errorMessage,
-      completedAt,
-    },
+  await updateLaunchRecord(launch.id, {
+    status: "FAILED",
+    errorMessage,
+    completedAt,
   });
   return {
     ...launch,
@@ -1053,7 +1042,7 @@ async function fundWalletsFromMain(
         balanceSol: mainBalance / LAMPORTS_PER_SOL,
         dataSource: "rpc",
       },
-      ...fundingPlan.map((target, index) => ({
+      ...fundingPlan.map((target) => ({
         walletPublicKey: target.publicKey.toBase58(),
         role: "launch-wallet",
         balanceSol:
@@ -1621,9 +1610,9 @@ async function cancelLaunchIfRequested(launchId: string) {
     return false;
   }
   await appendLog(launchId, "WARN", "Launch canceled", "cancel");
-  await prisma.launch.update({
-    where: { id: launchId },
-    data: { status: "CANCELED", completedAt: new Date() },
+  await updateLaunchRecord(launchId, {
+    status: "CANCELED",
+    completedAt: new Date(),
   });
   return true;
 }
@@ -2026,17 +2015,21 @@ async function persistTokenPending(
 }
 
 async function activateToken(tokenPublicKey: string) {
-  return prisma.token.update({
-    where: { publicKey: tokenPublicKey },
-    data: { status: "ACTIVE" },
-  });
+  return await retryLaunchDbWrite(() =>
+    prisma.token.update({
+      where: { publicKey: tokenPublicKey },
+      data: { status: "ACTIVE" },
+    })
+  );
 }
 
 async function failToken(tokenPublicKey: string) {
-  return prisma.token.update({
-    where: { publicKey: tokenPublicKey },
-    data: { status: "FAILED" },
-  });
+  return await retryLaunchDbWrite(() =>
+    prisma.token.update({
+      where: { publicKey: tokenPublicKey },
+      data: { status: "FAILED" },
+    })
+  );
 }
 
 async function returnExcessSolToMain(
@@ -2150,6 +2143,43 @@ async function returnExcessSolToMain(
   };
 }
 
+function buildLaunchSuccessResult(params: {
+  tokenPublicKey: string;
+  devWalletPublicKey: string;
+  mainWalletPublicKey: string;
+  bundlerWalletPublicKeys: string[];
+  recovery: LaunchRecoveryData;
+  jitoTipAmountSol: number;
+  solReturn: {
+    attempted: number;
+    returned: number;
+    failed: number;
+    skipped: number;
+    totalReturnedSol: number;
+    results: SolReturnResult[];
+  } | null;
+}): Prisma.InputJsonObject {
+  const {
+    tokenPublicKey,
+    devWalletPublicKey,
+    mainWalletPublicKey,
+    bundlerWalletPublicKeys,
+    recovery,
+    jitoTipAmountSol,
+    solReturn,
+  } = params;
+
+  return {
+    tokenPublicKey,
+    devWalletPublicKey,
+    mainWalletPublicKey,
+    bundlerWallets: bundlerWalletPublicKeys,
+    jitoTipAmountSol,
+    ...(solReturn ? { solReturn } : {}),
+    recovery,
+  };
+}
+
 async function finalizeLaunch(
   launchId: string,
   userId: string,
@@ -2211,25 +2241,24 @@ async function finalizeLaunch(
     }
   }
 
-  await prisma.launch.update({
-    where: { id: launchId },
-    data: {
-      status: finalStatus,
-      progress: 100,
-      completedAt: new Date(),
+  await updateLaunchRecord(launchId, {
+    status: finalStatus,
+    progress: 100,
+    currentStep: "complete",
+    errorMessage: null,
+    completedAt: new Date(),
+    tokenPublicKey,
+    result: buildLaunchSuccessResult({
       tokenPublicKey,
-      result: {
-        tokenPublicKey,
-        devWalletPublicKey,
-        mainWalletPublicKey,
-        bundlerWallets: bundlerWalletKeypairs.map((wallet) =>
-          wallet.publicKey.toBase58()
-        ),
-        jitoTipAmountSol,
-        solReturn,
-        recovery,
-      },
-    },
+      devWalletPublicKey,
+      mainWalletPublicKey,
+      bundlerWalletPublicKeys: bundlerWalletKeypairs.map((wallet) =>
+        wallet.publicKey.toBase58()
+      ),
+      recovery,
+      jitoTipAmountSol,
+      solReturn,
+    }),
   });
 
   const completionData: Prisma.InputJsonObject = {
@@ -2253,6 +2282,9 @@ async function finalizeLaunchFailure(params: {
   persistedTokenPublicKey: string | null;
   reservedVanityId: string | null;
   vanityConsumed: boolean;
+  recoveryData: LaunchRecoveryData | null;
+  mainWalletKeypair: Keypair | null;
+  managedLaunchWallets: Keypair[];
 }) {
   const {
     launchId,
@@ -2261,6 +2293,9 @@ async function finalizeLaunchFailure(params: {
     persistedTokenPublicKey,
     reservedVanityId,
     vanityConsumed,
+    recoveryData,
+    mainWalletKeypair,
+    managedLaunchWallets,
   } = params;
   if (persistedTokenPublicKey) {
     try {
@@ -2313,12 +2348,91 @@ async function finalizeLaunchFailure(params: {
     logger.error("Launch failed", context);
   }
 
-  await prisma.launch.update({
-    where: { id: launchId },
-    data: {
-      status: "FAILED",
-      errorMessage: clientMessage,
-      completedAt: new Date(),
+  let failureRecoveryResult: Prisma.InputJsonObject | null = null;
+  if (recoveryData && mainWalletKeypair) {
+    try {
+      await setStep(launchId, 96, "reclaim", "Reclaiming remaining SOL");
+      const reclaimResult = await reclaimManagedLaunchWallets(
+        launchId,
+        mainWalletKeypair,
+        managedLaunchWallets
+      );
+      const reclaimSummary = summarizeFailureRecoveryAttempt(
+        reclaimResult.results
+      );
+      failureRecoveryResult = {
+        ...reclaimSummary,
+        attemptedWalletCount: reclaimResult.attempted,
+        durationMs: reclaimResult.durationMs,
+        results: reclaimResult.results,
+      };
+
+      if (!reclaimSummary.attempted) {
+        await appendLog(launchId, "INFO", "No remaining SOL to reclaim", "reclaim");
+      } else if (reclaimSummary.manualActionRequired) {
+        await appendLog(
+          launchId,
+          "ERROR",
+          reclaimSummary.failureMessage ?? "Automatic reclaim could not return all wallet SOL.",
+          "reclaim",
+          {
+            recoveredWalletCount: reclaimSummary.recoveredWalletCount,
+            failedWalletCount: reclaimSummary.failedWalletCount,
+            skippedWalletCount: reclaimSummary.skippedWalletCount,
+            totalReturnedSol: reclaimSummary.totalReturnedSol,
+            results: reclaimResult.results,
+            durationMs: reclaimResult.durationMs,
+          }
+        );
+      } else {
+        await appendLog(launchId, "INFO", "Funds reclaimed to main wallet", "reclaim", {
+          recoveredWalletCount: reclaimSummary.recoveredWalletCount,
+          skippedWalletCount: reclaimSummary.skippedWalletCount,
+          totalReturnedSol: reclaimSummary.totalReturnedSol,
+          results: reclaimResult.results,
+          durationMs: reclaimResult.durationMs,
+        });
+      }
+    } catch (reclaimError) {
+      const reclaimErrorMessage =
+        getErrorMessage(reclaimError) || "Automatic reclaim failed";
+      failureRecoveryResult = {
+        attempted: true,
+        manualActionRequired: true,
+        recoveredWalletCount: 0,
+        failedWalletCount: managedLaunchWallets.length,
+        skippedWalletCount: 0,
+        totalReturnedSol: 0,
+        failureMessage: "Automatic reclaim could not return all wallet SOL.",
+        errorMessage: reclaimErrorMessage,
+      };
+      logger.error("Automatic launch reclaim failed", {
+        launchId,
+        errorMessage: reclaimErrorMessage,
+      });
+      await appendLog(
+        launchId,
+        "ERROR",
+        "Automatic reclaim could not return all wallet SOL.",
+        "reclaim",
+        {
+          errorMessage: reclaimErrorMessage,
+        }
+      );
+    }
+  }
+
+  await updateLaunchRecord(launchId, {
+    status: "FAILED",
+    progress: 100,
+    currentStep: failureRecoveryResult ? "reclaim" : "error",
+    errorMessage: clientMessage,
+    completedAt: new Date(),
+    result: {
+      ...(recoveryData ? { recovery: recoveryData } : {}),
+      ...(failureRecoveryResult
+        ? { failureRecovery: failureRecoveryResult }
+        : {}),
     },
   });
   const logData: Prisma.InputJsonObject = {
@@ -2335,6 +2449,198 @@ async function finalizeLaunchFailure(params: {
       : {}),
   };
   await appendLog(launchId, "ERROR", clientMessage, "error", logData);
+}
+
+async function repairSuccessfulLaunchAfterError(params: {
+  launchId: string;
+  tokenPublicKey: string;
+  recovery: LaunchRecoveryData;
+  jitoTipAmountSol: number;
+  error: unknown;
+}) {
+  const { launchId, tokenPublicKey, recovery, jitoTipAmountSol, error } = params;
+  const errorMessage = getErrorMessage(error);
+  const finalStatus = (await isCancelRequested(launchId))
+    ? "CANCELED"
+    : "SUCCEEDED";
+
+  logger.warn("Repairing launch state after post-confirm persistence failure", {
+    launchId,
+    tokenPublicKey,
+    finalStatus,
+    errorMessage,
+  });
+
+  try {
+    await activateToken(tokenPublicKey);
+  } catch (activateError) {
+    logger.warn("Failed to reactivate token during launch repair", {
+      launchId,
+      tokenPublicKey,
+      message: getErrorMessage(activateError),
+    });
+  }
+
+  await updateLaunchRecord(launchId, {
+    status: finalStatus,
+    progress: 100,
+    currentStep: "complete",
+    errorMessage: null,
+    completedAt: new Date(),
+    tokenPublicKey,
+    result: buildLaunchSuccessResult({
+      tokenPublicKey,
+      devWalletPublicKey: recovery.devWalletPublicKey,
+      mainWalletPublicKey: recovery.mainWalletPublicKey,
+      bundlerWalletPublicKeys: recovery.bundlerWallets,
+      recovery,
+      jitoTipAmountSol,
+      solReturn: null,
+    }),
+  });
+}
+
+async function reclaimManagedLaunchWallets(
+  launchId: string,
+  mainWalletKeypair: Keypair,
+  sourceWallets: Keypair[]
+) {
+  const startedAt = Date.now();
+  const connection = getSolanaConnection();
+  const mainPublicKey = mainWalletKeypair.publicKey;
+  const uniqueSourceWallets = sourceWallets.filter(
+    (wallet, index, all) =>
+      !wallet.publicKey.equals(mainPublicKey) &&
+      all.findIndex((item) => item.publicKey.equals(wallet.publicKey)) === index
+  );
+
+  if (uniqueSourceWallets.length === 0) {
+    return {
+      attempted: 0,
+      returned: 0,
+      failed: 0,
+      skipped: 0,
+      totalReturnedSol: 0,
+      results: [] as SolReturnResult[],
+      durationMs: Date.now() - startedAt,
+    };
+  }
+
+  const results: SolReturnResult[] = [];
+  let totalReturnedLamports = BigInt(0);
+
+  for (const sourceWallet of uniqueSourceWallets) {
+    const attemptedAt = new Date();
+    const balanceLamports = await connection.getBalance(sourceWallet.publicKey);
+    const lamportsToSend = computeFailedLaunchDrainLamports(balanceLamports);
+    if (lamportsToSend <= 0) {
+      await prisma.launchRecoveryWallet.updateMany({
+        where: {
+          launchId,
+          walletPublicKey: sourceWallet.publicKey.toBase58(),
+        },
+        data: {
+          reclaimStatus: "SKIPPED",
+          reclaimError: "Zero balance",
+          reclaimTxSignature: null,
+          lastAttemptAt: attemptedAt,
+        },
+      });
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "skipped",
+        remainingBalanceSol: 0,
+        error: "Zero balance",
+      });
+      continue;
+    }
+
+    try {
+      const transaction = new Transaction();
+      transaction.feePayer = mainPublicKey;
+      transaction.add(
+        SystemProgram.transfer({
+          fromPubkey: sourceWallet.publicKey,
+          toPubkey: mainPublicKey,
+          lamports: lamportsToSend,
+        })
+      );
+      const signature = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [mainWalletKeypair, sourceWallet],
+        { commitment: "confirmed" }
+      );
+      await prisma.launchRecoveryWallet.updateMany({
+        where: {
+          launchId,
+          walletPublicKey: sourceWallet.publicKey.toBase58(),
+        },
+        data: {
+          reclaimStatus: "RETURNED",
+          reclaimError: null,
+          reclaimTxSignature: signature,
+          lastAttemptAt: attemptedAt,
+          reclaimedAt: new Date(),
+        },
+      });
+      await testRunLogService.appendServerEvent({
+        eventType: "funds_return",
+        source: "launch.service",
+        action: "launch.failureReclaim",
+        launchId,
+        wallets: [sourceWallet.publicKey.toBase58(), mainPublicKey.toBase58()],
+        signature,
+        status: "submitted",
+        actualValue: {
+          amountSol: lamportsToSol(BigInt(lamportsToSend)),
+          walletPublicKey: sourceWallet.publicKey.toBase58(),
+        },
+      });
+      totalReturnedLamports += BigInt(lamportsToSend);
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "returned",
+        signature,
+        amountSol: lamportsToSol(BigInt(lamportsToSend)),
+        remainingBalanceSol: 0,
+      });
+    } catch (reclaimError) {
+      const errorMessage =
+        getErrorMessage(reclaimError) || "Automatic reclaim failed";
+      const remainingBalanceLamports = await connection.getBalance(
+        sourceWallet.publicKey
+      );
+      await prisma.launchRecoveryWallet.updateMany({
+        where: {
+          launchId,
+          walletPublicKey: sourceWallet.publicKey.toBase58(),
+        },
+        data: {
+          reclaimStatus: "FAILED",
+          reclaimError: errorMessage,
+          reclaimTxSignature: null,
+          lastAttemptAt: attemptedAt,
+        },
+      });
+      results.push({
+        publicKey: sourceWallet.publicKey.toBase58(),
+        status: "failed",
+        remainingBalanceSol: remainingBalanceLamports / LAMPORTS_PER_SOL,
+        error: errorMessage,
+      });
+    }
+  }
+
+  return {
+    attempted: uniqueSourceWallets.length,
+    returned: results.filter((result) => result.status === "returned").length,
+    failed: results.filter((result) => result.status === "failed").length,
+    skipped: results.filter((result) => result.status === "skipped").length,
+    totalReturnedSol: lamportsToSol(totalReturnedLamports),
+    results,
+    durationMs: Date.now() - startedAt,
+  };
 }
 
 async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
@@ -3041,13 +3347,10 @@ export const launchService = {
     }
 
     if (launch.status === "PENDING") {
-      const updated = await prisma.launch.update({
-        where: { id: launchId },
-        data: {
-          status: "CANCELED",
-          cancelRequestedAt: new Date(),
-          completedAt: new Date(),
-        },
+      const updated = await updateLaunchRecord(launchId, {
+        status: "CANCELED",
+        cancelRequestedAt: new Date(),
+        completedAt: new Date(),
       });
       await appendLog(
         launchId,
@@ -3058,11 +3361,8 @@ export const launchService = {
       return updated;
     }
 
-    const updated = await prisma.launch.update({
-      where: { id: launchId },
-      data: {
-        cancelRequestedAt: new Date(),
-      },
+    const updated = await updateLaunchRecord(launchId, {
+      cancelRequestedAt: new Date(),
     });
     await appendLog(launchId, "WARN", "Cancel requested", "cancel");
     return updated;
@@ -3081,9 +3381,10 @@ export const launchService = {
       return;
     }
 
-    await prisma.launch.update({
-      where: { id: launchId },
-      data: { status: "RUNNING", startedAt: new Date(), progress: 2 },
+    await updateLaunchRecord(launchId, {
+      status: "RUNNING",
+      startedAt: new Date(),
+      progress: 2,
     });
 
     const launchStartedAt = Date.now();
@@ -3097,6 +3398,9 @@ export const launchService = {
     let vanityConsumed = false;
     let recoveryData: LaunchRecoveryData | null = null;
     let persistedTokenPublicKey: string | null = null;
+    let mainWalletKeypair: Keypair | null = null;
+    let managedLaunchWallets: Keypair[] = [];
+    let launchReadyForSuccessRepair = false;
 
     try {
       const usageFees = calculateLaunchUsageFees({
@@ -3174,7 +3478,7 @@ export const launchService = {
 
       const walletsStartedAt = Date.now();
       const user = await loadUserWithMainWallet(launch.userId);
-      const mainWalletKeypair = keypairFromPrivateKey(
+      mainWalletKeypair = keypairFromPrivateKey(
         user.mainWallet.privateKey
       );
       const { devWalletKeypair, devWalletPublicKey } = await resolveDevWallet(
@@ -3222,6 +3526,14 @@ export const launchService = {
         bundlerWalletKeypairs,
         distributionWallets
       );
+      managedLaunchWallets = [
+        ...(input.devWalletOption === "generate" &&
+        devWalletPublicKey !== user.mainWallet.publicKey
+          ? [devWalletKeypair]
+          : []),
+        ...bundlerWalletKeypairs,
+        ...distributionWallets.map((wallet) => wallet.wallet),
+      ];
 
       const { SHYFT_API_KEY, APP_URL } = getEnv();
       if (SHYFT_API_KEY && APP_URL) {
@@ -3531,7 +3843,7 @@ export const launchService = {
               break;
             }
             const buyer = bundlerWalletKeypairs[i];
-            const { amount, amountLamports } = buildBundlerBuyTarget(
+            const { amountLamports } = buildBundlerBuyTarget(
               buyer,
               bundlerBuyAmountSol,
               bundlerBuyVariancePercent
@@ -3614,6 +3926,7 @@ export const launchService = {
         );
       }
 
+      launchReadyForSuccessRepair = true;
       await updateProgress(launchId, 80, "persist");
       await appendLog(launchId, "STEP", "Activating token", "persist");
       await activateToken(mintPublicKey);
@@ -3622,14 +3935,6 @@ export const launchService = {
       });
 
       await setStep(launchId, 90, "cleanup", "Returning excess SOL");
-      const managedLaunchWallets: Keypair[] = [
-        ...(input.devWalletOption === "generate" &&
-        devWalletPublicKey !== user.mainWallet.publicKey
-          ? [devWalletKeypair]
-          : []),
-        ...bundlerWalletKeypairs,
-        ...distributionWallets.map((wallet) => wallet.wallet),
-      ];
       const solReturn = await returnExcessSolToMain(
         launchId,
         user.mainWallet.publicKey,
@@ -3720,6 +4025,17 @@ export const launchService = {
         Date.now() - launchStartedAt
       );
     } catch (error) {
+      if (launchReadyForSuccessRepair && persistedTokenPublicKey && recoveryData) {
+        await repairSuccessfulLaunchAfterError({
+          launchId,
+          tokenPublicKey: persistedTokenPublicKey,
+          recovery: recoveryData,
+          jitoTipAmountSol,
+          error,
+        });
+        return;
+      }
+
       await finalizeLaunchFailure({
         launchId,
         error,
@@ -3727,6 +4043,9 @@ export const launchService = {
         persistedTokenPublicKey,
         reservedVanityId,
         vanityConsumed,
+        recoveryData,
+        mainWalletKeypair,
+        managedLaunchWallets,
       });
     }
   },

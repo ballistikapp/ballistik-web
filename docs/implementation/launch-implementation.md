@@ -32,6 +32,7 @@
   - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
 - `launch.recoveryWalletsByToken` (query): resolves failed/canceled launch by token and returns wallets eligible for recovery.
 - `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions.
+- `launch.status` also surfaces failed-launch auto reclaim activity through launch logs and `Launch.result`.
 - `launch.getUserLaunches` (query): returns all user launches with token join for the clone token dialog.
 
 ## Database Models
@@ -143,12 +144,18 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - `Token.imageUrl` stores the same normalized media URL.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
    - The non-bundled create-time dev buy uses the same raw `buy_exact_sol_in` transaction builder as the newer Pump flow, including the current volume accumulator accounts required by the on-chain program.
+   - In bundled launches, follow-up buyer ATA creation is hoisted into the first create transaction so later bundle transactions can submit buy-only instructions against the freshly created mint state.
+   - Hoisted ATA instructions keep their original buyer payer/owner, and those buyer keypairs are added to the first transaction signer set so the reordered bundle remains signature-valid without shifting rent costs.
+   - ATA hoisting is capped by an actual versioned-transaction size estimate; once the first bundle transaction would exceed Solana's raw `1232`-byte limit, remaining buyer ATA creation stays in later bundle transactions.
+   - When that hoist is present, the first bundle transaction skips the synthetic compute-budget instruction to stay under Solana's raw 1232-byte transaction limit.
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
    - Vanity mint is consumed only after this confirmation succeeds.
+   - For bundled launches, bundle confirmation also polls Jito `getInflightBundleStatuses` so logs can distinguish block-engine `Pending` / `Failed` / `Landed` / `Invalid` states from plain RPC `not_found` signatures.
 10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
 11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
-13. **Complete**: mark SUCCEEDED or CANCELED, store result metadata, log completion.
+13. **Failure Reclaim**: if launch execution fails after recovery wallets were persisted, attempt to return remaining SOL to the main wallet before final UI guidance is shown.
+14. **Complete**: mark SUCCEEDED or CANCELED, or mark FAILED after reclaim outcome is recorded, store result metadata, log completion.
 
 ## UI Integration
 
@@ -157,9 +164,12 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
 - User can request cancellation.
 - Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
-- Reclaim actions are owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true) and not by the launch progress dialog.
-- During long bundle confirmation, the progress dialog surfaces helper copy that confirmation can take a couple of minutes during congestion.
-- Failed launch progress surfaces retry and manage-tokens actions.
+- Reclaim actions remain owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true); the launch progress dialog does not open a reclaim dialog during launch.
+- During long launch work, the progress dialog surfaces helper copy: `Token creation may take couple of minutes. Please be patient.`
+- Progress activity is rendered newest-first, with the most recent row visually emphasized and raw log levels hidden from the user-facing list.
+- Failed launch progress first attempts automatic reclaim and shows reclaim as launch activity.
+- If automatic reclaim succeeds, the failed dialog keeps a visible reclaimed-funds step and does not show manual reclaim guidance.
+- If automatic reclaim fails, failed launch progress surfaces retry and Manage Tokens guidance for manual reclaim.
 - Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
 
 ### Retry Model (Failed Launches)
@@ -257,6 +267,8 @@ The server quote groups values into:
 - Post-launch cleanup attempts to return excess SOL from managed launch wallets back to main wallet.
 - If some SOL cannot be returned during cleanup, launch result metadata records actual returned and residual amounts so UI can show the difference between expected and realized post-cleanup deltas.
 - Residual SOL remains recoverable through reclaim paths and should be displayed explicitly as reclaimable balance.
+- Once all on-chain launch work is complete, later persistence-only failures must repair the launch into a successful token state instead of downgrading the mint to `FAILED`. This keeps `Launch.tokenPublicKey` populated and the token `ACTIVE`, so dashboard and holdings flows stay usable even if a post-confirm Prisma write times out.
+- Launch control-plane writes (`Launch` status/progress and token status updates) retry transient Prisma timeout/pool errors. Progress updates are best-effort so a short-lived database stall does not abort an otherwise healthy on-chain launch.
 
 ## On-chain Confirmation Timeouts
 
@@ -375,6 +387,24 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 - Balances are refreshed on demand only
 - Server enforces a 15-second debounce per wallet
+- The My Tokens page explicitly refetches launches when it mounts so navigation does not reuse a fresh-cache snapshot for too long.
+
+## Failed Launch Reclaim UX
+
+- Automatic reclaim runs only after a launch reaches a failed execution path and only when recovery wallets are available.
+- Automatic reclaim is logged as launch activity so it appears in the launch progress dialog just like create, confirm, and cleanup steps.
+- Launch state remains `FAILED` even when automatic reclaim succeeds.
+- Automatic reclaim outcome is stored in `Launch.result.failureRecovery` for user-facing messaging.
+- `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Manage Tokens for reclaim.
+- Failed-launch reclaim uses an aggressive drain path for temporary generated wallets so the main-wallet balance returns as close to unchanged as possible when the launch never lands.
+- Failed launches without `failureRecovery` metadata fall back to showing My Tokens guidance so older/stale failure records still have a recovery path.
+- Manual reclaim remains available from Manage Tokens row actions and the reclaim dialog.
+
+## Manage Tokens Reclaim Dialog
+
+- The reclaim dialog keeps wallet rows in the scrollable region and uses a sticky footer for actions.
+- The sticky footer shows the total reclaimable SOL amount on the left.
+- Successful reclaim invalidates `launch.getUserLaunches` so the My Tokens table refreshes immediately.
 
 ## Test Run Logging
 

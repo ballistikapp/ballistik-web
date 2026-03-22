@@ -17,6 +17,10 @@ import {
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  buildLaunchActivityItems,
+  getLaunchFailureGuidance,
+} from "./launch-progress-dialog.helpers";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type LaunchStatusOutput = RouterOutputs["launch"]["status"];
@@ -66,13 +70,16 @@ export function LaunchProgressDialog({
   const canClose =
     status === "SUCCEEDED" || status === "FAILED" || status === "CANCELED";
   const currentStep = launch?.currentStep || "Preparing";
-  const showSlowConfirmHint =
-    status === "RUNNING" &&
-    currentStep.toLowerCase().includes("confirm");
+  const showPatienceMessage = status === "PENDING" || status === "RUNNING";
   const tokenPublicKey = launch?.tokenPublicKey ?? "";
   const hasTokenPublicKey = Boolean(tokenPublicKey);
   const hasTokenLink = status === "SUCCEEDED" && hasTokenPublicKey;
   const failedTokensHref = "/tokens";
+  const activityItems = buildLaunchActivityItems(launch?.logs ?? []);
+  const failureGuidance = getLaunchFailureGuidance({
+    status,
+    result: launch?.result,
+  });
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,9 +97,9 @@ export function LaunchProgressDialog({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4 min-w-0">
-          {showSlowConfirmHint && (
-            <div className="rounded-md border border-primary/30 bg-primary/5 px-3 py-2 text-sm text-muted-foreground">
-              Confirmation can take a couple of minutes during network congestion.
+          {showPatienceMessage && (
+            <div className="py-2 text-sm text-muted-foreground">
+              Token creation may take couple of minutes.
             </div>
           )}
           <Progress value={progress} className="w-full" />
@@ -132,28 +139,38 @@ export function LaunchProgressDialog({
           <div className="space-y-2">
             <div className="text-sm font-medium">Activity</div>
             <div className="max-h-72 overflow-y-auto rounded-md border p-3 space-y-2">
-              {launch?.logs?.length ? (
-                launch.logs.map((log) => (
-                  <div key={log.id} className="flex items-start gap-3 text-sm">
-                    <Badge
-                      variant={
-                        log.level === "ERROR" ? "destructive" : "secondary"
-                      }
-                    >
-                      {log.level}
-                    </Badge>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-foreground wrap-break-word">
-                        {log.message}
-                      </div>
-                      {log.step && (
-                        <div className="text-xs text-muted-foreground wrap-break-word">
-                          {log.step}
+              {activityItems.length ? (
+                activityItems.map((log) => (
+                  <div
+                    key={log.id}
+                    className={`rounded-md border px-3 py-2 text-sm ${
+                      log.isLatest
+                        ? "border-primary/40 bg-primary/5 shadow-sm"
+                        : log.tone === "error"
+                          ? "border-destructive/30 bg-destructive/5"
+                          : "border-border/70"
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <div
+                          className={`wrap-break-word ${
+                            log.isLatest
+                              ? "font-medium text-foreground"
+                              : "text-foreground"
+                          }`}
+                        >
+                          {log.message}
                         </div>
-                      )}
-                    </div>
-                    <div className="text-xs text-muted-foreground shrink-0">
-                      {new Date(log.createdAt).toLocaleTimeString()}
+                        {log.step && (
+                          <div className="text-xs text-muted-foreground capitalize wrap-break-word">
+                            {log.step}
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-xs text-muted-foreground shrink-0">
+                        {new Date(log.createdAt).toLocaleTimeString()}
+                      </div>
                     </div>
                   </div>
                 ))
@@ -164,32 +181,35 @@ export function LaunchProgressDialog({
               )}
             </div>
           </div>
-          {status === "FAILED" && (
+          {status === "FAILED" && failureGuidance.showManageTokensAction && (
             <div className="space-y-2">
               <div className="text-sm font-medium">Launch Failed</div>
-              <div className="rounded-md border p-3 flex flex-wrap items-center justify-between gap-3">
-                <div className="text-sm text-muted-foreground">
-                  Manage reclaim from the Manage Tokens page.
-                </div>
-                <div className="flex items-center gap-2">
-                  {onRetry && (
-                    <Button
-                      size="sm"
-                      onClick={onRetry}
-                      disabled={retryPending}
-                    >
-                      {retryPending && <Spinner className="mr-2 size-4" />}
-                      Retry launch
-                    </Button>
-                  )}
+              <div className="rounded-md border p-3 space-y-3">
+                {launch?.errorMessage ? (
+                  <div className="text-sm text-foreground wrap-break-word">
+                    {launch.errorMessage}
+                  </div>
+                ) : null}
+                {failureGuidance.description ? (
+                  <div className="text-sm text-muted-foreground">
+                    {failureGuidance.description}
+                  </div>
+                ) : null}
+                <div className="flex items-center justify-end">
                   <Button asChild size="sm" variant="outline">
-                    <Link href={failedTokensHref}>Go to Manage Tokens</Link>
+                    <Link href={failedTokensHref}>Go to My Tokens</Link>
                   </Button>
                 </div>
               </div>
             </div>
           )}
           <div className="flex justify-end gap-3">
+            {status === "FAILED" && onRetry && (
+              <Button onClick={onRetry} disabled={retryPending}>
+                {retryPending && <Spinner className="mr-2 size-4" />}
+                Retry launch
+              </Button>
+            )}
             {canCancel && (
               <Button variant="destructive" onClick={onCancel}>
                 Cancel

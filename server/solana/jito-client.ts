@@ -18,6 +18,25 @@ type JitoSendResult =
   | { ok: true; value: string }
   | { ok: false; error: string | { message?: string } };
 
+export type JitoInflightBundleStatus = {
+  bundleId: string;
+  status: string;
+  landedSlot: number | null;
+};
+
+export type JitoInflightBundleStatuses = {
+  contextSlot: number | null;
+  bundles: JitoInflightBundleStatus[];
+};
+
+type JitoInflightBundleStatusesResult =
+  | {
+      ok: true;
+      value: JitoInflightBundleStatuses;
+      endpoint: string;
+    }
+  | { ok: false; error: string };
+
 type TipCacheEntry = {
   fetchedAt: number;
   accounts: PublicKey[];
@@ -54,6 +73,7 @@ type JitoState = {
   endpoints: string[];
   clients: {
     endpoint: string;
+    url: string;
     client: ReturnType<typeof searcher.searcherClient>;
   }[];
   preferredEndpoint: string;
@@ -67,10 +87,16 @@ function getJitoState(): JitoState {
   }
   const { SOLANA_RPC_URL } = getEnv();
   const endpoints = resolveGrpcEndpoints(SOLANA_RPC_URL);
-  const clients = endpoints.map((endpoint) => ({
-    endpoint,
-    client: searcher.searcherClient(endpoint),
-  }));
+  const clients = endpoints.map((endpoint) => {
+    const url =
+      jitoConfig.blockEngineUrls.find((candidate) => toGrpcEndpoint(candidate) === endpoint) ??
+      `https://${endpoint}`;
+    return {
+      endpoint,
+      url,
+      client: searcher.searcherClient(endpoint),
+    };
+  });
   jitoState = {
     endpoints,
     clients,
@@ -98,6 +124,98 @@ function orderedClients() {
 function setPreferredEndpoint(endpoint: string) {
   const state = getJitoState();
   state.preferredEndpoint = endpoint;
+}
+
+function getBundleRpcUrl(baseUrl: string) {
+  return `${baseUrl}/api/v1/bundles`;
+}
+
+function normalizeRpcError(value: unknown) {
+  if (typeof value === "string") {
+    return value;
+  }
+  if (isRecord(value)) {
+    const message =
+      typeof value.message === "string" ? value.message : normalizeError(value);
+    const data =
+      "data" in value && value.data !== undefined
+        ? ` ${normalizeError(value.data)}`
+        : "";
+    return `${message}${data}`.trim();
+  }
+  return normalizeError(value);
+}
+
+async function postBundleRpcRequest(
+  url: string,
+  method: string,
+  params: unknown[]
+) {
+  const response = await fetch(getBundleRpcUrl(url), {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      jsonrpc: "2.0",
+      id: 1,
+      method,
+      params,
+    }),
+  });
+
+  const responseText = await response.text();
+  let payload: unknown = null;
+  try {
+    payload = responseText ? JSON.parse(responseText) : null;
+  } catch {
+    payload = responseText;
+  }
+
+  if (!response.ok) {
+    throw new Error(
+      isRecord(payload) && "error" in payload
+        ? normalizeRpcError(payload.error)
+        : `HTTP ${response.status} ${response.statusText}`
+    );
+  }
+
+  if (isRecord(payload) && "error" in payload) {
+    throw new Error(normalizeRpcError(payload.error));
+  }
+
+  return payload;
+}
+
+export function parseInflightBundleStatusesResponse(
+  payload: unknown
+): JitoInflightBundleStatuses {
+  if (!isRecord(payload) || !isRecord(payload.result)) {
+    throw new Error("Invalid inflight bundle status response");
+  }
+
+  const contextSlot =
+    isRecord(payload.result.context) && typeof payload.result.context.slot === "number"
+      ? payload.result.context.slot
+      : null;
+  const rawBundles = Array.isArray(payload.result.value) ? payload.result.value : [];
+
+  return {
+    contextSlot,
+    bundles: rawBundles.flatMap((entry) => {
+      if (!isRecord(entry) || typeof entry.bundle_id !== "string") {
+        return [];
+      }
+      return [
+        {
+          bundleId: entry.bundle_id,
+          status: typeof entry.status === "string" ? entry.status : "Unknown",
+          landedSlot:
+            typeof entry.landed_slot === "number" ? entry.landed_slot : null,
+        },
+      ];
+    }),
+  };
 }
 
 export async function getTipAccount() {
@@ -183,4 +301,45 @@ export async function sendBundle(
     }
   }
   return lastError ?? { ok: false, error: "Jito bundle send failed" };
+}
+
+export async function getInflightBundleStatuses(
+  bundleIds: string[]
+): Promise<JitoInflightBundleStatusesResult> {
+  if (bundleIds.length === 0) {
+    return { ok: false, error: "No bundle IDs provided" };
+  }
+  if (bundleIds.length > 5) {
+    return {
+      ok: false,
+      error: `Too many bundle IDs provided: ${bundleIds.length} > 5`,
+    };
+  }
+
+  let lastError: string | null = null;
+  for (const entry of orderedClients()) {
+    try {
+      const payload = await postBundleRpcRequest(entry.url, "getInflightBundleStatuses", [
+        bundleIds,
+      ]);
+      const parsed = parseInflightBundleStatusesResponse(payload);
+      setPreferredEndpoint(entry.endpoint);
+      return {
+        ok: true,
+        value: parsed,
+        endpoint: entry.endpoint,
+      };
+    } catch (error) {
+      const message = normalizeError(error);
+      lastError = message ? `endpoint=${entry.endpoint} ${message}` : message;
+      logger.warn("Jito inflight bundle status error", {
+        endpoint: entry.endpoint,
+        error: message,
+      });
+    }
+  }
+
+  return lastError
+    ? { ok: false, error: lastError }
+    : { ok: false, error: "Jito inflight bundle status request failed" };
 }

@@ -42,7 +42,12 @@ const LAUNCH_STATUS_MAP: Record<string, TokenRowStatus> = {
 
 export default function ManageTokensPage() {
   const router = useRouter();
-  const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery();
+  const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery(
+    undefined,
+    {
+      refetchOnMount: "always",
+    }
+  );
   const getPrivateKeyMutation = trpc.token.getPrivateKey.useMutation();
   const retryLaunchMutation = trpc.launch.retry.useMutation({
     onSuccess: () => {

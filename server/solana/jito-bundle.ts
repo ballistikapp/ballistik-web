@@ -11,7 +11,12 @@ import {
 import bs58 from "bs58";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { logger } from "@/lib/logger";
-import { getTipAccount, sendBundle } from "@/server/solana/jito-client";
+import {
+  getInflightBundleStatuses,
+  getTipAccount,
+  sendBundle,
+  type JitoInflightBundleStatus,
+} from "@/server/solana/jito-client";
 import { waitForSignaturesViaGrpc } from "@/server/solana/shyft-grpc";
 
 const MAX_TRANSACTIONS_PER_BUNDLE = 5;
@@ -30,9 +35,11 @@ const MAX_BLOCKHASH_REBUILDS = 2;
 export type BundleTelemetryEvent = {
   type:
     | "bundle_send_start"
+    | "bundle_transactions_profiled"
     | "bundle_sent"
     | "bundle_confirm_start"
     | "bundle_confirm_summary"
+    | "bundle_inflight_status"
     | "bundle_resend_triggered"
     | "bundle_resent"
     | "bundle_rebuild_triggered"
@@ -56,6 +63,34 @@ type AdaptiveTipEscalationOptions = {
 type SendJitoBundleOptions = {
   onEvent?: BundleTelemetryHandler;
   adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
+};
+
+type SimulateTransactionResult = {
+  value: {
+    err: unknown;
+    unitsConsumed?: number | null;
+    logs?: string[] | null;
+  };
+};
+
+type SimulateTransactionFn = (
+  transaction: VersionedTransaction
+) => Promise<SimulateTransactionResult>;
+
+export type BundleTransactionProfile = {
+  txIndex: number;
+  signature: string | null;
+  instructionCount: number;
+  signerCount: number;
+  serializedSizeBytes: number;
+  unitsConsumed: number | null;
+  simulationError: string | null;
+  simulationLogs: string[] | null;
+};
+
+type BundleInflightStatusSummary = JitoInflightBundleStatus & {
+  endpoint: string;
+  contextSlot: number | null;
 };
 
 export async function sendJitoBundle(
@@ -167,23 +202,46 @@ export async function sendJitoBundle(
     feePayers,
     blockhash,
   });
-  if (currentBuild.versionedTxs[0]) {
-    const simulation = await connection.simulateTransaction(currentBuild.versionedTxs[0], {
-      sigVerify: false,
-      commitment: "processed",
+  let currentProfiles = await profileVersionedTransactions({
+    versionedTxs: currentBuild.versionedTxs,
+    signatures: currentBuild.signatures,
+    simulateTransaction: async (transaction) =>
+      await connection.simulateTransaction(transaction, {
+        sigVerify: false,
+        commitment: "processed",
+      }),
+  });
+  logger.info("Bundle transactions profiled", {
+    blockhash,
+    tipLamports: currentTipLamports,
+    transactionCount: currentProfiles.length,
+    transactions: currentProfiles,
+  });
+  await emitBundleTelemetry(telemetry, {
+    type: "bundle_transactions_profiled",
+    data: summarizeBundleProfiles({
+      stage: "initial",
+      rebuild: 0,
+      blockhash,
+      tipLamports: currentTipLamports,
+      transactions: currentProfiles,
+    }),
+  });
+  if (currentProfiles[0]?.simulationError) {
+    logger.error("Bundle first transaction simulation failed", {
+      error: currentProfiles[0].simulationError,
+      logs: currentProfiles[0].simulationLogs,
+      txIndex: currentProfiles[0].txIndex,
+      signature: currentProfiles[0].signature,
     });
-    if (simulation.value.err) {
-      const errStr = JSON.stringify(simulation.value.err);
-      logger.error("Bundle first transaction simulation failed", {
-        error: simulation.value.err,
-        logs: simulation.value.logs?.slice(0, 100),
-      });
-      throw new Error(`Transaction simulation failed: ${errStr}`);
-    } else {
-      logger.info("Bundle first transaction simulation succeeded", {
-        unitsConsumed: simulation.value.unitsConsumed ?? null,
-      });
-    }
+    throw new Error(`Transaction simulation failed: ${currentProfiles[0].simulationError}`);
+  }
+  if (currentProfiles[0]) {
+    logger.info("Bundle first transaction simulation succeeded", {
+      unitsConsumed: currentProfiles[0].unitsConsumed,
+      serializedSizeBytes: currentProfiles[0].serializedSizeBytes,
+      signature: currentProfiles[0].signature,
+    });
   }
 
   let lastSendEndpoint: string | null = null;
@@ -321,6 +379,32 @@ export async function sendJitoBundle(
       currentTipLamports,
       blockhash
     );
+    currentProfiles = await profileVersionedTransactions({
+      versionedTxs: currentBuild.versionedTxs,
+      signatures: currentBuild.signatures,
+      simulateTransaction: async (transaction) =>
+        await connection.simulateTransaction(transaction, {
+          sigVerify: false,
+          commitment: "processed",
+        }),
+    });
+    logger.info("Rebuilt bundle transactions profiled", {
+      rebuild: rebuilds,
+      blockhash,
+      tipLamports: currentTipLamports,
+      transactionCount: currentProfiles.length,
+      transactions: currentProfiles,
+    });
+    await emitBundleTelemetry(telemetry, {
+      type: "bundle_transactions_profiled",
+      data: summarizeBundleProfiles({
+        stage: "rebuild",
+        rebuild: rebuilds,
+        blockhash,
+        tipLamports: currentTipLamports,
+        transactions: currentProfiles,
+      }),
+    });
     currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
     sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
@@ -393,10 +477,9 @@ function buildVersionedTransactions(
       throw new Error(`Missing fee payer for bundle transaction ${i}`);
     }
     const txSigners = signers[i] ?? [];
-    const allSigners =
-      i === lastIdx && tipLamports > 0
-        ? dedupeSigners([...txSigners, tipper])
-        : txSigners;
+    const allSigners = dedupeSigners(
+      i === lastIdx && tipLamports > 0 ? [...txSigners, tipper] : txSigners
+    );
 
     const messageV0 = new TransactionMessage({
       payerKey: tx.feePayer,
@@ -411,6 +494,89 @@ function buildVersionedTransactions(
   }
 
   return { versionedTxs, signatures };
+}
+
+function stringifySimulationError(error: unknown) {
+  if (!error) {
+    return null;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  try {
+    return JSON.stringify(error);
+  } catch {
+    return String(error);
+  }
+}
+
+function sanitizeSimulationLogs(logs: string[] | null | undefined) {
+  if (!logs || logs.length === 0) {
+    return null;
+  }
+  return logs.slice(0, 10).map((entry) => entry.slice(0, 500));
+}
+
+export async function profileVersionedTransactions({
+  versionedTxs,
+  signatures,
+  simulateTransaction,
+}: {
+  versionedTxs: VersionedTransaction[];
+  signatures: string[];
+  simulateTransaction: SimulateTransactionFn;
+}): Promise<BundleTransactionProfile[]> {
+  return await Promise.all(
+    versionedTxs.map(async (transaction, txIndex) => {
+      const simulation = await simulateTransaction(transaction);
+      return {
+        txIndex,
+        signature: signatures[txIndex] ?? null,
+        instructionCount: transaction.message.compiledInstructions.length,
+        signerCount: transaction.signatures.length,
+        serializedSizeBytes: transaction.serialize().length,
+        unitsConsumed: simulation.value.unitsConsumed ?? null,
+        simulationError: stringifySimulationError(simulation.value.err),
+        simulationLogs: sanitizeSimulationLogs(simulation.value.logs),
+      };
+    })
+  );
+}
+
+function summarizeBundleProfiles({
+  stage,
+  rebuild,
+  blockhash,
+  tipLamports,
+  transactions,
+}: {
+  stage: "initial" | "rebuild";
+  rebuild: number;
+  blockhash: string;
+  tipLamports: number;
+  transactions: BundleTransactionProfile[];
+}) {
+  const serializedSizes = transactions.map(
+    (transaction) => transaction.serializedSizeBytes
+  );
+  const consumedUnits = transactions
+    .map((transaction) => transaction.unitsConsumed)
+    .filter((value): value is number => value !== null);
+  return {
+    stage,
+    rebuild,
+    blockhash,
+    tipLamports,
+    transactionCount: transactions.length,
+    failingSimulationCount: transactions.filter(
+      (transaction) => transaction.simulationError !== null
+    ).length,
+    maxSerializedSizeBytes:
+      serializedSizes.length > 0 ? Math.max(...serializedSizes) : 0,
+    maxUnitsConsumed:
+      consumedUnits.length > 0 ? Math.max(...consumedUnits) : null,
+    transactions,
+  };
 }
 
 function isRateLimitMessage(message: string) {
@@ -460,6 +626,10 @@ async function confirmBundleOnChain({
   let lastStatusError: string | null = null;
   let lastLoggedSummary: string | null = null;
   let lastLoggedStatusError: string | null = null;
+  let lastInflightStatus: BundleInflightStatusSummary | null = null;
+  let lastInflightStatusError: string | null = null;
+  let lastLoggedInflightStatus: string | null = null;
+  let lastLoggedInflightStatusError: string | null = null;
   const fallbackConnection = getFallbackConnection();
   logger.info("Bundle confirmation start", {
     bundleId,
@@ -558,6 +728,68 @@ async function confirmBundleOnChain({
         const summary = summarizeBundleStatuses(statuses);
         lastSummary = summary;
         lastStatusError = null;
+        const inflightResult = await getInflightBundleStatuses([currentBundleId]);
+        if (inflightResult.ok) {
+          const matchedStatus =
+            inflightResult.value.bundles.find(
+              (bundleStatus) => bundleStatus.bundleId === currentBundleId
+            ) ??
+            inflightResult.value.bundles[0] ??
+            null;
+          lastInflightStatus = matchedStatus
+            ? {
+                ...matchedStatus,
+                endpoint: inflightResult.endpoint,
+                contextSlot: inflightResult.value.contextSlot,
+              }
+            : null;
+          lastInflightStatusError = null;
+          const inflightStatusKey = lastInflightStatus
+            ? `${lastInflightStatus.status}:${lastInflightStatus.landedSlot}:${lastInflightStatus.endpoint}:${lastInflightStatus.contextSlot}`
+            : "missing";
+          if (inflightStatusKey !== lastLoggedInflightStatus) {
+            logger.info("Bundle inflight status", {
+              bundleId: currentBundleId,
+              elapsedMs: Date.now() - startedAt,
+              inflightStatus: lastInflightStatus?.status ?? null,
+              inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
+              inflightContextSlot: lastInflightStatus?.contextSlot ?? null,
+              inflightEndpoint: lastInflightStatus?.endpoint ?? null,
+            });
+            await emitBundleTelemetry(onEvent, {
+              type: "bundle_inflight_status",
+              data: {
+                bundleId: currentBundleId,
+                elapsedMs: Date.now() - startedAt,
+                inflightStatus: lastInflightStatus?.status ?? null,
+                inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
+                inflightContextSlot: lastInflightStatus?.contextSlot ?? null,
+                inflightEndpoint: lastInflightStatus?.endpoint ?? null,
+              },
+            });
+            lastLoggedInflightStatus = inflightStatusKey;
+          }
+        } else {
+          lastInflightStatus = null;
+          lastInflightStatusError = inflightResult.error;
+          if (lastInflightStatusError !== lastLoggedInflightStatusError) {
+            logger.warn("Jito inflight status check error", {
+              bundleId: currentBundleId,
+              error: lastInflightStatusError,
+              elapsedMs: Date.now() - startedAt,
+            });
+            await emitBundleTelemetry(onEvent, {
+              type: "bundle_status_check_error",
+              data: {
+                bundleId: currentBundleId,
+                error: lastInflightStatusError,
+                elapsedMs: Date.now() - startedAt,
+                source: "jito_inflight",
+              },
+            });
+            lastLoggedInflightStatusError = lastInflightStatusError;
+          }
+        }
 
         if (rateLimitCount > 0) {
           rateLimitCount = 0;
@@ -566,13 +798,17 @@ async function confirmBundleOnChain({
             : BUNDLE_CONFIRM_INTERVAL_MS;
         }
 
-        const summaryKey = `${summary.foundCount}:${summary.confirmedCount}:${summary.failedCount}:${summary.notFoundCount}:${summary.createStatus}`;
+        const summaryKey = `${summary.foundCount}:${summary.confirmedCount}:${summary.failedCount}:${summary.notFoundCount}:${summary.createStatus}:${lastInflightStatus?.status ?? "unknown"}:${lastInflightStatus?.landedSlot ?? "none"}`;
         if (summaryKey !== lastLoggedSummary) {
           logger.info("Bundle confirmation summary", {
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
             grpcActive: grpcState.active,
+            inflightStatus: lastInflightStatus?.status ?? null,
+            inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
+            inflightContextSlot: lastInflightStatus?.contextSlot ?? null,
+            inflightEndpoint: lastInflightStatus?.endpoint ?? null,
             ...summary,
           });
           await emitBundleTelemetry(onEvent, {
@@ -582,10 +818,27 @@ async function confirmBundleOnChain({
               elapsedMs: Date.now() - startedAt,
               blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
               grpcActive: grpcState.active,
+              inflightStatus: lastInflightStatus?.status ?? null,
+              inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
+              inflightContextSlot: lastInflightStatus?.contextSlot ?? null,
+              inflightEndpoint: lastInflightStatus?.endpoint ?? null,
               ...summary,
             },
           });
           lastLoggedSummary = summaryKey;
+        }
+        if (lastInflightStatus?.status === "Failed") {
+          throw new Error(
+            `Bundle failed in Jito block engine (bundleId=${currentBundleId})`
+          );
+        }
+        if (lastInflightStatus?.status === "Landed") {
+          logger.info("Bundle landed via inflight status", {
+            bundleId: currentBundleId,
+            landedSlot: lastInflightStatus.landedSlot,
+            elapsedMs: Date.now() - startedAt,
+          });
+          return currentBundleId;
         }
         if (summary.createError) {
           logger.warn("Bundle create failed", {
@@ -601,11 +854,13 @@ async function confirmBundleOnChain({
           return currentBundleId;
         }
         const blockhashAge = Date.now() - currentBlockhashFetchedAt;
+        const inflightPending = lastInflightStatus?.status === "Pending";
 
         if (
           summary.foundCount === 0 &&
           blockhashAge >= BUNDLE_BLOCKHASH_MAX_AGE_MS &&
-          rebuildAndResend
+          rebuildAndResend &&
+          !inflightPending
         ) {
           logger.warn("Blockhash expired, rebuilding bundle", {
             bundleId: currentBundleId,
@@ -632,6 +887,10 @@ async function confirmBundleOnChain({
             currentBlockhashFetchedAt = rebuilt.blockhashFetchedAt;
             lastResendAt = Date.now();
             lastLoggedSummary = null;
+            lastInflightStatus = null;
+            lastInflightStatusError = null;
+            lastLoggedInflightStatus = null;
+            lastLoggedInflightStatusError = null;
             continue;
           } catch (rebuildError) {
             const msg = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
@@ -646,6 +905,7 @@ async function confirmBundleOnChain({
         if (
           summary.foundCount === 0 &&
           blockhashAge < BUNDLE_BLOCKHASH_MAX_AGE_MS &&
+          !inflightPending &&
           Date.now() - lastResendAt > BUNDLE_RESEND_INTERVAL_MS
         ) {
           logger.warn("Bundle resend triggered", {
@@ -731,6 +991,12 @@ async function confirmBundleOnChain({
   const summaryText = lastSummary
     ? `found=${lastSummary.foundCount} confirmed=${lastSummary.confirmedCount} failed=${lastSummary.failedCount} notFound=${lastSummary.notFoundCount} createStatus=${lastSummary.createStatus}`
     : "no status summary";
+  const inflightSummaryText = lastInflightStatus
+    ? ` inflightStatus=${lastInflightStatus.status} inflightLandedSlot=${lastInflightStatus.landedSlot ?? "null"}`
+    : "";
+  const inflightStatusErrorText = lastInflightStatusError
+    ? ` inflightStatusError=${lastInflightStatusError}`
+    : "";
   const statusErrorText = lastStatusError
     ? ` statusError=${lastStatusError}`
     : "";
@@ -748,11 +1014,20 @@ async function confirmBundleOnChain({
             createStatus: lastSummary.createStatus,
           }
         : null,
+      inflight: lastInflightStatus
+        ? {
+            status: lastInflightStatus.status,
+            landedSlot: lastInflightStatus.landedSlot,
+            contextSlot: lastInflightStatus.contextSlot,
+            endpoint: lastInflightStatus.endpoint,
+          }
+        : null,
+      inflightStatusError: lastInflightStatusError,
       statusError: lastStatusError,
     },
   });
   throw new Error(
-    `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${statusErrorText})`
+    `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${inflightSummaryText}${statusErrorText}${inflightStatusErrorText})`
   );
 }
 

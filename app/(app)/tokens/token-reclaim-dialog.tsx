@@ -15,6 +15,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Spinner } from "@/components/ui/spinner";
+import { getTotalReclaimableSol } from "./token-reclaim-dialog.helpers";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type RecoveryWallet =
@@ -66,6 +67,7 @@ export function TokenReclaimDialog({
   const hasRecoverableBalance = wallets.some(
     (wallet) => Number(wallet.balanceSol ?? 0) > 0
   );
+  const totalReclaimableSol = getTotalReclaimableSol(wallets);
 
   const handleRecover = async () => {
     if (!tokenPublicKey && !launchId) {
@@ -97,6 +99,7 @@ export function TokenReclaimDialog({
         recoveryQuery.refetch(),
         utils.token.getAllUserTokens.invalidate(),
         utils.launch.getFailedLaunches.invalidate(),
+        utils.launch.getUserLaunches.invalidate(),
         utils.wallet.getMain.invalidate(),
         tokenPublicKey
           ? utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey })
@@ -135,8 +138,8 @@ export function TokenReclaimDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
-        <DialogHeader>
+      <DialogContent className="max-w-2xl max-h-[85vh] overflow-hidden p-0">
+        <DialogHeader className="px-6 pt-6">
           <DialogTitle>Reclaim SOL</DialogTitle>
           <DialogDescription className="break-all">
             {tokenPublicKey
@@ -144,41 +147,53 @@ export function TokenReclaimDialog({
               : `Launch: ${launchId ?? "—"}`}
           </DialogDescription>
         </DialogHeader>
-        <div className="space-y-3">
-          {recoveryQuery.isLoading ? (
-            <div className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Spinner className="size-4" />
-              Loading recovery wallets...
-            </div>
-          ) : recoveryQuery.error ? (
-            <div className="text-sm text-muted-foreground">
-              Recovery data is unavailable.
-            </div>
-          ) : wallets.length === 0 ? (
-            <div className="text-sm text-muted-foreground">
-              No recovery wallets available.
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {wallets.map((wallet) => (
-                <div
-                  key={wallet.publicKey}
-                  className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
-                >
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Badge variant="secondary">{wallet.type}</Badge>
-                    <span className="font-mono text-xs break-all">
-                      {wallet.publicKey}
-                    </span>
-                  </div>
-                  <div className="text-xs text-muted-foreground">
-                    {formatSol(wallet.balanceSol)} SOL
-                  </div>
+        <div className="flex max-h-[calc(85vh-5rem)] min-h-0 flex-col">
+          <div className="min-h-0 flex-1 overflow-y-auto px-6 pb-4">
+            <div className="space-y-3">
+              {recoveryQuery.isLoading ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Spinner className="size-4" />
+                  Loading recovery wallets...
                 </div>
-              ))}
+              ) : recoveryQuery.error ? (
+                <div className="text-sm text-muted-foreground">
+                  Recovery data is unavailable.
+                </div>
+              ) : wallets.length === 0 ? (
+                <div className="text-sm text-muted-foreground">
+                  No recovery wallets available.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {wallets.map((wallet) => (
+                    <div
+                      key={wallet.publicKey}
+                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2 text-sm"
+                    >
+                      <div className="flex items-center gap-2 min-w-0">
+                        <Badge variant="secondary">{wallet.type}</Badge>
+                        <span className="font-mono text-xs break-all">
+                          {wallet.publicKey}
+                        </span>
+                      </div>
+                      <div className="text-xs text-muted-foreground">
+                        {formatSol(wallet.balanceSol)} SOL
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          <div className="flex justify-end gap-2">
+          </div>
+          <div className="border-t bg-background/95 px-6 py-4 backdrop-blur supports-backdrop-filter:bg-background/80">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="text-sm text-muted-foreground">
+                Total reclaimable:{" "}
+                <span className="font-medium text-foreground">
+                  {formatSol(totalReclaimableSol)} SOL
+                </span>
+              </div>
+              <div className="flex justify-end gap-2">
             <Button
               variant="outline"
               onClick={() => recoveryQuery.refetch()}
@@ -200,6 +215,8 @@ export function TokenReclaimDialog({
                 ? "Returning..."
                 : "Return SOL"}
             </Button>
+              </div>
+            </div>
           </div>
         </div>
       </DialogContent>
