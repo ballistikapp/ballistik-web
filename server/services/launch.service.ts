@@ -598,7 +598,7 @@ async function appendBundleTelemetryLog(
 
 async function updateLaunchRecord(
   launchId: string,
-  data: Prisma.LaunchUpdateInput,
+  data: Prisma.XOR<Prisma.LaunchUpdateInput, Prisma.LaunchUncheckedUpdateInput>,
   options?: { bestEffort?: boolean; context?: Record<string, unknown> }
 ) {
   try {
@@ -4030,7 +4030,7 @@ export const launchService = {
           launchId,
           tokenPublicKey: persistedTokenPublicKey,
           recovery: recoveryData,
-          jitoTipAmountSol,
+          jitoTipAmountSol: input.jitoTipAmountSol,
           error,
         });
         return;

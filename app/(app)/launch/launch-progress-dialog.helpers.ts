@@ -11,10 +11,18 @@ type LaunchFailureLike = {
   result?: unknown;
 };
 
+type FailureRecoveryLike = {
+  manualActionRequired?: boolean;
+};
+
 export type LaunchActivityItem = LaunchLogLike & {
   isLatest: boolean;
   tone: "default" | "error";
 };
+
+function isFailureRecoveryLike(value: unknown): value is FailureRecoveryLike {
+  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
+}
 
 export function buildLaunchActivityItems(logs: LaunchLogLike[]) {
   return [...logs]
@@ -35,9 +43,7 @@ export function getLaunchFailureGuidance(launch: LaunchFailureLike) {
     typeof launch.result === "object" &&
     !Array.isArray(launch.result) &&
     "failureRecovery" in launch.result &&
-    launch.result.failureRecovery &&
-    typeof launch.result.failureRecovery === "object" &&
-    !Array.isArray(launch.result.failureRecovery)
+    isFailureRecoveryLike(launch.result.failureRecovery)
       ? launch.result.failureRecovery
       : null;
   const manualActionRequired =
