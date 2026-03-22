@@ -23,7 +23,7 @@ const MAX_TRANSACTIONS_PER_BUNDLE = 5;
 const MAX_BUNDLE_SEND_ATTEMPTS = 3;
 const BUNDLE_RETRY_BASE_DELAY_MS = 500;
 const BUNDLE_RETRY_MAX_DELAY_MS = 2_000;
-const BUNDLE_CONFIRM_TIMEOUT_MS = 120_000;
+const BUNDLE_CONFIRM_TIMEOUT_MS = 180_000;
 const BUNDLE_CONFIRM_INTERVAL_MS = 500;
 const BUNDLE_CONFIRM_INTERVAL_BACKOFF_MS = 2000;
 const BUNDLE_CONFIRM_GRPC_POLL_MS = 100;
@@ -618,7 +618,7 @@ async function confirmBundleOnChain({
   }>;
 }) {
   const startedAt = Date.now();
-  let lastResendAt = 0;
+  let lastResendAt = startedAt;
   let currentBundleId = bundleId;
   let currentSignatures = initialSignatures;
   let currentBlockhashFetchedAt = initialBlockhashFetchedAt;

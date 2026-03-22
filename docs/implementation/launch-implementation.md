@@ -151,6 +151,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 9. **Confirm**: verify token mint exists on-chain using a gRPC-first approach — subscribe to the mint account via `grpcManager` and race against RPC polling. First response wins, with automatic cleanup of the gRPC subscription on completion or timeout.
    - Vanity mint is consumed only after this confirmation succeeds.
    - For bundled launches, bundle confirmation also polls Jito `getInflightBundleStatuses` so logs can distinguish block-engine `Pending` / `Failed` / `Landed` / `Invalid` states from plain RPC `not_found` signatures.
+   - The first bundle resend waits the normal resend interval instead of firing immediately, giving newly sent bundles a short grace period to surface before resend logic begins.
 10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
 11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
@@ -272,9 +273,9 @@ The server quote groups values into:
 
 ## On-chain Confirmation Timeouts
 
-- Bundle CREATE confirmation timeout is set to 2 minutes (`120_000ms`) in `server/solana/jito-bundle.ts`.
+- Bundle CREATE confirmation timeout is set to 3 minutes (`180_000ms`) in `server/solana/jito-bundle.ts`.
 - Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
-- Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 2-minute window.
+- Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 3-minute window.
 
 ## Bundle Launch
 
