@@ -1,0 +1,4 @@
+-- Historical placeholder migration.
+-- The original 20260318155203_config_and_marketing migration file was lost.
+-- Its schema changes were later reverted, so the net schema state already matches
+-- the current Prisma schema. This placeholder preserves migration history only.

@@ -11,6 +11,7 @@ Define the authentication model for `sollabs-web`, including access token verifi
 - Auth identity is resolved in `server/trpc/context.ts` from `auth-token` cookie.
 - Server route protection in layouts uses `lib/utils/auth.ts`.
 - `proxy.ts` is optimistic and checks cookie presence only.
+- The access token carries the user's current `plan` claim for request-time feature gating.
 
 ## Identified Gaps Addressed
 
@@ -36,7 +37,7 @@ Server persistence:
 1. `register` / `loginWithPrivateKey`
    - Create an `AuthSession`.
    - Create initial `RefreshToken` record with hashed token.
-   - Issue JWT access token.
+   - Issue JWT access token with `userId`, `publicKey`, `name`, and `plan`.
    - Set both cookies.
 2. `refreshSession`
    - Validate refresh token hash and session state.
@@ -89,6 +90,7 @@ Server persistence:
 - Reuse of a previously used refresh token revokes the full session.
 - Access-token verification remains stateless in normal request path.
 - No implicit refresh inside tRPC context or server layout helpers.
+- Feature entitlement and platform-fee waiver decisions are made from the verified access-token `plan` claim, not from per-request database reads.
 
 ## Client Refresh Behavior
 
@@ -114,7 +116,7 @@ Server persistence:
 - `JWT_SECRET` required in production.
 - `REFRESH_TOKEN_TTL_DAYS` required in production.
 - `SESSION_MAX_TTL_DAYS` optional; defaults applied when unset.
-- Optional `JWT_EXPIRATION` controls access token lifetime.
+- Optional `JWT_EXPIRATION` controls access token lifetime and therefore the entitlement-refresh window for `plan` changes.
 
 ## Operational Signals
 
@@ -124,6 +126,13 @@ Track and log:
 - refresh failures by reason
 - refresh-token reuse incidents
 - refresh success rate and retry rate
+- plan-claim rollout issues, especially stale-access windows after plan changes
+
+## Entitlement Freshness
+
+- `User.plan` in the database is the source of truth when issuing or refreshing access tokens.
+- Requests rely on the `plan` embedded in the current access token.
+- Upgrades and downgrades therefore become effective on the next token issue/refresh or when the current access token expires.
 
 ## Validation Checklist
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import type { UserPlan } from "@/lib/generated/prisma/client";
 
 export const registerSchema = z
   .object({
@@ -37,6 +38,7 @@ export type LoginWithPrivateKeyInput = z.infer<
 export type AuthUserOutput = {
   id: string;
   name: string;
+  plan: UserPlan;
   mainWalletPublicKey: string;
   mainWalletBalanceSol: number;
   createdAt: Date;
@@ -50,6 +52,7 @@ export type AuthUserOutput = {
 export type ContextUser = {
   id: string;
   name: string;
+  plan: UserPlan;
   mainWalletPublicKey: string;
 };
 

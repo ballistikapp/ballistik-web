@@ -54,6 +54,7 @@ import {
   bundleBuyFeeSol,
   calculateLaunchUsageFees,
   descriptionAttributionRemovalFeeSol,
+  waiveLaunchUsageFees,
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
 
@@ -171,18 +172,30 @@ function calculateLaunchTotals(values: {
   vanityMint: boolean;
   removeAttribution: boolean;
   distributionWalletMultiplier: number;
+  platformFeeWaived?: boolean;
 }) {
   const bundleBuyTotal = values.bundleBuyEnabled
     ? values.bundlerWalletCount * values.bundlerBuyAmountSol
     : 0;
-  const usageFees = calculateLaunchUsageFees({
-    devWalletOption: values.devWalletOption,
-    bundleBuyEnabled: values.bundleBuyEnabled,
-    bundlerWalletCount: values.bundlerWalletCount,
-    distributionWalletMultiplier: values.distributionWalletMultiplier,
-    vanityMint: values.vanityMint,
-    removeAttribution: values.removeAttribution,
-  });
+  const usageFees = values.platformFeeWaived
+    ? waiveLaunchUsageFees(
+        calculateLaunchUsageFees({
+          devWalletOption: values.devWalletOption,
+          bundleBuyEnabled: values.bundleBuyEnabled,
+          bundlerWalletCount: values.bundlerWalletCount,
+          distributionWalletMultiplier: values.distributionWalletMultiplier,
+          vanityMint: values.vanityMint,
+          removeAttribution: values.removeAttribution,
+        })
+      )
+    : calculateLaunchUsageFees({
+        devWalletOption: values.devWalletOption,
+        bundleBuyEnabled: values.bundleBuyEnabled,
+        bundlerWalletCount: values.bundlerWalletCount,
+        distributionWalletMultiplier: values.distributionWalletMultiplier,
+        vanityMint: values.vanityMint,
+        removeAttribution: values.removeAttribution,
+      });
   const totalCostSol =
     values.devBuyAmountSol +
     bundleBuyTotal +
@@ -215,6 +228,7 @@ type LaunchFormProps = {
 export function LaunchForm({ initialValues }: LaunchFormProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const { data: currentUser } = trpc.auth.me.useQuery();
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
   const [bannerPreview, setBannerPreview] = React.useState<string | null>(null);
   const [showLaunchDialog, setShowLaunchDialog] = React.useState(false);
@@ -1483,7 +1497,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => {
                   const { totalCostSol, distributionWallets, usageFees } =
-                    calculateLaunchTotals(values);
+                    calculateLaunchTotals({
+                      ...values,
+                      platformFeeWaived: currentUser?.plan === "PRO",
+                    });
                   const vanityFeeDisplaySol = values.vanityMint
                     ? usageFees.vanityMintFeeSol
                     : vanityMintFeeSol;
@@ -1660,6 +1677,11 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 {usageFees.totalFeeSol.toFixed(4)} SOL
                               </span>
                             </div>
+                            {usageFees.platformFeeWaived && (
+                              <div className="text-xs text-emerald-400">
+                                Pro active. Platform fees are waived for this launch.
+                              </div>
+                            )}
                             <div
                               className={cn(
                                 "flex items-center justify-between",

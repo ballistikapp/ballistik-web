@@ -24,7 +24,7 @@ export const volumeBotRouter = router({
   start: expensiveProtectedProcedure
     .input(startVolumeBotSchema)
     .mutation(async ({ input, ctx }) => {
-      return await volumeBotService.startSession(input, ctx.user.id);
+      return await volumeBotService.startSession(input, ctx.user);
     }),
   status: protectedRateLimitedProcedure
     .input(volumeBotStatusSchema)
@@ -59,7 +59,7 @@ export const volumeBotRouter = router({
   selectionSummary: protectedRateLimitedProcedure
     .input(volumeBotSelectionSummarySchema)
     .query(async ({ input, ctx }) => {
-      return await volumeBotService.getSelectionSummary(input, ctx.user.id);
+      return await volumeBotService.getSelectionSummary(input, ctx.user);
     }),
   logs: protectedRateLimitedProcedure
     .input(stopVolumeBotSchema)

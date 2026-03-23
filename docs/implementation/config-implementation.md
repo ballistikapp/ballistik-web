@@ -26,9 +26,11 @@
 
 - `SOLANA_RPC_URL` is required and validated when `getEnv()` is called
 - `SHYFT_API_KEY` is required and enables Shyft REST APIs, callback management, and DeFi APIs
-- `SHYFT_GRPC_TOKEN` is required and provides the x-token for gRPC authentication
+- `SHYFT_GRPC_TOKEN` is optional and provides the x-token for gRPC authentication
+- `GRPC_ACCESS_MODE` is optional and globally controls app access to gRPC-powered features (`off`, `pro`, `all`)
 - `SHYFT_CALLBACK_SECRET` is optional and used to validate incoming Shyft webhook requests
 - `REFRESH_TOKEN_TTL_DAYS` defaults to `7` days when unset and must be a positive integer when provided
+- `JWT_EXPIRATION` also defines how quickly token-embedded `plan` claims refresh after an upgrade/downgrade
 - `PINATA_JWT` is required and enables token media uploads to Pinata during token persistence
 - `PINATA_GATEWAY_URL` is required (must be a valid URL) and sets the base gateway used for stored IPFS media URLs
 - `APP_URL` is required (must be a valid URL) and used to construct the Shyft callback webhook URL (`${APP_URL}/api/webhooks/shyft`) for automatic callback registration on token and wallet creation.

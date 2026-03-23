@@ -2104,6 +2104,7 @@ export type TestTableScalarFieldEnum = (typeof TestTableScalarFieldEnum)[keyof t
 export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  plan: 'plan',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -2525,6 +2526,20 @@ export type DateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel
  * Reference to a field of type 'DateTime[]'
  */
 export type ListDateTimeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'DateTime[]'>
+    
+
+
+/**
+ * Reference to a field of type 'UserPlan'
+ */
+export type EnumUserPlanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserPlan'>
+    
+
+
+/**
+ * Reference to a field of type 'UserPlan[]'
+ */
+export type ListEnumUserPlanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'UserPlan[]'>
     
 
 

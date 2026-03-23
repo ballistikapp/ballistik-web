@@ -16,6 +16,7 @@ type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
 interface MonitoringPanelProps {
   isMonitoring: boolean;
+  disabledMessage?: string | null;
   onToggleMonitoring: (enabled: boolean) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
   isRefreshing: boolean;
@@ -26,6 +27,7 @@ interface MonitoringPanelProps {
 
 export function MonitoringPanel({
   isMonitoring,
+  disabledMessage,
   onToggleMonitoring,
   onRefresh,
   isRefreshing,
@@ -172,6 +174,13 @@ export function MonitoringPanel({
           {isMonitoring && healthState === "healthy" && (
             <div className="text-xs text-muted-foreground">
               Live transactions + auto-refreshing holdings
+            </div>
+          )}
+
+          {!isMonitoring && disabledMessage && (
+            <div className="flex items-start gap-2 text-xs text-muted-foreground">
+              <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+              <span>{disabledMessage}</span>
             </div>
           )}
 

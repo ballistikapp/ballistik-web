@@ -32,6 +32,9 @@ import type {
   StartExitInput,
 } from "@/server/schemas/holding.schema";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
+import type { ContextUser } from "@/server/schemas/auth.schema";
+import { UserPlan } from "@/lib/generated/prisma/client";
 
 const cancelledExits = new Set<string>();
 
@@ -81,6 +84,12 @@ const CLEANUP_WALLET_CONCURRENCY = 3;
 const MIN_RENT_LAMPORTS = 2_100_000;
 const FUND_AMOUNT_LAMPORTS = 5_000_000;
 const EXIT_LOG_WINDOW = 200;
+type RequestUser = Pick<ContextUser, "id" | "plan">;
+type StoredHoldingExitInput = StartExitInput & {
+  entitlementSnapshot?: {
+    plan: ContextUser["plan"];
+  };
+};
 
 async function appendExitLog(
   exitId: string,
@@ -682,6 +691,8 @@ async function runExitFlow(exitId: string) {
 
   try {
     checkCancelled();
+    const input = exit.input as StoredHoldingExitInput;
+    const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
 
     const { token, wallets, mainWallet } = await getAllowedWalletsWithKeys(
       exit.tokenPublicKey,
@@ -797,7 +808,13 @@ async function runExitFlow(exitId: string) {
             transactions,
             signerGroups,
             mainKeypair,
-            tipLamports
+            tipLamports,
+            {
+              enableGrpc: grpcAccessService.getFeatureAccess(
+                { plan: requestPlan },
+                "bundle-fast-confirmation"
+              ).allowed,
+            }
           );
           await testRunLogService.appendServerEvent({
             eventType: "wallet_transaction",
@@ -986,9 +1003,9 @@ async function runExitFlow(exitId: string) {
 }
 
 export const holdingExitService = {
-  async startExit(input: StartExitInput, userId: string) {
-    const actionKey = `holding-exit:start:${userId}:${input.tokenPublicKey}`;
-    const idempotencyKey = `holding-exit:${userId}:${input.tokenPublicKey}`;
+  async startExit(input: StartExitInput, user: RequestUser) {
+    const actionKey = `holding-exit:start:${user.id}:${input.tokenPublicKey}`;
+    const idempotencyKey = `holding-exit:${user.id}:${input.tokenPublicKey}`;
 
     return await withActionLock(actionKey, async () => {
       return await withIdempotency({
@@ -997,7 +1014,7 @@ export const holdingExitService = {
         execute: async () => {
           const existing = await prisma.holdingExit.findFirst({
             where: {
-              userId,
+              userId: user.id,
               tokenPublicKey: input.tokenPublicKey,
               status: { in: ["PENDING", "RUNNING"] },
             },
@@ -1010,12 +1027,17 @@ export const holdingExitService = {
 
           const exit = await prisma.holdingExit.create({
             data: {
-              userId,
+              userId: user.id,
               tokenPublicKey: input.tokenPublicKey,
               status: "PENDING",
               progress: 0,
               currentStep: "Queued",
-              input,
+              input: {
+                ...input,
+                entitlementSnapshot: {
+                  plan: user.plan,
+                },
+              } satisfies StoredHoldingExitInput,
             },
           });
 

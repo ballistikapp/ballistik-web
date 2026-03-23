@@ -26,6 +26,12 @@ type WalletRangeSchedule = {
   nextTickAt: Date;
 };
 
+type StoredVolumeBotConfig = VolumeBotConfigInput & {
+  entitlementSnapshot?: {
+    volumeBotRealtimeEnabled?: boolean;
+  };
+};
+
 class VolumeBotTimerManager {
   private walletRangeTimers = new Map<string, NodeJS.Timeout>();
   private walletRangeToSession = new Map<string, string>();
@@ -172,6 +178,11 @@ class VolumeBotTimerManager {
     return new Date(Date.now() + delaySeconds * 1000);
   }
 
+  private sessionUsesGrpc(config: unknown) {
+    const storedConfig = config as StoredVolumeBotConfig;
+    return Boolean(storedConfig.entitlementSnapshot?.volumeBotRealtimeEnabled);
+  }
+
   async recover() {
     const sessions = await prisma.volumeBotSession.findMany({
       where: { status: { in: ["RUNNING", "SCHEDULED"] } },
@@ -200,10 +211,13 @@ class VolumeBotTimerManager {
       this.scheduleStartTimer(session.id, session.scheduledStartAt)
     );
 
-    if (runningSessions.length > 0) {
+    const realtimeSessions = runningSessions.filter((session) =>
+      this.sessionUsesGrpc(session.config)
+    );
+    if (realtimeSessions.length > 0) {
       const connected = await volumeBotGrpc.connect();
       if (connected) {
-        for (const session of runningSessions) {
+        for (const session of realtimeSessions) {
           await this.subscribeSessionToGrpc(session.id, session.tokenPublicKey);
         }
       }
@@ -219,7 +233,7 @@ class VolumeBotTimerManager {
 
     const walletRangeSchedules: Array<{ walletId: string; rangeIndex: number }> = [];
     wallets.forEach((wallet) => {
-      const config = wallet.session.config as VolumeBotConfigInput;
+      const config = wallet.session.config as StoredVolumeBotConfig;
       config.ranges.forEach((_, rangeIndex) => {
         walletRangeSchedules.push({ walletId: wallet.id, rangeIndex });
       });
@@ -452,7 +466,7 @@ class VolumeBotTimerManager {
       data: { status: "RUNNING", startedAt: now },
     });
     try {
-      const config = session.config as VolumeBotConfigInput;
+      const config = session.config as StoredVolumeBotConfig;
       await this.fundSessionWallets(
         session.id,
         session.tokenPublicKey,
@@ -474,7 +488,9 @@ class VolumeBotTimerManager {
       return;
     }
 
-    await this.subscribeSessionToGrpc(session.id, session.tokenPublicKey);
+    if (this.sessionUsesGrpc(session.config)) {
+      await this.subscribeSessionToGrpc(session.id, session.tokenPublicKey);
+    }
     await this.scheduleSession(session.id);
   }
 

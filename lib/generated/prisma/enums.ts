@@ -9,6 +9,14 @@
 * 🟢 You can import this file directly.
 */
 
+export const UserPlan = {
+  FREE: 'FREE',
+  PRO: 'PRO'
+} as const
+
+export type UserPlan = (typeof UserPlan)[keyof typeof UserPlan]
+
+
 export const WalletType = {
   MAIN_WALLET: 'MAIN_WALLET',
   DEV: 'DEV',

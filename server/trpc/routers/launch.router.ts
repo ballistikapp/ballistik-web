@@ -20,10 +20,10 @@ export const launchRouter = router({
   previewCosts: protectedRateLimitedProcedure
     .input(launchPreviewCostsSchema)
     .query(async ({ input, ctx }) => {
-      return await launchService.previewCosts(input, ctx.user.id);
+      return await launchService.previewCosts(input, ctx.user);
     }),
   start: expensiveProtectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
-    return await launchService.startLaunch(input, ctx.user.id);
+    return await launchService.startLaunch(input, ctx.user);
   }),
   status: protectedRateLimitedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
     return await launchService.getLaunchStatus(input.launchId, ctx.user.id);
@@ -32,7 +32,7 @@ export const launchRouter = router({
     return await launchService.cancelLaunch(input.launchId, ctx.user.id);
   }),
   retry: expensiveProtectedProcedure.input(launchRetrySchema).mutation(async ({ input, ctx }) => {
-    return await launchService.retryLaunch(input.launchId, ctx.user.id);
+    return await launchService.retryLaunch(input.launchId, ctx.user);
   }),
   getActive: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getActiveLaunch(ctx.user.id);

@@ -44,7 +44,7 @@ export const holdingRouter = router({
   startExit: expensiveProtectedProcedure
     .input(startExitSchema)
     .mutation(async ({ input, ctx }) => {
-      return await holdingExitService.startExit(input, ctx.user.id);
+      return await holdingExitService.startExit(input, ctx.user);
     }),
   exitStatus: protectedRateLimitedProcedure
     .input(exitStatusSchema)

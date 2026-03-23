@@ -13,6 +13,7 @@ export type LaunchUsageFeeInput = {
 };
 
 export type LaunchUsageFeeBreakdown = {
+  platformFeeWaived: boolean;
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
   vanityMintFeeSol: number;
@@ -22,6 +23,7 @@ export type LaunchUsageFeeBreakdown = {
 };
 
 export type VolumeBotUsageFeeBreakdown = {
+  platformFeeWaived: boolean;
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
   totalFeeSol: number;
@@ -67,6 +69,7 @@ export function calculateLaunchUsageFees(
     attributionRemovalFeeValue +
     bundleBuyFeeValue;
   return {
+    platformFeeWaived: false,
     generatedWalletCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     vanityMintFeeSol: vanityFeeValue,
@@ -82,8 +85,34 @@ export function calculateVolumeBotUsageFees(
   const normalizedCount = Math.max(0, Math.floor(generatedWalletCount));
   const generatedWalletFeeValue = normalizedCount * generatedWalletFeeSol;
   return {
+    platformFeeWaived: false,
     generatedWalletCount: normalizedCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     totalFeeSol: generatedWalletFeeValue,
+  };
+}
+
+export function waiveLaunchUsageFees(
+  breakdown: LaunchUsageFeeBreakdown
+): LaunchUsageFeeBreakdown {
+  return {
+    ...breakdown,
+    platformFeeWaived: true,
+    generatedWalletFeeSol: 0,
+    vanityMintFeeSol: 0,
+    descriptionAttributionRemovalFeeSol: 0,
+    bundleBuyFeeSol: 0,
+    totalFeeSol: 0,
+  };
+}
+
+export function waiveVolumeBotUsageFees(
+  breakdown: VolumeBotUsageFeeBreakdown
+): VolumeBotUsageFeeBreakdown {
+  return {
+    ...breakdown,
+    platformFeeWaived: true,
+    generatedWalletFeeSol: 0,
+    totalFeeSol: 0,
   };
 }

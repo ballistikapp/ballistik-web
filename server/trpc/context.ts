@@ -46,6 +46,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions) {
       user = {
         id: payload.userId,
         name: payload.name ?? "User",
+        plan: payload.plan,
         mainWalletPublicKey: payload.publicKey,
       };
     }

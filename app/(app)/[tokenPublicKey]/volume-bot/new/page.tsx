@@ -62,7 +62,10 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
-import { calculateVolumeBotUsageFees } from "@/lib/config/usage-fees.config";
+import {
+  calculateVolumeBotUsageFees,
+  waiveVolumeBotUsageFees,
+} from "@/lib/config/usage-fees.config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -246,6 +249,7 @@ export default function VolumeBotStartPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const router = useRouter();
   const utils = trpc.useUtils();
+  const { data: currentUser } = trpc.auth.me.useQuery();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [walletDialogOpen, setWalletDialogOpen] = useState(false);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -521,8 +525,11 @@ export default function VolumeBotStartPage() {
     [selectedWalletPublicKeys.length, topUpAmount]
   );
   const localUsageFees = useMemo(
-    () => calculateVolumeBotUsageFees(generatedWalletCount),
-    [generatedWalletCount]
+    () =>
+      currentUser?.plan === "PRO"
+        ? waiveVolumeBotUsageFees(calculateVolumeBotUsageFees(generatedWalletCount))
+        : calculateVolumeBotUsageFees(generatedWalletCount),
+    [currentUser?.plan, generatedWalletCount]
   );
 
   const localPreflight = useMemo(() => {
@@ -620,6 +627,17 @@ export default function VolumeBotStartPage() {
   const selectionSummary = selectionSummaryQuery.data;
   const effectivePreflight = selectionSummary ?? localPreflight;
   const usageFees = selectionSummary?.usageFees ?? localUsageFees;
+  const minimumIntervalSeconds =
+    selectionSummary?.access?.minimumIntervalSeconds ??
+    (currentUser?.plan === "PRO" ? 1 : 5);
+  const fastestConfiguredInterval = Math.min(...ranges.map((range) => range.intervalMin));
+  const requiresProForFastIntervals =
+    selectionSummary?.access?.realtimeReason === "not_pro" &&
+    fastestConfiguredInterval < minimumIntervalSeconds;
+  const realtimeUnavailable =
+    (selectionSummary?.access?.realtimeReason === "grpc_disabled" ||
+      selectionSummary?.access?.realtimeReason === "grpc_not_configured") &&
+    fastestConfiguredInterval < minimumIntervalSeconds;
   const confirmQuote = selectionSummary?.quote;
   const estimatedTotalOutflowSol =
     confirmQuote?.chargedNowSol ??
@@ -850,6 +868,14 @@ export default function VolumeBotStartPage() {
       totalSellableValue <= 0
     ) {
       toast.error("Selected wallets have no tokens to sell");
+      return;
+    }
+    if (fastestConfiguredInterval < minimumIntervalSeconds) {
+      toast.error(
+        requiresProForFastIntervals
+          ? `Upgrade to Pro to use intervals below ${minimumIntervalSeconds}s`
+          : `Intervals below ${minimumIntervalSeconds}s are unavailable right now`
+      );
       return;
     }
     setConfirmOpen(true);
@@ -1921,7 +1947,8 @@ export default function VolumeBotStartPage() {
           {(fundingBelowSuggested ||
             selectionSummaryQuery.error ||
             sellWarning ||
-            ranges.some((r) => r.intervalMin < 5) ||
+            fastestConfiguredInterval < minimumIntervalSeconds ||
+            usageFees.platformFeeWaived ||
             (netSolDirection < 0 && selectedWalletPublicKeys.length === 0)) && (
             <div className="space-y-2.5">
               {selectionSummaryQuery.error && (
@@ -1955,15 +1982,21 @@ export default function VolumeBotStartPage() {
                   </span>
                 </div>
               )}
-              {ranges.some((r) => r.intervalMin < 5) && (
+              {usageFees.platformFeeWaived && (
+                <div className="flex items-start gap-2.5 text-sm text-emerald-400">
+                  <InfoIcon className="size-4 shrink-0 mt-0.5" />
+                  <span>Pro active. Platform usage fees are waived for this run.</span>
+                </div>
+              )}
+              {fastestConfiguredInterval < minimumIntervalSeconds && (
                 <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
                   <InfoIcon className="size-4 shrink-0 mt-0.5" />
                   <span>
-                    Intervals below 5s use gRPC streaming. Max{" "}
-                    {Math.floor(
-                      18 * Math.min(...ranges.map((r) => r.intervalMin))
-                    )}{" "}
-                    wallets allowed.
+                    {requiresProForFastIntervals
+                      ? `Upgrade to Pro to use intervals below ${minimumIntervalSeconds}s and activate gRPC-backed realtime trading.`
+                      : realtimeUnavailable
+                        ? `Intervals below ${minimumIntervalSeconds}s are currently unavailable because gRPC infrastructure is disabled.`
+                        : `Intervals below ${minimumIntervalSeconds}s use gRPC streaming. Max ${Math.floor(18 * fastestConfiguredInterval)} wallets allowed.`}
                   </span>
                 </div>
               )}
@@ -2071,6 +2104,11 @@ export default function VolumeBotStartPage() {
                 {usageFees.totalFeeSol.toFixed(4)} SOL
               </span>
             </div>
+            {usageFees.platformFeeWaived && (
+              <div className="text-xs text-emerald-400">
+                Pro active. Platform usage fees are waived.
+              </div>
+            )}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Generated funding</span>
               <span className="font-semibold">

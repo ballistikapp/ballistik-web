@@ -63,6 +63,7 @@ type AdaptiveTipEscalationOptions = {
 type SendJitoBundleOptions = {
   onEvent?: BundleTelemetryHandler;
   adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
+  enableGrpc?: boolean;
 };
 
 type SimulateTransactionResult = {
@@ -101,6 +102,7 @@ export async function sendJitoBundle(
   options?: SendJitoBundleOptions
 ) {
   const telemetry = options?.onEvent;
+  const enableGrpc = options?.enableGrpc ?? true;
   const adaptiveTipEnabled = options?.adaptiveTipEscalation?.enabled ?? false;
   const tipEscalationMultiplier = Math.max(
     1,
@@ -440,6 +442,7 @@ export async function sendJitoBundle(
   const confirmedBundleId = await confirmBundleOnChain({
     connection,
     onEvent: telemetry,
+    enableGrpc,
     initialSignatures: currentBuild.signatures,
     accountKeys: feePayers,
     initialBlockhashFetchedAt: blockhashFetchedAt,
@@ -597,6 +600,7 @@ function sleep(ms: number) {
 async function confirmBundleOnChain({
   connection,
   onEvent,
+  enableGrpc,
   initialSignatures,
   accountKeys,
   initialBlockhashFetchedAt,
@@ -606,6 +610,7 @@ async function confirmBundleOnChain({
 }: {
   connection: ReturnType<typeof getSolanaConnection>;
   onEvent?: BundleTelemetryHandler;
+  enableGrpc: boolean;
   initialSignatures: string[];
   accountKeys: string[];
   initialBlockhashFetchedAt: number;
@@ -660,11 +665,13 @@ async function confirmBundleOnChain({
     active: false,
   };
 
-  const grpcPromise = waitForSignaturesViaGrpc({
-    signatures: currentSignatures,
-    accountKeys,
-    timeoutMs: BUNDLE_CONFIRM_TIMEOUT_MS,
-  });
+  const grpcPromise = enableGrpc
+    ? waitForSignaturesViaGrpc({
+        signatures: currentSignatures,
+        accountKeys,
+        timeoutMs: BUNDLE_CONFIRM_TIMEOUT_MS,
+      })
+    : Promise.resolve(null);
 
   grpcPromise
     .then((result) => {

@@ -28,8 +28,13 @@ import {
   fetchPumpQuoteState,
 } from "@/server/solana/pump-quotes";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
-import { calculateVolumeBotUsageFees } from "@/lib/config/usage-fees.config";
+import {
+  calculateVolumeBotUsageFees,
+  waiveVolumeBotUsageFees,
+} from "@/lib/config/usage-fees.config";
 import { usageFeeService } from "@/server/services/usage-fee.service";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
+import type { ContextUser } from "@/server/schemas/auth.schema";
 
 const clampNumber = (value: number, min: number, max: number) =>
   Math.min(Math.max(value, min), max);
@@ -267,6 +272,7 @@ const formatTokenBalance = (raw: bigint, decimals: number) => {
 
 const RPC_BATCH_SIZE = rpcConfig.tuning.solBalanceBatchSize;
 const RPC_BATCH_CONCURRENCY = rpcConfig.tuning.tokenBalanceConcurrency;
+type RequestUser = Pick<ContextUser, "id" | "plan">;
 
 const fetchTokenBalances = async (
   mintPublicKey: PublicKey,
@@ -382,9 +388,9 @@ const resolveEligibleWallets = async (
 };
 
 export const volumeBotService = {
-  async startSession(input: StartVolumeBotInput, userId: string) {
-    const actionKey = `volume-bot:start:${userId}:${input.tokenPublicKey}`;
-    const idempotencyKey = `volume-bot:start:${userId}:${input.tokenPublicKey}`;
+  async startSession(input: StartVolumeBotInput, user: RequestUser) {
+    const actionKey = `volume-bot:start:${user.id}:${input.tokenPublicKey}`;
+    const idempotencyKey = `volume-bot:start:${user.id}:${input.tokenPublicKey}`;
 
     return await withActionLock(actionKey, async () =>
       withIdempotency({
@@ -393,12 +399,27 @@ export const volumeBotService = {
         execute: async () => {
     const { token, wallets: eligibleWallets } = await resolveEligibleWallets(
       input.tokenPublicKey,
-      userId
+      user.id
     );
+    const realtimeAccess = grpcAccessService.getFeatureAccess(
+      user,
+      "volume-bot-realtime"
+    );
+    const minimumIntervalSeconds =
+      grpcAccessService.getVolumeBotMinIntervalSeconds(user);
+    const fastestRange = Math.min(...input.config.ranges.map((range) => range.intervalMin));
+    if (fastestRange < minimumIntervalSeconds) {
+      throw new AppError(
+        realtimeAccess.reason === "not_pro"
+          ? `Volume bot intervals below ${minimumIntervalSeconds}s require Pro`
+          : `Volume bot intervals below ${minimumIntervalSeconds}s are unavailable right now`,
+        403
+      );
+    }
 
     const activeSession = await prisma.volumeBotSession.findFirst({
       where: {
-        userId,
+        userId: user.id,
         tokenPublicKey: token.publicKey,
         status: { in: ["SCHEDULED", "RUNNING", "STOP_REQUESTED", "STOPPING"] },
       },
@@ -425,11 +446,15 @@ export const volumeBotService = {
     if (missingKey) {
       throw new AppError("Selected wallet is missing a private key", 400);
     }
-    const totalWalletCount =
-      selectedWallets.length + input.config.walletConfig.generatedWalletCount;
-    const usageFees = calculateVolumeBotUsageFees(
-      input.config.walletConfig.generatedWalletCount
-    );
+    const usageFees = grpcAccessService.isPlatformFeeWaived(user)
+      ? waiveVolumeBotUsageFees(
+          calculateVolumeBotUsageFees(
+            input.config.walletConfig.generatedWalletCount
+          )
+        )
+      : calculateVolumeBotUsageFees(
+          input.config.walletConfig.generatedWalletCount
+        );
     validateSchedule(
       input.config,
       input.scheduledStartAt,
@@ -490,7 +515,7 @@ export const volumeBotService = {
       )
     );
     await usageFeeService.collectFromMainWallet({
-      userId,
+      userId: user.id,
       totalFeeSol: usageFees.totalFeeSol,
       reason: "volume-bot.start",
     });
@@ -498,6 +523,11 @@ export const volumeBotService = {
     const session = await prisma.$transaction(async (tx) => {
       const configSnapshot = {
         ...input.config,
+        entitlementSnapshot: {
+          plan: user.plan,
+          volumeBotRealtimeEnabled: realtimeAccess.allowed,
+          platformFeeWaived: usageFees.platformFeeWaived,
+        },
         walletConfig: {
           ...input.config.walletConfig,
           selectedWalletPublicKeys,
@@ -505,7 +535,7 @@ export const volumeBotService = {
       };
       console.log("[VolumeBot] Starting session", {
         tokenPublicKey: token.publicKey,
-        userId,
+        userId: user.id,
         config: {
           ...configSnapshot,
           selectedWalletCount: selectedWallets.length,
@@ -516,7 +546,7 @@ export const volumeBotService = {
       });
       const createdSession = await tx.volumeBotSession.create({
         data: {
-          userId,
+          userId: user.id,
           tokenPublicKey: token.publicKey,
           status,
           config: configSnapshot,
@@ -533,7 +563,7 @@ export const volumeBotService = {
             privateKey: wallet.privateKey,
             type: "VOLUME",
             tokenPublicKey: token.publicKey,
-            userId,
+          userId: user.id,
           })),
         });
       }
@@ -576,7 +606,7 @@ export const volumeBotService = {
           );
           await walletService.sendSolFromMainWallet(
             token.publicKey,
-            userId,
+            user.id,
             walletPublicKeys,
             fundingAmountSol
           );
@@ -605,7 +635,7 @@ export const volumeBotService = {
               );
               await walletService.sendSolFromMainWallet(
                 token.publicKey,
-                userId,
+                user.id,
                 [wallet.publicKey],
                 topUpSol
               );
@@ -872,11 +902,11 @@ export const volumeBotService = {
 
   async getSelectionSummary(
     input: VolumeBotSelectionSummaryInput,
-    userId: string
+    user: RequestUser
   ) {
     const { token, wallets } = await resolveEligibleWallets(
       input.tokenPublicKey,
-      userId
+      user.id
     );
     const selectedWalletPublicKeys = Array.from(
       new Set(input.config.walletConfig.selectedWalletPublicKeys ?? [])
@@ -923,9 +953,21 @@ export const volumeBotService = {
     const totalWalletCount =
       input.config.walletConfig.generatedWalletCount +
       selectedWalletPublicKeys.length;
-    const usageFees = calculateVolumeBotUsageFees(
-      input.config.walletConfig.generatedWalletCount
+    const realtimeAccess = grpcAccessService.getFeatureAccess(
+      user,
+      "volume-bot-realtime"
     );
+    const minimumIntervalSeconds =
+      grpcAccessService.getVolumeBotMinIntervalSeconds(user);
+    const usageFees = grpcAccessService.isPlatformFeeWaived(user)
+      ? waiveVolumeBotUsageFees(
+          calculateVolumeBotUsageFees(
+            input.config.walletConfig.generatedWalletCount
+          )
+        )
+      : calculateVolumeBotUsageFees(
+          input.config.walletConfig.generatedWalletCount
+        );
     const netSolDirection = computeNetSolDirection(input.config.ranges);
     const hasSellRanges = input.config.ranges.some(
       (range) => range.direction !== "buy"
@@ -1018,6 +1060,11 @@ export const volumeBotService = {
       sellWarning,
       priceUnavailable,
       usageFees,
+      access: {
+        realtimeAllowed: realtimeAccess.allowed,
+        realtimeReason: realtimeAccess.reason,
+        minimumIntervalSeconds,
+      },
       estimatedFundingSol: generatedFundingSol,
       estimatedTopUpMaxSol:
         selectedWalletPublicKeys.length * input.config.walletConfig.topUpAmount,

@@ -19,9 +19,20 @@ import { ingestionQueue } from "@/server/services/ingestion-queue.service";
 import { transactionService } from "@/server/services/transaction.service";
 import { logger } from "@/lib/logger";
 import { getEnv } from "@/lib/config/env";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
 
 const log = logger.child({ service: "subscription" });
 const { MONITORING_PIPELINE_V2: monitoringPipelineV2Enabled } = getEnv();
+
+function getLiveMonitoringErrorMessage(reason: string) {
+  if (reason === "not_pro") {
+    return "Pro plan required for live monitoring";
+  }
+  if (reason === "grpc_disabled" || reason === "grpc_not_configured") {
+    return "Live monitoring is currently unavailable";
+  }
+  return "Live monitoring is unavailable";
+}
 
 type BalanceUpdateEvent = {
   pubkey: string;
@@ -86,6 +97,13 @@ export const subscriptionRouter = router({
       })
     )
     .subscription(async function* ({ input, ctx }) {
+      const access = grpcAccessService.getFeatureAccess(
+        ctx.user,
+        "dashboard-live-monitoring"
+      );
+      if (!access.allowed) {
+        throw new Error(getLiveMonitoringErrorMessage(access.reason));
+      }
       const allPubkeys = await getMonitoredWalletPubkeys(
         input.tokenPublicKey,
         ctx.user.id,
@@ -183,6 +201,13 @@ export const subscriptionRouter = router({
       })
     )
     .subscription(async function* ({ input, ctx }) {
+      const access = grpcAccessService.getFeatureAccess(
+        ctx.user,
+        "dashboard-live-monitoring"
+      );
+      if (!access.allowed) {
+        throw new Error(getLiveMonitoringErrorMessage(access.reason));
+      }
       const walletPubkeys = await getMonitoredWalletPubkeys(
         input.tokenPublicKey,
         ctx.user.id,
@@ -350,6 +375,13 @@ export const subscriptionRouter = router({
       })
     )
     .subscription(async function* ({ input, ctx }) {
+      const access = grpcAccessService.getFeatureAccess(
+        ctx.user,
+        "dashboard-live-monitoring"
+      );
+      if (!access.allowed) {
+        throw new Error(getLiveMonitoringErrorMessage(access.reason));
+      }
       const mint = new PublicKey(input.tokenPublicKey);
       const { bondingCurve } = derivePumpAddresses(mint);
 

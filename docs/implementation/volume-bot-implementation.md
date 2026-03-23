@@ -7,6 +7,13 @@
 - Persist sessions, wallets, and trade logs for recovery and UI status.
 - Support scheduled start, scheduled stop, reclaim, and close-accounts actions.
 
+## Plan-Tier Behavior
+
+- Volume bot remains available to free and Pro users.
+- gRPC-backed volume-bot acceleration is a Pro feature.
+- Free users must stay on the non-gRPC interval profile (minimum 5 seconds).
+- Pro users can use sub-5-second intervals and RabbitStream-backed balance/transaction acceleration when infrastructure is enabled.
+
 ## Recent Changes: Removed Execution Probability
 
 **Date**: 2026-02-11
@@ -154,6 +161,7 @@ Each range runs on its own independent timer. When the timer fires, a trade **al
 
 1. Each range: `solMin <= solMax`, `intervalMin <= intervalMax`.
 2. `solMin >= 0.001`, `solMax <= 10`, `intervalMin >= 1`, `intervalMax <= 3600`.
+   - Additional plan-tier rule: non-Pro requests cannot use `intervalMin < 5`.
 3. `totalWalletCount = generated + selected` must be `1-50`.
 4. `targetDurationSeconds` must be `1-604800`.
 5. If `scheduledStartAt` is set, it must be in the future and within 30 days.
@@ -516,7 +524,9 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 
 ### Fallback Behavior
 
-- If `SHYFT_GRPC_TOKEN` (or `SHYFT_API_KEY` fallback) is not set, gRPC is disabled
+- If `SHYFT_GRPC_TOKEN` is not set, gRPC is disabled
+- If `GRPC_ACCESS_MODE=off`, gRPC is disabled for all users
+- If the current request is not Pro-entitled, volume bot runs in RPC-only mode
 - If gRPC connection fails, uses RPC with rate limiter
 - On cache miss, fetches via RPC with rate limiting
 - Auto-reconnect with 5-second delay on disconnect
@@ -530,7 +540,8 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 ## Environment Variables
 
 - `SOLANA_RPC_URL` — Solana RPC endpoint (required)
-- `SHYFT_GRPC_TOKEN` — Shyft gRPC x-token for streaming (optional, recommended; falls back to `SHYFT_API_KEY`)
+- `SHYFT_GRPC_TOKEN` — Shyft gRPC x-token for streaming (optional, required for Pro gRPC acceleration)
+- `GRPC_ACCESS_MODE` — global override for app gRPC features (`off`, `pro`, `all`)
 - `DATABASE_URL` — PostgreSQL connection string (required)
 - `FEE_COLLECTOR_WALLET_ADDRESS` — collector wallet used for usage-fee transfers (required for fee-charged starts)
 
@@ -538,6 +549,7 @@ The volume bot uses Shyft RabbitStream for real-time account updates, reducing R
 
 - Fee schedule and scope rules are defined in `docs/implementation/pricing-implementation.md`.
 - Volume bot start applies generated-wallet usage fees (`generatedWalletCount * 0.02 SOL`).
+- Pro users receive a zero-fee platform quote and are not charged the generated-wallet platform fee.
 - Preflight/summary responses include usage-fee totals for UI visibility.
 
 ## Logging

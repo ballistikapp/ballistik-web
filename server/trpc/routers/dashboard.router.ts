@@ -7,6 +7,7 @@ import {
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { ingestionQueue } from "@/server/services/ingestion-queue.service";
 import { getEnv } from "@/lib/config/env";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
 
 export const dashboardRouter = router({
   getStats: protectedProcedure
@@ -19,12 +20,21 @@ export const dashboardRouter = router({
     .query(async ({ input, ctx }) => {
       return await dashboardService.getDeFiPools(input, ctx.user.id);
     }),
-  getGrpcStatus: protectedProcedure.query(() => {
+  getGrpcStatus: protectedProcedure.query(({ ctx }) => {
     const status = grpcManager.getStatus();
     const ingestionStatus = ingestionQueue.getStatus();
     const { MONITORING_PIPELINE_V2 } = getEnv();
+    const access = grpcAccessService.getFeatureAccess(
+      ctx.user,
+      "dashboard-live-monitoring"
+    );
     return {
-      available: status.enabled,
+      available: access.allowed,
+      entitled: access.allowed,
+      accessReason: access.reason,
+      infraAvailable: access.infraAvailable,
+      tokenConfigured: access.tokenConfigured,
+      accessMode: access.accessMode,
       connected: status.connected,
       lastError: status.lastError,
       monitoringPipelineV2: MONITORING_PIPELINE_V2,

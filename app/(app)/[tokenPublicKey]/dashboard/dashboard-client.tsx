@@ -114,6 +114,10 @@ export function DashboardClient() {
       }
     );
 
+  const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
+    enabled: !!tokenPublicKey,
+  });
+
   const storedMonitoringOverride = tokenPublicKey
     ? getStoredMonitoringOverride(tokenPublicKey)
     : null;
@@ -121,16 +125,14 @@ export function DashboardClient() {
     userMonitoringOverride?.tokenPublicKey === tokenPublicKey
       ? userMonitoringOverride.enabled
       : storedMonitoringOverride;
-  const isMonitoring =
+  const liveMonitoringAllowed = grpcStatusQuery.data?.available ?? false;
+  const desiredMonitoring =
     activeMonitoringOverride ??
     (statsData
       ? shouldDefaultMonitoring(statsData.header.launchCompletedAt)
       : false);
+  const isMonitoring = desiredMonitoring && liveMonitoringAllowed;
   const monitoringInitialized = Boolean(statsData && tokenPublicKey);
-
-  const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
-    enabled: false,
-  });
   const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
     enabled: !!tokenPublicKey,
   });
@@ -152,7 +154,11 @@ export function DashboardClient() {
         try {
           const { data } = await grpcStatusQuery.refetch();
           if (!data?.available) {
-            toast.error("Real-time monitoring is unavailable");
+            toast.error(
+              data?.accessReason === "not_pro"
+                ? "Upgrade to Pro to activate live monitoring"
+                : "Real-time monitoring is unavailable"
+            );
             return;
           }
         } catch {
@@ -290,7 +296,13 @@ export function DashboardClient() {
         refetchStats();
       }
     },
-    [isMonitoring, monitoringRefreshHoldings, refetchStats, tokenPublicKey]
+    [
+      isMonitoring,
+      logDashboardEvent,
+      monitoringRefreshHoldings,
+      refetchStats,
+      tokenPublicKey,
+    ]
   );
 
   const scheduleMonitoringHoldingsRefresh = useCallback(
@@ -527,6 +539,13 @@ export function DashboardClient() {
   const staleByStats = dataUpdatedAt > 0 && nowMs - dataUpdatedAt > STALE_THRESHOLD_MS;
   const staleByEvents =
     lastSseEventAt !== null && nowMs - lastSseEventAt > STALE_THRESHOLD_MS;
+  const monitoringDisabledMessage =
+    grpcStatusQuery.data?.accessReason === "not_pro"
+      ? "Upgrade to Pro to activate live monitoring. Dashboard will keep polling every 30 seconds."
+      : grpcStatusQuery.data?.accessReason === "grpc_disabled" ||
+          grpcStatusQuery.data?.accessReason === "grpc_not_configured"
+        ? "Live monitoring is currently unavailable. Dashboard will keep polling every 30 seconds."
+        : null;
   const monitoringHealthState: MonitoringHealthState = !isMonitoring
     ? "off"
     : sseError || grpcConnected === false
@@ -756,6 +775,7 @@ export function DashboardClient() {
       {monitoringInitialized && (
         <MonitoringPanel
           isMonitoring={isMonitoring}
+          disabledMessage={monitoringDisabledMessage}
           onToggleMonitoring={handleToggleMonitoring}
           onRefresh={handleRefresh}
           isRefreshing={fullRefreshing || statsRefreshing}

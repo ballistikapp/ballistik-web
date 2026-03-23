@@ -2,12 +2,19 @@
 
 ## Overview
 
-Shyft provides multiple APIs for interacting with Solana data. The project uses the Shyft "Build" plan which includes gRPC streaming (Yellowstone + RabbitStream), REST APIs, Callbacks, and DeFi APIs. All Shyft features are opt-in: when `SHYFT_API_KEY` is not set, the system falls back to raw Solana RPC calls.
+Shyft provides multiple APIs for interacting with Solana data. The project uses Shyft REST, callback, DeFi, and optional gRPC streaming integrations. gRPC-backed product features are gated separately from raw infrastructure availability:
+
+- `SHYFT_API_KEY` enables REST APIs, callbacks, and DeFi APIs.
+- `SHYFT_GRPC_TOKEN` enables Yellowstone/RabbitStream transport for server-side streaming.
+- App-level access to gRPC-powered features is controlled by the user's JWT `plan` claim plus the global `GRPC_ACCESS_MODE` override.
+
+Free users fall back to RPC polling or slower non-streaming behavior. Pro users can use live gRPC-powered features when infrastructure is enabled.
 
 ## Environment Variables
 
 - `SHYFT_API_KEY` — enables Shyft REST APIs, Callbacks, and DeFi APIs
-- `SHYFT_GRPC_TOKEN` — x-token for gRPC authentication (separate from API key per Shyft docs). Falls back to `SHYFT_API_KEY` if not set.
+- `SHYFT_GRPC_TOKEN` — x-token for gRPC authentication
+- `GRPC_ACCESS_MODE` — global app override for gRPC-powered features (`off`, `pro`, `all`)
 - `SHYFT_CALLBACK_SECRET` — validates incoming webhook requests at `/api/webhooks/shyft`
 - `APP_URL` — base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
 
@@ -28,6 +35,8 @@ The manager provides an event-driven API:
 - `grpcManager.onTransactionUpdate(callback)` — listen for new transactions (signature + account keys)
 
 Auto-reconnect with 5-second backoff is built in. The manager is a global singleton preserved across hot reloads in development.
+
+Infrastructure availability alone does not grant product access. Callers must check the centralized gRPC access service before using gRPC-backed features for a user-facing workflow.
 
 ### Shared Utilities (`server/solana/grpc-utils.ts`)
 
@@ -59,7 +68,13 @@ The tRPC client uses a `splitLink` to route subscriptions to `httpSubscriptionLi
 
 ### Fallback Behavior
 
-When subscriptions are available, polling intervals are relaxed (e.g. live transactions poll every 30s instead of 2s). If the subscription connection fails, components fall back to aggressive polling automatically.
+When subscriptions are available, polling intervals are relaxed (e.g. live transactions poll every 30s instead of 2s). If the user is not entitled to live monitoring, or if the subscription connection fails, components fall back to polling/manual refresh automatically.
+
+Current product policy:
+
+- Pro users can access all gRPC-powered features when `SHYFT_GRPC_TOKEN` is configured and `GRPC_ACCESS_MODE` permits it.
+- Free users do not get live dashboard monitoring and do not use gRPC-assisted launch/bundle confirmation.
+- Free users can still use volume bot, but only under the slower non-gRPC interval constraints.
 
 ## Shyft REST APIs (`server/services/shyft-api.service.ts`)
 
@@ -174,6 +189,17 @@ Client
        ├─> httpSubscriptionLink (SSE) → subscription.router.ts
        └─> httpBatchLink (HTTP) → feature routers → services → Shyft REST / RPC
 ```
+
+### Entitlement Layer
+
+User entitlements are not re-read from the database on every request. Instead:
+
+1. `User.plan` is stored in the database as the source of truth.
+2. The current plan is embedded into the short-lived JWT access token.
+3. `server/trpc/context.ts` exposes that `plan` claim on `ctx.user`.
+4. gRPC feature checks and platform-fee waivers use the token claim during request handling.
+
+This means plan upgrades/downgrades take effect when the access token is re-issued or expires.
 
 ## Region Selection
 

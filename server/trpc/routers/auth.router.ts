@@ -170,7 +170,8 @@ export const authRouter = router({
       const token = signToken(
         updated.id,
         updated.mainWalletPublicKey,
-        updated.name
+        updated.name,
+        updated.plan
       );
       const cookieStore = await cookies();
       const secureCookie = await resolveCookieSecure();

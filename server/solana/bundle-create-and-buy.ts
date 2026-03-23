@@ -25,6 +25,7 @@ type BundleLaunchInput = {
   buyAmountsLamport: bigint[];
   tipper: Keypair;
   tipLamports: number;
+  enableGrpc?: boolean;
   onBundleEvent?: (event: BundleTelemetryEvent) => void | Promise<void>;
   adaptiveTipEscalation?: {
     enabled?: boolean;
@@ -147,6 +148,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
       input.tipper,
       input.tipLamports,
       {
+        enableGrpc: input.enableGrpc,
         onEvent: input.onBundleEvent,
         adaptiveTipEscalation: input.adaptiveTipEscalation,
       }

@@ -20,6 +20,7 @@
 - Vanity mint fee applies only when vanity mint is enabled for launch.
 - Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
 - Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
+- Pro waives platform fees only. Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not waived.
 
 ## Configuration
 
@@ -56,6 +57,8 @@ Total usage fee is:
 - Usage fees are computed server-side and transferred from the user's main wallet to the configured collector wallet.
 - Fee collection is part of protected server workflows and is never trusted to client-side calculations.
 - Fee collection validates collector wallet configuration before transfer.
+- Fee exemption is decided from the authenticated user's JWT `plan` claim during the request path.
+- `User.plan` in the database is the source of truth for newly issued access tokens, but active access tokens continue to honor their embedded plan claim until refresh/expiry.
 
 ## UI Visibility Requirements
 
@@ -82,6 +85,13 @@ All pre-operation quotes use a shared vocabulary across launch and volume bot:
 - **Edit-time estimate**: fast client-side estimate used while users edit forms. This can be conservative.
 - **Confirm-time quote**: server-generated live quote using current balances and rent values. This is the authoritative amount shown before user confirmation.
 - Runtime-sensitive categories (for example trade execution fees and variable bundle buys) must be labeled as ranges or caveats when they cannot be exact at confirm time.
+
+## Pro Plan Behavior
+
+- Launch previews and starts return zero platform usage fees for Pro users.
+- Volume bot preflight and start return zero platform usage fees for Pro users.
+- The same fee-waiver decision must be applied consistently to quote generation and actual fee collection.
+- UI should still show non-waived operational costs so the user understands expected network spend.
 
 ## Related Files
 

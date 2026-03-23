@@ -69,14 +69,18 @@ class GrpcManager {
   async connect(
     endpoint?: "rabbitstream" | "yellowstone"
   ): Promise<boolean> {
-    const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
-    const grpcToken = SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY;
-    if (!grpcToken) {
+    const { SHYFT_GRPC_TOKEN, GRPC_ACCESS_MODE } = getEnv();
+    if (GRPC_ACCESS_MODE === "off") {
+      log.warn("GRPC_ACCESS_MODE=off, gRPC disabled");
+      this.lastError = "GRPC_ACCESS_MODE=off";
+      return false;
+    }
+    if (!SHYFT_GRPC_TOKEN) {
       log.warn("SHYFT_GRPC_TOKEN not set, gRPC disabled");
       this.lastError = "SHYFT_GRPC_TOKEN not set";
       return false;
     }
-    this.apiKey = grpcToken;
+    this.apiKey = SHYFT_GRPC_TOKEN;
     this.endpointType = endpoint ?? "rabbitstream";
 
     try {
@@ -93,7 +97,7 @@ class GrpcManager {
         return false;
       }
 
-      const client = new Client(url, grpcToken, undefined);
+      const client = new Client(url, SHYFT_GRPC_TOKEN, undefined);
       this.stream = await client.subscribe();
       this.setupStreamHandlers();
       this.connected = true;
@@ -392,11 +396,11 @@ class GrpcManager {
   }
 
   getStatus() {
-    const { SHYFT_GRPC_TOKEN, SHYFT_API_KEY } = getEnv();
-    const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN ?? SHYFT_API_KEY);
+    const { SHYFT_GRPC_TOKEN, GRPC_ACCESS_MODE } = getEnv();
+    const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN);
     return {
       connected: this.connected,
-      enabled: tokenConfigured,
+      enabled: tokenConfigured && GRPC_ACCESS_MODE !== "off",
       lastError: this.lastError,
       endpointType: this.endpointType,
       subscriptionCount: this.subscriptions.size,

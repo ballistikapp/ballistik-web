@@ -1,6 +1,7 @@
 import jwt from "jsonwebtoken";
 import type { SignOptions } from "jsonwebtoken";
 import { getEnv } from "@/lib/config/env";
+import { UserPlan, type UserPlan as UserPlanType } from "@/lib/generated/prisma/client";
 
 const INSECURE_FALLBACK_SECRET = "your-secret-key-change-in-production";
 
@@ -52,6 +53,7 @@ export interface JWTPayload {
   userId: string;
   publicKey: string;
   name?: string;
+  plan: UserPlanType;
   iat?: number;
   exp?: number;
 }
@@ -59,9 +61,10 @@ export interface JWTPayload {
 export function signToken(
   userId: string,
   publicKey: string,
-  name: string
+  name: string,
+  plan: UserPlanType
 ): string {
-  return jwt.sign({ userId, publicKey, name }, resolveJwtSecret(), {
+  return jwt.sign({ userId, publicKey, name, plan }, resolveJwtSecret(), {
     expiresIn: resolveJwtExpiration(),
   });
 }
@@ -69,7 +72,10 @@ export function signToken(
 export function verifyToken(token: string): JWTPayload | null {
   try {
     const decoded = jwt.verify(token, resolveJwtSecret()) as JWTPayload;
-    return decoded;
+    return {
+      ...decoded,
+      plan: decoded.plan ?? UserPlan.FREE,
+    };
   } catch {
     return null;
   }

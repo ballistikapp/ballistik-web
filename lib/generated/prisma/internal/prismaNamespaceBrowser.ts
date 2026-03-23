@@ -103,6 +103,7 @@ export type TestTableScalarFieldEnum = (typeof TestTableScalarFieldEnum)[keyof t
 export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
+  plan: 'plan',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

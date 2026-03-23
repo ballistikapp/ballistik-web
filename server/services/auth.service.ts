@@ -8,7 +8,7 @@ import type {
   AuthUserOutput,
   UpdateNameInput,
 } from "@/server/schemas";
-import { WalletType } from "@/lib/generated/prisma/client";
+import { UserPlan, WalletType } from "@/lib/generated/prisma/client";
 import { logger } from "@/lib/logger";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { signToken } from "@/lib/auth/jwt";
@@ -25,7 +25,10 @@ type SessionRequestMeta = {
   userAgent?: string | null;
 };
 
-type SessionUser = Pick<AuthUserOutput, "id" | "name" | "mainWalletPublicKey">;
+type SessionUser = Pick<
+  AuthUserOutput,
+  "id" | "name" | "plan" | "mainWalletPublicKey"
+>;
 
 function sanitizeMeta(meta?: SessionRequestMeta) {
   const ip = meta?.clientIp?.trim() || null;
@@ -95,6 +98,7 @@ export const authService = {
       const user = await prisma.user.create({
         data: {
           name: accountName,
+          plan: UserPlan.FREE,
           mainWalletPublicKey: publicKey,
         },
       });
@@ -102,6 +106,7 @@ export const authService = {
       const result: AuthUserOutput = {
         id: user.id,
         name: user.name,
+        plan: user.plan,
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: 0,
         createdAt: user.createdAt,
@@ -162,6 +167,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
+        plan: user.plan,
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(wallet.balanceSol ?? 0),
         createdAt: user.createdAt,
@@ -189,7 +195,7 @@ export const authService = {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { name: input.name.trim() },
-      select: { id: true, name: true, mainWalletPublicKey: true },
+      select: { id: true, name: true, plan: true, mainWalletPublicKey: true },
     });
 
     return updated;
@@ -233,7 +239,12 @@ export const authService = {
 
     return {
       sessionId: session.id,
-      accessToken: signToken(user.id, user.mainWalletPublicKey, user.name),
+      accessToken: signToken(
+        user.id,
+        user.mainWalletPublicKey,
+        user.name,
+        user.plan
+      ),
       refreshToken,
       refreshExpiresAt,
       sessionExpiresAt,
@@ -257,6 +268,7 @@ export const authService = {
                 select: {
                   id: true,
                   name: true,
+                  plan: true,
                   mainWalletPublicKey: true,
                 },
               },
@@ -359,7 +371,8 @@ export const authService = {
       accessToken: signToken(
         result.user.id,
         result.user.mainWalletPublicKey,
-        result.user.name
+        result.user.name,
+        result.user.plan
       ),
     };
   },
@@ -442,6 +455,7 @@ export const authService = {
         select: {
           id: true,
           name: true,
+          plan: true,
           mainWalletPublicKey: true,
           createdAt: true,
           updatedAt: true,
@@ -460,6 +474,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
+        plan: user.plan,
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(user.mainWallet?.balanceSol ?? 0),
         createdAt: user.createdAt,

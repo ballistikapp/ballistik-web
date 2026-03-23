@@ -37,7 +37,12 @@ type VolumeBotWalletWithRelations = Prisma.VolumeBotWalletGetPayload<{
   include: { session: true; wallet: true };
 }>;
 
-type StoredVolumeBotConfig = VolumeBotConfigInput;
+type StoredVolumeBotConfig = VolumeBotConfigInput & {
+  entitlementSnapshot?: {
+    volumeBotRealtimeEnabled?: boolean;
+    platformFeeWaived?: boolean;
+  };
+};
 
 type VolumeBotAction = "BUY" | "SELL";
 

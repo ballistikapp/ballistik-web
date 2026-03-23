@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import { UserPlan, type Prisma } from "@/lib/generated/prisma/client";
 import { AppError, isAppError } from "@/server/errors";
 import { logger } from "@/lib/logger";
 import {
@@ -9,7 +9,10 @@ import {
 } from "@/server/schemas/launch.schema";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
-import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
+import {
+  calculateLaunchUsageFees,
+  waiveLaunchUsageFees,
+} from "@/lib/config/usage-fees.config";
 import { getEnv } from "@/lib/config/env";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
@@ -48,9 +51,19 @@ import { usageFeeService } from "@/server/services/usage-fee.service";
 import { retryLaunchDbWrite } from "@/server/services/launch-db.helpers";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { computeFailedLaunchDrainLamports } from "@/server/services/launch-failure-recovery.helpers";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
+import type { ContextUser } from "@/server/schemas/auth.schema";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
+type RequestUser = Pick<ContextUser, "id" | "plan">;
+type StoredLaunchInput = LaunchTokenInput & {
+  entitlementSnapshot?: {
+    plan: ContextUser["plan"];
+    launchRealtimeEnabled: boolean;
+    platformFeeWaived: boolean;
+  };
+};
 const LAUNCH_LOG_WINDOW = 200;
 
 function toLamports(amount: number) {
@@ -66,6 +79,23 @@ function normalizeSymbol(symbol: string) {
 }
 
 const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
+
+function applyLaunchFeePolicy(
+  input: LaunchTokenInput | LaunchPreviewCostsInput,
+  user: Pick<ContextUser, "plan">
+) {
+  const usageFees = calculateLaunchUsageFees({
+    devWalletOption: input.devWalletOption,
+    bundleBuyEnabled: input.bundleBuyEnabled,
+    bundlerWalletCount: input.bundlerWalletCount,
+    distributionWalletMultiplier: input.distributionWalletMultiplier,
+    vanityMint: input.vanityMint,
+    removeAttribution: input.removeAttribution,
+  });
+  return grpcAccessService.isPlatformFeeWaived(user)
+    ? waiveLaunchUsageFees(usageFees)
+    : usageFees;
+}
 
 function composeTokenDescription(input: LaunchTokenInput) {
   const baseDescription = input.description?.trim() || "";
@@ -776,7 +806,11 @@ async function setStep(
   await appendLog(launchId, "STEP", message, step);
 }
 
-async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
+async function waitForMintAccount(
+  mintPublicKey: string,
+  launchId?: string,
+  useGrpc = true
+) {
   const {
     mintConfirmTimeoutMs: MINT_CONFIRM_TIMEOUT_MS,
     mintConfirmIntervalMs: MINT_CONFIRM_INTERVAL_MS,
@@ -798,7 +832,7 @@ async function waitForMintAccount(mintPublicKey: string, launchId?: string) {
   };
 
   const grpcPromise = new Promise<MintResult>((resolve) => {
-    if (!grpcManager.isConnected()) {
+    if (!useGrpc || !grpcManager.isConnected()) {
       return;
     }
 
@@ -1317,8 +1351,11 @@ async function resolvePreflightDevWalletBalance(params: {
   return { devWalletPublicKey, currentLamports };
 }
 
-async function ensureLaunchFundingAvailable(input: LaunchCostInput, userId: string) {
-  const preview = await calculateLaunchCostPreview(input, userId);
+async function ensureLaunchFundingAvailable(
+  input: LaunchCostInput,
+  user: RequestUser
+) {
+  const preview = await calculateLaunchCostPreview(input, user);
   if (!preview.hasSufficientMainWallet) {
     throw new AppError(
       `Main wallet requires ${preview.requiredMainWalletSol.toFixed(4)} SOL to fund launch wallets and usage fees`,
@@ -1329,7 +1366,7 @@ async function ensureLaunchFundingAvailable(input: LaunchCostInput, userId: stri
 
 async function calculateLaunchCostPreview(
   input: LaunchCostInput,
-  userId: string
+  user: RequestUser
 ): Promise<LaunchCostPreview> {
   const {
     bundlerWalletCount,
@@ -1343,9 +1380,9 @@ async function calculateLaunchCostPreview(
     createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
     minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
   } = getLaunchConfig();
-  const user = await loadUserWithMainWallet(userId);
+  const dbUser = await loadUserWithMainWallet(user.id);
   const connection = getSolanaConnection();
-  const mainWalletPublicKey = user.mainWallet.publicKey;
+  const mainWalletPublicKey = dbUser.mainWallet.publicKey;
   const { devWalletPublicKey, currentLamports: importedDevCurrentLamports } =
     await resolvePreflightDevWalletBalance({
       input,
@@ -1372,14 +1409,7 @@ async function calculateLaunchCostPreview(
   const mainBalanceLamports = BigInt(
     await connection.getBalance(new PublicKey(mainWalletPublicKey), "confirmed")
   );
-  const usageFees = calculateLaunchUsageFees({
-    devWalletOption: input.devWalletOption,
-    bundleBuyEnabled: input.bundleBuyEnabled,
-    bundlerWalletCount,
-    distributionWalletMultiplier,
-    vanityMint: input.vanityMint,
-    removeAttribution: input.removeAttribution,
-  });
+  const usageFees = applyLaunchFeePolicy(input, user);
   const usageFeeLamports = BigInt(toLamports(usageFees.totalFeeSol));
   const totalLamports = fundingPlan.fundingTargets.reduce((total, target) => {
     const currentLamports =
@@ -1425,6 +1455,7 @@ async function calculateLaunchCostPreview(
   );
 
   return {
+    platformFeeWaived: usageFees.platformFeeWaived,
     mainWalletBalanceSol: lamportsToSol(mainBalanceLamports),
     mainWalletBalanceLamports: mainBalanceLamports.toString(),
     requiredMainWalletSol: lamportsToSol(requiredMainLamports),
@@ -2751,8 +2782,8 @@ export type UserLaunchRow = {
 };
 
 export const launchService = {
-  async previewCosts(input: LaunchPreviewCostsInput, userId: string) {
-    return await calculateLaunchCostPreview(input, userId);
+  async previewCosts(input: LaunchPreviewCostsInput, user: RequestUser) {
+    return await calculateLaunchCostPreview(input, user);
   },
 
   async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
@@ -2860,14 +2891,14 @@ export const launchService = {
     }
   },
 
-  async startLaunch(input: LaunchTokenInput, userId: string) {
+  async startLaunch(input: LaunchTokenInput, user: RequestUser) {
     const idempotencyKey = [
       "launch-start",
-      userId,
+      user.id,
       input.tokenName.trim().toLowerCase(),
       normalizeSymbol(input.tokenSymbol),
     ].join(":");
-    const actionKey = `launch:start:${userId}`;
+    const actionKey = `launch:start:${user.id}`;
 
     return await withActionLock(actionKey, async () => {
       return await withIdempotency({
@@ -2876,7 +2907,7 @@ export const launchService = {
         execute: async () => {
           const existing = await prisma.launch.findFirst({
             where: {
-              userId,
+              userId: user.id,
               status: { in: ["PENDING", "RUNNING"] },
             },
             orderBy: { createdAt: "desc" },
@@ -2887,12 +2918,24 @@ export const launchService = {
           }
 
           const normalizedInput = await normalizeLaunchInputMediaForStorage(input);
-          await ensureLaunchFundingAvailable(normalizedInput, userId);
+          await ensureLaunchFundingAvailable(normalizedInput, user);
+          const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
+            user,
+            "launch-fast-confirmation"
+          );
+          const queuedInput: StoredLaunchInput = {
+            ...normalizedInput,
+            entitlementSnapshot: {
+              plan: user.plan,
+              launchRealtimeEnabled: launchRealtimeAccess.allowed,
+              platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
+            },
+          };
           const launch = await prisma.launch.create({
             data: {
-              userId,
+              userId: user.id,
               status: "PENDING",
-              input: normalizedInput,
+              input: queuedInput,
             },
           });
 
@@ -2905,12 +2948,12 @@ export const launchService = {
     });
   },
 
-  async retryLaunch(launchId: string, userId: string) {
-    const actionKey = `launch:retry:${userId}:${launchId}`;
+  async retryLaunch(launchId: string, user: RequestUser) {
+    const actionKey = `launch:retry:${user.id}:${launchId}`;
     return await withActionLock(actionKey, async () => {
       const existingActive = await prisma.launch.findFirst({
         where: {
-          userId,
+          userId: user.id,
           status: { in: ["PENDING", "RUNNING"] },
         },
         orderBy: { createdAt: "desc" },
@@ -2923,7 +2966,7 @@ export const launchService = {
       const sourceLaunch = await prisma.launch.findFirst({
         where: {
           id: launchId,
-          userId,
+          userId: user.id,
           status: { in: ["FAILED", "CANCELED"] },
         },
         select: {
@@ -2955,13 +2998,24 @@ export const launchService = {
         );
       }
       const retryInput = parsedInput.data;
-      await ensureLaunchFundingAvailable(retryInput, userId);
+      await ensureLaunchFundingAvailable(retryInput, user);
+      const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
+        user,
+        "launch-fast-confirmation"
+      );
 
       const retryLaunch = await prisma.launch.create({
         data: {
           userId: sourceLaunch.userId,
           status: "PENDING",
-          input: retryInput,
+          input: {
+            ...retryInput,
+            entitlementSnapshot: {
+              plan: user.plan,
+              launchRealtimeEnabled: retryRealtimeAccess.allowed,
+              platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
+            },
+          } satisfies StoredLaunchInput,
           retriedFromLaunchId: sourceLaunch.id,
         },
       });
@@ -3388,7 +3442,8 @@ export const launchService = {
     });
 
     const launchStartedAt = Date.now();
-    const input = launch.input as LaunchTokenInput;
+    const input = launch.input as StoredLaunchInput;
+    const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
     const {
       createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
       minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
@@ -3403,14 +3458,7 @@ export const launchService = {
     let launchReadyForSuccessRepair = false;
 
     try {
-      const usageFees = calculateLaunchUsageFees({
-        devWalletOption: input.devWalletOption,
-        bundleBuyEnabled: input.bundleBuyEnabled,
-        bundlerWalletCount: input.bundlerWalletCount,
-        distributionWalletMultiplier: input.distributionWalletMultiplier,
-        vanityMint: input.vanityMint,
-        removeAttribution: input.removeAttribution,
-      });
+      const usageFees = applyLaunchFeePolicy(input, { plan: requestPlan });
       const tokenMediaSource = input.tokenImage
         ? input.tokenImage.startsWith("data:")
           ? "inline"
@@ -3737,6 +3785,10 @@ export const launchService = {
             multiplier: 2,
             maxEscalations: 1,
           },
+          enableGrpc: grpcAccessService.getFeatureAccess(
+            { plan: requestPlan },
+            "bundle-fast-confirmation"
+          ).allowed,
           onBundleEvent: async (event) => {
             await appendBundleTelemetryLog(launchId, event);
           },
@@ -3810,7 +3862,14 @@ export const launchService = {
       }
 
       await setStep(launchId, 55, "confirm", "Confirming token on-chain");
-      const confirmation = await waitForMintAccount(mintPublicKey, launchId);
+      const confirmation = await waitForMintAccount(
+        mintPublicKey,
+        launchId,
+        grpcAccessService.getFeatureAccess(
+          { plan: requestPlan },
+          "launch-fast-confirmation"
+        ).allowed
+      );
       if (reservedVanityId !== null) {
         await consumeReservedVanityMint(reservedVanityId, mintPublicKey);
         vanityConsumed = true;
