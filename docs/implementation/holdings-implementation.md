@@ -59,8 +59,8 @@ The `refreshByToken` service is optimized for speed:
 - Mint supply lookups use a short-lived in-memory cache (10s TTL, capped map size) to reduce repeated RPC calls across paginated requests.
 - If supply is temporarily unavailable, the table shows `--` instead of `0.0000%`.
 - Zero-balance rows appear when the wallet has an open ATA for the token.
-- Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells).
-- Sell dialog includes a "Return SOL to main wallet" toggle with a clear description that it sweeps only spendable SOL from processed wallets back to the main wallet while preserving the source wallet's rent reserve.
+- Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells and checked by default when the dialog opens).
+- Sell dialog includes a "Return SOL to main wallet" toggle with a clear description that it sweeps only spendable SOL from processed wallets back to the main wallet while preserving the source wallet's rent reserve, and it is checked by default when the dialog opens.
 - Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.
 

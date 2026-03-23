@@ -42,8 +42,8 @@ export function HoldingSellDialog({
   onConfirm,
 }: HoldingSellDialogProps) {
   const [percentage, setPercentage] = useState("100");
-  const [closeAta, setCloseAta] = useState(false);
-  const [returnSolToMainWallet, setReturnSolToMainWallet] = useState(false);
+  const [closeAta, setCloseAta] = useState(true);
+  const [returnSolToMainWallet, setReturnSolToMainWallet] = useState(true);
   const parsedPercentage = Number.parseFloat(percentage);
   const canCloseAta =
     Number.isFinite(parsedPercentage) && parsedPercentage === 100;
@@ -51,8 +51,8 @@ export function HoldingSellDialog({
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
       setPercentage("100");
-      setCloseAta(false);
-      setReturnSolToMainWallet(false);
+      setCloseAta(true);
+      setReturnSolToMainWallet(true);
     }
     onOpenChange(nextOpen);
   };

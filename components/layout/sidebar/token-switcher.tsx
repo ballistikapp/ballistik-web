@@ -30,7 +30,6 @@ import Link from "next/link";
 import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { useSelectedToken } from "@/hooks/use-selected-token";
 
 export const TokenSwitcher = React.memo(function TokenSwitcher({
@@ -80,9 +79,30 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
 
   if (tokens.length === 0) {
     return (
-      <Button asChild size="xl" className="w-full text-lg font-semibold">
-        <Link href="/launch">Launch New Token</Link>
-      </Button>
+      <SidebarMenuButton
+        asChild
+        size="lg"
+        tooltip="Launch New Token"
+        className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground group-data-[collapsible=icon]:justify-center"
+      >
+        <Link href="/launch" aria-label="Launch New Token">
+          {isSidebarCollapsed ? (
+            <Plus className="size-5 shrink-0" />
+          ) : (
+            <>
+              <div className="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg shrink-0">
+                <Plus className="size-4" />
+              </div>
+              <div className="flex min-w-0 flex-1 flex-col gap-0.5 leading-none">
+                <span className="truncate font-semibold">Launch New Token</span>
+                <span className="text-muted-foreground truncate text-xs">
+                  Create your first token
+                </span>
+              </div>
+            </>
+          )}
+        </Link>
+      </SidebarMenuButton>
     );
   }
 
