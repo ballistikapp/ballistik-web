@@ -4,7 +4,9 @@ import * as React from "react";
 import {
   type Icon,
   IconArrowsRightLeft,
+  IconBrandTelegram,
   IconCoins,
+  IconExternalLink,
   IconLayoutDashboard,
   IconList,
   IconPlus,
@@ -21,6 +23,7 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import { BALLISTIK_TELEGRAM_URL } from "@/lib/config/external-links";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -29,6 +32,7 @@ export type NavMainItem = {
   url: string;
   icon?: Icon;
   scope?: "token" | "global";
+  external?: boolean;
 };
 
 export const tokenWorkspaceRoutes: NavMainItem[] = [
@@ -85,6 +89,16 @@ export const buildAndManageRoutes: NavMainItem[] = [
   },
 ];
 
+export const helpRoutes: NavMainItem[] = [
+  {
+    title: "Telegram",
+    url: BALLISTIK_TELEGRAM_URL,
+    icon: IconBrandTelegram,
+    scope: "global",
+    external: true,
+  },
+];
+
 export const NavMain = React.memo(function NavMain({
   title,
   items,
@@ -123,9 +137,16 @@ export const NavMain = React.memo(function NavMain({
                   tooltip={item.title}
                   disabled={isDisabled}
                 >
-                  <Link href={href}>
-                    {item.icon && <item.icon className="size-10" />}
-                    <span>{item.title}</span>
+                  <Link
+                    href={href}
+                    target={item.external ? "_blank" : undefined}
+                    rel={item.external ? "noreferrer" : undefined}
+                  >
+                    {item.icon && <item.icon className="size-10 shrink-0" />}
+                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                    {item.external ? (
+                      <IconExternalLink className="ml-auto size-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" />
+                    ) : null}
                   </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>

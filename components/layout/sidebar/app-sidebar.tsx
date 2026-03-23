@@ -3,6 +3,7 @@
 import * as React from "react";
 import {
   buildAndManageRoutes,
+  helpRoutes,
   NavMain,
   tokenWorkspaceRoutes,
 } from "@/components/layout/sidebar/nav-main";
@@ -12,9 +13,9 @@ import {
   SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
-import { TokenSwitcher } from "./token-switcher";
 import type { UserTokenItems } from "@/server/services/token.service";
 import { useSelectedToken } from "@/hooks/use-selected-token";
+import { TokenSwitcher } from "./token-switcher";
 
 type Props = React.ComponentProps<typeof Sidebar> & {
   tokens: UserTokenItems;
@@ -42,6 +43,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
           currentToken={effectiveTokenPublicKey}
           className="mt-6"
         />
+        <NavMain title="Contact & Help" items={helpRoutes} className="mt-6" />
       </SidebarContent>
       <SidebarFooter className="pt-0">
         <p className="text-center text-4xl font-bold tracking-wide text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">

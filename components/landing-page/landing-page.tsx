@@ -2,12 +2,18 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { IconBrandTelegram } from "@tabler/icons-react";
 import { motion } from "motion/react";
-import { ChevronRightIcon } from "lucide-react";
+import {
+  ArrowRightIcon,
+  ArrowUpRightIcon,
+  ChevronRightIcon,
+} from "lucide-react";
 import { Spotlight } from "@/components/ui/spotlight";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
 import FeaturesGrid from "@/components/landing-page/features-grid";
+import { BALLISTIK_TELEGRAM_URL } from "@/lib/config/external-links";
 
 export function LandingPage() {
   return (
@@ -314,14 +320,11 @@ export function LandingPage() {
       </main>
 
       <footer className="mt-20 border-t border-neutral-800 px-6 md:px-12 py-20 ">
-        <div className="flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-2xl font-bold text-foreground tracking-wide">
+        <div className="flex flex-col items-center gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
+          <p className="text-2xl font-bold text-foreground tracking-wide md:justify-self-start">
             BALLISTIK
           </p>
-          <p className="text-xs text-neutral-500">
-            © {new Date().getFullYear()} Ballistik. All rights reserved.
-          </p>
-          <div className="flex items-center gap-6 text-xs text-neutral-500">
+          <div className="flex items-center justify-center gap-6 text-xs text-neutral-500 md:justify-self-center">
             <Link
               href="#features"
               className="hover:text-neutral-300 transition-colors"
@@ -336,11 +339,22 @@ export function LandingPage() {
             </Link>
             <Link
               href="/auth"
-              className="hover:text-neutral-300 transition-colors"
+              className="inline-flex items-center gap-1 hover:text-neutral-300 transition-colors"
             >
-              App
+              <span>App</span>
+              <ArrowRightIcon className="size-3.5" />
             </Link>
           </div>
+          <Link
+            href={BALLISTIK_TELEGRAM_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center justify-center gap-1 text-xs text-neutral-500 hover:text-neutral-300 transition-colors md:justify-self-end"
+          >
+            <IconBrandTelegram className="size-3.5" />
+            <span>Telegram</span>
+            <ArrowUpRightIcon className="size-3.5" />
+          </Link>
         </div>
       </footer>
     </div>
