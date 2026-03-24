@@ -29,6 +29,7 @@ const HOLDINGS_REFRESH_DEBOUNCE_MS = 1_500;
 const MONITORING_HOLDINGS_SAFETY_INTERVAL_MS = 12_000;
 const MONITORING_ACTIVITY_WINDOW_MS = 60_000;
 const HOLDINGS_STALE_THRESHOLD_MS = 20_000;
+const ACCOUNT_SUBSCRIPTION_HREF = "/account/subscription";
 
 type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
@@ -156,7 +157,7 @@ export function DashboardClient() {
           if (!data?.available) {
             toast.error(
               data?.accessReason === "not_pro"
-                ? "Upgrade to Pro to activate live monitoring"
+                ? "Upgrade to Pro on your subscription page to activate live monitoring"
                 : "Real-time monitoring is unavailable"
             );
             return;
@@ -776,6 +777,16 @@ export function DashboardClient() {
         <MonitoringPanel
           isMonitoring={isMonitoring}
           disabledMessage={monitoringDisabledMessage}
+          disabledActionHref={
+            grpcStatusQuery.data?.accessReason === "not_pro"
+              ? ACCOUNT_SUBSCRIPTION_HREF
+              : undefined
+          }
+          disabledActionLabel={
+            grpcStatusQuery.data?.accessReason === "not_pro"
+              ? "Upgrade to Pro"
+              : undefined
+          }
           onToggleMonitoring={handleToggleMonitoring}
           onRefresh={handleRefresh}
           isRefreshing={fullRefreshing || statsRefreshing}

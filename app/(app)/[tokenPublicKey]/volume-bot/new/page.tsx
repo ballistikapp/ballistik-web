@@ -78,6 +78,7 @@ import {
 } from "@/components/ui/alert-dialog";
 
 const DEFAULT_DURATION_SECONDS = 5 * 60;
+const ACCOUNT_SUBSCRIPTION_HREF = "/account/subscription";
 
 type RangeInput = {
   solMin: number;
@@ -873,7 +874,7 @@ export default function VolumeBotStartPage() {
     if (fastestConfiguredInterval < minimumIntervalSeconds) {
       toast.error(
         requiresProForFastIntervals
-          ? `Upgrade to Pro to use intervals below ${minimumIntervalSeconds}s`
+          ? `Upgrade to Pro on your subscription page to use intervals below ${minimumIntervalSeconds}s`
           : `Intervals below ${minimumIntervalSeconds}s are unavailable right now`
       );
       return;
@@ -1989,15 +1990,24 @@ export default function VolumeBotStartPage() {
                 </div>
               )}
               {fastestConfiguredInterval < minimumIntervalSeconds && (
-                <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
-                  <InfoIcon className="size-4 shrink-0 mt-0.5" />
-                  <span>
-                    {requiresProForFastIntervals
-                      ? `Upgrade to Pro to use intervals below ${minimumIntervalSeconds}s and activate gRPC-backed realtime trading.`
-                      : realtimeUnavailable
-                        ? `Intervals below ${minimumIntervalSeconds}s are currently unavailable because gRPC infrastructure is disabled.`
-                        : `Intervals below ${minimumIntervalSeconds}s use gRPC streaming. Max ${Math.floor(18 * fastestConfiguredInterval)} wallets allowed.`}
-                  </span>
+                <div className="space-y-3">
+                  <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
+                    <InfoIcon className="size-4 shrink-0 mt-0.5" />
+                    <span>
+                      {requiresProForFastIntervals
+                        ? `Upgrade to Pro to use intervals below ${minimumIntervalSeconds}s and activate gRPC-backed realtime trading.`
+                        : realtimeUnavailable
+                          ? `Intervals below ${minimumIntervalSeconds}s are currently unavailable because gRPC infrastructure is disabled.`
+                          : `Intervals below ${minimumIntervalSeconds}s use gRPC streaming. Max ${Math.floor(18 * fastestConfiguredInterval)} wallets allowed.`}
+                    </span>
+                  </div>
+                  {requiresProForFastIntervals ? (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link href={ACCOUNT_SUBSCRIPTION_HREF}>
+                        Upgrade to Pro
+                      </Link>
+                    </Button>
+                  ) : null}
                 </div>
               )}
             </div>

@@ -21,6 +21,7 @@
 - Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
 - Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
 - Pro waives platform fees only. Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not waived.
+- Weekly Pro access costs `0.95 SOL` for 7 days and is charged from the user's main wallet to the existing fee collector wallet.
 
 ## Configuration
 
@@ -59,6 +60,7 @@ Total usage fee is:
 - Fee collection validates collector wallet configuration before transfer.
 - Fee exemption is decided from the authenticated user's JWT `plan` claim during the request path.
 - `User.plan` in the database is the source of truth for newly issued access tokens, but active access tokens continue to honor their embedded plan claim until refresh/expiry.
+- Weekly Pro purchases reuse the same collector-wallet payment rail as other platform charges; no external billing provider is involved in v1.
 
 ## UI Visibility Requirements
 
@@ -92,6 +94,9 @@ All pre-operation quotes use a shared vocabulary across launch and volume bot:
 - Volume bot preflight and start return zero platform usage fees for Pro users.
 - The same fee-waiver decision must be applied consistently to quote generation and actual fee collection.
 - UI should still show non-waived operational costs so the user understands expected network spend.
+- Pro is account-wide and lasts 7 days per purchase.
+- There is no auto-renewal in v1; renewal is a manual repeat purchase.
+- Billing history should show the Pro purchase amount, transaction signature, purchase time, and expiration time.
 
 ## Related Files
 

@@ -53,6 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  ProSubscriptionPayment: 'ProSubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
   Wallet: 'Wallet',
@@ -104,12 +105,27 @@ export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
   plan: 'plan',
+  proStartedAt: 'proStartedAt',
+  proExpiresAt: 'proExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const ProSubscriptionPaymentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  amountSol: 'amountSol',
+  txSignature: 'txSignature',
+  startsAt: 'startsAt',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type ProSubscriptionPaymentScalarFieldEnum = (typeof ProSubscriptionPaymentScalarFieldEnum)[keyof typeof ProSubscriptionPaymentScalarFieldEnum]
 
 
 export const AuthSessionScalarFieldEnum = {

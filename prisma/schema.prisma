@@ -24,10 +24,13 @@ model User {
   id String @id @default(cuid())
   name String
   plan UserPlan @default(FREE)
+  proStartedAt DateTime?
+  proExpiresAt DateTime?
   mainWalletPublicKey String @unique
   mainWallet Wallet @relation("UserMainWallet", fields: [mainWalletPublicKey], references: [publicKey])
   wallets Wallet[] @relation("WalletUser")
   authSessions AuthSession[] @relation("AuthSessionUser")
+  proSubscriptionPayments ProSubscriptionPayment[] @relation("ProSubscriptionPaymentUser")
   tokens Token[] @relation("TokenUser")
   launches Launch[] @relation("LaunchUser")
   holdingExits HoldingExit[] @relation("HoldingExitUser")
@@ -38,6 +41,20 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
+}
+
+model ProSubscriptionPayment {
+  id String @id @default(cuid())
+  userId String
+  user User @relation("ProSubscriptionPaymentUser", fields: [userId], references: [id])
+  amountSol Decimal
+  txSignature String @unique
+  startsAt DateTime
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@map("ProSubscriptionPayment")
 }
 
 model AuthSession {

@@ -28,6 +28,8 @@ export type UserMinAggregateOutputType = {
   id: string | null
   name: string | null
   plan: $Enums.UserPlan | null
+  proStartedAt: Date | null
+  proExpiresAt: Date | null
   mainWalletPublicKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -37,6 +39,8 @@ export type UserMaxAggregateOutputType = {
   id: string | null
   name: string | null
   plan: $Enums.UserPlan | null
+  proStartedAt: Date | null
+  proExpiresAt: Date | null
   mainWalletPublicKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -46,6 +50,8 @@ export type UserCountAggregateOutputType = {
   id: number
   name: number
   plan: number
+  proStartedAt: number
+  proExpiresAt: number
   mainWalletPublicKey: number
   createdAt: number
   updatedAt: number
@@ -57,6 +63,8 @@ export type UserMinAggregateInputType = {
   id?: true
   name?: true
   plan?: true
+  proStartedAt?: true
+  proExpiresAt?: true
   mainWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
@@ -66,6 +74,8 @@ export type UserMaxAggregateInputType = {
   id?: true
   name?: true
   plan?: true
+  proStartedAt?: true
+  proExpiresAt?: true
   mainWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
@@ -75,6 +85,8 @@ export type UserCountAggregateInputType = {
   id?: true
   name?: true
   plan?: true
+  proStartedAt?: true
+  proExpiresAt?: true
   mainWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
@@ -157,6 +169,8 @@ export type UserGroupByOutputType = {
   id: string
   name: string
   plan: $Enums.UserPlan
+  proStartedAt: Date | null
+  proExpiresAt: Date | null
   mainWalletPublicKey: string
   createdAt: Date
   updatedAt: Date
@@ -187,12 +201,15 @@ export type UserWhereInput = {
   id?: Prisma.StringFilter<"User"> | string
   name?: Prisma.StringFilter<"User"> | string
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
+  proStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  proExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   mainWalletPublicKey?: Prisma.StringFilter<"User"> | string
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
   wallets?: Prisma.WalletListRelationFilter
   authSessions?: Prisma.AuthSessionListRelationFilter
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
   holdingExits?: Prisma.HoldingExitListRelationFilter
@@ -206,12 +223,15 @@ export type UserOrderByWithRelationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   plan?: Prisma.SortOrder
+  proStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  proExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   mainWallet?: Prisma.WalletOrderByWithRelationInput
   wallets?: Prisma.WalletOrderByRelationAggregateInput
   authSessions?: Prisma.AuthSessionOrderByRelationAggregateInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentOrderByRelationAggregateInput
   tokens?: Prisma.TokenOrderByRelationAggregateInput
   launches?: Prisma.LaunchOrderByRelationAggregateInput
   holdingExits?: Prisma.HoldingExitOrderByRelationAggregateInput
@@ -229,11 +249,14 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   name?: Prisma.StringFilter<"User"> | string
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
+  proStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  proExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
   wallets?: Prisma.WalletListRelationFilter
   authSessions?: Prisma.AuthSessionListRelationFilter
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentListRelationFilter
   tokens?: Prisma.TokenListRelationFilter
   launches?: Prisma.LaunchListRelationFilter
   holdingExits?: Prisma.HoldingExitListRelationFilter
@@ -247,6 +270,8 @@ export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   plan?: Prisma.SortOrder
+  proStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  proExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -262,6 +287,8 @@ export type UserScalarWhereWithAggregatesInput = {
   id?: Prisma.StringWithAggregatesFilter<"User"> | string
   name?: Prisma.StringWithAggregatesFilter<"User"> | string
   plan?: Prisma.EnumUserPlanWithAggregatesFilter<"User"> | $Enums.UserPlan
+  proStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  proExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   mainWalletPublicKey?: Prisma.StringWithAggregatesFilter<"User"> | string
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -271,11 +298,14 @@ export type UserCreateInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -289,11 +319,14 @@ export type UserUncheckedCreateInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -307,11 +340,14 @@ export type UserUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -325,11 +361,14 @@ export type UserUncheckedUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -343,6 +382,8 @@ export type UserCreateManyInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -352,6 +393,8 @@ export type UserUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -360,6 +403,8 @@ export type UserUncheckedUpdateManyInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -369,6 +414,8 @@ export type UserCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   plan?: Prisma.SortOrder
+  proStartedAt?: Prisma.SortOrder
+  proExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -378,6 +425,8 @@ export type UserMaxOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   plan?: Prisma.SortOrder
+  proStartedAt?: Prisma.SortOrder
+  proExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -387,6 +436,8 @@ export type UserMinOrderByAggregateInput = {
   id?: Prisma.SortOrder
   name?: Prisma.SortOrder
   plan?: Prisma.SortOrder
+  proStartedAt?: Prisma.SortOrder
+  proExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -404,6 +455,24 @@ export type UserNullableScalarRelationFilter = {
 
 export type EnumUserPlanFieldUpdateOperationsInput = {
   set?: $Enums.UserPlan
+}
+
+export type NullableDateTimeFieldUpdateOperationsInput = {
+  set?: Date | string | null
+}
+
+export type UserCreateNestedOneWithoutProSubscriptionPaymentsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedCreateWithoutProSubscriptionPaymentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutProSubscriptionPaymentsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutProSubscriptionPaymentsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedCreateWithoutProSubscriptionPaymentsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutProSubscriptionPaymentsInput
+  upsert?: Prisma.UserUpsertWithoutProSubscriptionPaymentsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutProSubscriptionPaymentsInput, Prisma.UserUpdateWithoutProSubscriptionPaymentsInput>, Prisma.UserUncheckedUpdateWithoutProSubscriptionPaymentsInput>
 }
 
 export type UserCreateNestedOneWithoutAuthSessionsInput = {
@@ -568,14 +637,113 @@ export type UserUpdateOneRequiredWithoutRefreshCachesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRefreshCachesInput, Prisma.UserUpdateWithoutRefreshCachesInput>, Prisma.UserUncheckedUpdateWithoutRefreshCachesInput>
 }
 
-export type UserCreateWithoutAuthSessionsInput = {
+export type UserCreateWithoutProSubscriptionPaymentsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutProSubscriptionPaymentsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
+  mainWalletPublicKey: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutProSubscriptionPaymentsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedCreateWithoutProSubscriptionPaymentsInput>
+}
+
+export type UserUpsertWithoutProSubscriptionPaymentsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedUpdateWithoutProSubscriptionPaymentsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedCreateWithoutProSubscriptionPaymentsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutProSubscriptionPaymentsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutProSubscriptionPaymentsInput, Prisma.UserUncheckedUpdateWithoutProSubscriptionPaymentsInput>
+}
+
+export type UserUpdateWithoutProSubscriptionPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutProSubscriptionPaymentsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutAuthSessionsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -589,10 +757,13 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -622,10 +793,13 @@ export type UserUpdateWithoutAuthSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -639,10 +813,13 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -656,10 +833,13 @@ export type UserCreateWithoutWalletsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -673,10 +853,13 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -695,10 +878,13 @@ export type UserCreateWithoutMainWalletInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -712,10 +898,13 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -745,10 +934,13 @@ export type UserUpdateWithoutWalletsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -762,10 +954,13 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -790,10 +985,13 @@ export type UserUpdateWithoutMainWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -807,10 +1005,13 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -824,11 +1025,14 @@ export type UserCreateWithoutTokensInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
@@ -841,11 +1045,14 @@ export type UserUncheckedCreateWithoutTokensInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
@@ -874,11 +1081,14 @@ export type UserUpdateWithoutTokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
@@ -891,11 +1101,14 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -908,11 +1121,14 @@ export type UserCreateWithoutLaunchesInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
@@ -925,11 +1141,14 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
@@ -958,11 +1177,14 @@ export type UserUpdateWithoutLaunchesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
@@ -975,11 +1197,14 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -992,11 +1217,14 @@ export type UserCreateWithoutHoldingExitsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
@@ -1009,11 +1237,14 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
@@ -1042,11 +1273,14 @@ export type UserUpdateWithoutHoldingExitsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
@@ -1059,11 +1293,14 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1076,11 +1313,14 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -1093,11 +1333,14 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -1126,11 +1369,14 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -1143,11 +1389,14 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -1160,11 +1409,14 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -1177,11 +1429,14 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -1210,11 +1465,14 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -1227,11 +1485,14 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -1244,11 +1505,14 @@ export type UserCreateWithoutVanityMintsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -1261,11 +1525,14 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -1294,11 +1561,14 @@ export type UserUpdateWithoutVanityMintsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -1311,11 +1581,14 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -1328,11 +1601,14 @@ export type UserCreateWithoutRefreshCachesInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
@@ -1345,11 +1621,14 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
   mainWalletPublicKey: string
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
   tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
   launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
   holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
@@ -1378,11 +1657,14 @@ export type UserUpdateWithoutRefreshCachesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
@@ -1395,11 +1677,14 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   name?: Prisma.StringFieldUpdateOperationsInput | string
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
   tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
   launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
   holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
@@ -1416,6 +1701,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
 export type UserCountOutputType = {
   wallets: number
   authSessions: number
+  proSubscriptionPayments: number
   tokens: number
   launches: number
   holdingExits: number
@@ -1428,6 +1714,7 @@ export type UserCountOutputType = {
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   wallets?: boolean | UserCountOutputTypeCountWalletsArgs
   authSessions?: boolean | UserCountOutputTypeCountAuthSessionsArgs
+  proSubscriptionPayments?: boolean | UserCountOutputTypeCountProSubscriptionPaymentsArgs
   tokens?: boolean | UserCountOutputTypeCountTokensArgs
   launches?: boolean | UserCountOutputTypeCountLaunchesArgs
   holdingExits?: boolean | UserCountOutputTypeCountHoldingExitsArgs
@@ -1459,6 +1746,13 @@ export type UserCountOutputTypeCountWalletsArgs<ExtArgs extends runtime.Types.Ex
  */
 export type UserCountOutputTypeCountAuthSessionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.AuthSessionWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountProSubscriptionPaymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ProSubscriptionPaymentWhereInput
 }
 
 /**
@@ -1515,12 +1809,15 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   id?: boolean
   name?: boolean
   plan?: boolean
+  proStartedAt?: boolean
+  proExpiresAt?: boolean
   mainWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   authSessions?: boolean | Prisma.User$authSessionsArgs<ExtArgs>
+  proSubscriptionPayments?: boolean | Prisma.User$proSubscriptionPaymentsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
   holdingExits?: boolean | Prisma.User$holdingExitsArgs<ExtArgs>
@@ -1535,6 +1832,8 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   id?: boolean
   name?: boolean
   plan?: boolean
+  proStartedAt?: boolean
+  proExpiresAt?: boolean
   mainWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1545,6 +1844,8 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   id?: boolean
   name?: boolean
   plan?: boolean
+  proStartedAt?: boolean
+  proExpiresAt?: boolean
   mainWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1555,16 +1856,19 @@ export type UserSelectScalar = {
   id?: boolean
   name?: boolean
   plan?: boolean
+  proStartedAt?: boolean
+  proExpiresAt?: boolean
   mainWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "mainWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "proStartedAt" | "proExpiresAt" | "mainWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
   authSessions?: boolean | Prisma.User$authSessionsArgs<ExtArgs>
+  proSubscriptionPayments?: boolean | Prisma.User$proSubscriptionPaymentsArgs<ExtArgs>
   tokens?: boolean | Prisma.User$tokensArgs<ExtArgs>
   launches?: boolean | Prisma.User$launchesArgs<ExtArgs>
   holdingExits?: boolean | Prisma.User$holdingExitsArgs<ExtArgs>
@@ -1587,6 +1891,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     mainWallet: Prisma.$WalletPayload<ExtArgs>
     wallets: Prisma.$WalletPayload<ExtArgs>[]
     authSessions: Prisma.$AuthSessionPayload<ExtArgs>[]
+    proSubscriptionPayments: Prisma.$ProSubscriptionPaymentPayload<ExtArgs>[]
     tokens: Prisma.$TokenPayload<ExtArgs>[]
     launches: Prisma.$LaunchPayload<ExtArgs>[]
     holdingExits: Prisma.$HoldingExitPayload<ExtArgs>[]
@@ -1599,6 +1904,8 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     id: string
     name: string
     plan: $Enums.UserPlan
+    proStartedAt: Date | null
+    proExpiresAt: Date | null
     mainWalletPublicKey: string
     createdAt: Date
     updatedAt: Date
@@ -1999,6 +2306,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   mainWallet<T extends Prisma.WalletDefaultArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.WalletDefaultArgs<ExtArgs>>): Prisma.Prisma__WalletClient<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | Null, Null, ExtArgs, GlobalOmitOptions>
   wallets<T extends Prisma.User$walletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$walletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$WalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   authSessions<T extends Prisma.User$authSessionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$authSessionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AuthSessionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  proSubscriptionPayments<T extends Prisma.User$proSubscriptionPaymentsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$proSubscriptionPaymentsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ProSubscriptionPaymentPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   tokens<T extends Prisma.User$tokensArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$tokensArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   launches<T extends Prisma.User$launchesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$launchesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   holdingExits<T extends Prisma.User$holdingExitsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$holdingExitsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$HoldingExitPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
@@ -2038,6 +2346,8 @@ export interface UserFieldRefs {
   readonly id: Prisma.FieldRef<"User", 'String'>
   readonly name: Prisma.FieldRef<"User", 'String'>
   readonly plan: Prisma.FieldRef<"User", 'UserPlan'>
+  readonly proStartedAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly proExpiresAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly mainWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
@@ -2482,6 +2792,30 @@ export type User$authSessionsArgs<ExtArgs extends runtime.Types.Extensions.Inter
   take?: number
   skip?: number
   distinct?: Prisma.AuthSessionScalarFieldEnum | Prisma.AuthSessionScalarFieldEnum[]
+}
+
+/**
+ * User.proSubscriptionPayments
+ */
+export type User$proSubscriptionPaymentsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ProSubscriptionPayment
+   */
+  select?: Prisma.ProSubscriptionPaymentSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ProSubscriptionPayment
+   */
+  omit?: Prisma.ProSubscriptionPaymentOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ProSubscriptionPaymentInclude<ExtArgs> | null
+  where?: Prisma.ProSubscriptionPaymentWhereInput
+  orderBy?: Prisma.ProSubscriptionPaymentOrderByWithRelationInput | Prisma.ProSubscriptionPaymentOrderByWithRelationInput[]
+  cursor?: Prisma.ProSubscriptionPaymentWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ProSubscriptionPaymentScalarFieldEnum | Prisma.ProSubscriptionPaymentScalarFieldEnum[]
 }
 
 /**

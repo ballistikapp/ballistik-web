@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { AccountNav } from "./account-nav";
 
 export const metadata: Metadata = {
   title: "Account",
@@ -9,5 +10,10 @@ export default function AccountLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  return children;
+  return (
+    <div className="flex flex-col gap-6">
+      <AccountNav />
+      {children}
+    </div>
+  );
 }

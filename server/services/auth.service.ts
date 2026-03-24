@@ -19,6 +19,10 @@ import {
   getSessionMaxTtlDays,
   hashRefreshToken,
 } from "@/lib/auth/refresh-token";
+import {
+  resolveEffectiveUserPlan,
+  syncUserPlanState,
+} from "@/server/services/pro-subscription.service";
 
 type SessionRequestMeta = {
   clientIp?: string | null;
@@ -61,7 +65,7 @@ export const authService = {
           keypair = Keypair.fromSecretKey(secretKey);
           privateKey = input.privateKey!;
           publicKey = keypair.publicKey.toBase58();
-        } catch (error) {
+        } catch {
           throw new AppError("Invalid private key format", 400);
         }
       }
@@ -138,7 +142,7 @@ export const authService = {
       try {
         const secretKey = bs58.decode(input.privateKey);
         keypair = Keypair.fromSecretKey(secretKey);
-      } catch (error) {
+      } catch {
         throw new AppError("Invalid private key format", 400);
       }
 
@@ -167,7 +171,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
-        plan: user.plan,
+        plan: resolveEffectiveUserPlan(user.proExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(wallet.balanceSol ?? 0),
         createdAt: user.createdAt,
@@ -269,6 +273,7 @@ export const authService = {
                   id: true,
                   name: true,
                   plan: true,
+                  proExpiresAt: true,
                   mainWalletPublicKey: true,
                 },
               },
@@ -353,11 +358,22 @@ export const authService = {
         },
       });
 
+      const effectivePlan = await syncUserPlanState(
+        tx,
+        session.user.id,
+        session.user.plan,
+        session.user.proExpiresAt,
+        now
+      );
+
       return {
         sessionId: session.id,
         refreshToken: nextRefreshToken,
         refreshExpiresAt,
-        user: session.user,
+        user: {
+          ...session.user,
+          plan: effectivePlan,
+        },
       };
     });
 
@@ -456,6 +472,7 @@ export const authService = {
           id: true,
           name: true,
           plan: true,
+          proExpiresAt: true,
           mainWalletPublicKey: true,
           createdAt: true,
           updatedAt: true,
@@ -474,7 +491,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
-        plan: user.plan,
+        plan: resolveEffectiveUserPlan(user.proExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(user.mainWallet?.balanceSol ?? 0),
         createdAt: user.createdAt,

@@ -44,6 +44,7 @@ Server persistence:
    - Mark current refresh token as used.
    - Create replacement refresh token.
    - Rotate cookies and return session metadata.
+   - Re-evaluate time-based Pro entitlement before issuing the next access token.
 3. `logout`
    - Revoke current session and outstanding refresh tokens.
    - Clear both cookies.
@@ -133,6 +134,8 @@ Track and log:
 - `User.plan` in the database is the source of truth when issuing or refreshing access tokens.
 - Requests rely on the `plan` embedded in the current access token.
 - Upgrades and downgrades therefore become effective on the next token issue/refresh or when the current access token expires.
+- Weekly Pro purchases should force an immediate `refreshSession` on the client so upgraded users receive a fresh `plan = PRO` token right away.
+- Weekly Pro expiry does not require an automatic background job in v1; an expired plan can be normalized back to `FREE` during normal login/refresh flows.
 
 ## Validation Checklist
 

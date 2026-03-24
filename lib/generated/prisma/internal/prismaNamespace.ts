@@ -386,6 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  ProSubscriptionPayment: 'ProSubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
   Wallet: 'Wallet',
@@ -421,7 +422,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
+    modelProps: "testTable" | "user" | "proSubscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -570,6 +571,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    ProSubscriptionPayment: {
+      payload: Prisma.$ProSubscriptionPaymentPayload<ExtArgs>
+      fields: Prisma.ProSubscriptionPaymentFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ProSubscriptionPaymentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ProSubscriptionPaymentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        findFirst: {
+          args: Prisma.ProSubscriptionPaymentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ProSubscriptionPaymentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        findMany: {
+          args: Prisma.ProSubscriptionPaymentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+        }
+        create: {
+          args: Prisma.ProSubscriptionPaymentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        createMany: {
+          args: Prisma.ProSubscriptionPaymentCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ProSubscriptionPaymentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+        }
+        delete: {
+          args: Prisma.ProSubscriptionPaymentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        update: {
+          args: Prisma.ProSubscriptionPaymentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        deleteMany: {
+          args: Prisma.ProSubscriptionPaymentDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ProSubscriptionPaymentUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ProSubscriptionPaymentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+        }
+        upsert: {
+          args: Prisma.ProSubscriptionPaymentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+        }
+        aggregate: {
+          args: Prisma.ProSubscriptionPaymentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateProSubscriptionPayment>
+        }
+        groupBy: {
+          args: Prisma.ProSubscriptionPaymentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProSubscriptionPaymentGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ProSubscriptionPaymentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ProSubscriptionPaymentCountAggregateOutputType> | number
         }
       }
     }
@@ -2105,12 +2180,27 @@ export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
   plan: 'plan',
+  proStartedAt: 'proStartedAt',
+  proExpiresAt: 'proExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const ProSubscriptionPaymentScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  amountSol: 'amountSol',
+  txSignature: 'txSignature',
+  startsAt: 'startsAt',
+  expiresAt: 'expiresAt',
+  createdAt: 'createdAt'
+} as const
+
+export type ProSubscriptionPaymentScalarFieldEnum = (typeof ProSubscriptionPaymentScalarFieldEnum)[keyof typeof ProSubscriptionPaymentScalarFieldEnum]
 
 
 export const AuthSessionScalarFieldEnum = {
@@ -2544,20 +2634,6 @@ export type ListEnumUserPlanFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
 
 
 /**
- * Reference to a field of type 'WalletType'
- */
-export type EnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType'>
-    
-
-
-/**
- * Reference to a field of type 'WalletType[]'
- */
-export type ListEnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType[]'>
-    
-
-
-/**
  * Reference to a field of type 'Decimal'
  */
 export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
@@ -2568,6 +2644,20 @@ export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
  * Reference to a field of type 'Decimal[]'
  */
 export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal[]'>
+    
+
+
+/**
+ * Reference to a field of type 'WalletType'
+ */
+export type EnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType'>
+    
+
+
+/**
+ * Reference to a field of type 'WalletType[]'
+ */
+export type ListEnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType[]'>
     
 
 
@@ -2912,6 +3002,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   testTable?: Prisma.TestTableOmit
   user?: Prisma.UserOmit
+  proSubscriptionPayment?: Prisma.ProSubscriptionPaymentOmit
   authSession?: Prisma.AuthSessionOmit
   refreshToken?: Prisma.RefreshTokenOmit
   wallet?: Prisma.WalletOmit

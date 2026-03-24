@@ -28,6 +28,11 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model ProSubscriptionPayment
+ * 
+ */
+export type ProSubscriptionPayment = Prisma.ProSubscriptionPaymentModel
+/**
  * Model AuthSession
  * 
  */

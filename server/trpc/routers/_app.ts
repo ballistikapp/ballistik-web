@@ -11,6 +11,7 @@ import { volumeBotRouter } from "./volume-bot.router";
 import { subscriptionRouter } from "./subscription.router";
 import { dashboardRouter } from "./dashboard.router";
 import { testRunLogRouter } from "./test-run-log.router";
+import { billingRouter } from "./billing.router";
 
 const baseRouters = {
   auth: authRouter,
@@ -23,6 +24,7 @@ const baseRouters = {
   volumeBot: volumeBotRouter,
   subscription: subscriptionRouter,
   dashboard: dashboardRouter,
+  billing: billingRouter,
   testRunLog: testRunLogRouter,
 };
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import Link from "next/link";
 import { Activity, AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
@@ -17,6 +18,8 @@ type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 interface MonitoringPanelProps {
   isMonitoring: boolean;
   disabledMessage?: string | null;
+  disabledActionHref?: string;
+  disabledActionLabel?: string;
   onToggleMonitoring: (enabled: boolean) => void | Promise<void>;
   onRefresh: () => void | Promise<void>;
   isRefreshing: boolean;
@@ -28,6 +31,8 @@ interface MonitoringPanelProps {
 export function MonitoringPanel({
   isMonitoring,
   disabledMessage,
+  disabledActionHref,
+  disabledActionLabel,
   onToggleMonitoring,
   onRefresh,
   isRefreshing,
@@ -178,9 +183,16 @@ export function MonitoringPanel({
           )}
 
           {!isMonitoring && disabledMessage && (
-            <div className="flex items-start gap-2 text-xs text-muted-foreground">
-              <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
-              <span>{disabledMessage}</span>
+            <div className="space-y-2">
+              <div className="flex items-start gap-2 text-xs text-muted-foreground">
+                <AlertTriangle className="size-3.5 shrink-0 mt-0.5" />
+                <span>{disabledMessage}</span>
+              </div>
+              {disabledActionHref && disabledActionLabel ? (
+                <Button variant="outline" size="sm" asChild className="w-full">
+                  <Link href={disabledActionHref}>{disabledActionLabel}</Link>
+                </Button>
+              ) : null}
             </div>
           )}
 

@@ -463,10 +463,6 @@ export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
 }
 
-export type NullableDateTimeFieldUpdateOperationsInput = {
-  set?: Date | string | null
-}
-
 export type AuthSessionCreateNestedOneWithoutRefreshTokensInput = {
   create?: Prisma.XOR<Prisma.AuthSessionCreateWithoutRefreshTokensInput, Prisma.AuthSessionUncheckedCreateWithoutRefreshTokensInput>
   connectOrCreate?: Prisma.AuthSessionCreateOrConnectWithoutRefreshTokensInput

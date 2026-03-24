@@ -296,6 +296,9 @@ export default function AccountPage() {
         </div>
 
         <div className="flex flex-wrap items-center justify-end gap-2">
+          <Button variant="outline" size="lg" asChild>
+            <Link href="/account/subscription">Manage Subscription</Link>
+          </Button>
           <Button
             variant="outline"
             size="lg"
