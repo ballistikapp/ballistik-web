@@ -6,7 +6,7 @@ Add a simple weekly Pro subscription flow that is paid from the user's main wall
 
 ## Product Rules
 
-- Price is `0.95 SOL` per week.
+- Price is `4.95 SOL` per week.
 - Pro is account-wide.
 - Pro unlocks existing Pro-only gRPC features and platform-fee waivers.
 - Pro waives platform fees only; network, protocol, rent, and Jito costs still apply.

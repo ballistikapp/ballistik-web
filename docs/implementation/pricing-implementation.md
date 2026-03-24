@@ -21,7 +21,7 @@
 - Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
 - Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
 - Pro waives platform fees only. Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not waived.
-- Weekly Pro access costs `0.95 SOL` for 7 days and is charged from the user's main wallet to the existing fee collector wallet.
+- Weekly Pro access costs `4.95 SOL` for 7 days and is charged from the user's main wallet to the existing fee collector wallet.
 
 ## Configuration
 

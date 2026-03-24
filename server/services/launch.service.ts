@@ -2764,9 +2764,6 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
       role: true,
     },
   });
-  if (recoveryWallets.length === 0) {
-    throw new AppError("Launch recovery data is unavailable", 500);
-  }
   const managedWalletPublicKeys = recoveryWallets
     .filter((wallet) => wallet.isManaged)
     .map((wallet) => wallet.walletPublicKey);

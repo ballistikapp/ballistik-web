@@ -111,7 +111,7 @@ export function LandingPage() {
           className="flex flex-col gap-10 w-full py-20 md:py-40 px-4 md:px-6"
         >
           <motion.h2
-            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
+            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
@@ -140,18 +140,18 @@ export function LandingPage() {
           </motion.div>
         </section>
 
-        {/* <section
+        <section
           id="pricing"
-          className="flex flex-col gap-10 w-full py-40 px-6 max-w-6xl mx-auto"
+          className="flex flex-col gap-10 w-full py-20 md:py-32 px-4 md:px-6"
         >
           <motion.h2
-            className="text-[3rem] w-full text-center bg-clip-text text-transparent bg-gradient-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
+            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
             initial={{ opacity: 0, y: 30 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut" }}
           >
-            Only pay for what you use. Or less.
+            Simple pricing. Clear access.
           </motion.h2>
           <motion.p
             className="text-center text-neutral-500 text-lg -mt-4"
@@ -160,10 +160,11 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
           >
-            No subscriptions required. Pay per action, or save with a plan.
+            Start free, or upgrade to Pro for live features and zero platform fees
+            on supported flows.
           </motion.p>
           <div className="h-10" />
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-[0.95fr_1.05fr]">
             <motion.div
               className="flex flex-col gap-6 rounded-2xl border border-neutral-800 bg-neutral-950/60 p-8"
               initial={{ opacity: 0, y: 40 }}
@@ -173,83 +174,86 @@ export function LandingPage() {
             >
               <div>
                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">
-                  Pay As You Go
+                  Free
                 </p>
                 <p className="text-4xl font-semibold text-neutral-100">Free</p>
                 <p className="text-sm text-neutral-500 mt-1">
-                  No monthly commitment
+                  Pay platform fees only when you use supported tools
                 </p>
               </div>
               <div className="h-px bg-neutral-800" />
               <div className="flex flex-col gap-3">
-                <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-1">
-                  Fee Schedule
-                </p>
                 {[
-                  ["Token Launch", "0.05 SOL"],
-                  ["Liquidity Pool Creation", "0.02 SOL"],
-                  ["Metadata Update", "0.005 SOL"],
-                  ["Freeze / Revoke Authority", "0.005 SOL"],
-                  ["Airdrop (per 100 wallets)", "0.01 SOL"],
-                  ["Custom Vanity Address", "0.02 SOL"],
-                ].map(([label, fee]) => (
+                  "Launch and manage tokens with pay-as-you-go platform fees",
+                  "Dashboard monitoring falls back to polling",
+                  "Volume bot stays available with slower minimum intervals",
+                ].map((feature) => (
                   <div
-                    key={label}
-                    className="flex items-center justify-between text-sm"
+                    key={feature}
+                    className="flex items-start gap-3 text-sm"
                   >
-                    <span className="text-neutral-400">{label}</span>
-                    <span className="text-neutral-200 font-medium tabular-nums">
-                      {fee}
-                    </span>
+                    <span className="mt-1 size-1.5 shrink-0 rounded-full bg-neutral-600" />
+                    <span className="text-neutral-400">{feature}</span>
                   </div>
                 ))}
+              </div>
+              <div className="mt-auto pt-2">
+                <Link
+                  href="/launch?preset=free"
+                  className="inline-flex items-center gap-2 text-sm text-neutral-300 transition-colors hover:text-white"
+                >
+                  <span>Start for free</span>
+                  <ChevronRightIcon className="h-4 w-4" />
+                </Link>
               </div>
             </motion.div>
 
             <motion.div
-              className="relative flex flex-col gap-6 rounded-2xl border border-neutral-700 bg-neutral-900/60 p-8"
+              className="relative flex flex-col gap-6 overflow-hidden rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/80 to-black p-8"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.55 }}
             >
+              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="rounded-full border border-neutral-600 bg-neutral-800 px-3 py-0.5 text-xs font-medium text-neutral-300">
-                  Most Popular
+                  Pro Plan
                 </span>
               </div>
-              <div>
+              <div className="relative">
                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">
                   Pro
                 </p>
                 <div className="flex items-end gap-1.5">
-                  <p className="text-4xl font-semibold text-neutral-100">$29</p>
-                  <p className="text-neutral-500 mb-1">/month</p>
+                  <p className="text-4xl font-semibold text-neutral-100">4.95 SOL</p>
+                  <p className="text-neutral-500 mb-1">/week</p>
                 </div>
                 <p className="text-sm text-neutral-500 mt-1">
-                  For active launchers
+                  Account-wide access with cleaner execution for active users
                 </p>
               </div>
-              <div className="h-px bg-neutral-800" />
-              <div className="flex flex-col gap-3">
+              <div className="relative h-px bg-neutral-800" />
+              <div className="relative flex flex-col gap-3">
                 {[
-                  "10 token launches / month",
-                  "Unlimited metadata updates",
-                  "Priority RPC access",
-                  "Liquidity pool automation",
-                  "Airdrop tool (up to 500 wallets)",
-                  "Email support",
+                  "Unlock live dashboard monitoring",
+                  "Enable faster gRPC-backed flows where supported",
+                  "Remove platform fees on supported launch and volume-bot flows",
+                  "Manual renewal only, with no auto-renewal",
                 ].map((feature) => (
                   <div
                     key={feature}
                     className="flex items-start gap-2.5 text-sm"
                   >
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
+                    <span className="mt-1 size-1.5 shrink-0 rounded-full bg-neutral-200" />
                     <span className="text-neutral-300">{feature}</span>
                   </div>
                 ))}
               </div>
-              <div className="mt-auto pt-2">
+              <p className="relative text-sm text-neutral-500">
+                Network, Jito, rent, and protocol costs still apply.
+              </p>
+              <div className="relative mt-auto pt-2">
                 <HoverBorderGradient
                   as={Link}
                   href="/auth"
@@ -257,66 +261,24 @@ export function LandingPage() {
                   className="w-full justify-center bg-background flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground"
                   highlight="radial-gradient(75% 181.15942028985506% at 50% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)"
                 >
-                  Get Started
-                  <ChevronRightIcon className="h-4 w-4" />
-                </HoverBorderGradient>
-              </div>
-            </motion.div>
-
-            <motion.div
-              className="flex flex-col gap-6 rounded-2xl border border-neutral-800 bg-neutral-950/60 p-8"
-              initial={{ opacity: 0, y: 40 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true, margin: "-100px" }}
-              transition={{ duration: 0.8, ease: "easeOut", delay: 0.7 }}
-            >
-              <div>
-                <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">
-                  Scale
-                </p>
-                <div className="flex items-end gap-1.5">
-                  <p className="text-4xl font-semibold text-neutral-100">$99</p>
-                  <p className="text-neutral-500 mb-1">/month</p>
-                </div>
-                <p className="text-sm text-neutral-500 mt-1">
-                  For teams and high-volume ops
-                </p>
-              </div>
-              <div className="h-px bg-neutral-800" />
-              <div className="flex flex-col gap-3">
-                {[
-                  "Unlimited token launches",
-                  "Unlimited metadata updates",
-                  "Dedicated RPC node",
-                  "Liquidity pool automation",
-                  "Airdrop tool (unlimited wallets)",
-                  "Multi-wallet management",
-                  "Priority support + SLA",
-                ].map((feature) => (
-                  <div
-                    key={feature}
-                    className="flex items-start gap-2.5 text-sm"
-                  >
-                    <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-neutral-400" />
-                    <span className="text-neutral-300">{feature}</span>
-                  </div>
-                ))}
-              </div>
-              <div className="mt-auto pt-2">
-                <HoverBorderGradient
-                  as={Link}
-                  href="/auth"
-                  containerClassName="w-full rounded-lg"
-                  className="w-full justify-center bg-background flex items-center gap-2 px-4 py-2 text-sm font-medium text-foreground"
-                  highlight="radial-gradient(75% 181.15942028985506% at 50% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)"
-                >
-                  Get Started
+                  Get Pro in the App
                   <ChevronRightIcon className="h-4 w-4" />
                 </HoverBorderGradient>
               </div>
             </motion.div>
           </div>
-        </section> */}
+          <motion.p
+            className="mx-auto max-w-3xl text-center text-sm text-neutral-600"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.7 }}
+          >
+            Pro pricing is public and straightforward. Free stays available for
+            pay-as-you-go usage, while Pro adds faster live features and removes
+            platform fees on supported flows.
+          </motion.p>
+        </section>
       </main>
 
       <footer className="mt-20 border-t border-neutral-800 px-6 md:px-12 py-20 ">

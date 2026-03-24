@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
@@ -118,19 +118,14 @@ export default function Page() {
     });
   }, [holdingsData?.totalSupply, tokenData, tokenPublicKey]);
 
-  const holdings = holdingsData?.holdings ?? [];
+  const holdings = useMemo(
+    () => holdingsData?.holdings ?? [],
+    [holdingsData?.holdings]
+  );
   const totalCount = holdingsData?.totalCount ?? 0;
   const totalBalance = holdingsData?.totalBalance ?? 0;
   const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
-  const walletsWithBalance = useMemo(
-    () =>
-      holdings.filter(
-        (holding) =>
-          Number.isFinite(Number(holding.tokenBalance)) &&
-          Number(holding.tokenBalance) > 0
-      ).length,
-    [holdings]
-  );
+  const walletsWithBalance = holdingsData?.walletsWithBalance ?? 0;
   const totalSupply = holdingsData?.totalSupply ?? null;
   const totalSupplyShare =
     totalSupply && totalSupply > 0 ? (totalBalance / totalSupply) * 100 : null;
@@ -163,68 +158,83 @@ export default function Page() {
     ]
   );
   const selectedHoldings = useMemo(
-    () => holdings.filter((holding) => rowSelection[holding.walletPublicKey]),
+    () => holdings.filter((holding) => rowSelection[holding.id]),
     [holdings, rowSelection]
   );
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const lastSnapshotKeyRef = useRef<string | null>(null);
 
-  const logHoldingsEvent = (event: Parameters<typeof appendTestRunEvent.mutate>[0]) => {
-    if (!tokenPublicKey || !testRunLogConfig?.enabled) return;
-    appendTestRunEvent.mutate({
-      tokenPublicKey,
-      page: "holdings",
-      source: "holdings-page",
-      ...event,
-    });
-  };
-
-  const handleRefresh = async (options?: { showToast?: boolean }) => {
-    if (!tokenPublicKey) return;
-    logHoldingsEvent({
-      eventType: "holdings_refresh",
-      action: "refresh",
-      status: "started",
-    });
-    const showToast = options?.showToast !== false;
-    const toastId = showToast
-      ? toast.loading("Refreshing holdings...", {
-          icon: <Spinner className="size-4" />,
-        })
-      : null;
-    try {
-      await refreshHoldings({ tokenPublicKey });
-      void utils.holding.listByToken.invalidate();
-      const latestHoldings = await utils.holding.listByToken.fetch({
+  const logHoldingsEvent = useCallback(
+    (event: Parameters<typeof appendTestRunEvent.mutate>[0]) => {
+      if (!tokenPublicKey || !testRunLogConfig?.enabled) return;
+      appendTestRunEvent.mutate({
         tokenPublicKey,
-        page: pagination.pageIndex + 1,
-        pageSize: pagination.pageSize,
+        page: "holdings",
+        source: "holdings-page",
+        ...event,
       });
-      await refetchRefreshCache();
+    },
+    [appendTestRunEvent, testRunLogConfig?.enabled, tokenPublicKey]
+  );
+
+  const handleRefresh = useCallback(
+    async (options?: { showToast?: boolean }) => {
+      if (!tokenPublicKey) return;
       logHoldingsEvent({
         eventType: "holdings_refresh",
         action: "refresh",
-        status: "completed",
-        actualValue: {
-          totalCount: latestHoldings.totalCount,
-          totalBalance: latestHoldings.totalBalance,
-        },
+        status: "started",
       });
-      if (toastId) {
-        toast.success("Holdings refreshed", { id: toastId, icon: null });
+      const showToast = options?.showToast !== false;
+      const toastId = showToast
+        ? toast.loading("Refreshing holdings...", {
+            icon: <Spinner className="size-4" />,
+          })
+        : null;
+      try {
+        await refreshHoldings({ tokenPublicKey });
+        void utils.holding.listByToken.invalidate();
+        const latestHoldings = await utils.holding.listByToken.fetch({
+          tokenPublicKey,
+          page: pagination.pageIndex + 1,
+          pageSize: pagination.pageSize,
+        });
+        await refetchRefreshCache();
+        logHoldingsEvent({
+          eventType: "holdings_refresh",
+          action: "refresh",
+          status: "completed",
+          actualValue: {
+            totalCount: latestHoldings.totalCount,
+            totalBalance: latestHoldings.totalBalance,
+            walletsWithBalance: latestHoldings.walletsWithBalance,
+          },
+        });
+        if (toastId) {
+          toast.success("Holdings refreshed", { id: toastId, icon: null });
+        }
+      } catch (error) {
+        logHoldingsEvent({
+          eventType: "run_issue",
+          action: "holdings-refresh",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        if (toastId) {
+          toast.error("Failed to refresh holdings", { id: toastId, icon: null });
+        }
       }
-    } catch (error) {
-      logHoldingsEvent({
-        eventType: "run_issue",
-        action: "holdings-refresh",
-        error: error instanceof Error ? error.message : String(error),
-      });
-      if (toastId) {
-        toast.error("Failed to refresh holdings", { id: toastId, icon: null });
-      }
-    }
-  };
+    },
+    [
+      logHoldingsEvent,
+      pagination.pageIndex,
+      pagination.pageSize,
+      refetchRefreshCache,
+      refreshHoldings,
+      tokenPublicKey,
+      utils.holding.listByToken,
+    ]
+  );
 
   const handleSell = async (
     sellPercentage: number,
@@ -232,8 +242,8 @@ export default function Page() {
     returnSolToMainWallet: boolean
   ) => {
     if (!tokenPublicKey || selectedHoldings.length === 0) return;
-    const walletPublicKeys = selectedHoldings.map(
-      (holding) => holding.wallet.publicKey
+    const walletPublicKeys = Array.from(
+      new Set(selectedHoldings.map((holding) => holding.wallet.publicKey))
     );
     const toastId = toast.loading("Submitting sell transactions...");
     try {
@@ -371,6 +381,7 @@ export default function Page() {
     autoRefreshTriggered.current = true;
     void handleRefresh({ showToast: false });
   }, [
+    handleRefresh,
     isRefreshing,
     refreshCacheLoading,
     refreshTimestamp,
@@ -398,7 +409,7 @@ export default function Page() {
         totalCount: holdingsData.totalCount,
         totalBalance: holdingsData.totalBalance,
         totalSupply: holdingsData.totalSupply,
-        walletsWithBalance,
+        walletsWithBalance: holdingsData.walletsWithBalance,
         refreshTimestamp,
       },
       snapshot: {
@@ -408,6 +419,7 @@ export default function Page() {
     });
   }, [
     holdingsData,
+    logHoldingsEvent,
     metricCards,
     pagination.pageIndex,
     pagination.pageSize,
@@ -477,7 +489,7 @@ export default function Page() {
         pageCount={pageCount}
         rowCount={totalCount}
         onPaginationStateChange={setPagination}
-        getRowId={(row) => row.walletPublicKey}
+        getRowId={(row) => row.id}
         enableRowSelection
         onRowSelectionChange={setRowSelection}
         enableUrlState

@@ -56,6 +56,14 @@ interface DashboardHoldingsProps {
   tokenPublicKey: string;
 }
 
+const walletTypeLabel: Record<string, string> = {
+  MAIN_WALLET: "Main",
+  DEV: "Dev",
+  BUNDLER: "Bundler",
+  VOLUME: "Volume",
+  DISTRIBUTION: "Distribution",
+};
+
 export function DashboardHoldings({
   holdings,
   tokenPublicKey,
@@ -163,7 +171,7 @@ export function DashboardHoldings({
                           variant="outline"
                           className="text-[10px] px-1 py-0 leading-tight"
                         >
-                          {wallet.type}
+                          {walletTypeLabel[wallet.type] ?? wallet.type}
                         </Badge>
                         <Tooltip>
                           <TooltipTrigger asChild>

@@ -207,17 +207,42 @@ export default function AccountSubscriptionPage() {
 
                 <div className="grid gap-3">
                   {[
-                    "Live monitoring on the dashboard",
-                    "Faster gRPC-backed confirmation paths where supported",
-                    "No platform fees on supported launch and volume-bot flows",
+                    {
+                      label: "No fees.",
+                      description:
+                        "Platform fees are removed on supported launch and volume-bot flows.",
+                      accent: true,
+                    },
+                    {
+                      label: "Live monitoring.",
+                      description: "Track dashboard activity in real time.",
+                      accent: false,
+                    },
+                    {
+                      label: "Faster execution.",
+                      description:
+                        "Use gRPC-backed confirmation paths where supported.",
+                      accent: false,
+                    },
                   ].map((feature) => (
                     <div
-                      key={feature}
+                      key={feature.label}
                       className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3"
                     >
-                      <span className="mt-1 size-2 rounded-full bg-neutral-200" />
+                      <span
+                        className={`mt-1.5 size-2 rounded-full ${
+                          feature.accent ? "bg-primary" : "bg-neutral-200"
+                        }`}
+                      />
                       <span className="text-sm text-neutral-200">
-                        {feature}
+                        <strong
+                          className={`font-semibold uppercase tracking-[0.08em] ${
+                            feature.accent ? "text-primary" : "text-neutral-50"
+                          }`}
+                        >
+                          {feature.label}
+                        </strong>
+                        <span className="mt-1 block">{feature.description}</span>
                       </span>
                     </div>
                   ))}

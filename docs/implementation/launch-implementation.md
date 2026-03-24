@@ -101,6 +101,8 @@ Based on `devWalletOption`:
 - `generate`: server creates a new `DEV` wallet
 - `import`: server validates and stores imported key as `DEV`
 
+When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
+
 ### Bundler Wallets
 
 If bundle buys are enabled, server generates `BUNDLER` wallets and uses them for buy transactions.
@@ -171,6 +173,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Failed launch progress first attempts automatic reclaim and shows reclaim as launch activity.
 - If automatic reclaim succeeds, the failed dialog keeps a visible reclaimed-funds step and does not show manual reclaim guidance.
 - If automatic reclaim fails, failed launch progress surfaces retry and Manage Tokens guidance for manual reclaim.
+- Shared main/dev launches with no generated recovery wallets are treated as a valid zero-wallet recovery state rather than an error.
 - Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
 
 ### Retry Model (Failed Launches)

@@ -49,6 +49,7 @@ type WalletOption = {
 };
 
 const walletTypeLabel: Record<string, string> = {
+  MAIN_WALLET: "Main Wallet (used as dev)",
   DEV: "Dev",
   BUNDLER: "Bundler",
   VOLUME: "Volume Bot",
@@ -93,7 +94,7 @@ export function AccountSendDialog({
 
   const availableWallets: WalletOption[] = useMemo(() => {
     const result: WalletOption[] = [];
-    if (devWallet) {
+    if (devWallet && devWallet.type !== "MAIN_WALLET") {
       result.push({
         publicKey: devWallet.publicKey,
         type: devWallet.type,

@@ -27,6 +27,7 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 ## Exit Flow
 
 1. **Prepare**: load allowed wallets (main, dev, operational), fetch on-chain balances, sort descending.
+   - Shared `main = dev` addresses are deduped by `publicKey` so exit processes one real wallet owner.
 2. **Chunk**: split into groups of 20 wallets.
 3. **Funding**: top up underfunded wallets before bundle processing to reduce failed transfers/sells.
 4. **Bundle (parallel, concurrency=2)**: for each chunk:
@@ -154,7 +155,9 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 - Exit dialog opens on demand or automatically when a running exit exists
 - Dialog shows a detailed pre-flight description of each exit step
 - Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
+- Exit preflight totals should reflect deduped holdings data so shared main/dev launches do not inflate wallet counts or token totals.
 - Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior
 - Activity logs are shown in real time
 - Summary shows totals including chunk outcomes (total/successful/failed chunks), wallets, bundles, tokens, ATAs closed, SOL recovered, and total Jito tip
 - Users can cancel an active exit via `holding.cancelExit`
+- This pass keeps exit execution logic unchanged and instead aligns preflight inputs with deduped holdings data.

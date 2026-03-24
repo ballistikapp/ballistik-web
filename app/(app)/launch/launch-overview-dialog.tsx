@@ -205,7 +205,7 @@ export function LaunchOverviewDialog({
                       ? "Imported wallet"
                       : launchInput.devWalletOption === "generate"
                         ? "Will be generated"
-                        : "Main wallet"}
+                        : "Main Wallet (used as dev)"}
                   </span>
                 </div>
                 <div className="grid grid-cols-[140px_1fr] gap-2">

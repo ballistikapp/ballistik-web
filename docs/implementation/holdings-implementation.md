@@ -15,12 +15,14 @@ Holdings show per-wallet token balances, holding percentage vs mint supply, and 
 - Token ownership is verified on every holdings read and mutation.
 - Allowed wallets are the main wallet, token dev wallet, and token operational wallets.
 - Sell actions only execute for allowed wallets with private keys.
+- When `main = dev`, holdings behavior must treat that shared wallet as one owner keyed by `wallet.publicKey`.
 
 ## Refresh Flow
 
 The `refreshByToken` service is optimized for speed:
 
 1. `getAllowedWallets()` resolves the token and its associated wallets.
+   - Shared main/dev addresses are deduped by `publicKey` before balance fetching.
 2. Balance fetching uses an **adaptive strategy**:
    - Small/medium wallet sets use Shyft `getTokenBalance()` per wallet with bounded concurrency and retry/backoff on transient errors.
    - Large wallet sets use direct batched RPC (`getMultipleParsedAccounts`) for faster aggregate fetch throughput.
@@ -32,6 +34,7 @@ The `refreshByToken` service is optimized for speed:
    - `lastUpdated` changes only for rows that were created/updated
 4. Last transaction lookup (`DISTINCT ON`) is narrowed to wallets that are actually being created/updated (instead of all wallets in scope).
 5. Persistence runs in a single atomic write phase with batched delete (`deleteMany`) plus grouped create/update operations.
+   - If duplicate `Holding` rows already exist for the same `(walletPublicKey, tokenPublicKey)`, refresh keeps one canonical row and deletes the extras.
 6. The mutation touches refresh cache state; client invalidates `holding.listByToken` and refetches.
 
 ## Sell Flow
@@ -51,6 +54,7 @@ The `refreshByToken` service is optimized for speed:
 ## UI Behavior
 
 - Bulk sell action operates on selected holdings rows.
+- Shared `main = dev` holdings should appear as one logical wallet row, not duplicated role rows.
 - Manual refresh is available; auto refresh uses `RefreshCache` staleness.
 - Header layout keeps title on the left and refresh controls on the right.
 - Metrics cards are shown under the header and summarize currently loaded holdings rows.
@@ -63,6 +67,7 @@ The `refreshByToken` service is optimized for speed:
 - Sell dialog includes a "Return SOL to main wallet" toggle with a short description that it returns the maximum available SOL from processed wallets back to the main wallet, and it is checked by default when the dialog opens.
 - Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.
+- This pass is application-level only; no schema migration is introduced for holdings dedupe.
 
 ## Test Run Logging
 

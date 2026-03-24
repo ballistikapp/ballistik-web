@@ -24,7 +24,6 @@ import {
   DataTableViewOptions,
 } from "@/components/data-table";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -52,6 +51,8 @@ type RefreshedWallet = {
   balanceRefreshedAt: Date | string;
 };
 
+const SHARED_MAIN_DEV_LABEL = "Main Wallet (used as dev)";
+
 export default function WalletPage() {
   const params = useParams<{
     tokenPublicKey: string;
@@ -76,6 +77,10 @@ export default function WalletPage() {
       walletPublicKey: walletPublicKey || "",
     },
     { enabled: !!tokenPublicKey && !!walletPublicKey }
+  );
+  const { data: devWallet } = trpc.wallet.getDevByToken.useQuery(
+    { tokenPublicKey: tokenPublicKey || "" },
+    { enabled: !!tokenPublicKey }
   );
 
   const { mutateAsync: refreshBalances, isPending: isRefreshingBalances } =
@@ -213,7 +218,7 @@ export default function WalletPage() {
       } else {
         toast.info("No wallets were refreshed", { id: toastId, icon: null });
       }
-    } catch (error) {
+    } catch {
       toast.error("Failed to refresh wallet balance", {
         id: toastId,
         icon: null,
@@ -233,7 +238,7 @@ export default function WalletPage() {
       });
       await utils.holding.listByToken.invalidate();
       toast.success("Holdings refreshed", { id: toastId, icon: null });
-    } catch (error) {
+    } catch {
       toast.error("Failed to refresh holdings", { id: toastId, icon: null });
     }
   };
@@ -250,7 +255,7 @@ export default function WalletPage() {
       });
       await utils.transaction.listByToken.invalidate();
       toast.success("Transactions refreshed", { id: toastId, icon: null });
-    } catch (error) {
+    } catch {
       toast.error("Failed to refresh transactions", {
         id: toastId,
         icon: null,
@@ -273,6 +278,8 @@ export default function WalletPage() {
 
   const { wallet, token } = data;
   const isMainWallet = wallet.type === "MAIN_WALLET";
+  const isSharedMainDevWallet =
+    isMainWallet && devWallet?.publicKey === wallet.publicKey;
   const walletTitle = {
     MAIN_WALLET: "Main Wallet",
     DEV: "Dev Wallet",
@@ -280,6 +287,9 @@ export default function WalletPage() {
     VOLUME: "Volume Bot Wallet",
     DISTRIBUTION: "Distribution Wallet",
   }[wallet.type];
+  const resolvedWalletTitle = isSharedMainDevWallet
+    ? SHARED_MAIN_DEV_LABEL
+    : walletTitle;
   const holdingsColumns = getHoldingsColumns({
     tokenSymbol: token.symbol,
     tokenSupply: holdingsData?.totalSupply ?? null,
@@ -293,7 +303,7 @@ export default function WalletPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={walletTitle ?? "Wallet"}
+        title={resolvedWalletTitle ?? "Wallet"}
         rightContent={
           <div className="mt-3 flex flex-col items-end gap-4">
             <div className="text-right">

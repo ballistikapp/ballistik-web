@@ -64,7 +64,7 @@ export function AuthButton() {
   });
   const mainWalletBalanceSol = Number(mainWalletQuery.data?.balanceSol ?? 0);
   const subscriptionOverview = subscriptionOverviewQuery.data;
-  const effectivePlan = subscriptionOverview?.plan ?? currentUser?.plan ?? "FREE";
+  const effectivePlan = subscriptionOverview?.plan ?? currentUser?.plan ?? null;
   const isProPlan = effectivePlan === "PRO";
   const proExpiresAtLabel = subscriptionOverview?.proExpiresAt
     ? format(new Date(subscriptionOverview.proExpiresAt), "MMM d, yyyy")
@@ -216,26 +216,30 @@ export function AuthButton() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
 
-          <DropdownMenuLabel className="flex flex-col gap-1">
-            <div>
-              <Badge variant={isProPlan ? "default" : "secondary"}>
-                {isProPlan ? "Pro Plan" : "Free Plan"}
-              </Badge>
-            </div>
-            {isProPlan && proExpiresAtLabel ? (
-              <span className="text-xs text-muted-foreground">
-                Active until {proExpiresAtLabel}
-              </span>
-            ) : null}
-          </DropdownMenuLabel>
-          <DropdownMenuItem asChild>
-            <Link href="/account/subscription">
-              <IconCreditCard />
-              {isProPlan ? "Manage Subscription" : "Upgrade to Pro Plan"}
-            </Link>
-          </DropdownMenuItem>
+          {effectivePlan ? (
+            <>
+              <DropdownMenuLabel className="flex flex-col gap-1">
+                <div>
+                  <Badge variant={isProPlan ? "default" : "secondary"}>
+                    {isProPlan ? "Pro Plan" : "Free Plan"}
+                  </Badge>
+                </div>
+                {isProPlan && proExpiresAtLabel ? (
+                  <span className="text-xs text-muted-foreground">
+                    Active until {proExpiresAtLabel}
+                  </span>
+                ) : null}
+              </DropdownMenuLabel>
+              <DropdownMenuItem asChild>
+                <Link href="/account/subscription">
+                  <IconCreditCard />
+                  {isProPlan ? "Manage Subscription" : "Upgrade to Pro Plan"}
+                </Link>
+              </DropdownMenuItem>
 
-          <DropdownMenuSeparator />
+              <DropdownMenuSeparator />
+            </>
+          ) : null}
 
           <DropdownMenuGroup>
             <DropdownMenuItem

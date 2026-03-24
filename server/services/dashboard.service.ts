@@ -36,6 +36,44 @@ export function invalidateStatsCache(tokenPublicKey: string) {
 
 const round4 = (n: number) => Math.round(n * 10000) / 10000;
 
+type UserHoldingRow = {
+  id: string;
+  walletPublicKey: string;
+  tokenBalance: Prisma.Decimal;
+  lastUpdated: Date;
+  createdAt: Date;
+  wallet: {
+    publicKey: string;
+    type: string;
+    balanceSol: Prisma.Decimal;
+  };
+};
+
+function dedupeUserHoldingsByWallet(holdings: UserHoldingRow[]) {
+  const holdingsByWallet = new Map<string, UserHoldingRow[]>();
+
+  for (const holding of holdings) {
+    const existing = holdingsByWallet.get(holding.walletPublicKey) ?? [];
+    existing.push(holding);
+    holdingsByWallet.set(holding.walletPublicKey, existing);
+  }
+
+  return Array.from(holdingsByWallet.values())
+    .map((walletHoldings) =>
+      [...walletHoldings].sort((a, b) => {
+        const lastUpdatedDiff =
+          b.lastUpdated.getTime() - a.lastUpdated.getTime();
+        if (lastUpdatedDiff !== 0) return lastUpdatedDiff;
+
+        const createdAtDiff = b.createdAt.getTime() - a.createdAt.getTime();
+        if (createdAtDiff !== 0) return createdAtDiff;
+
+        return b.id.localeCompare(a.id);
+      })[0]
+    )
+    .filter((holding): holding is UserHoldingRow => Boolean(holding));
+}
+
 function downsamplePriceHistory(
   points: Array<{ time: number; price: number }>,
   targetPoints: number
@@ -197,16 +235,7 @@ async function getHoldingsBreakdown(
 ) {
   const walletFilter = Array.from(userWalletPubkeys);
 
-  const [holdingAgg, userHoldings, topHolders] = await Promise.all([
-    walletFilter.length > 0
-      ? prisma.holding.aggregate({
-          where: {
-            tokenPublicKey,
-            walletPublicKey: { in: walletFilter },
-          },
-          _sum: { tokenBalance: true },
-        })
-      : Promise.resolve({ _sum: { tokenBalance: null } }),
+  const [userHoldings, topHolders] = await Promise.all([
     walletFilter.length > 0
       ? prisma.holding.findMany({
           where: {
@@ -218,12 +247,16 @@ async function getHoldingsBreakdown(
               select: { publicKey: true, type: true, balanceSol: true },
             },
           },
+          orderBy: [{ lastUpdated: "desc" }, { createdAt: "desc" }],
         })
       : Promise.resolve([]),
     holdersService.getTopHolders(tokenPublicKey),
   ]);
-
-  const totalTokenHoldings = Number(holdingAgg._sum.tokenBalance ?? 0);
+  const uniqueUserHoldings = dedupeUserHoldingsByWallet(userHoldings);
+  const totalTokenHoldings = uniqueUserHoldings.reduce(
+    (sum, holding) => sum + Number(holding.tokenBalance),
+    0
+  );
   const tokenTotalSupply = currentPrice?.tokenTotalSupply ?? 0;
   const bondingCurveTokens = currentPrice?.realTokenReserves ?? 0;
 
@@ -240,7 +273,7 @@ async function getHoldingsBreakdown(
   if (bondingCurvePda) excludedAddresses.add(bondingCurvePda);
   for (const pk of userWalletPubkeys) excludedAddresses.add(pk);
 
-  const userWalletRows = userHoldings
+  const userWalletRows = uniqueUserHoldings
     .map((h) => {
       const tokenBalance = Number(h.tokenBalance);
       const holdingPercent =

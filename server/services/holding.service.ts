@@ -66,6 +66,66 @@ const monitoringRefreshState = new Map<
   }
 >();
 
+type HoldingRowLike = {
+  id: string;
+  walletPublicKey: string;
+  lastUpdated: Date;
+  createdAt: Date;
+};
+
+function dedupeWalletsByPublicKey<T extends { publicKey: string }>(wallets: T[]) {
+  return Array.from(
+    new Map(wallets.map((wallet) => [wallet.publicKey, wallet])).values()
+  );
+}
+
+function compareHoldingsByRecency<T extends HoldingRowLike>(a: T, b: T) {
+  const lastUpdatedDiff = b.lastUpdated.getTime() - a.lastUpdated.getTime();
+  if (lastUpdatedDiff !== 0) return lastUpdatedDiff;
+
+  const createdAtDiff = b.createdAt.getTime() - a.createdAt.getTime();
+  if (createdAtDiff !== 0) return createdAtDiff;
+
+  return b.id.localeCompare(a.id);
+}
+
+function splitHoldingsByWallet<T extends HoldingRowLike>(holdings: T[]) {
+  const holdingsByWallet = new Map<string, T[]>();
+
+  for (const holding of holdings) {
+    const existing = holdingsByWallet.get(holding.walletPublicKey) ?? [];
+    existing.push(holding);
+    holdingsByWallet.set(holding.walletPublicKey, existing);
+  }
+
+  const canonicalByWallet = new Map<string, T>();
+  const duplicateIdsByWallet = new Map<string, string[]>();
+
+  for (const [walletPublicKey, walletHoldings] of holdingsByWallet) {
+    const sorted = [...walletHoldings].sort(compareHoldingsByRecency);
+    const canonical = sorted[0];
+
+    if (!canonical) continue;
+
+    canonicalByWallet.set(walletPublicKey, canonical);
+    duplicateIdsByWallet.set(
+      walletPublicKey,
+      sorted.slice(1).map((holding) => holding.id)
+    );
+  }
+
+  return {
+    canonicalByWallet,
+    duplicateIdsByWallet,
+  };
+}
+
+function dedupeHoldingRows<T extends HoldingRowLike>(holdings: T[]) {
+  return Array.from(splitHoldingsByWallet(holdings).canonicalByWallet.values()).sort(
+    compareHoldingsByRecency
+  );
+}
+
 type MonitoringRefreshResult =
   | { status: "refreshed"; startedAt: number; completedAt: number }
   | {
@@ -112,11 +172,11 @@ async function getAllowedWallets(
     }),
   ]);
 
-  const allWallets: WalletRecord[] = [
+  const allWallets = dedupeWalletsByPublicKey<WalletRecord>([
     ...(user?.mainWallet ? [user.mainWallet] : []),
     ...(devWallet?.wallet ? [devWallet.wallet] : []),
     ...operationalWallets,
-  ];
+  ]);
 
   const walletSet = walletPublicKeys?.length ? new Set(walletPublicKeys) : null;
   const filteredWallets = walletSet
@@ -508,7 +568,7 @@ export const holdingService = {
       ...(input.walletPublicKey ? { walletPublicKey: input.walletPublicKey } : {}),
     };
 
-    const [holdings, totalCount, balanceAgg, totalSupply] = await Promise.all([
+    const [allHoldings, totalSupply] = await Promise.all([
       prisma.holding.findMany({
         where,
         include: {
@@ -516,19 +576,7 @@ export const holdingService = {
             select: { publicKey: true, type: true },
           },
         },
-        orderBy: { lastUpdated: "desc" },
-        skip,
-        take,
-      }),
-      prisma.holding.count({ where }),
-      prisma.holding.aggregate({
-        where: {
-          tokenPublicKey: input.tokenPublicKey,
-          ...(input.walletPublicKey
-            ? { walletPublicKey: input.walletPublicKey }
-            : {}),
-        },
-        _sum: { tokenBalance: true },
+        orderBy: [{ lastUpdated: "desc" }, { createdAt: "desc" }],
       }),
       (async () => {
         try {
@@ -540,10 +588,24 @@ export const holdingService = {
       })(),
     ]);
 
+    const dedupedHoldings = dedupeHoldingRows(allHoldings);
+    const holdings = dedupedHoldings.slice(skip, skip + take);
+    const totalCount = dedupedHoldings.length;
+    const totalBalance = dedupedHoldings.reduce(
+      (sum, holding) => sum + Number(holding.tokenBalance),
+      0
+    );
+    const walletsWithBalance = dedupedHoldings.filter(
+      (holding) =>
+        Number.isFinite(Number(holding.tokenBalance)) &&
+        Number(holding.tokenBalance) > 0
+    ).length;
+
     return {
       holdings,
       totalCount,
-      totalBalance: Number(balanceAgg._sum.tokenBalance ?? 0),
+      totalBalance,
+      walletsWithBalance,
       totalSupply,
     };
   },
@@ -577,23 +639,20 @@ export const holdingService = {
           tokenSymbol: true,
           tokenImageUrl: true,
           tokenDecimals: true,
+          lastUpdated: true,
+          createdAt: true,
         },
       }),
     ]);
 
-    const existingHoldingMap = new Map<
-      string,
-      (typeof existingHoldings)[number]
-    >();
-    for (const holding of existingHoldings) {
-      existingHoldingMap.set(holding.walletPublicKey, holding);
-    }
+    const { canonicalByWallet, duplicateIdsByWallet } =
+      splitHoldingsByWallet(existingHoldings);
 
     const persistedCandidates = balanceResults.results.filter(
       (result) => result.isResolved && (result.tokenBalance > 0 || result.ataExists)
     );
-    const candidateWalletPublicKeys = persistedCandidates.map(
-      (result) => result.wallet.publicKey
+    const candidateWalletPublicKeys = Array.from(
+      new Set(persistedCandidates.map((result) => result.wallet.publicKey))
     );
 
     const lastTransactions =
@@ -632,12 +691,14 @@ export const holdingService = {
       }
 
       const shouldPersist = tokenBalance > 0 || ataExists;
-      const existing = existingHoldingMap.get(wallet.publicKey);
+      const existing = canonicalByWallet.get(wallet.publicKey);
+      const duplicateIds = duplicateIdsByWallet.get(wallet.publicKey) ?? [];
 
       if (!shouldPersist) {
         if (existing) {
           deleteIds.push(existing.id);
         }
+        deleteIds.push(...duplicateIds);
         continue;
       }
 
@@ -662,6 +723,7 @@ export const holdingService = {
           ...baseData,
           lastUpdated: now,
         });
+        deleteIds.push(...duplicateIds);
         continue;
       }
 
@@ -678,6 +740,7 @@ export const holdingService = {
         existing.tokenDecimals !== mintDecimals;
 
       if (!hasChanges) {
+        deleteIds.push(...duplicateIds);
         continue;
       }
 
@@ -688,12 +751,21 @@ export const holdingService = {
           lastUpdated: now,
         },
       });
+      deleteIds.push(...duplicateIds);
     }
 
-    if (deleteIds.length > 0) {
+    const uniqueDeleteIds = Array.from(new Set(deleteIds));
+
+    if (uniqueDeleteIds.length > 0) {
       const deleteBatches: string[][] = [];
-      for (let i = 0; i < deleteIds.length; i += HOLDING_MUTATION_BATCH_SIZE) {
-        deleteBatches.push(deleteIds.slice(i, i + HOLDING_MUTATION_BATCH_SIZE));
+      for (
+        let i = 0;
+        i < uniqueDeleteIds.length;
+        i += HOLDING_MUTATION_BATCH_SIZE
+      ) {
+        deleteBatches.push(
+          uniqueDeleteIds.slice(i, i + HOLDING_MUTATION_BATCH_SIZE)
+        );
       }
       await mapWithConcurrency(
         deleteBatches,

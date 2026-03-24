@@ -583,16 +583,22 @@ export const walletService = {
       balanceSol: number;
       balanceRefreshedAt: Date | null;
       type: WalletType;
-    }> = [
-      ...(user?.mainWallet ? [user.mainWallet] : []),
-      ...(devWallet?.wallet ? [devWallet.wallet] : []),
-      ...operationalWallets,
-    ].map((wallet) => ({
-      publicKey: wallet.publicKey,
-      balanceSol: Number(wallet.balanceSol ?? 0),
-      balanceRefreshedAt: wallet.balanceRefreshedAt,
-      type: wallet.type,
-    }));
+    }> = Array.from(
+      new Map(
+        [
+          ...(user?.mainWallet ? [user.mainWallet] : []),
+          ...(devWallet?.wallet ? [devWallet.wallet] : []),
+          ...operationalWallets,
+        ]
+          .map((wallet) => ({
+            publicKey: wallet.publicKey,
+            balanceSol: Number(wallet.balanceSol ?? 0),
+            balanceRefreshedAt: wallet.balanceRefreshedAt,
+            type: wallet.type,
+          }))
+          .map((wallet) => [wallet.publicKey, wallet])
+      ).values()
+    );
 
     const allowedWallets = new Map(
       availableWallets.map((wallet) => [wallet.publicKey, wallet])
@@ -805,12 +811,18 @@ export const walletService = {
       throw new AppError("Main wallet not found", 400);
     }
 
+    const devWalletPublicKey =
+      devWallet?.wallet?.publicKey &&
+      devWallet.wallet.publicKey !== mainWallet.publicKey
+        ? devWallet.wallet.publicKey
+        : null;
     const allowedWallets = new Set([
       ...operationalWallets.map((wallet) => wallet.publicKey),
-      ...(devWallet?.wallet ? [devWallet.wallet.publicKey] : []),
+      ...(devWalletPublicKey ? [devWalletPublicKey] : []),
     ]);
-    const targets = walletPublicKeys.filter((publicKey) =>
-      allowedWallets.has(publicKey)
+    const targets = Array.from(new Set(walletPublicKeys)).filter(
+      (publicKey) =>
+        publicKey !== mainWallet.publicKey && allowedWallets.has(publicKey)
     );
 
     if (targets.length === 0) {
@@ -1009,14 +1021,19 @@ export const walletService = {
     }
 
     const mainPublicKey = new PublicKey(mainWallet.publicKey);
+    const devWalletTarget =
+      devWallet?.wallet &&
+      devWallet.wallet.publicKey !== mainWallet.publicKey
+        ? devWallet.wallet
+        : null;
     const allowedWallets = new Map(
-      [
-        ...operationalWallets,
-        ...(devWallet?.wallet ? [devWallet.wallet] : []),
-      ].map((wallet) => [wallet.publicKey, wallet])
+      [...operationalWallets, ...(devWalletTarget ? [devWalletTarget] : [])].map(
+        (wallet) => [wallet.publicKey, wallet]
+      )
     );
 
-    const targets = walletPublicKeys
+    const targets = Array.from(new Set(walletPublicKeys))
+      .filter((publicKey) => publicKey !== mainWallet.publicKey)
       .map((publicKey) => allowedWallets.get(publicKey))
       .filter((wallet): wallet is NonNullable<typeof wallet> =>
         Boolean(wallet)

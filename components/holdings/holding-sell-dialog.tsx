@@ -47,6 +47,15 @@ export function HoldingSellDialog({
   const parsedPercentage = Number.parseFloat(percentage);
   const canCloseAta =
     Number.isFinite(parsedPercentage) && parsedPercentage === 100;
+  const uniqueHoldings = useMemo(
+    () =>
+      Array.from(
+        new Map(
+          holdings.map((holding) => [holding.walletPublicKey, holding])
+        ).values()
+      ),
+    [holdings]
+  );
 
   const handleOpenChange = (nextOpen: boolean) => {
     if (!nextOpen) {
@@ -59,13 +68,13 @@ export function HoldingSellDialog({
 
   const totalBalance = useMemo(
     () =>
-      holdings.reduce(
+      uniqueHoldings.reduce(
         (sum, holding) =>
           sum +
           (Number.isFinite(holding.tokenBalance) ? holding.tokenBalance : 0),
         0
       ),
-    [holdings]
+    [uniqueHoldings]
   );
 
   const handleConfirm = async () => {
@@ -77,7 +86,7 @@ export function HoldingSellDialog({
       toast.error("Enter a percentage between 1 and 100");
       return;
     }
-    if (holdings.length === 0) {
+    if (uniqueHoldings.length === 0) {
       toast.error("Select at least one holding");
       return;
     }
@@ -101,7 +110,7 @@ export function HoldingSellDialog({
           <div className="grid gap-2">
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Selected wallets</span>
-              <span className="font-mono">{holdings.length}</span>
+              <span className="font-mono">{uniqueHoldings.length}</span>
             </div>
             <div className="flex items-center justify-between text-sm text-muted-foreground">
               <span>Total balance</span>
@@ -171,7 +180,7 @@ export function HoldingSellDialog({
           <Button
             variant="destructive"
             onClick={handleConfirm}
-            disabled={isSubmitting || holdings.length === 0}
+            disabled={isSubmitting || uniqueHoldings.length === 0}
           >
             {isSubmitting ? "Selling..." : "Sell"}
           </Button>

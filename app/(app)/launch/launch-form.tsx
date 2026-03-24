@@ -1141,7 +1141,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       )}
                       {devWalletOption === "use_main" && (
                         <p className="text-sm text-muted-foreground flex items-center h-full">
-                          Your connected wallet will be used for dev operations
+                          Your main wallet will be used as the dev wallet for this launch
                         </p>
                       )}
                     </div>
@@ -1606,7 +1606,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   ? "Imported wallet"
                                   : values.devWalletOption === "generate"
                                     ? "Will be generated"
-                                    : "Main wallet"}
+                                    : "Main Wallet (used as dev)"}
                               </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">

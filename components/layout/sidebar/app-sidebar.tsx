@@ -35,8 +35,10 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
       retry: false,
     }
   );
+  const resolvedPlan =
+    subscriptionOverviewQuery.data?.plan ?? currentUser?.plan ?? null;
   const subscriptionPlanBadge =
-    subscriptionOverviewQuery.data?.plan === "PRO" ? "Pro" : "Free";
+    resolvedPlan === "PRO" ? "Pro" : resolvedPlan === "FREE" ? "Free" : undefined;
   const buildAndManageItems = React.useMemo(
     () => [
       ...buildAndManageRoutes,

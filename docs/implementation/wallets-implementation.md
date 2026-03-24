@@ -4,6 +4,8 @@
 
 Wallets are token-scoped for operational usage, while the main wallet is user-scoped. The wallets page and wallet detail pages separate operational wallets (bundler/volume/distribution) from the main and dev wallets, with different fetch paths and behavior.
 
+When a token launch uses `devWalletOption = use_main`, the token's dev wallet and the user's main wallet share the same wallet address. In that case, the UI should present a single shared wallet concept labeled `Main Wallet (used as dev)` instead of rendering duplicate main/dev presentations for the same public key.
+
 ## Data Model
 
 - `Wallet.tokenPublicKey` is used for operational wallets (bundler/volume/distribution).
@@ -104,12 +106,16 @@ Service rules:
 Wallets list page:
 
 - Separates main/dev wallets from operational wallets.
+- When main and dev share the same `publicKey`, renders a single shared wallet card labeled `Main Wallet (used as dev)`.
+- Shared-wallet totals and transfer selections must dedupe by `publicKey` so the same address is not counted twice.
 - Provides bulk actions for refresh, send, and return.
 - Dev wallet actions include send and return.
+- Shared-wallet presentations do not expose self-transfer or self-return actions.
 
 Wallet detail page:
 
 - Non-main wallets allow send and return actions.
+- When the token dev wallet is the same address as the user's main wallet, the detail title remains `Main Wallet (used as dev)` and does not expose self-transfer or self-return actions.
 - Private keys are fetched on demand from a dialog in the wallet detail view.
 - Wallet detail includes holdings and transactions tables scoped to the current wallet.
 - Wallet detail tables reuse:
@@ -156,6 +162,7 @@ Wallet balance queries use targeted `wallet.refreshBalances` for post-tx and man
 - Users receive summary feedback for partial success (`submitted/failed/skipped`).
 - Failed wallet outcomes include per-wallet error text when available.
 - Send mode shows total outflow preview: `amountPerWallet * selectedWalletCount`.
+- Shared main/dev wallet addresses are excluded from token-wallet transfer targets so users cannot send from main to the same main wallet through the dev-wallet path.
 
 Invalidation triggers:
 

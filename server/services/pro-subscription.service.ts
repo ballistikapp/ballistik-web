@@ -4,7 +4,7 @@ import { AppError } from "@/server/errors";
 import { usageFeeService } from "@/server/services/usage-fee.service";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 
-export const WEEKLY_PRO_PRICE_SOL = 0.95;
+export const WEEKLY_PRO_PRICE_SOL = 4.95;
 export const WEEKLY_PRO_DURATION_DAYS = 7;
 const HISTORY_LIMIT = 20;
 
