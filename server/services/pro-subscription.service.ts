@@ -124,7 +124,8 @@ export const proSubscriptionService = {
             reason: "pro.weekly",
           });
 
-          if (feeResult.skipped || !feeResult.signature) {
+          const paymentSignature = feeResult.signature;
+          if (feeResult.skipped || !paymentSignature) {
             throw new AppError("Failed to confirm Pro payment", 500);
           }
 
@@ -157,7 +158,7 @@ export const proSubscriptionService = {
               data: {
                 userId: user.id,
                 amountSol: WEEKLY_PRO_PRICE_SOL,
-                txSignature: feeResult.signature,
+                txSignature: paymentSignature,
                 startsAt,
                 expiresAt,
               },
