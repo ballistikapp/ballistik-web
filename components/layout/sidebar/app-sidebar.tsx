@@ -1,6 +1,8 @@
 "use client";
 
 import * as React from "react";
+import { IconCreditCard } from "@tabler/icons-react";
+import { trpc } from "@/lib/trpc/client";
 import {
   buildAndManageRoutes,
   helpRoutes,
@@ -25,6 +27,29 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
   const { selectedTokenPublicKey } = useSelectedToken();
   const effectiveTokenPublicKey =
     selectedTokenPublicKey ?? props.tokens[0]?.publicKey;
+  const { data: currentUser } = trpc.auth.me.useQuery();
+  const subscriptionOverviewQuery = trpc.billing.getSubscriptionOverview.useQuery(
+    {},
+    {
+      enabled: Boolean(currentUser),
+      retry: false,
+    }
+  );
+  const subscriptionPlanBadge =
+    subscriptionOverviewQuery.data?.plan === "PRO" ? "Pro" : "Free";
+  const buildAndManageItems = React.useMemo(
+    () => [
+      ...buildAndManageRoutes,
+      {
+        title: "Subscription",
+        url: "/account/subscription",
+        icon: IconCreditCard,
+        scope: "global" as const,
+        badge: subscriptionPlanBadge,
+      },
+    ],
+    [subscriptionPlanBadge]
+  );
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -39,7 +64,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
         />
         <NavMain
           title="Build & Manage"
-          items={buildAndManageRoutes}
+          items={buildAndManageItems}
           currentToken={effectiveTokenPublicKey}
           className="mt-6"
         />

@@ -19,6 +19,7 @@ import {
   SidebarGroup,
   SidebarGroupContent,
   SidebarGroupLabel,
+  SidebarMenuBadge,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
@@ -33,6 +34,7 @@ export type NavMainItem = {
   icon?: Icon;
   scope?: "token" | "global";
   external?: boolean;
+  badge?: string;
 };
 
 export const tokenWorkspaceRoutes: NavMainItem[] = [
@@ -131,6 +133,7 @@ export const NavMain = React.memo(function NavMain({
                 <SidebarMenuButton
                   className={cn(
                     "text-base py-2 h-auto text-muted-foreground",
+                    item.badge && "pr-14",
                     isDisabled && "pointer-events-none opacity-50"
                   )}
                   asChild={true}
@@ -144,6 +147,11 @@ export const NavMain = React.memo(function NavMain({
                   >
                     {item.icon && <item.icon className="size-10 shrink-0" />}
                     <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                    {item.badge ? (
+                      <SidebarMenuBadge className="right-2 rounded-full border border-sidebar-border/70 bg-sidebar-accent/60 px-2 text-[10px] font-semibold uppercase tracking-[0.08em]">
+                        {item.badge}
+                      </SidebarMenuBadge>
+                    ) : null}
                     {item.external ? (
                       <IconExternalLink className="ml-auto size-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" />
                     ) : null}

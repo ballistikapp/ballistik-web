@@ -1,14 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
-import { PageHeader } from "@/components/layout/sections";
+import {
+  PageHeader,
+  PageSection,
+  PageSectionDivider,
+  PageSectionHeader,
+} from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 function formatDateTime(value: Date | string | null | undefined) {
   if (!value) {
@@ -26,6 +40,7 @@ function formatSignature(signature: string) {
 export default function AccountSubscriptionPage() {
   const utils = trpc.useUtils();
   const refreshTriggeredRef = useRef(false);
+  const [confirmOpen, setConfirmOpen] = useState(false);
 
   const overviewQuery = trpc.billing.getSubscriptionOverview.useQuery({});
   const historyQuery = trpc.billing.getHistory.useQuery({ limit: 20 });
@@ -34,8 +49,7 @@ export default function AccountSubscriptionPage() {
 
   const overview = overviewQuery.data;
   const history = historyQuery.data ?? [];
-  const isBusy =
-    purchaseMutation.isPending || refreshSessionMutation.isPending;
+  const isBusy = purchaseMutation.isPending || refreshSessionMutation.isPending;
 
   useEffect(() => {
     if (!overview?.requiresTokenRefresh || refreshTriggeredRef.current) {
@@ -55,26 +69,40 @@ export default function AccountSubscriptionPage() {
       .catch((error) => {
         refreshTriggeredRef.current = false;
         toast.error(
-          error instanceof Error
-            ? error.message
-            : "Failed to refresh session"
+          error instanceof Error ? error.message : "Failed to refresh session"
         );
       });
-  }, [overview?.requiresTokenRefresh, refreshSessionMutation, utils.auth.me, utils.billing.getSubscriptionOverview]);
+  }, [
+    overview?.requiresTokenRefresh,
+    refreshSessionMutation,
+    utils.auth.me,
+    utils.billing.getSubscriptionOverview,
+  ]);
 
   const ctaLabel = useMemo(() => {
     if (overview?.status === "ACTIVE") {
-      return "Extend Pro by 7 days";
+      return "Extend Pro";
     }
     if (overview?.status === "EXPIRED") {
       return "Renew Pro";
     }
-    return "Upgrade to Pro";
+    return "Subscribe to Pro";
+  }, [overview?.status]);
+
+  const statusLabel = useMemo(() => {
+    if (overview?.status === "ACTIVE") {
+      return "Active";
+    }
+    if (overview?.status === "EXPIRED") {
+      return "Expired";
+    }
+    return "Free";
   }, [overview?.status]);
 
   const handlePurchase = async () => {
     try {
       const result = await purchaseMutation.mutateAsync({});
+      setConfirmOpen(false);
       let refreshFailed = false;
       try {
         await refreshSessionMutation.mutateAsync({});
@@ -103,8 +131,8 @@ export default function AccountSubscriptionPage() {
     return (
       <div className="flex flex-col gap-6">
         <Skeleton className="h-10 w-56" />
-        <Skeleton className="h-48 w-full rounded-xl" />
-        <Skeleton className="h-72 w-full rounded-xl" />
+        <Skeleton className="h-40 w-full rounded-xl" />
+        <Skeleton className="h-64 w-full rounded-xl" />
       </div>
     );
   }
@@ -121,80 +149,234 @@ export default function AccountSubscriptionPage() {
   }
 
   return (
-    <div className="flex flex-col gap-6">
-      <PageHeader
-        title="Subscription"
-        rightContent={
-          <p className="max-w-sm text-sm text-muted-foreground">
-            Manage your weekly Pro access and review recent billing activity.
-          </p>
-        }
-      />
-
-      <section className="grid gap-6 lg:grid-cols-[minmax(0,1.2fr)_minmax(0,0.8fr)]">
-        <div className="rounded-2xl border bg-card p-6">
-          <div className="flex items-start justify-between gap-4">
-            <div className="space-y-2">
-              <div className="flex items-center gap-2">
-                <span className="rounded-full bg-muted px-3 py-1 text-xs uppercase tracking-wide text-muted-foreground">
+    <>
+      <div className="flex flex-col gap-6">
+        <PageHeader
+          title="Subscription"
+          rightContent={
+            <div className="mt-3 text-right">
+              <div className="flex items-center justify-end gap-2">
+                <Badge
+                  variant={overview.plan === "PRO" ? "default" : "secondary"}
+                  className="h-8 rounded-full px-4 text-sm font-semibold"
+                >
                   {overview.plan === "PRO" ? "Pro" : "Free"}
-                </span>
-                <span className="rounded-full border px-3 py-1 text-xs uppercase tracking-wide text-muted-foreground">
-                  {overview.status}
-                </span>
+                </Badge>
+                <Badge
+                  variant="outline"
+                  className="h-8 rounded-full px-4 text-sm font-medium"
+                >
+                  {statusLabel}
+                </Badge>
               </div>
-              <h2 className="text-2xl font-semibold">Weekly Pro</h2>
-              <p className="text-sm text-muted-foreground">
-                Pro unlocks live monitoring, faster gRPC-backed tooling, and
-                zero platform fees on supported flows.
+              <p className="mt-4 text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                WEEKLY PRICE
+              </p>
+              <p className="font-mono leading-none">
+                <span className="text-4xl">{overview.priceSol.toFixed(2)}</span>{" "}
+                <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
-            <div className="text-right">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Public price
+          }
+        />
+
+        <PageSection className="pt-8">
+          <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-8 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.18)_1px,transparent_1px)] bg-size-[18px_18px] opacity-30 mask-[radial-gradient(circle_at_center,black,transparent_75%)]" />
+              <div className="relative space-y-8">
+                <div className="space-y-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500">
+                    Weekly Pro
+                  </p>
+                  <PageSectionHeader
+                    title="Pro Features"
+                    className="items-start"
+                    meta={
+                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-neutral-300">
+                        Account-wide access
+                      </span>
+                    }
+                  />
+                  <p className="max-w-md text-sm text-neutral-400">
+                    Faster tooling, live monitoring, and cleaner execution with
+                    fewer platform charges on supported flows.
+                  </p>
+                </div>
+
+                <div className="grid gap-3">
+                  {[
+                    "Live monitoring on the dashboard",
+                    "Faster gRPC-backed confirmation paths where supported",
+                    "No platform fees on supported launch and volume-bot flows",
+                  ].map((feature) => (
+                    <div
+                      key={feature}
+                      className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3"
+                    >
+                      <span className="mt-1 size-2 rounded-full bg-neutral-200" />
+                      <span className="text-sm text-neutral-200">
+                        {feature}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+
+                <p className="text-sm text-neutral-500">
+                  Each purchase extends Pro by 7 days. There is no auto-renewal
+                  in this version.
+                </p>
               </div>
-              <div className="text-3xl font-semibold">
-                {overview.priceSol.toFixed(2)} SOL
+            </div>
+
+            <div className="space-y-8">
+              <div className="space-y-3">
+                <h2 className="text-2xl font-normal">Weekly Pro access</h2>
+                <p className="max-w-2xl text-sm text-muted-foreground">
+                  Pro unlocks live monitoring, faster gRPC-backed tooling, and
+                  removes platform fees on supported flows.
+                </p>
               </div>
-              <div className="text-sm text-muted-foreground">per 7 days</div>
+
+              <div className="grid gap-8 sm:grid-cols-3">
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                    PLAN
+                  </p>
+                  <p className="text-xl">
+                    {overview.plan === "PRO" ? "Pro" : "Free"}
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                    STATUS
+                  </p>
+                  <p className="text-xl">{statusLabel}</p>
+                </div>
+                <div className="space-y-2">
+                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+                    EXPIRES
+                  </p>
+                  <p className="text-xl">
+                    {overview.proExpiresAt
+                      ? formatDateTime(overview.proExpiresAt)
+                      : "Not active"}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-2 text-sm text-muted-foreground">
+                <p>
+                  Pro removes platform fees only. Network, protocol, rent, and
+                  Jito costs still apply when relevant.
+                </p>
+                <p>
+                  There is no auto-renewal. When your period ends, you can renew
+                  manually from this page.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-3">
+                <Button
+                  onClick={() => setConfirmOpen(true)}
+                  disabled={isBusy}
+                  size="lg"
+                >
+                  {ctaLabel}
+                </Button>
+                <Button variant="outline" size="lg" asChild>
+                  <Link href="/account">View account</Link>
+                </Button>
+              </div>
             </div>
           </div>
 
-          <div className="mt-6 grid gap-4 md:grid-cols-2">
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Current status
-              </div>
-              <div className="mt-2 text-lg font-medium">
-                {overview.status === "ACTIVE"
-                  ? "Active"
-                  : overview.status === "EXPIRED"
-                    ? "Expired"
-                    : "Free plan"}
-              </div>
-            </div>
-            <div className="rounded-xl border bg-muted/30 p-4">
-              <div className="text-xs uppercase tracking-wide text-muted-foreground">
-                Expires
-              </div>
-              <div className="mt-2 text-lg font-medium">
-                {formatDateTime(overview.proExpiresAt)}
-              </div>
-            </div>
-          </div>
+          <PageSectionDivider className="my-24" />
 
-          <div className="mt-6 space-y-2 text-sm text-muted-foreground">
+          <div className="space-y-10 pb-8">
+            <PageSectionHeader
+              title="Billing history"
+              meta={
+                <p className="text-sm text-muted-foreground">
+                  Recent weekly Pro purchases charged from your main wallet.
+                </p>
+              }
+            />
+
+            {historyQuery.isLoading ? (
+              <div className="mt-8 grid gap-5">
+                <Skeleton className="h-20 w-full rounded-none" />
+                <Skeleton className="h-20 w-full rounded-none" />
+              </div>
+            ) : history.length === 0 ? (
+              <div className="border-t pt-10 pb-6 text-sm text-muted-foreground">
+                No Pro purchases yet.
+              </div>
+            ) : (
+              <div className="border-t pt-4">
+                {history.map((entry) => (
+                  <div
+                    key={entry.id}
+                    className="flex flex-col gap-4 border-b py-6 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div className="space-y-1">
+                      <div className="font-medium">
+                        {Number(entry.amountSol).toFixed(2)} SOL
+                      </div>
+                      <div className="text-sm text-muted-foreground">
+                        Active from {formatDateTime(entry.startsAt)} until{" "}
+                        {formatDateTime(entry.expiresAt)}
+                      </div>
+                    </div>
+                    <div className="text-sm text-muted-foreground">
+                      <Link
+                        href={`https://solscan.io/tx/${entry.txSignature}`}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="font-mono text-foreground hover:underline"
+                      >
+                        {formatSignature(entry.txSignature)}
+                      </Link>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </PageSection>
+      </div>
+
+      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>{ctaLabel}</DialogTitle>
+            <DialogDescription>
+              This will charge {overview.priceSol.toFixed(2)} SOL from your main
+              wallet and activate Pro for 7 days.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 text-sm text-muted-foreground">
             <p>
               Pro removes platform fees only. Network, protocol, rent, and Jito
               costs still apply when relevant.
             </p>
-            <p>
-              There is no auto-renewal. When your period ends, you can renew
-              from this page.
-            </p>
+            {overview.proExpiresAt ? (
+              <p>
+                Your current access{" "}
+                {overview.status === "ACTIVE" ? "ends" : "ended"} on{" "}
+                {formatDateTime(overview.proExpiresAt)}.
+              </p>
+            ) : null}
           </div>
-
-          <div className="mt-6 flex flex-wrap gap-3">
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setConfirmOpen(false)}
+              disabled={isBusy}
+            >
+              Cancel
+            </Button>
             <Button onClick={handlePurchase} disabled={isBusy}>
               {isBusy ? (
                 <>
@@ -202,77 +384,12 @@ export default function AccountSubscriptionPage() {
                   Processing...
                 </>
               ) : (
-                ctaLabel
+                `Confirm and pay ${overview.priceSol.toFixed(2)} SOL`
               )}
             </Button>
-            <Button variant="outline" asChild>
-              <Link href="/account">Back to account</Link>
-            </Button>
-          </div>
-        </div>
-
-        <div className="rounded-2xl border bg-card p-6">
-          <div className="space-y-2">
-            <h3 className="text-lg font-semibold">What Pro includes</h3>
-            <ul className="space-y-2 text-sm text-muted-foreground">
-              <li>Live monitoring on the dashboard.</li>
-              <li>Faster gRPC-backed confirmation paths where supported.</li>
-              <li>No platform fees on supported launch and volume-bot flows.</li>
-            </ul>
-          </div>
-        </div>
-      </section>
-
-      <section className="rounded-2xl border bg-card p-6">
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h3 className="text-lg font-semibold">Billing history</h3>
-            <p className="text-sm text-muted-foreground">
-              Recent weekly Pro purchases charged from your main wallet.
-            </p>
-          </div>
-        </div>
-
-        {historyQuery.isLoading ? (
-          <div className="mt-6 grid gap-3">
-            <Skeleton className="h-16 w-full rounded-xl" />
-            <Skeleton className="h-16 w-full rounded-xl" />
-          </div>
-        ) : history.length === 0 ? (
-          <div className="mt-6 rounded-xl border border-dashed p-6 text-sm text-muted-foreground">
-            No Pro purchases yet.
-          </div>
-        ) : (
-          <div className="mt-6 space-y-3">
-            {history.map((entry) => (
-              <div
-                key={entry.id}
-                className="flex flex-col gap-3 rounded-xl border bg-muted/20 p-4 md:flex-row md:items-center md:justify-between"
-              >
-                <div className="space-y-1">
-                  <div className="font-medium">
-                    {Number(entry.amountSol).toFixed(2)} SOL
-                  </div>
-                  <div className="text-sm text-muted-foreground">
-                    Active from {formatDateTime(entry.startsAt)} until{" "}
-                    {formatDateTime(entry.expiresAt)}
-                  </div>
-                </div>
-                <div className="text-sm text-muted-foreground">
-                  <Link
-                    href={`https://solscan.io/tx/${entry.txSignature}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="font-mono text-foreground hover:underline"
-                  >
-                    {formatSignature(entry.txSignature)}
-                  </Link>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </section>
-    </div>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
   );
 }

@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
+import { format } from "date-fns";
 import {
   IconArrowDownLeft,
   IconArrowUpRight,
+  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconUser,
@@ -34,6 +36,7 @@ import {
 import { Spinner } from "@/components/ui/spinner";
 import { MainWalletDepositDialog } from "@/components/wallets/main-wallet-deposit-dialog";
 import { MainWalletWithdrawDialog } from "@/components/wallets/main-wallet-withdraw-dialog";
+import { Badge } from "@/components/ui/badge";
 
 export function AuthButton() {
   const [depositDialogOpen, setDepositDialogOpen] = React.useState(false);
@@ -48,12 +51,24 @@ export function AuthButton() {
       staleTime: cacheConfig.staleMs.wallets,
     }
   );
+  const subscriptionOverviewQuery = trpc.billing.getSubscriptionOverview.useQuery(
+    {},
+    {
+      enabled: isLoggedIn,
+    }
+  );
   const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation({
     onSuccess: () => {
       mainWalletQuery.refetch();
     },
   });
   const mainWalletBalanceSol = Number(mainWalletQuery.data?.balanceSol ?? 0);
+  const subscriptionOverview = subscriptionOverviewQuery.data;
+  const effectivePlan = subscriptionOverview?.plan ?? currentUser?.plan ?? "FREE";
+  const isProPlan = effectivePlan === "PRO";
+  const proExpiresAtLabel = subscriptionOverview?.proExpiresAt
+    ? format(new Date(subscriptionOverview.proExpiresAt), "MMM d, yyyy")
+    : null;
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -199,6 +214,27 @@ export function AuthButton() {
               <TooltipContent>Refresh</TooltipContent>
             </Tooltip>
           </DropdownMenuLabel>
+          <DropdownMenuSeparator />
+
+          <DropdownMenuLabel className="flex flex-col gap-1">
+            <div>
+              <Badge variant={isProPlan ? "default" : "secondary"}>
+                {isProPlan ? "Pro Plan" : "Free Plan"}
+              </Badge>
+            </div>
+            {isProPlan && proExpiresAtLabel ? (
+              <span className="text-xs text-muted-foreground">
+                Active until {proExpiresAtLabel}
+              </span>
+            ) : null}
+          </DropdownMenuLabel>
+          <DropdownMenuItem asChild>
+            <Link href="/account/subscription">
+              <IconCreditCard />
+              {isProPlan ? "Manage Subscription" : "Upgrade to Pro Plan"}
+            </Link>
+          </DropdownMenuItem>
+
           <DropdownMenuSeparator />
 
           <DropdownMenuGroup>
