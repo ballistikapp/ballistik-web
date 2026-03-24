@@ -35,6 +35,10 @@ import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 import { UserPlan } from "@/lib/generated/prisma/client";
+import {
+  computeSponsoredRecoverableLamports,
+  resolveBatchReclaimMode,
+} from "@/lib/utils/sol-recovery";
 
 const cancelledExits = new Set<string>();
 
@@ -494,6 +498,56 @@ async function closeAtasAndRecoverSol({
     returnSolToMainWallet,
   });
 
+  const walletBalances = new Map<string, number>();
+  let reclaimMode: "main-sponsored" | "source-funded" = "source-funded";
+  let sponsoredFeeLamports = 0;
+  if (returnSolToMainWallet) {
+    await mapWithConcurrency(
+      cleanupWallets,
+      CLEANUP_WALLET_CONCURRENCY,
+      async (wallet) => {
+        const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+        const balanceLamports = await connection.getBalance(owner.publicKey);
+        walletBalances.set(wallet.publicKey, balanceLamports);
+      }
+    );
+
+    const firstRecoverableWallet = cleanupWallets.find(
+      (wallet) => (walletBalances.get(wallet.publicKey) ?? 0) > 0
+    );
+    if (firstRecoverableWallet) {
+      const owner = Keypair.fromSecretKey(
+        bs58.decode(firstRecoverableWallet.privateKey)
+      );
+      const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+      const sponsoredFeeTransaction = new Transaction().add(
+        SystemProgram.transfer({
+          fromPubkey: owner.publicKey,
+          toPubkey: mainWallet.publicKey,
+          lamports: 1,
+        })
+      );
+      sponsoredFeeTransaction.recentBlockhash = latestBlockhash.blockhash;
+      sponsoredFeeTransaction.feePayer = mainWallet.publicKey;
+      const sponsoredFee = await connection.getFeeForMessage(
+        sponsoredFeeTransaction.compileMessage(),
+        "confirmed"
+      );
+      sponsoredFeeLamports = sponsoredFee.value ?? 5000;
+    }
+
+    const mainWalletBalanceLamports = await connection.getBalance(
+      mainWallet.publicKey
+    );
+    reclaimMode = resolveBatchReclaimMode({
+      mainWalletBalanceLamports,
+      walletBalancesLamports: cleanupWallets.map(
+        (wallet) => walletBalances.get(wallet.publicKey) ?? 0
+      ),
+      sponsoredFeeLamports,
+    });
+  }
+
   const results = await mapWithConcurrency(
     cleanupWallets,
     CLEANUP_WALLET_CONCURRENCY,
@@ -574,7 +628,7 @@ async function closeAtasAndRecoverSol({
             throw new Error("Exit cancelled by user");
           }
           try {
-            const balanceLamports = await connection.getBalance(owner.publicKey);
+            const balanceLamports = walletBalances.get(wallet.publicKey) ?? 0;
             const feeTransaction = new Transaction().add(
               SystemProgram.transfer({
                 fromPubkey: owner.publicKey,
@@ -592,7 +646,13 @@ async function closeAtasAndRecoverSol({
               "confirmed"
             );
             const feeLamports = fee.value ?? 5000;
-            const lamports = balanceLamports - feeLamports;
+            const lamports =
+              reclaimMode === "main-sponsored"
+                ? computeSponsoredRecoverableLamports({
+                    balanceLamports,
+                    feeLamports: sponsoredFeeLamports,
+                  })
+                : balanceLamports - feeLamports;
             if (lamports > 0) {
               const transferTx = new Transaction().add(
                 SystemProgram.transfer({
@@ -602,10 +662,20 @@ async function closeAtasAndRecoverSol({
                 })
               );
               transferTx.recentBlockhash = latestBlockhash.blockhash;
-              transferTx.feePayer = owner.publicKey;
-              const signature = await sendAndConfirmTransaction(connection, transferTx, [owner], {
-                commitment: "confirmed",
-              });
+              transferTx.feePayer =
+                reclaimMode === "main-sponsored"
+                  ? mainWallet.publicKey
+                  : owner.publicKey;
+              const signature = await sendAndConfirmTransaction(
+                connection,
+                transferTx,
+                reclaimMode === "main-sponsored"
+                  ? [mainWallet, owner]
+                  : [owner],
+                {
+                  commitment: "confirmed",
+                }
+              );
               await testRunLogService.appendServerEvent({
                 eventType: "wallet_transaction",
                 source: "holding-exit.service",
@@ -615,6 +685,7 @@ async function closeAtasAndRecoverSol({
                 status: "submitted",
                 expectedValue: {
                   lamports,
+                  reclaimMode,
                 },
               });
               solRecoveredLamports = lamports;

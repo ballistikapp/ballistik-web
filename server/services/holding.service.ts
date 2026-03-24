@@ -6,7 +6,11 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
-import { computeRecoverableLamports } from "@/lib/utils/sol-recovery";
+import {
+  computeRecoverableLamports,
+  computeSponsoredRecoverableLamports,
+  resolveBatchReclaimMode,
+} from "@/lib/utils/sol-recovery";
 import {
   Keypair,
   PublicKey,
@@ -245,6 +249,51 @@ async function returnSolToMainWallet(
 ) {
   const rentExemptMinimumLamports =
     await connection.getMinimumBalanceForRentExemption(0, "confirmed");
+  const walletBalances = new Map<string, number>();
+  await mapWithConcurrency(wallets, 2, async (wallet) => {
+    if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
+      walletBalances.set(wallet.publicKey, 0);
+      return;
+    }
+
+    const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+    const balanceLamports = await connection.getBalance(owner.publicKey);
+    walletBalances.set(wallet.publicKey, balanceLamports);
+  });
+  const firstRecoverableWallet = wallets.find(
+    (wallet) => (walletBalances.get(wallet.publicKey) ?? 0) > 0
+  );
+  let sponsoredFeeLamports = 0;
+  if (firstRecoverableWallet) {
+    const owner = Keypair.fromSecretKey(
+      bs58.decode(firstRecoverableWallet.privateKey)
+    );
+    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
+    const sponsoredFeeTransaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: owner.publicKey,
+        toPubkey: mainWalletKeypair.publicKey,
+        lamports: 1,
+      })
+    );
+    sponsoredFeeTransaction.feePayer = mainWalletKeypair.publicKey;
+    sponsoredFeeTransaction.recentBlockhash = latestBlockhash.blockhash;
+    const sponsoredFee = await connection.getFeeForMessage(
+      sponsoredFeeTransaction.compileMessage(),
+      "confirmed"
+    );
+    sponsoredFeeLamports = sponsoredFee.value ?? 5000;
+  }
+  const mainWalletBalanceLamports = await connection.getBalance(
+    mainWalletKeypair.publicKey
+  );
+  const reclaimMode = resolveBatchReclaimMode({
+    mainWalletBalanceLamports,
+    walletBalancesLamports: wallets.map(
+      (wallet) => walletBalances.get(wallet.publicKey) ?? 0
+    ),
+    sponsoredFeeLamports,
+  });
   const results = await mapWithConcurrency(wallets, 2, async (wallet) => {
     if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
       return {
@@ -256,7 +305,7 @@ async function returnSolToMainWallet(
 
     try {
       const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-      const balanceLamports = await connection.getBalance(owner.publicKey);
+      const balanceLamports = walletBalances.get(wallet.publicKey) ?? 0;
       if (balanceLamports <= 0) {
         return {
           walletPublicKey: wallet.publicKey,
@@ -281,11 +330,17 @@ async function returnSolToMainWallet(
         "confirmed"
       );
       const feeLamports = fee.value ?? 5000;
-      const lamports = computeRecoverableLamports({
-        balanceLamports,
-        feeLamports,
-        rentExemptMinimumLamports,
-      });
+      const lamports =
+        reclaimMode === "main-sponsored"
+          ? computeSponsoredRecoverableLamports({
+              balanceLamports,
+              feeLamports: sponsoredFeeLamports,
+            })
+          : computeRecoverableLamports({
+              balanceLamports,
+              feeLamports,
+              rentExemptMinimumLamports,
+            });
       if (lamports <= 0) {
         return {
           walletPublicKey: wallet.publicKey,
@@ -302,10 +357,20 @@ async function returnSolToMainWallet(
         })
       );
       transferTx.recentBlockhash = latestBlockhash.blockhash;
-      transferTx.feePayer = owner.publicKey;
-      const signature = await sendAndConfirmTransaction(connection, transferTx, [owner], {
-        commitment: "confirmed",
-      });
+      transferTx.feePayer =
+        reclaimMode === "main-sponsored"
+          ? mainWalletKeypair.publicKey
+          : owner.publicKey;
+      const signature = await sendAndConfirmTransaction(
+        connection,
+        transferTx,
+        reclaimMode === "main-sponsored"
+          ? [mainWalletKeypair, owner]
+          : [owner],
+        {
+          commitment: "confirmed",
+        }
+      );
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "holding.service",
@@ -315,6 +380,7 @@ async function returnSolToMainWallet(
         status: "submitted",
         expectedValue: {
           recoverableLamports: lamports,
+          reclaimMode,
         },
         actualValue: {
           walletPublicKey: wallet.publicKey,

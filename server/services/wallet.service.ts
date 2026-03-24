@@ -18,6 +18,10 @@ import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { mapWithConcurrency } from "@/lib/utils/async";
+import {
+  computeSponsoredRecoverableLamports,
+  resolveBatchReclaimMode,
+} from "@/lib/utils/sol-recovery";
 import type {
   WalletTransferResult,
   WithdrawMainSolResult,
@@ -980,7 +984,9 @@ export const walletService = {
     const [user, operationalWallets, devWallet] = await Promise.all([
       prisma.user.findUnique({
         where: { id: userId },
-        select: { mainWallet: { select: { publicKey: true } } },
+        select: {
+          mainWallet: { select: { publicKey: true, privateKey: true } },
+        },
       }),
       prisma.wallet.findMany({
         where: {
@@ -1021,6 +1027,70 @@ export const walletService = {
     }
 
     const connection = getSolanaConnection();
+    const mainKeypair =
+      useMax && mainWallet.privateKey
+        ? Keypair.fromSecretKey(bs58.decode(mainWallet.privateKey))
+        : null;
+    const walletBalances = new Map<string, number>();
+    let reclaimMode: "main-sponsored" | "source-funded" = "source-funded";
+    let sponsoredFeeLamports = 0;
+    if (useMax && mainKeypair) {
+      await mapWithConcurrency(
+        targets,
+        rpcConfig.tuning.transferConcurrency,
+        async (wallet) => {
+          const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+          const balanceLamports = await retryRpcWithTimeout(
+            () => connection.getBalance(sender.publicKey),
+            rpcConfig.tuning.rpcTimeoutMs
+          );
+          walletBalances.set(wallet.publicKey, balanceLamports);
+        }
+      );
+
+      const firstRecoverableTarget = targets.find(
+        (wallet) => (walletBalances.get(wallet.publicKey) ?? 0) > 0
+      );
+      if (firstRecoverableTarget) {
+        const sender = Keypair.fromSecretKey(
+          bs58.decode(firstRecoverableTarget.privateKey)
+        );
+        const { blockhash } = await retryRpcWithTimeout(
+          () => connection.getLatestBlockhash("confirmed"),
+          rpcConfig.tuning.rpcTimeoutMs
+        );
+        const sponsoredFeeTransaction = new Transaction().add(
+          SystemProgram.transfer({
+            fromPubkey: sender.publicKey,
+            toPubkey: mainPublicKey,
+            lamports: 1,
+          })
+        );
+        sponsoredFeeTransaction.recentBlockhash = blockhash;
+        sponsoredFeeTransaction.feePayer = mainKeypair.publicKey;
+        const sponsoredFee = await retryRpcWithTimeout(
+          () =>
+            connection.getFeeForMessage(
+              sponsoredFeeTransaction.compileMessage(),
+              "confirmed"
+            ),
+          rpcConfig.tuning.rpcTimeoutMs
+        );
+        sponsoredFeeLamports = sponsoredFee.value ?? 5000;
+      }
+
+      const mainWalletBalanceLamports = await retryRpcWithTimeout(
+        () => connection.getBalance(mainKeypair.publicKey),
+        rpcConfig.tuning.rpcTimeoutMs
+      );
+      reclaimMode = resolveBatchReclaimMode({
+        mainWalletBalanceLamports,
+        walletBalancesLamports: targets.map(
+          (wallet) => walletBalances.get(wallet.publicKey) ?? 0
+        ),
+        sponsoredFeeLamports,
+      });
+    }
     const transferConcurrency = rpcConfig.tuning.transferConcurrency;
     const results = await mapWithConcurrency(
       targets,
@@ -1030,10 +1100,18 @@ export const walletService = {
 
         const computeLamports = async (blockhash: string) => {
           if (useMax) {
-            const balanceLamports = await retryRpcWithTimeout(
-              () => connection.getBalance(sender.publicKey),
-              rpcConfig.tuning.rpcTimeoutMs
-            );
+            const balanceLamports =
+              walletBalances.get(wallet.publicKey) ??
+              (await retryRpcWithTimeout(
+                () => connection.getBalance(sender.publicKey),
+                rpcConfig.tuning.rpcTimeoutMs
+              ));
+            if (reclaimMode === "main-sponsored") {
+              return computeSponsoredRecoverableLamports({
+                balanceLamports,
+                feeLamports: sponsoredFeeLamports,
+              });
+            }
             const feeTransaction = new Transaction().add(
               SystemProgram.transfer({
                 fromPubkey: sender.publicKey,
@@ -1079,12 +1157,22 @@ export const walletService = {
             })
           );
           transaction.recentBlockhash = blockhash;
-          transaction.feePayer = sender.publicKey;
+          transaction.feePayer =
+            useMax && reclaimMode === "main-sponsored" && mainKeypair
+              ? mainKeypair.publicKey
+              : sender.publicKey;
           return await retryRpcWithTimeout(
             () =>
-              sendAndConfirmTransaction(connection, transaction, [sender], {
-                commitment: "confirmed",
-              }),
+              sendAndConfirmTransaction(
+                connection,
+                transaction,
+                useMax && reclaimMode === "main-sponsored" && mainKeypair
+                  ? [mainKeypair, sender]
+                  : [sender],
+                {
+                  commitment: "confirmed",
+                }
+              ),
             rpcConfig.tuning.confirmTimeoutMs
           );
         };

@@ -83,7 +83,7 @@ export function WalletTransferDialog({
   const balanceLabel = selectionCount > 1 ? "Total available" : "Available balance";
   const description = isSendMode
     ? "Send SOL from the main wallet to each selected wallet. Amount is per wallet."
-    : "Return SOL from selected wallets back to the main wallet. Network fees are paid by each source wallet.";
+    : "Return the maximum available SOL from selected wallets back to the main wallet.";
   const parsedAmount = Number.parseFloat(amount);
   const totalOutflow =
     isSendMode &&

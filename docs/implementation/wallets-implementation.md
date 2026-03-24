@@ -42,7 +42,7 @@ tRPC procedures:
   - `requestedCount`
   - `targeted`
 - `wallet.sendSol` sends SOL from main wallet to selected token wallets.
-- `wallet.returnSol` returns SOL from selected token wallets to main wallet.
+- `wallet.returnSol` returns SOL from selected token wallets to main wallet, using the main wallet as fee payer for max reclaim when possible and falling back otherwise.
 - `wallet.sendSol` and `wallet.returnSol` return structured transfer outcomes:
   - `submittedCount`
   - `failedCount`

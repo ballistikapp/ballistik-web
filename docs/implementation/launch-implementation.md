@@ -154,7 +154,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - The first bundle resend waits the normal resend interval instead of firing immediately, giving newly sent bundles a short grace period to surface before resend logic begins.
 10. **Distribution**: split bundler wallet token balances into distribution wallets when enabled.
 11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
-12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet, leaving transfer-fee buffer in each source wallet.
+12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet. Cleanup tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
 13. **Failure Reclaim**: if launch execution fails after recovery wallets were persisted, attempt to return remaining SOL to the main wallet before final UI guidance is shown.
 14. **Complete**: mark SUCCEEDED or CANCELED, or mark FAILED after reclaim outcome is recorded, store result metadata, log completion.
 

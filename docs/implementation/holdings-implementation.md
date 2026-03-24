@@ -45,7 +45,7 @@ The `refreshByToken` service is optimized for speed:
    - `getLatestBlockhash` uses `rpcConfig.tuning.rpcTimeoutMs` (30s default)
    - `sendAndConfirmTransaction` uses `rpcConfig.tuning.confirmTimeoutMs` (120s default)
 7. If close ATA is enabled, the service closes empty associated token accounts after selling.
-8. If return SOL is enabled, the service transfers only spendable SOL from processed wallets to the main wallet, leaving the system-account rent-exempt reserve and transaction fee behind in the source wallet.
+8. If return SOL is enabled, the service returns the maximum available SOL from processed wallets to the main wallet. It tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
 9. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
 
 ## UI Behavior
@@ -60,7 +60,7 @@ The `refreshByToken` service is optimized for speed:
 - If supply is temporarily unavailable, the table shows `--` instead of `0.0000%`.
 - Zero-balance rows appear when the wallet has an open ATA for the token.
 - Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells and checked by default when the dialog opens).
-- Sell dialog includes a "Return SOL to main wallet" toggle with a clear description that it sweeps only spendable SOL from processed wallets back to the main wallet while preserving the source wallet's rent reserve, and it is checked by default when the dialog opens.
+- Sell dialog includes a "Return SOL to main wallet" toggle with a short description that it returns the maximum available SOL from processed wallets back to the main wallet, and it is checked by default when the dialog opens.
 - Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.
 

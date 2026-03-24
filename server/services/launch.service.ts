@@ -53,6 +53,10 @@ import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { computeFailedLaunchDrainLamports } from "@/server/services/launch-failure-recovery.helpers";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
 import type { ContextUser } from "@/server/schemas/auth.schema";
+import {
+  computeSponsoredRecoverableLamports,
+  resolveBatchReclaimMode,
+} from "@/lib/utils/sol-recovery";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -1191,6 +1195,7 @@ type LaunchFundingPlan = {
 };
 
 type LaunchCostPreview = {
+  platformFeeWaived: boolean;
   mainWalletBalanceSol: number;
   mainWalletBalanceLamports: string;
   requiredMainWalletSol: number;
@@ -2065,13 +2070,14 @@ async function failToken(tokenPublicKey: string) {
 
 async function returnExcessSolToMain(
   launchId: string,
-  mainWalletPublicKey: string,
+  mainWalletKeypair: Keypair,
   sourceWallets: Keypair[]
 ) {
   const { transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS } =
     getLaunchConfig();
   const startedAt = Date.now();
   const connection = getSolanaConnection();
+  const mainWalletPublicKey = mainWalletKeypair.publicKey.toBase58();
   const mainPublicKey = new PublicKey(mainWalletPublicKey);
   const rentExemptReserveLamports =
     await connection.getMinimumBalanceForRentExemption(0);
@@ -2093,20 +2099,54 @@ async function returnExcessSolToMain(
     };
   }
 
+  const sourceBalances = await Promise.all(
+    uniqueSourceWallets.map((wallet) => connection.getBalance(wallet.publicKey))
+  );
+  const { blockhash } = await connection.getLatestBlockhash("confirmed");
+  const sponsoredFeeTransaction = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: uniqueSourceWallets[0].publicKey,
+      toPubkey: mainPublicKey,
+      lamports: 1,
+    })
+  );
+  sponsoredFeeTransaction.recentBlockhash = blockhash;
+  sponsoredFeeTransaction.feePayer = mainPublicKey;
+  const [mainWalletBalanceLamports, sponsoredFee] = await Promise.all([
+    connection.getBalance(mainPublicKey),
+    connection.getFeeForMessage(
+      sponsoredFeeTransaction.compileMessage(),
+      "confirmed"
+    ),
+  ]);
+  const sponsoredFeeLamports = sponsoredFee.value ?? 5000;
+  const reclaimMode = resolveBatchReclaimMode({
+    mainWalletBalanceLamports,
+    walletBalancesLamports: sourceBalances,
+    sponsoredFeeLamports,
+  });
   const results: SolReturnResult[] = [];
   let totalReturnedLamports = BigInt(0);
-  for (const sourceWallet of uniqueSourceWallets) {
-    const balanceLamports = await connection.getBalance(sourceWallet.publicKey);
+  for (const [index, sourceWallet] of uniqueSourceWallets.entries()) {
+    const balanceLamports = sourceBalances[index] ?? 0;
     const lamportsToSend =
-      balanceLamports -
-      TRANSFER_FEE_BUFFER_LAMPORTS -
-      rentExemptReserveLamports;
+      reclaimMode === "main-sponsored"
+        ? computeSponsoredRecoverableLamports({
+            balanceLamports,
+            feeLamports: sponsoredFeeLamports,
+          })
+        : balanceLamports -
+          TRANSFER_FEE_BUFFER_LAMPORTS -
+          rentExemptReserveLamports;
     if (lamportsToSend <= 0) {
       results.push({
         publicKey: sourceWallet.publicKey.toBase58(),
         status: "skipped",
         remainingBalanceSol: balanceLamports / LAMPORTS_PER_SOL,
-        error: "Insufficient balance after fee and rent reserve",
+        error:
+          reclaimMode === "main-sponsored"
+            ? "Insufficient balance after fee"
+            : "Insufficient balance after fee and rent reserve",
       });
       continue;
     }
@@ -2118,10 +2158,16 @@ async function returnExcessSolToMain(
           lamports: lamportsToSend,
         })
       );
+      transaction.feePayer =
+        reclaimMode === "main-sponsored"
+          ? mainPublicKey
+          : sourceWallet.publicKey;
       const signature = await sendAndConfirmTransaction(
         connection,
         transaction,
-        [sourceWallet],
+        reclaimMode === "main-sponsored"
+          ? [mainWalletKeypair, sourceWallet]
+          : [sourceWallet],
         { commitment: "confirmed" }
       );
       await testRunLogService.appendServerEvent({
@@ -2134,6 +2180,7 @@ async function returnExcessSolToMain(
         status: "submitted",
         expectedValue: {
           lamportsToSend,
+          reclaimMode,
         },
         actualValue: {
           publicKey: sourceWallet.publicKey.toBase58(),
@@ -2147,8 +2194,10 @@ async function returnExcessSolToMain(
         signature,
         amountSol: lamportsToSol(BigInt(lamportsToSend)),
         remainingBalanceSol:
-          (TRANSFER_FEE_BUFFER_LAMPORTS + rentExemptReserveLamports) /
-          LAMPORTS_PER_SOL,
+          reclaimMode === "main-sponsored"
+            ? 0
+            : (TRANSFER_FEE_BUFFER_LAMPORTS + rentExemptReserveLamports) /
+              LAMPORTS_PER_SOL,
       });
     } catch (error) {
       const remainingBalanceLamports = await connection.getBalance(
@@ -3996,7 +4045,7 @@ export const launchService = {
       await setStep(launchId, 90, "cleanup", "Returning excess SOL");
       const solReturn = await returnExcessSolToMain(
         launchId,
-        user.mainWallet.publicKey,
+        mainWalletKeypair,
         managedLaunchWallets
       );
       await appendLog(

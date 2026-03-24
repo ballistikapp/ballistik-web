@@ -36,7 +36,7 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
    - submit as a Jito bundle
 5. **Cleanup**:
    - close empty ATAs for wallets involved in the exit
-   - optionally transfer remaining spendable SOL to the main wallet when `returnSolToMainWallet` is enabled
+  - optionally return the remaining available SOL to the main wallet when `returnSolToMainWallet` is enabled, using the main wallet as fee payer when possible and falling back otherwise
 6. **Finalize**:
    - persist `result` summary
    - mark status `SUCCEEDED` or `FAILED`
