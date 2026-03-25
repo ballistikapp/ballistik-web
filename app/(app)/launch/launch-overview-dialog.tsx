@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { ImagePlus } from "lucide-react";
+import { ImagePlus, InfoIcon } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -12,6 +12,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import {
   bundleBuyFeeSol,
   descriptionAttributionRemovalFeeSol,
@@ -105,6 +110,49 @@ export function LaunchOverviewDialog({
   const bundleFeeDisplaySol = launchInput.bundleBuyEnabled
     ? (preview?.lineItems.bundleBuyFeeSol ?? bundleBuyFeeSol)
     : bundleBuyFeeSol;
+  const temporaryReserveItems = preview
+    ? [
+        {
+          label: "Creator reserve",
+          amount: `${preview.lineItems.creatorReserveSol.toFixed(4)} SOL`,
+          tooltip:
+            "Temporary SOL reserved for token creation and creator-side launch steps. Any unused amount is expected to be returned after launch cleanup.",
+        },
+        {
+          label: "Buy wallet reserve",
+          amount: launchInput.bundleBuyEnabled
+            ? `${preview.lineItems.buyWalletReserveSol.toFixed(4)} SOL`
+            : "Not needed",
+          tooltip:
+            "Temporary SOL reserved across buy wallets so bundle execution can complete smoothly. Any unused amount is expected to be returned after launch cleanup.",
+        },
+        {
+          label: "Transfer reserve",
+          amount: `${preview.lineItems.transferReserveSol.toFixed(4)} SOL`,
+          tooltip:
+            "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
+        },
+      ]
+    : [
+    {
+      label: "Creator reserve",
+      amount: "Calculating...",
+      tooltip:
+        "Temporary SOL reserved for token creation and creator-side launch steps. Any unused amount is expected to be returned after launch cleanup.",
+    },
+    {
+      label: "Buy wallet reserve",
+      amount: launchInput.bundleBuyEnabled ? "Calculating..." : "Not needed",
+      tooltip:
+        "Temporary SOL reserved across buy wallets so bundle execution can complete smoothly. Any unused amount is expected to be returned after launch cleanup.",
+    },
+    {
+      label: "Transfer reserve",
+      amount: "Calculating...",
+      tooltip:
+        "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
+    },
+  ] as const;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -387,15 +435,60 @@ export function LaunchOverviewDialog({
                     </div>
                   </div>
                 </div>
-                {preview.riskNotes.length > 0 && (
-                  <div className="rounded-md border bg-muted/30 p-3 mt-2 space-y-1">
-                    {preview.riskNotes.map((note) => (
-                      <p key={note} className="text-xs text-muted-foreground">
-                        - {note}
-                      </p>
+                <div className="rounded-md border bg-muted/30 p-3">
+                  <div className="flex items-center justify-between border-b pb-2">
+                    <span className="font-medium">Temporary reserves</span>
+                    <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                      <span>Will be returned</span>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            type="button"
+                            className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                            aria-label="Temporary reserves info"
+                          >
+                            <InfoIcon className="size-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent side="top">
+                          These are temporary reserves added to help the launch complete.
+                          Any unused amount is returned to your main wallet after cleanup.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="mt-2 space-y-2">
+                    {temporaryReserveItems.map((item) => (
+                      <div
+                        key={item.label}
+                        className={`flex items-center justify-between ${
+                          item.amount === "Not needed" ? "opacity-50" : ""
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5 text-muted-foreground">
+                          <span>{item.label}</span>
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <button
+                                type="button"
+                                className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                                aria-label={`${item.label} info`}
+                              >
+                                <InfoIcon className="size-3.5" />
+                              </button>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {item.tooltip}
+                            </TooltipContent>
+                          </Tooltip>
+                        </div>
+                        <span className="tabular-nums text-xs text-muted-foreground">
+                          {item.amount}
+                        </span>
+                      </div>
                     ))}
                   </div>
-                )}
+                </div>
                 {!preview.hasSufficientMainWallet && (
                   <p className="text-xs text-destructive mt-1">
                     Main wallet is below the required start amount.

@@ -43,12 +43,13 @@ export default function LaunchPage() {
     <div className="flex flex-col gap-12">
       <PageHeader
         title="New Token Launch"
+        className="flex-row items-center gap-3"
         actions={
           hasTokens ? (
             <Button
               size="lg"
               variant="outline"
-              className="w-full sm:w-auto"
+              className="shrink-0"
               onClick={() => setCloneDialogOpen(true)}
             >
               <Copy className="size-4 mr-2 text-primary" />

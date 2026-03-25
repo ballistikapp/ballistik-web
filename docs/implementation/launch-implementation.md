@@ -261,10 +261,18 @@ The server quote groups values into:
 `launch.previewCosts` includes line items for:
 
 - Usage fees (bundle-buy fee, attribution-removal fee, vanity fee, generated-wallet fee).
-- Dev buy and bundle-buy funding requirements (including variance reserve).
+- Dev buy and bundle-buy funding requirements.
 - Jito tip (when bundle buy is enabled).
 - Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
 - Operational buffers (`createFeeBufferLamports`, `fundingBufferLamports`, `transferFeeBufferLamports`) and creator/main reserves.
+
+### Fixed Bundle Spend
+
+- Bundle-buy variance redistributes spend across bundler wallets but does not increase the total bundle spend.
+- Fixed total bundle spend is `bundlerWalletCount * bundlerBuyAmountSol`.
+- The launch quote and funding plan do not include an additional bundle-variance reserve.
+- Each launch attempt derives one deterministic per-wallet bundle allocation server-side and reuses it for wallet funding and bundle execution.
+- User retries create a new launch attempt, so they receive a fresh deterministic allocation for that new attempt.
 
 ### Return and Residual Handling
 
@@ -312,9 +320,10 @@ Note: No off-chain token amount calculation is needed. The program determines to
 
 ### Buyer Amounts
 
-- Each bundler buy amount uses a random variance:
-  - `amount = bundlerBuyAmountSol ± (bundlerBuyAmountSol * bundlerBuyVariancePercent / 100)`
-- Buys with non-positive amounts are skipped.
+- Bundle buy uses a fixed total spend:
+  - `totalBundleSpend = bundlerWalletCount * bundlerBuyAmountSol`
+- Variance changes how that fixed total is distributed across bundler wallets.
+- The per-wallet bundle amounts are generated once per launch attempt and then reused for both wallet funding and transaction building.
 - Buy amounts represent the actual spend; ATA rent is funded separately.
 - User volume accumulator rent is funded separately for each buy wallet.
 

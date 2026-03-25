@@ -634,6 +634,30 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       distributionWalletMultiplier: values.distributionWalletMultiplier,
     });
   };
+  const previewInput = React.useMemo(
+    () => ({
+      devWalletOption: form.state.values.devWalletOption,
+      importedDevWalletKey:
+        form.state.values.devWalletOption === "import"
+          ? form.state.values.importedDevWalletKey
+          : undefined,
+      devBuyAmountSol: form.state.values.devBuyAmountSol,
+      jitoTipAmountSol: form.state.values.jitoTipAmountSol,
+      bundleBuyEnabled: form.state.values.bundleBuyEnabled,
+      vanityMint: form.state.values.vanityMint,
+      removeAttribution: form.state.values.removeAttribution,
+      bundlerWalletCount: form.state.values.bundlerWalletCount,
+      bundlerBuyAmountSol: form.state.values.bundlerBuyAmountSol,
+      bundlerBuyVariancePercent: form.state.values.bundlerBuyVariancePercent,
+      distributionWalletMultiplier:
+        form.state.values.distributionWalletMultiplier,
+    }),
+    [form.state.values]
+  );
+  const previewCostsQuery = trpc.launch.previewCosts.useQuery(previewInput, {
+    refetchOnWindowFocus: false,
+  });
+  const preview = previewCostsQuery.data;
 
   return (
     <div className="space-y-6 pb-12">
@@ -1141,7 +1165,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                       )}
                       {devWalletOption === "use_main" && (
                         <p className="text-sm text-muted-foreground flex items-center h-full">
-                          Your main wallet will be used as the dev wallet for this launch
+                          Your main wallet will be used as the dev wallet for
+                          this launch
                         </p>
                       )}
                     </div>
@@ -1198,8 +1223,9 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
           <PageSection>
             <PageSectionHeader
               title="Bundler Settings"
+              className="flex-row items-center justify-start gap-3"
               meta={
-                <div className="flex items-center gap-2 mb-1 mr-auto ml-4">
+                <div className="mb-1 flex items-center gap-2">
                   <Tooltip>
                     <TooltipTrigger>
                       <Info className="h-4 w-4 text-muted-foreground" />
@@ -1561,12 +1587,16 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
 
                         <div className="grid gap-3 text-sm">
                           <div className="grid grid-cols-[140px_1fr] gap-2">
-                            <span className="text-muted-foreground">Description</span>
+                            <span className="text-muted-foreground">
+                              Description
+                            </span>
                             <span className="text-foreground line-clamp-3 whitespace-pre-line">
                               {reviewDescription}
                             </span>
                           </div>
-                          {(values.twitter || values.telegram || values.website) && (
+                          {(values.twitter ||
+                            values.telegram ||
+                            values.website) && (
                             <div className="grid grid-cols-[140px_1fr] gap-2">
                               <span className="text-muted-foreground">
                                 Social Links
@@ -1600,7 +1630,9 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           </div>
                           <div className="grid gap-3 text-sm">
                             <div className="grid grid-cols-[140px_1fr] gap-2">
-                              <span className="text-muted-foreground">Dev Wallet</span>
+                              <span className="text-muted-foreground">
+                                Dev Wallet
+                              </span>
                               <span>
                                 {values.devWalletOption === "import"
                                   ? "Imported wallet"
@@ -1610,12 +1642,20 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">
-                              <span className="text-muted-foreground">Dev Buy</span>
-                              <span>{values.devBuyAmountSol.toFixed(4)} SOL</span>
+                              <span className="text-muted-foreground">
+                                Dev Buy
+                              </span>
+                              <span>
+                                {values.devBuyAmountSol.toFixed(4)} SOL
+                              </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">
-                              <span className="text-muted-foreground">Jito Tip</span>
-                              <span>{values.jitoTipAmountSol.toFixed(4)} SOL</span>
+                              <span className="text-muted-foreground">
+                                Jito Tip
+                              </span>
+                              <span>
+                                {values.jitoTipAmountSol.toFixed(4)} SOL
+                              </span>
                             </div>
                             {values.bundleBuyEnabled && (
                               <>
@@ -1636,7 +1676,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     </span>
                                     <span>
                                       {distributionWallets} wallets after ×
-                                      {values.distributionWalletMultiplier} distribution
+                                      {values.distributionWalletMultiplier}{" "}
+                                      distribution
                                     </span>
                                   </div>
                                 )}
@@ -1654,7 +1695,9 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               <span className="text-muted-foreground">
                                 Vanity Address
                               </span>
-                              <span>{values.vanityMint ? "Enabled" : "Disabled"}</span>
+                              <span>
+                                {values.vanityMint ? "Enabled" : "Disabled"}
+                              </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">
                               <span className="text-muted-foreground">
@@ -1679,7 +1722,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             </div>
                             {usageFees.platformFeeWaived && (
                               <div className="text-xs text-emerald-400">
-                                Pro active. Platform fees are waived for this launch.
+                                Pro active. Platform fees are waived for this
+                                launch.
                               </div>
                             )}
                             <div
@@ -1705,7 +1749,9 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 !values.vanityMint && "opacity-50 line-through"
                               )}
                             >
-                              <div className="text-muted-foreground">Vanity mint fee</div>
+                              <div className="text-muted-foreground">
+                                Vanity mint fee
+                              </div>
                               <span className="tabular-nums">
                                 {vanityFeeDisplaySol.toFixed(4)} SOL
                               </span>
@@ -1713,7 +1759,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             <div
                               className={cn(
                                 "flex items-center justify-between",
-                                !values.removeAttribution && "opacity-50 line-through"
+                                !values.removeAttribution &&
+                                  "opacity-50 line-through"
                               )}
                             >
                               <div className="text-muted-foreground">
@@ -1726,19 +1773,140 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             <div
                               className={cn(
                                 "flex items-center justify-between",
-                                !values.bundleBuyEnabled && "opacity-50 line-through"
+                                !values.bundleBuyEnabled &&
+                                  "opacity-50 line-through"
                               )}
                             >
-                              <div className="text-muted-foreground">Bundler fee</div>
+                              <div className="text-muted-foreground">
+                                Bundler fee
+                              </div>
                               <span className="tabular-nums">
                                 {bundleFeeDisplaySol.toFixed(4)} SOL
                               </span>
+                            </div>
+                            <div className="border-t pt-3">
+                              <div className="mb-2 flex items-center justify-between">
+                                <span className="font-medium">
+                                  Temporary reserves
+                                </span>
+                                <div className="flex items-center gap-1 text-xs text-muted-foreground">
+                                  <span>Will be returned</span>
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <button
+                                        type="button"
+                                        className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                                        aria-label="Temporary reserves info"
+                                      >
+                                        <Info className="size-3.5" />
+                                      </button>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      These are temporary reserves added to help
+                                      the launch complete. Any unused amount is
+                                      returned to your main wallet after
+                                      cleanup.
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </div>
+                              <div className="space-y-2">
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span>Creator reserve</span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                                          aria-label="Creator reserve info"
+                                        >
+                                          <Info className="size-3.5" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        Temporary SOL reserved for token
+                                        creation and creator-side launch steps.
+                                        Any unused amount is expected to be
+                                        returned after launch cleanup.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <span className="tabular-nums text-xs text-muted-foreground">
+                                    {preview
+                                      ? `${preview.lineItems.creatorReserveSol.toFixed(4)} SOL`
+                                      : "Calculating..."}
+                                  </span>
+                                </div>
+                                <div
+                                  className={cn(
+                                    "flex items-center justify-between",
+                                    !values.bundleBuyEnabled && "opacity-50"
+                                  )}
+                                >
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span>Buy wallet reserve</span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                                          aria-label="Buy wallet reserve info"
+                                        >
+                                          <Info className="size-3.5" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        Temporary SOL reserved across buy
+                                        wallets so bundle execution can complete
+                                        smoothly. Any unused amount is expected
+                                        to be returned after launch cleanup.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <span className="tabular-nums text-xs text-muted-foreground">
+                                    {values.bundleBuyEnabled
+                                      ? preview
+                                        ? `${preview.lineItems.buyWalletReserveSol.toFixed(4)} SOL`
+                                        : "Calculating..."
+                                      : "Not needed"}
+                                  </span>
+                                </div>
+                                <div className="flex items-center justify-between">
+                                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                                    <span>Transfer reserve</span>
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <button
+                                          type="button"
+                                          className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                                          aria-label="Transfer reserve info"
+                                        >
+                                          <Info className="size-3.5" />
+                                        </button>
+                                      </TooltipTrigger>
+                                      <TooltipContent side="top">
+                                        A small temporary amount reserved so
+                                        launch wallets can send remaining SOL
+                                        back during cleanup. Any unused amount
+                                        is expected to be returned after launch
+                                        cleanup.
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </div>
+                                  <span className="tabular-nums text-xs text-muted-foreground">
+                                    {preview
+                                      ? `${preview.lineItems.transferReserveSol.toFixed(4)} SOL`
+                                      : "Calculating..."}
+                                  </span>
+                                </div>
+                              </div>
                             </div>
                           </div>
                         </div>
                       </div>
 
-                      <div className="mt-8 border-t bg-muted/30 px-4 py-8 sm:px-6 sm:py-10">
+                      <div className="mt-8 -mx-4 border-t bg-muted/30 px-4 py-8 md:-mx-6 md:px-6 md:py-10 xl:-mx-8 xl:px-8">
                         <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
                           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:items-center lg:gap-10">
                             <div className="space-y-1">
@@ -1821,7 +1989,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
           }
         }}
         onRetry={() => {
-          const launch = launchStatusQuery.data ?? activeLaunchQuery.data ?? null;
+          const launch =
+            launchStatusQuery.data ?? activeLaunchQuery.data ?? null;
           if (!launch) {
             return;
           }

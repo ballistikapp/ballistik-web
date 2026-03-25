@@ -52,6 +52,7 @@ import { retryLaunchDbWrite } from "@/server/services/launch-db.helpers";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { computeFailedLaunchDrainLamports } from "@/server/services/launch-failure-recovery.helpers";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
+import { allocateFixedTotalBundleLamports } from "@/server/services/launch-bundle-allocation";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 import {
   computeSponsoredRecoverableLamports,
@@ -77,6 +78,9 @@ function toLamports(amount: number) {
 function lamportsToSol(lamports: bigint) {
   return Number(lamports) / LAMPORTS_PER_SOL;
 }
+
+const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
+const MIN_BUNDLER_BUY_AMOUNT_LAMPORTS = toLamports(MIN_BUNDLER_BUY_AMOUNT_SOL);
 
 function normalizeSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
@@ -150,6 +154,11 @@ type SolReturnResult = {
 type DistributionWallet = {
   parentIndex: number;
   wallet: Keypair;
+};
+
+type BundlerBuyTarget = {
+  wallet: Keypair;
+  amountLamports: bigint;
 };
 
 type LaunchCostInput = Pick<
@@ -593,19 +602,49 @@ async function appendBundleTelemetryLog(
       });
       return;
     case "bundle_tip_escalated":
-      await appendLog(launchId, "WARN", "Adaptive bundle tip escalation applied", "create", shared);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Adaptive bundle tip escalation applied",
+        "create",
+        shared
+      );
       return;
     case "bundle_rebuild_triggered":
-      await appendLog(launchId, "WARN", "Blockhash expired, rebuilding bundle", "create", shared);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Blockhash expired, rebuilding bundle",
+        "create",
+        shared
+      );
       return;
     case "bundle_rebuilt":
-      await appendLog(launchId, "INFO", "Bundle rebuilt and resent", "create", shared);
+      await appendLog(
+        launchId,
+        "INFO",
+        "Bundle rebuilt and resent",
+        "create",
+        shared
+      );
       return;
     case "bundle_resend_triggered":
-      await appendLog(launchId, "WARN", "Bundle resend triggered", "create", shared);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Bundle resend triggered",
+        "create",
+        shared
+      );
       return;
     case "bundle_status_check_error":
-      await appendLog(launchId, "WARN", "Bundle status check error", "create", shared);
+      await appendLog(
+        launchId,
+        "WARN",
+        "Bundle status check error",
+        "create",
+        shared
+      );
       return;
     case "bundle_confirm_timeout":
       await appendLog(
@@ -617,7 +656,13 @@ async function appendBundleTelemetryLog(
       );
       return;
     case "bundle_confirm_summary":
-      await appendLog(launchId, "INFO", "Bundle confirmation summary", "create", shared);
+      await appendLog(
+        launchId,
+        "INFO",
+        "Bundle confirmation summary",
+        "create",
+        shared
+      );
       return;
     case "bundle_sent":
       await appendLog(launchId, "INFO", "Jito bundle sent", "create", shared);
@@ -914,8 +959,8 @@ async function mintAccountExistsOnChain(mint: PublicKey) {
   }
 }
 
-function requiredBuyLamports(
-  amountSol: number,
+function requiredBuyLamportsFromLamports(
+  amountLamports: bigint,
   extraBufferLamports = 0,
   rentLamports = BigInt(0)
 ) {
@@ -923,13 +968,25 @@ function requiredBuyLamports(
     fundingBufferLamports: FUNDING_BUFFER_LAMPORTS,
     transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS,
   } = getLaunchConfig();
-  if (amountSol <= 0) {
+  if (amountLamports <= BigInt(0)) {
     return BigInt(0);
   }
   return (
-    toLamports(amountSol) +
+    amountLamports +
     BigInt(FUNDING_BUFFER_LAMPORTS + TRANSFER_FEE_BUFFER_LAMPORTS) +
     BigInt(extraBufferLamports) +
+    rentLamports
+  );
+}
+
+function requiredBuyLamports(
+  amountSol: number,
+  extraBufferLamports = 0,
+  rentLamports = BigInt(0)
+) {
+  return requiredBuyLamportsFromLamports(
+    toLamports(amountSol),
+    extraBufferLamports,
     rentLamports
   );
 }
@@ -1055,7 +1112,9 @@ async function fundWalletsFromMain(
 
   const [mainBalanceAfter, ...targetBalancesAfter] = await Promise.all([
     connection.getBalance(mainWalletKeypair.publicKey, "confirmed"),
-    ...fundingPlan.map((target) => connection.getBalance(target.publicKey, "confirmed")),
+    ...fundingPlan.map((target) =>
+      connection.getBalance(target.publicKey, "confirmed")
+    ),
   ]);
 
   await appendLog(launchId, "INFO", "Wallets funded", "funding", {
@@ -1121,7 +1180,6 @@ function validateLaunchInput(input: LaunchCostInput) {
     minBuyAmountSol: MIN_BUY_AMOUNT_SOL,
     maxBundleWallets: MAX_BUNDLE_WALLETS,
   } = getLaunchConfig();
-  const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
   const bundlerWalletCount = Math.max(0, Math.floor(input.bundlerWalletCount));
@@ -1185,13 +1243,14 @@ type LaunchFundingPlan = {
   mainReserveLamports: bigint;
   tipLamports: bigint;
   devFundingLamports: bigint;
-  bundlerFundingLamports: bigint;
+  bundlerFundingTargetLamports: bigint[];
+  totalBundlerFundingLamports: bigint;
+  totalBundleBuyLamports: bigint;
   creatorTargetLamports: bigint;
   ataRentLamports: bigint;
   userVolumeAccumulatorRentLamports: bigint;
   buyRentLamports: bigint;
   distributionAtaLamports: bigint;
-  maxBundlerBuySol: number;
 };
 
 type LaunchCostPreview = {
@@ -1217,20 +1276,22 @@ type LaunchCostPreview = {
     bundleBuyBaseSol: number;
     bundleBuyMaxSol: number;
     bundleBuyVarianceReserveSol: number;
+    creatorReserveSol: number;
     jitoTipSol: number;
     walletFundingTopUpSol: number;
     mainReserveSol: number;
+    buyWalletReserveSol: number;
     creatorTargetSol: number;
     devFundingSol: number;
     bundlerFundingPerWalletSol: number;
     totalBundlerFundingSol: number;
+    transferReserveSol: number;
     ataRentSol: number;
     userVolumeAccumulatorRentSol: number;
     buyRentPerWalletSol: number;
     distributionAtaPerBundlerSol: number;
     totalDistributionAtaSol: number;
   };
-  riskNotes: string[];
 };
 
 async function buildLaunchFundingPlan(params: {
@@ -1244,6 +1305,8 @@ async function buildLaunchFundingPlan(params: {
   mainWalletPublicKey: string;
   devWalletPublicKey: string;
   bundlerWalletPublicKeys: PublicKey[];
+  bundlerBuyAmountLamportsByWallet?: bigint[];
+  allocationSeed?: string;
   createFeeBufferLamports: number;
   minCreatorBalanceLamports: bigint;
 }) {
@@ -1263,9 +1326,23 @@ async function buildLaunchFundingPlan(params: {
     distributionWalletsPerBundler > 0
       ? ataRentLamports * BigInt(distributionWalletsPerBundler)
       : BigInt(0);
-  const maxBundlerBuySol =
-    params.bundlerBuyAmountSol *
-    (1 + Math.max(0, params.bundlerBuyVariancePercent) / 100);
+  const totalBundleBuyLamports = params.input.bundleBuyEnabled
+    ? toLamports(params.bundlerWalletCount * params.bundlerBuyAmountSol)
+    : BigInt(0);
+  const bundlerBuyAmountLamportsByWallet =
+    params.input.bundleBuyEnabled && params.bundlerWalletPublicKeys.length > 0
+      ? (params.bundlerBuyAmountLamportsByWallet ??
+        allocateFixedTotalBundleLamports({
+          walletCount: params.bundlerWalletPublicKeys.length,
+          totalLamports: totalBundleBuyLamports,
+          targetLamportsPerWallet: toLamports(params.bundlerBuyAmountSol),
+          variancePercent: params.bundlerBuyVariancePercent,
+          minLamportsPerWallet: MIN_BUNDLER_BUY_AMOUNT_LAMPORTS,
+          seed:
+            params.allocationSeed ??
+            `preview:${params.bundlerWalletCount}:${params.bundlerBuyAmountSol}:${params.bundlerBuyVariancePercent}`,
+        }).amountLamportsByWallet)
+      : [];
   const requiredCreatorLamports = requiredBuyLamports(
     params.devBuyAmountSol,
     params.createFeeBufferLamports,
@@ -1279,10 +1356,17 @@ async function buildLaunchFundingPlan(params: {
     params.devWalletPublicKey === params.mainWalletPublicKey
       ? BigInt(0)
       : creatorTargetLamports;
-  const bundlerFundingLamports = requiredBuyLamports(
-    maxBundlerBuySol,
-    0,
-    buyRentLamports + distributionAtaLamports
+  const bundlerFundingTargetLamports = bundlerBuyAmountLamportsByWallet.map(
+    (buyAmountLamports) =>
+      requiredBuyLamportsFromLamports(
+        buyAmountLamports,
+        0,
+        buyRentLamports + distributionAtaLamports
+      )
+  );
+  const totalBundlerFundingLamports = bundlerFundingTargetLamports.reduce(
+    (total, lamports) => total + lamports,
+    BigInt(0)
   );
   const tipLamports = params.input.bundleBuyEnabled
     ? BigInt(Math.floor(params.jitoTipAmountSol * LAMPORTS_PER_SOL))
@@ -1301,9 +1385,9 @@ async function buildLaunchFundingPlan(params: {
           },
         ]
       : []),
-    ...params.bundlerWalletPublicKeys.map((publicKey) => ({
+    ...params.bundlerWalletPublicKeys.map((publicKey, index) => ({
       publicKey,
-      requiredLamports: bundlerFundingLamports,
+      requiredLamports: bundlerFundingTargetLamports[index] ?? BigInt(0),
     })),
   ];
 
@@ -1312,13 +1396,14 @@ async function buildLaunchFundingPlan(params: {
     mainReserveLamports,
     tipLamports,
     devFundingLamports,
-    bundlerFundingLamports,
+    bundlerFundingTargetLamports,
+    totalBundlerFundingLamports,
+    totalBundleBuyLamports,
     creatorTargetLamports,
     ataRentLamports,
     userVolumeAccumulatorRentLamports,
     buyRentLamports,
     distributionAtaLamports,
-    maxBundlerBuySol,
   } satisfies LaunchFundingPlan;
 }
 
@@ -1383,7 +1468,9 @@ async function calculateLaunchCostPreview(
   } = validateLaunchInput(input);
   const {
     createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+    fundingBufferLamports: FUNDING_BUFFER_LAMPORTS,
     minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+    transferFeeBufferLamports: TRANSFER_FEE_BUFFER_LAMPORTS,
   } = getLaunchConfig();
   const dbUser = await loadUserWithMainWallet(user.id);
   const connection = getSolanaConnection();
@@ -1395,7 +1482,10 @@ async function calculateLaunchCostPreview(
     });
   const bundlerWalletPublicKeys =
     input.bundleBuyEnabled && bundlerWalletCount > 0
-      ? Array.from({ length: bundlerWalletCount }, () => Keypair.generate().publicKey)
+      ? Array.from(
+          { length: bundlerWalletCount },
+          () => Keypair.generate().publicKey
+        )
       : [];
   const fundingPlan = await buildLaunchFundingPlan({
     input,
@@ -1426,38 +1516,38 @@ async function calculateLaunchCostPreview(
   }, BigInt(0));
   const requiredMainLamports =
     totalLamports + fundingPlan.mainReserveLamports + usageFeeLamports;
-  const bundleBuyBaseSol = input.bundleBuyEnabled
-    ? bundlerWalletCount * bundlerBuyAmountSol
-    : 0;
-  const bundleBuyMaxSol = input.bundleBuyEnabled
-    ? bundlerWalletCount * fundingPlan.maxBundlerBuySol
-    : 0;
-  const bundleBuyVarianceReserveSol = Math.max(
-    0,
-    bundleBuyMaxSol - bundleBuyBaseSol
+  const requiredCreatorLamports = requiredBuyLamports(
+    devBuyAmountSol,
+    CREATE_FEE_BUFFER_LAMPORTS,
+    fundingPlan.buyRentLamports
   );
+  const creatorFloorExtraLamports =
+    fundingPlan.creatorTargetLamports > requiredCreatorLamports
+      ? fundingPlan.creatorTargetLamports - requiredCreatorLamports
+      : BigInt(0);
+  const creatorReserveLamports =
+    BigInt(CREATE_FEE_BUFFER_LAMPORTS + FUNDING_BUFFER_LAMPORTS) +
+    creatorFloorExtraLamports;
+  const buyWalletReserveLamports = input.bundleBuyEnabled
+    ? BigInt(FUNDING_BUFFER_LAMPORTS * bundlerWalletCount)
+    : BigInt(0);
+  const transferReserveLamports = BigInt(
+    TRANSFER_FEE_BUFFER_LAMPORTS *
+      (1 + (input.bundleBuyEnabled ? bundlerWalletCount : 0))
+  );
+  const bundleBuyBaseSol = lamportsToSol(fundingPlan.totalBundleBuyLamports);
+  const bundleBuyMaxSol = bundleBuyBaseSol;
+  const bundleBuyVarianceReserveSol = 0;
   const jitoTipSol = input.bundleBuyEnabled ? jitoTipAmountSol : 0;
-  const totalBundlerFundingLamports =
-    fundingPlan.bundlerFundingLamports * BigInt(bundlerWalletCount);
   const expectedReturnLamports = totalLamports
     ? totalLamports -
       toLamports(devBuyAmountSol) -
-      toLamports(bundleBuyMaxSol) -
-      fundingPlan.tipLamports
+      fundingPlan.totalBundleBuyLamports
     : BigInt(0);
   const expectedReturnSol = Math.max(0, lamportsToSol(expectedReturnLamports));
   const chargedNowSol = lamportsToSol(requiredMainLamports);
   const permanentSpendSol =
-    usageFees.totalFeeSol + devBuyAmountSol + bundleBuyMaxSol + jitoTipSol;
-  const riskNotes: string[] = [];
-  if (bundleBuyVarianceReserveSol > 0) {
-    riskNotes.push(
-      "Bundle buy includes variance reserve. Actual spend can be lower than the reserved maximum."
-    );
-  }
-  riskNotes.push(
-    "Network and protocol execution fees can change at runtime and may affect the final wallet delta."
-  );
+    usageFees.totalFeeSol + devBuyAmountSol + bundleBuyBaseSol + jitoTipSol;
 
   return {
     platformFeeWaived: usageFees.platformFeeWaived,
@@ -1486,15 +1576,22 @@ async function calculateLaunchCostPreview(
       bundleBuyBaseSol,
       bundleBuyMaxSol,
       bundleBuyVarianceReserveSol,
+      creatorReserveSol: lamportsToSol(creatorReserveLamports),
       jitoTipSol,
       walletFundingTopUpSol: lamportsToSol(totalLamports),
       mainReserveSol: lamportsToSol(fundingPlan.mainReserveLamports),
+      buyWalletReserveSol: lamportsToSol(buyWalletReserveLamports),
       creatorTargetSol: lamportsToSol(fundingPlan.creatorTargetLamports),
       devFundingSol: lamportsToSol(fundingPlan.devFundingLamports),
-      bundlerFundingPerWalletSol: lamportsToSol(
-        fundingPlan.bundlerFundingLamports
+      bundlerFundingPerWalletSol:
+        bundlerWalletCount > 0
+          ? lamportsToSol(fundingPlan.totalBundlerFundingLamports) /
+            bundlerWalletCount
+          : 0,
+      totalBundlerFundingSol: lamportsToSol(
+        fundingPlan.totalBundlerFundingLamports
       ),
-      totalBundlerFundingSol: lamportsToSol(totalBundlerFundingLamports),
+      transferReserveSol: lamportsToSol(transferReserveLamports),
       ataRentSol: lamportsToSol(fundingPlan.ataRentLamports),
       userVolumeAccumulatorRentSol: lamportsToSol(
         fundingPlan.userVolumeAccumulatorRentLamports
@@ -1507,7 +1604,6 @@ async function calculateLaunchCostPreview(
         fundingPlan.distributionAtaLamports * BigInt(bundlerWalletCount)
       ),
     },
-    riskNotes,
   };
 }
 
@@ -1758,33 +1854,28 @@ async function reserveMintIfRequested(
   );
 }
 
-function buildBundlerBuyTarget(
-  wallet: Keypair,
-  bundlerBuyAmountSol: number,
-  bundlerBuyVariancePercent: number
-) {
-  const variance = bundlerBuyAmountSol * (bundlerBuyVariancePercent / 100);
-  const amount = Math.max(
-    0,
-    bundlerBuyAmountSol + (Math.random() * 2 - 1) * variance
-  );
-  return { wallet, amount, amountLamports: toLamports(amount) };
-}
-
 function buildBundlerBuyTargets(
   wallets: Keypair[],
   bundlerBuyAmountSol: number,
-  bundlerBuyVariancePercent: number
+  bundlerBuyVariancePercent: number,
+  seed: string
 ) {
-  return wallets
-    .map((wallet) =>
-      buildBundlerBuyTarget(
-        wallet,
-        bundlerBuyAmountSol,
-        bundlerBuyVariancePercent
-      )
-    )
-    .filter((target) => target.amountLamports > BigInt(0));
+  const allocation = allocateFixedTotalBundleLamports({
+    walletCount: wallets.length,
+    totalLamports: toLamports(wallets.length * bundlerBuyAmountSol),
+    targetLamportsPerWallet: toLamports(bundlerBuyAmountSol),
+    variancePercent: bundlerBuyVariancePercent,
+    minLamportsPerWallet: MIN_BUNDLER_BUY_AMOUNT_LAMPORTS,
+    seed,
+  });
+
+  return {
+    ...allocation,
+    targets: wallets.map((wallet, index) => ({
+      wallet,
+      amountLamports: allocation.amountLamportsByWallet[index] ?? BigInt(0),
+    })) satisfies BundlerBuyTarget[],
+  };
 }
 
 async function distributeTokensToWallets(
@@ -2448,12 +2539,18 @@ async function finalizeLaunchFailure(params: {
       };
 
       if (!reclaimSummary.attempted) {
-        await appendLog(launchId, "INFO", "No remaining SOL to reclaim", "reclaim");
+        await appendLog(
+          launchId,
+          "INFO",
+          "No remaining SOL to reclaim",
+          "reclaim"
+        );
       } else if (reclaimSummary.manualActionRequired) {
         await appendLog(
           launchId,
           "ERROR",
-          reclaimSummary.failureMessage ?? "Automatic reclaim could not return all wallet SOL.",
+          reclaimSummary.failureMessage ??
+            "Automatic reclaim could not return all wallet SOL.",
           "reclaim",
           {
             recoveredWalletCount: reclaimSummary.recoveredWalletCount,
@@ -2465,13 +2562,19 @@ async function finalizeLaunchFailure(params: {
           }
         );
       } else {
-        await appendLog(launchId, "INFO", "Funds reclaimed to main wallet", "reclaim", {
-          recoveredWalletCount: reclaimSummary.recoveredWalletCount,
-          skippedWalletCount: reclaimSummary.skippedWalletCount,
-          totalReturnedSol: reclaimSummary.totalReturnedSol,
-          results: reclaimResult.results,
-          durationMs: reclaimResult.durationMs,
-        });
+        await appendLog(
+          launchId,
+          "INFO",
+          "Funds reclaimed to main wallet",
+          "reclaim",
+          {
+            recoveredWalletCount: reclaimSummary.recoveredWalletCount,
+            skippedWalletCount: reclaimSummary.skippedWalletCount,
+            totalReturnedSol: reclaimSummary.totalReturnedSol,
+            results: reclaimResult.results,
+            durationMs: reclaimResult.durationMs,
+          }
+        );
       }
     } catch (reclaimError) {
       const reclaimErrorMessage =
@@ -2538,7 +2641,8 @@ async function repairSuccessfulLaunchAfterError(params: {
   jitoTipAmountSol: number;
   error: unknown;
 }) {
-  const { launchId, tokenPublicKey, recovery, jitoTipAmountSol, error } = params;
+  const { launchId, tokenPublicKey, recovery, jitoTipAmountSol, error } =
+    params;
   const errorMessage = getErrorMessage(error);
   const finalStatus = (await isCancelRequested(launchId))
     ? "CANCELED"
@@ -2963,7 +3067,8 @@ export const launchService = {
             return { launchId: existing.id };
           }
 
-          const normalizedInput = await normalizeLaunchInputMediaForStorage(input);
+          const normalizedInput =
+            await normalizeLaunchInputMediaForStorage(input);
           await ensureLaunchFundingAvailable(normalizedInput, user);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
@@ -3033,7 +3138,10 @@ export const launchService = {
       }
 
       if (sourceLaunch.token?.status === "ACTIVE") {
-        throw new AppError("Launch cannot be retried after token activation", 400);
+        throw new AppError(
+          "Launch cannot be retried after token activation",
+          400
+        );
       }
 
       const parsedInput = launchTokenSchema.safeParse(sourceLaunch.input);
@@ -3572,9 +3680,7 @@ export const launchService = {
 
       const walletsStartedAt = Date.now();
       const user = await loadUserWithMainWallet(launch.userId);
-      mainWalletKeypair = keypairFromPrivateKey(
-        user.mainWallet.privateKey
-      );
+      mainWalletKeypair = keypairFromPrivateKey(user.mainWallet.privateKey);
       const { devWalletKeypair, devWalletPublicKey } = await resolveDevWallet(
         input,
         user.id,
@@ -3593,6 +3699,20 @@ export const launchService = {
               distributionWalletMultiplier
             )
           : [];
+      const bundlerBuyAllocation = input.bundleBuyEnabled
+        ? buildBundlerBuyTargets(
+            bundlerWalletKeypairs,
+            bundlerBuyAmountSol,
+            bundlerBuyVariancePercent,
+            launchId
+          )
+        : {
+            amountLamportsByWallet: [] as bigint[],
+            lowerBoundLamports: BigInt(0),
+            upperBoundLamports: BigInt(0),
+            usedFallback: false,
+            targets: [] as BundlerBuyTarget[],
+          };
       await appendLog(launchId, "INFO", "Wallets prepared", "wallets", {
         mainWalletPublicKey: user.mainWallet.publicKey,
         devWalletPublicKey,
@@ -3602,6 +3722,7 @@ export const launchService = {
         distributionWallets: distributionWallets.length,
         distributionWalletMultiplier,
         bundleBuyEnabled: input.bundleBuyEnabled,
+        bundleBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
         durationMs: Date.now() - walletsStartedAt,
       });
       recoveryData = buildLaunchRecoveryData(
@@ -3662,10 +3783,11 @@ export const launchService = {
         userVolumeAccumulatorRentLamports,
         buyRentLamports,
         distributionAtaLamports,
-        maxBundlerBuySol,
         creatorTargetLamports,
         devFundingLamports,
-        bundlerFundingLamports,
+        bundlerFundingTargetLamports,
+        totalBundlerFundingLamports,
+        totalBundleBuyLamports,
         mainReserveLamports,
         tipLamports,
         fundingTargets,
@@ -3682,6 +3804,9 @@ export const launchService = {
         bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
           (wallet) => wallet.publicKey
         ),
+        bundlerBuyAmountLamportsByWallet:
+          bundlerBuyAllocation.amountLamportsByWallet,
+        allocationSeed: launchId,
         createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
         minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
       });
@@ -3690,7 +3815,11 @@ export const launchService = {
         devFundingLamports: devFundingLamports.toString(),
         creatorMinLamports: MIN_CREATOR_BALANCE_LAMPORTS.toString(),
         creatorTargetLamports: creatorTargetLamports.toString(),
-        bundlerFundingLamports: bundlerFundingLamports.toString(),
+        bundlerFundingTargetLamports: bundlerFundingTargetLamports.map(
+          (lamports) => lamports.toString()
+        ),
+        totalBundlerFundingLamports: totalBundlerFundingLamports.toString(),
+        totalBundleBuyLamports: totalBundleBuyLamports.toString(),
         ataRentLamports: ataRentLamports.toString(),
         userVolumeAccumulatorRentLamports:
           userVolumeAccumulatorRentLamports.toString(),
@@ -3698,7 +3827,7 @@ export const launchService = {
         distributionAtaLamports: distributionAtaLamports.toString(),
         mainReserveLamports: mainReserveLamports.toString(),
         tipLamports: tipLamports.toString(),
-        maxBundlerBuySol,
+        bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
       });
       await fundWalletsFromMain(
         launchId,
@@ -3793,16 +3922,13 @@ export const launchService = {
       let createSignature: string | null = null;
       let bundleId: string | null = null;
       if (input.bundleBuyEnabled) {
-        const bundlerBuyTargets = buildBundlerBuyTargets(
-          bundlerWalletKeypairs,
-          bundlerBuyAmountSol,
-          bundlerBuyVariancePercent
+        const buyerWallets = bundlerBuyAllocation.targets.map(
+          (target) => target.wallet
         );
-        const buyerWallets = bundlerBuyTargets.map((target) => target.wallet);
-        const buyAmountsLamport = bundlerBuyTargets.map(
+        const buyAmountsLamport = bundlerBuyAllocation.targets.map(
           (target) => target.amountLamports
         );
-        const totalBuyLamports = bundlerBuyTargets.reduce(
+        const totalBuyLamports = bundlerBuyAllocation.targets.reduce(
           (total, target) => total + target.amountLamports,
           BigInt(0)
         );
@@ -3948,11 +4074,8 @@ export const launchService = {
               break;
             }
             const buyer = bundlerWalletKeypairs[i];
-            const { amountLamports } = buildBundlerBuyTarget(
-              buyer,
-              bundlerBuyAmountSol,
-              bundlerBuyVariancePercent
-            );
+            const amountLamports =
+              bundlerBuyAllocation.targets[i]?.amountLamports ?? BigInt(0);
             if (amountLamports <= BigInt(0)) {
               continue;
             }
@@ -4067,7 +4190,9 @@ export const launchService = {
         action: "launch.cleanup",
         launchId,
         userId: user.id,
-        wallets: managedLaunchWallets.map((wallet) => wallet.publicKey.toBase58()),
+        wallets: managedLaunchWallets.map((wallet) =>
+          wallet.publicKey.toBase58()
+        ),
         actualValue: {
           attempted: solReturn.attempted,
           returned: solReturn.returned,
@@ -4130,7 +4255,11 @@ export const launchService = {
         Date.now() - launchStartedAt
       );
     } catch (error) {
-      if (launchReadyForSuccessRepair && persistedTokenPublicKey && recoveryData) {
+      if (
+        launchReadyForSuccessRepair &&
+        persistedTokenPublicKey &&
+        recoveryData
+      ) {
         await repairSuccessfulLaunchAfterError({
           launchId,
           tokenPublicKey: persistedTokenPublicKey,
