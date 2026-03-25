@@ -149,8 +149,6 @@ export default function ManageTokensPage() {
         }
       />
 
-      <div />
-
       <DataTable
         columns={columns}
         data={tableRows}
@@ -158,11 +156,11 @@ export default function ManageTokensPage() {
         getRowId={(row) => row.id}
         searchableColumns={["token", "publicKey"]}
         toolbar={(table) => (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
               placeholder="Search tokens..."
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
             <DataTableViewOptions table={table} />
           </div>

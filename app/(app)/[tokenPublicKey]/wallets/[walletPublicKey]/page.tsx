@@ -305,19 +305,19 @@ export default function WalletPage() {
       <PageHeader
         title={resolvedWalletTitle ?? "Wallet"}
         rightContent={
-          <div className="mt-3 flex flex-col items-end gap-4">
-            <div className="text-right">
+          <div className="flex w-full flex-col items-start gap-3 md:items-end md:gap-4">
+            <div className="text-left md:text-right">
               <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                 WALLET BALANCE
               </p>
               <p className="font-mono leading-none">
-                <span className="text-4xl">
+                <span className="text-2xl md:text-4xl">
                   {Number(wallet.balanceSol ?? 0).toFixed(4)}
                 </span>{" "}
                 <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end md:gap-3">
               <p className="text-sm text-muted-foreground">
                 Last refresh: {formatRefreshTime(wallet.balanceRefreshedAt)}
               </p>
@@ -338,7 +338,7 @@ export default function WalletPage() {
           </div>
         }
       />
-      <div className="flex flex-col gap-6 pt-8 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-6 pt-6 md:pt-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-6">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
@@ -349,7 +349,7 @@ export default function WalletPage() {
                 asChild
                 onClick={() => copyToClipboard(wallet.publicKey, "Public key")}
               >
-                <code className="font-mono hover:text-foreground cursor-pointer text-3xl text-muted-foreground tracking-tighter  break-all">
+                <code className="cursor-pointer break-all font-mono text-lg tracking-tighter text-muted-foreground hover:text-foreground sm:text-xl md:text-2xl">
                   {wallet.publicKey}
                 </code>
               </TooltipTrigger>
@@ -357,7 +357,7 @@ export default function WalletPage() {
             </Tooltip>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
             <Button
               size="sm"
               variant="outline"
@@ -414,12 +414,12 @@ export default function WalletPage() {
         </div>
       </div>
 
-      <div className="-mx-6 my-8 border-t" />
+      <div className="my-8 border-t" />
 
       <section className="space-y-5 py-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-4xl -translate-y-4">Holdings</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-2xl md:text-3xl">Holdings</h2>
+          <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm text-muted-foreground">
               {(holdingsData?.totalCount ?? holdings.length)} position
               {(holdingsData?.totalCount ?? holdings.length) === 1 ? "" : "s"}
@@ -447,11 +447,11 @@ export default function WalletPage() {
           urlStatePrefix="wallet-holdings"
           pagination={(table) => <DataTablePagination table={table} />}
           toolbar={(table) => (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <DataTableSearch
                 table={table}
                 placeholder="Search holdings..."
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
               <DataTableViewOptions table={table} />
             </div>
@@ -459,12 +459,12 @@ export default function WalletPage() {
         />
       </section>
 
-      <div className="-mx-6 my-8 border-t" />
+      <div className="my-8 border-t" />
 
       <section className="space-y-5 py-2">
-        <div className="flex items-center justify-between gap-2">
-          <h2 className="text-4xl -translate-y-4">Transactions</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className="text-2xl md:text-3xl">Transactions</h2>
+          <div className="flex flex-wrap items-center gap-2">
             <p className="text-sm text-muted-foreground">
               {(transactionsData?.totalCount ?? transactions.length)} tx
               {(transactionsData?.totalCount ?? transactions.length) === 1
@@ -499,11 +499,11 @@ export default function WalletPage() {
           ]}
           pagination={(table) => <DataTablePagination table={table} />}
           toolbar={(table) => (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <DataTableSearch
                 table={table}
                 placeholder="Search transactions..."
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
               <DataTableViewOptions table={table} />
             </div>

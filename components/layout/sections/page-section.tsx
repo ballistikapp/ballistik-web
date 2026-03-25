@@ -9,5 +9,5 @@ type PageSectionProps = {
 };
 
 export function PageSection({ children, className }: PageSectionProps) {
-  return <div className={cn("space-y-12", className)}>{children}</div>;
+  return <div className={cn("space-y-8 md:space-y-12", className)}>{children}</div>;
 }

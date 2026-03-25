@@ -19,11 +19,11 @@ export function PageHeader({
   return (
     <div
       className={cn(
-        "flex justify-between items-center gap-2 -mx-6 px-6 pb-14 pt-10 border-b",
+        "flex flex-col items-start justify-between gap-4 border-b px-0 pb-8 pt-6 md:flex-row md:items-center md:gap-6 md:pb-10 md:pt-8",
         className
       )}
     >
-      <h1 className="text-4xl">{title}</h1>
+      <h1 className="text-2xl leading-tight md:text-4xl">{title}</h1>
       {rightContent ?? actions}
     </div>
   );

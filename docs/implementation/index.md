@@ -6,6 +6,7 @@ This directory contains detailed implementation documentation for all features i
 
 - [Project Overview](./project-overview.md) — high-level purpose, architecture, and conventions
 - [Auth Implementation](./auth-implementation.md) — access/refresh token model and session lifecycle
+- [UI Responsive Layout Pass](./ui-responsive-layout.md) — shared responsive strategy and cross-page layout baseline
 
 ## Core Features
 

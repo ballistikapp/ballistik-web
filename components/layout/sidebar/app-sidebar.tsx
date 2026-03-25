@@ -73,7 +73,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
         <NavMain title="Contact & Help" items={helpRoutes} className="mt-6" />
       </SidebarContent>
       <SidebarFooter className="pt-0">
-        <p className="text-center text-4xl font-bold tracking-wide text-sidebar-foreground/80 group-data-[collapsible=icon]:hidden">
+        <p className="text-center text-2xl font-bold tracking-wide text-sidebar-foreground/80 md:text-3xl lg:text-4xl group-data-[collapsible=icon]:hidden">
           BALLISTIK
         </p>
       </SidebarFooter>

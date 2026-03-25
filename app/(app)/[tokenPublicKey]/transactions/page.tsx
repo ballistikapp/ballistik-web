@@ -322,7 +322,7 @@ export default function TransactionsPage() {
       <PageHeader
         title="Transactions"
         rightContent={
-          <div className="flex flex-col items-end gap-1">
+          <div className="flex w-full flex-col items-start gap-1 md:items-end">
             <Button
               variant="outline"
               size="sm"
@@ -342,8 +342,6 @@ export default function TransactionsPage() {
           </div>
         }
       />
-
-      <div />
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
         {metricCards.map((metric) => (
@@ -374,11 +372,11 @@ export default function TransactionsPage() {
         urlStatePrefix="transactions"
         searchableColumns={["walletPublicKey", "walletType"]}
         toolbar={(table) => (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
               placeholder="Search transactions..."
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
             <DataTableViewOptions table={table} />
           </div>

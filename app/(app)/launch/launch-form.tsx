@@ -650,7 +650,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         <section id="token-details" className="scroll-mt-4">
           <PageSection>
             <div>
-              <div className="grid grid-cols-2 gap-8 items-start">
+              <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-2 lg:gap-8">
                 <div className="space-y-4">
                   <form.Field name="tokenName">
                     {(field) => {
@@ -884,7 +884,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   </form.Field>
                   <div className="pt-2">
                     <p className="text-sm font-medium mb-3">Social Links</p>
-                    <div className="grid grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                       <form.Field name="twitter">
                         {(field) => {
                           const isInvalid = getIsInvalid(field);
@@ -1230,7 +1230,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 {(bundleBuyEnabled) =>
                   bundleBuyEnabled && (
                     <div className="space-y-6">
-                      <div className="grid grid-cols-2 gap-6">
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                         <form.Field name="bundlerWalletCount">
                           {(field) => {
                             const isInvalid = getIsInvalid(field);
@@ -1316,7 +1316,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                         </CollapsibleTrigger>
                         <CollapsibleContent className="pt-4">
                           <div className="space-y-6">
-                            <div className="grid grid-cols-2 gap-6">
+                            <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
                               <form.Field name="bundlerBuyVariancePercent">
                                 {(field) => {
                                   const isInvalid = getIsInvalid(field);
@@ -1458,7 +1458,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
 
                           return (
                             <div className="rounded-lg border bg-muted/50 p-4">
-                              <div className="grid grid-cols-2 gap-4 text-sm">
+                              <div className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
                                 <div>
                                   <span className="text-muted-foreground">
                                     Total Bundle Buy
@@ -1738,9 +1738,9 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                         </div>
                       </div>
 
-                      <div className="-mx-6 -mb-14 mt-8 border-t bg-muted/30 px-6 py-14">
-                        <div className="flex items-center justify-between gap-8">
-                          <div className="flex items-center gap-10">
+                      <div className="mt-8 border-t bg-muted/30 px-4 py-8 sm:px-6 sm:py-10">
+                        <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+                          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:flex lg:items-center lg:gap-10">
                             <div className="space-y-1">
                               <div className="text-xs text-muted-foreground">
                                 Total fees
@@ -1776,7 +1776,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             size="lg"
                             type="submit"
                             form="launch-form"
-                            className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
+                            className="h-11 w-full shrink-0 border border-black px-4 text-xl font-black tracking-tight text-black/90 shadow-lg shadow-lime-400/10 hover:text-black hover:shadow-xl hover:shadow-lime-300/20 sm:w-auto sm:text-2xl md:h-12 md:text-3xl"
                           >
                             LAUNCH TOKEN
                           </Button>

@@ -203,11 +203,10 @@ export default function VolumeBotRunPage() {
     <section className="pb-8">
       <PageHeader
         title="Volume Bot Session"
-        className="-mx-6 pt-6 pb-10"
         rightContent={
-          <div className="flex items-center gap-3">
+          <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end md:gap-3">
             <span
-              className={`inline-flex items-center gap-3 rounded-lg px-3 py-1.5 text-xl font-semibold ${
+              className={`inline-flex items-center gap-2 rounded-lg px-3 py-1.5 text-base font-semibold sm:text-lg md:text-xl ${
                 session.status === "RUNNING"
                   ? "bg-emerald-500/15 text-emerald-500"
                   : session.status === "STOPPED"
@@ -344,11 +343,11 @@ export default function VolumeBotRunPage() {
           initialColumnVisibility={{ message: false }}
           searchableColumns={["walletPublicKey"]}
           toolbar={(table) => (
-            <div className="flex items-center justify-between gap-2">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <DataTableSearch
                 table={table}
                 placeholder="Search wallet public keys..."
-                className="max-w-sm"
+                className="w-full sm:max-w-sm"
               />
               <DataTableViewOptions table={table} />
             </div>
@@ -359,12 +358,12 @@ export default function VolumeBotRunPage() {
         />
       </div>
 
-      <div className="-mx-6 my-14">
+      <div className="my-10 md:my-14">
         <Separator />
       </div>
 
       <div className="space-y-6">
-        <div className="flex items-center justify-between">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="text-2xl font-normal">Details</h2>
           <Button
             variant="outline"
@@ -390,7 +389,7 @@ export default function VolumeBotRunPage() {
                     range.direction === "both" && "border-l-muted-foreground/40"
                   )}
                 >
-                  <div className="flex items-center justify-between mb-3">
+                  <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-semibold">
                         Range {index + 1}
@@ -428,7 +427,7 @@ export default function VolumeBotRunPage() {
                     )}
                   </div>
 
-                  <div className="grid grid-cols-2 gap-x-8 gap-y-3 sm:grid-cols-4">
+                  <div className="grid grid-cols-1 gap-x-8 gap-y-3 sm:grid-cols-2 xl:grid-cols-4">
                     <div>
                       <p className="text-[11px] uppercase tracking-wide text-muted-foreground mb-0.5">
                         Trade Size
@@ -473,7 +472,7 @@ export default function VolumeBotRunPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="rounded-lg border bg-card/50 px-3 py-2.5">
             <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
               Scheduling

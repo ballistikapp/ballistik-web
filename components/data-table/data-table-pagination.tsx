@@ -31,8 +31,8 @@ export function DataTablePagination<TData>({
 }: DataTablePaginationProps<TData>) {
   return (
     <div
-      className={`flex items-center px-4 ${
-        showSelectedCount ? "justify-between" : "justify-end"
+      className={`flex flex-col gap-3 px-1 sm:px-2 md:flex-row md:items-center ${
+        showSelectedCount ? "md:justify-between" : "md:justify-end"
       }`}
     >
       {showSelectedCount && (
@@ -42,8 +42,8 @@ export function DataTablePagination<TData>({
         </div>
       )}
       <div
-        className={`flex items-center gap-8 ${
-          showSelectedCount ? "w-full lg:w-fit" : "w-fit"
+        className={`flex w-full flex-wrap items-center gap-3 sm:gap-5 ${
+          showSelectedCount ? "justify-between lg:w-fit" : "justify-end"
         }`}
       >
         <div className="hidden items-center gap-2 lg:flex">
@@ -74,7 +74,7 @@ export function DataTablePagination<TData>({
           Page {table.getState().pagination.pageIndex + 1} of{" "}
           {table.getPageCount()}
         </div>
-        <div className="ml-auto flex items-center gap-2 lg:ml-0">
+        <div className="flex items-center gap-2 lg:ml-0">
           <Button
             variant="outline"
             className="hidden h-8 w-8 p-0 lg:flex"

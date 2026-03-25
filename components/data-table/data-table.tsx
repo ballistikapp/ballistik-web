@@ -222,7 +222,7 @@ export function DataTable<TData, TValue>({
     <div className="flex flex-col gap-4">
       {toolbar?.(table)}
       <div
-        className={`overflow-hidden rounded-lg border transition-opacity ${
+        className={`w-full overflow-hidden rounded-lg border transition-opacity ${
           showLoadingPulse ? "animate-pulse opacity-80" : ""
         }`}
       >

@@ -162,13 +162,13 @@ export default function AccountPage() {
       <PageHeader
         title={currentUser.name || "Account"}
         rightContent={
-          <div className="mt-3 flex flex-col items-end gap-4">
+          <div className="flex w-full flex-col items-start gap-3 md:items-end md:gap-4">
             {isEditingName ? (
-              <div className="flex items-center gap-2">
+              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
                 <Input
                   value={nameValue}
                   onChange={(e) => setNameValue(e.target.value)}
-                  className="h-10 text-2xl font-medium max-w-xs"
+                  className="h-10 w-full max-w-xs text-xl font-medium md:text-2xl"
                   maxLength={50}
                   autoFocus
                   onKeyDown={(e) => {
@@ -204,22 +204,22 @@ export default function AccountPage() {
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 text-muted-foreground hover:text-foreground self-end"
+                className="h-8 w-8 self-start text-muted-foreground hover:text-foreground md:self-end"
                 onClick={handleStartEditName}
               >
                 <IconPencil className="size-4" />
               </Button>
             )}
-            <div className="text-right">
+            <div className="text-left md:text-right">
               <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                 WALLET BALANCE
               </p>
               <p className="font-mono leading-none">
-                <span className="text-4xl">{balanceSol.toFixed(4)}</span>{" "}
+                <span className="text-2xl md:text-4xl">{balanceSol.toFixed(4)}</span>{" "}
                 <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end md:gap-3">
               <p className="text-sm text-muted-foreground">
                 Last refresh: {formatRefreshTime(wallet?.balanceRefreshedAt)}
               </p>
@@ -242,14 +242,14 @@ export default function AccountPage() {
       />
 
       {/* Wallet info */}
-      <div className="flex flex-col gap-6 pt-8 lg:flex-row lg:items-start lg:justify-between">
+      <div className="flex flex-col gap-6 pt-6 md:pt-8 lg:flex-row lg:items-start lg:justify-between">
         <div className="space-y-6">
           <div className="space-y-2">
             <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
               WALLET PUBLIC KEY
             </p>
             <div className="flex items-center gap-1.5">
-              <code className="font-mono text-xl text-muted-foreground tracking-tighter break-all">
+              <code className="font-mono text-base text-muted-foreground tracking-tighter break-all sm:text-lg md:text-xl">
                 {currentUser.mainWalletPublicKey}
               </code>
               <Tooltip>
@@ -295,7 +295,7 @@ export default function AccountPage() {
           </div>
         </div>
 
-        <div className="flex flex-wrap items-center justify-end gap-2">
+        <div className="flex flex-wrap items-center gap-2 lg:justify-end">
           <Button variant="outline" size="lg" asChild>
             <Link href="/account/subscription">Manage Subscription</Link>
           </Button>

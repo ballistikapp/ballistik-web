@@ -916,11 +916,12 @@ export default function VolumeBotStartPage() {
       <PageHeader
         title="New Volume Bot"
         rightContent={
-          <div className="flex flex-col items-end">
+          <div className="flex w-full flex-col items-start gap-2 md:items-end">
             <Button
               type="button"
               variant="outline"
               size="lg"
+              className="w-full sm:w-auto"
               onClick={() => setPresetsDialogOpen(true)}
               disabled={!presetsQuery.data?.length}
             >
@@ -940,7 +941,7 @@ export default function VolumeBotStartPage() {
               type="button"
               variant="ghost"
               size="lg"
-              className="translate-y-2"
+              className="w-full sm:w-auto md:translate-y-2"
               onClick={handleOpenCreatePreset}
             >
               <SaveIcon className="size-3.5 mr-1.5" />
@@ -950,7 +951,7 @@ export default function VolumeBotStartPage() {
         }
       />
 
-      <div />
+      <div className="h-2" />
 
       {isRunning && session && (
         <Card>
@@ -1125,7 +1126,7 @@ export default function VolumeBotStartPage() {
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Trade Size
                       </span>
-                      <div className="grid grid-cols-3 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">
                             Min
@@ -1205,7 +1206,7 @@ export default function VolumeBotStartPage() {
                       <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">
                         Frequency
                       </span>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">
                             Min
@@ -1353,7 +1354,7 @@ export default function VolumeBotStartPage() {
                       <Button
                         variant="outline"
                         className={cn(
-                          "w-[220px] justify-start text-left font-normal h-8",
+                          "h-8 w-full justify-start text-left font-normal sm:w-[220px]",
                           !scheduledStartDate && "text-muted-foreground"
                         )}
                       >
@@ -1503,7 +1504,7 @@ export default function VolumeBotStartPage() {
                     }
                   />
                 </div>
-                <div className="flex items-center gap-2 pt-2">
+                <div className="flex items-center gap-2 pt-2 md:col-span-3">
                   <Checkbox
                     checked={pauseOnHighSlippage}
                     onCheckedChange={(checked) =>
@@ -2014,9 +2015,9 @@ export default function VolumeBotStartPage() {
           )}
         </PageSection>
 
-        <div className="-mx-6 -mb-14 mt-14 border-t bg-muted/30 px-6 py-14">
-          <div className="flex items-center justify-between gap-8">
-            <div className="flex items-center gap-10">
+        <div className="mt-10 border-t bg-muted/30 px-4 py-8 sm:px-6 md:mt-14 md:py-12">
+          <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
               <div className="space-y-1">
                 <div className="text-xs text-muted-foreground">
                   Total wallets
@@ -2074,7 +2075,7 @@ export default function VolumeBotStartPage() {
               size="lg"
               onClick={handleStart}
               disabled={startMutation.isPending || !tokenPublicKey || isRunning}
-              className="h-12 px-4 text-3xl font-black tracking-tight shadow-lg shadow-lime-400/10 border border-black hover:shadow-xl hover:shadow-lime-300/20 text-black/90 hover:text-black shrink-0"
+              className="h-12 w-full border border-black px-4 text-xl font-black tracking-tight text-black/90 shadow-lg shadow-lime-400/10 hover:text-black hover:shadow-xl hover:shadow-lime-300/20 sm:w-auto md:text-2xl"
             >
               {startMutation.isPending ? "STARTING..." : "START VOLUME BOT"}
             </Button>

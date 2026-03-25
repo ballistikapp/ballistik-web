@@ -154,8 +154,8 @@ export default function AccountSubscriptionPage() {
         <PageHeader
           title="Subscription"
           rightContent={
-            <div className="mt-3 text-right">
-              <div className="flex items-center justify-end gap-2">
+            <div className="w-full text-left md:text-right">
+              <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <Badge
                   variant={overview.plan === "PRO" ? "default" : "secondary"}
                   className="h-8 rounded-full px-4 text-sm font-semibold"
@@ -169,23 +169,23 @@ export default function AccountSubscriptionPage() {
                   {statusLabel}
                 </Badge>
               </div>
-              <p className="mt-4 text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
+              <p className="mt-3 text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground md:mt-4">
                 WEEKLY PRICE
               </p>
               <p className="font-mono leading-none">
-                <span className="text-4xl">{overview.priceSol.toFixed(2)}</span>{" "}
+                <span className="text-2xl md:text-4xl">{overview.priceSol.toFixed(2)}</span>{" "}
                 <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
           }
         />
 
-        <PageSection className="pt-8">
+        <PageSection className="pt-6 md:pt-8">
           <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
-            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-8 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)]">
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-5 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] sm:p-6 md:p-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
               <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.18)_1px,transparent_1px)] bg-size-[18px_18px] opacity-30 mask-[radial-gradient(circle_at_center,black,transparent_75%)]" />
-              <div className="relative space-y-8">
+              <div className="relative space-y-6 md:space-y-8">
                 <div className="space-y-3">
                   <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500">
                     Weekly Pro
@@ -264,7 +264,7 @@ export default function AccountSubscriptionPage() {
                 </p>
               </div>
 
-              <div className="grid gap-8 sm:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-3 sm:gap-8">
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                     PLAN
@@ -317,7 +317,7 @@ export default function AccountSubscriptionPage() {
             </div>
           </div>
 
-          <PageSectionDivider className="my-24" />
+          <PageSectionDivider className="my-14 md:my-24" />
 
           <div className="space-y-10 pb-8">
             <PageSectionHeader

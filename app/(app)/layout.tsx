@@ -48,8 +48,8 @@ export default async function MainLayout({
         <SidebarInset>
           <SiteHeader />
           <div className="flex flex-1 flex-col">
-            <div className="@container/main flex flex-1 flex-col gap-2">
-              <div className="flex flex-col gap-4 py-4 md:gap-6 md:py-6 px-4 lg:px-6">
+            <div className="@container/main mx-auto flex w-full max-w-[1800px] flex-1 flex-col gap-2">
+              <div className="flex flex-col gap-4 px-4 py-4 md:gap-6 md:px-6 md:py-6 xl:px-8">
                 {children}
               </div>
             </div>

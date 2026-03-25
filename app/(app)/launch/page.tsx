@@ -48,6 +48,7 @@ export default function LaunchPage() {
             <Button
               size="lg"
               variant="outline"
+              className="w-full sm:w-auto"
               onClick={() => setCloneDialogOpen(true)}
             >
               <Copy className="size-4 mr-2 text-primary" />

@@ -393,17 +393,19 @@ export default function Page() {
       <PageHeader
         title="Wallets"
         rightContent={
-          <div className="mt-3 flex flex-col items-end gap-4">
-            <div className="text-right">
+          <div className="flex w-full flex-col items-start gap-3 md:items-end md:gap-4">
+            <div className="text-left md:text-right">
               <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                 TOTAL BALANCE
               </p>
               <p className="font-mono leading-none">
-                <span className="text-4xl">{totalSolBalance.toFixed(4)}</span>{" "}
+                <span className="text-2xl md:text-4xl">
+                  {totalSolBalance.toFixed(4)}
+                </span>{" "}
                 <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:justify-end md:gap-3">
               <p className="text-sm text-muted-foreground">
                 Last refresh: {formatRefreshTime(refreshTimestamp)}
               </p>
@@ -435,8 +437,8 @@ export default function Page() {
               <Badge variant="default">Main + Dev</Badge>
             </CardHeader>
             <CardContent className="flex flex-col gap-4">
-              <div className="flex items-center gap-1">
-                <div className="text-sm text-muted-foreground">
+              <div className="flex items-start gap-1">
+                <div className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
                   {sharedWallet?.publicKey || "Not available"}
                 </div>
                 {sharedWallet && (
@@ -539,8 +541,8 @@ export default function Page() {
                 <Badge variant="default">Main</Badge>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center gap-1">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex items-start gap-1">
+                  <div className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
                     {mainWallet?.publicKey || "Not available"}
                   </div>
                   {mainWallet && (
@@ -627,8 +629,8 @@ export default function Page() {
                 <Badge variant="secondary">Dev</Badge>
               </CardHeader>
               <CardContent className="flex flex-col gap-4">
-                <div className="flex items-center gap-1">
-                  <div className="text-sm text-muted-foreground">
+                <div className="flex items-start gap-1">
+                  <div className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
                     {devWallet?.publicKey || "Not available"}
                   </div>
                   {devWallet && (
@@ -772,13 +774,13 @@ export default function Page() {
         urlStatePrefix="wallets"
         onRowSelectionChange={setRowSelection}
         toolbar={(table) => (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
               placeholder="Search wallets..."
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <p className="text-sm text-muted-foreground">
                 {selectedWalletPublicKeys.length} wallet
                 {selectedWalletPublicKeys.length === 1 ? "" : "s"} selected

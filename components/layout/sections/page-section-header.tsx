@@ -15,8 +15,13 @@ export function PageSectionHeader({
   className,
 }: PageSectionHeaderProps) {
   return (
-    <div className={cn("flex items-baseline justify-between", className)}>
-      <h2 className="text-2xl font-normal">{title}</h2>
+    <div
+      className={cn(
+        "flex flex-col items-start justify-between gap-2 md:flex-row md:items-baseline md:gap-4",
+        className
+      )}
+    >
+      <h2 className="text-xl font-normal md:text-2xl">{title}</h2>
       {meta}
     </div>
   );

@@ -58,7 +58,7 @@ export default function VolumeBotPage() {
       <PageHeader
         title="Volume Bot Sessions"
         rightContent={
-          <div className="flex flex-col items-end gap-3 text-right text-muted-foreground">
+          <div className="flex w-full flex-col items-start gap-3 text-left text-muted-foreground md:items-end md:text-right">
             <Button asChild size="lg">
               <Link href={newRunHref}>
                 <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
@@ -78,11 +78,11 @@ export default function VolumeBotPage() {
         urlStatePrefix="volumeBotSessions"
         searchableColumns={["status"]}
         toolbar={(table) => (
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
               placeholder="Search sessions..."
-              className="max-w-sm"
+              className="w-full sm:max-w-sm"
             />
             <DataTableViewOptions table={table} />
           </div>
