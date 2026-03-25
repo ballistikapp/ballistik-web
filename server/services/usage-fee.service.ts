@@ -38,6 +38,34 @@ function toLamports(amountSol: number) {
   return Math.floor(amountSol * 1_000_000_000);
 }
 
+function getErrorMessage(error: unknown) {
+  if (error instanceof Error) {
+    return error.message;
+  }
+  if (typeof error === "string") {
+    return error;
+  }
+  if (
+    error &&
+    typeof error === "object" &&
+    "message" in error &&
+    typeof error.message === "string"
+  ) {
+    return error.message;
+  }
+  return "";
+}
+
+function isInsufficientBalanceError(error: unknown) {
+  const message = getErrorMessage(error).toLowerCase();
+  return (
+    message.includes("insufficient balance") ||
+    message.includes("insufficient funds") ||
+    message.includes("insufficient lamports") ||
+    message.includes("attempt to debit an account")
+  );
+}
+
 function resolveCollectorWalletPublicKey() {
   const collectorAddress = getEnv().FEE_COLLECTOR_WALLET_ADDRESS;
   if (!collectorAddress?.trim()) {
@@ -132,6 +160,11 @@ export const usageFeeService = {
     } catch (error) {
       if (error instanceof TransactionExpiredBlockheightExceededError) {
         signature = await sendTransfer();
+      } else if (isInsufficientBalanceError(error)) {
+        throw new AppError(
+          "Insufficient balance in your main wallet to purchase the Pro plan.",
+          400
+        );
       } else {
         throw error;
       }

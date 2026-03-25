@@ -9,7 +9,7 @@ type PageSectionDividerProps = {
 
 export function PageSectionDivider({ className }: PageSectionDividerProps) {
   return (
-    <div className={cn("my-10 md:my-14", className)}>
+    <div className={cn("-mx-4 my-10 md:-mx-6 md:my-14 xl:-mx-8", className)}>
       <Separator />
     </div>
   );

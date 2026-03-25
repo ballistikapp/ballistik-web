@@ -89,16 +89,6 @@ export default function AccountSubscriptionPage() {
     return "Subscribe to Pro";
   }, [overview?.status]);
 
-  const statusLabel = useMemo(() => {
-    if (overview?.status === "ACTIVE") {
-      return "Active";
-    }
-    if (overview?.status === "EXPIRED") {
-      return "Expired";
-    }
-    return "Free";
-  }, [overview?.status]);
-
   const handlePurchase = async () => {
     try {
       const result = await purchaseMutation.mutateAsync({});
@@ -161,12 +151,6 @@ export default function AccountSubscriptionPage() {
                   className="h-8 rounded-full px-4 text-sm font-semibold"
                 >
                   {overview.plan === "PRO" ? "Pro" : "Free"}
-                </Badge>
-                <Badge
-                  variant="outline"
-                  className="h-8 rounded-full px-4 text-sm font-medium"
-                >
-                  {statusLabel}
                 </Badge>
               </div>
               <p className="mt-3 text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground md:mt-4">
@@ -264,7 +248,7 @@ export default function AccountSubscriptionPage() {
                 </p>
               </div>
 
-              <div className="grid gap-5 sm:grid-cols-3 sm:gap-8">
+              <div className="grid gap-5 sm:grid-cols-2 sm:gap-8">
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                     PLAN
@@ -272,12 +256,6 @@ export default function AccountSubscriptionPage() {
                   <p className="text-xl">
                     {overview.plan === "PRO" ? "Pro" : "Free"}
                   </p>
-                </div>
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
-                    STATUS
-                  </p>
-                  <p className="text-xl">{statusLabel}</p>
                 </div>
                 <div className="space-y-2">
                   <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">

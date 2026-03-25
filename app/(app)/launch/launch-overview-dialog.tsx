@@ -212,10 +212,12 @@ export function LaunchOverviewDialog({
                   <span className="text-muted-foreground">Dev Buy</span>
                   <span>{launchInput.devBuyAmountSol.toFixed(4)} SOL</span>
                 </div>
-                <div className="grid grid-cols-[140px_1fr] gap-2">
-                  <span className="text-muted-foreground">Jito Tip</span>
-                  <span>{launchInput.jitoTipAmountSol.toFixed(4)} SOL</span>
-                </div>
+                {launchInput.bundleBuyEnabled && (
+                  <div className="grid grid-cols-[140px_1fr] gap-2">
+                    <span className="text-muted-foreground">Jito Tip</span>
+                    <span>{launchInput.jitoTipAmountSol.toFixed(4)} SOL</span>
+                  </div>
+                )}
                 {launchInput.bundleBuyEnabled && (
                   <>
                     <div className="grid grid-cols-[140px_1fr] gap-2">

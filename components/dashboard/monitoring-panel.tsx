@@ -2,7 +2,13 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { Activity, AlertTriangle, ChevronDown, ChevronUp, RefreshCw } from "lucide-react";
+import {
+  Activity,
+  AlertTriangle,
+  ChevronDown,
+  ChevronUp,
+  RefreshCw,
+} from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +19,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const POLL_INTERVAL_SECONDS = 30;
+const MONITORING_PANEL_STATE_KEY = "dashboard:monitoring-panel:minimized";
 type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
 
 interface MonitoringPanelProps {
@@ -40,11 +47,34 @@ export function MonitoringPanel({
   healthState,
   dataUpdatedAt,
 }: MonitoringPanelProps) {
-  const [minimized, setMinimized] = useState(false);
+  const [minimized, setMinimized] = useState(true);
   const [secondsAgo, setSecondsAgo] = useState(0);
   const [countdown, setCountdown] = useState(POLL_INTERVAL_SECONDS);
   const [toggling, setToggling] = useState(false);
+  const [hasLoadedMinimizedState, setHasLoadedMinimizedState] = useState(false);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const storedState = window.localStorage.getItem(MONITORING_PANEL_STATE_KEY);
+    if (storedState === "open") {
+      setMinimized(false);
+    } else if (storedState === "closed") {
+      setMinimized(true);
+    }
+
+    setHasLoadedMinimizedState(true);
+  }, []);
+
+  useEffect(() => {
+    if (!hasLoadedMinimizedState || typeof window === "undefined") return;
+
+    window.localStorage.setItem(
+      MONITORING_PANEL_STATE_KEY,
+      minimized ? "closed" : "open"
+    );
+  }, [hasLoadedMinimizedState, minimized]);
 
   useEffect(() => {
     if (intervalRef.current) clearInterval(intervalRef.current);
@@ -90,35 +120,50 @@ export function MonitoringPanel({
   if (minimized) {
     return (
       <div className="fixed bottom-5 right-5 z-50">
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={() => setMinimized(false)}
-              className={cn(
-                "flex items-center gap-2.5 rounded-full px-4 py-2 text-sm font-medium shadow-lg border transition-colors cursor-pointer",
-                "bg-card text-card-foreground border-border hover:bg-muted",
-              )}
-            >
-              <span
-                className={cn("size-2.5 rounded-full shrink-0", statusIndicatorClass)}
-              />
-              <span className="tabular-nums">
-                {secondsAgo}s ago
-              </span>
-              <ChevronUp className="size-3.5" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent side="left">
-            {isMonitoring
-              ? healthState === "degraded"
-                ? "Monitoring degraded"
-                : healthState === "failed"
-                  ? "Monitoring disconnected"
-                  : "Monitoring active (hybrid)"
-              : "Monitoring off"}
-          </TooltipContent>
-        </Tooltip>
+        <div className="flex items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={() => setMinimized(false)}
+                className={cn(
+                  "flex items-center gap-2.5 rounded-full px-4 py-2 text-sm font-medium shadow-lg border transition-colors cursor-pointer",
+                  "bg-card text-card-foreground border-border hover:bg-muted"
+                )}
+              >
+                <span
+                  className={cn(
+                    "size-2.5 rounded-full shrink-0",
+                    statusIndicatorClass
+                  )}
+                />
+                <span className="tabular-nums">{secondsAgo}s ago</span>
+                <ChevronUp className="size-3.5" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top">Open monitoring panel</TooltipContent>
+          </Tooltip>
+
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <Button
+                type="button"
+                variant="outline"
+                size="icon"
+                className="size-9 rounded-full bg-card! shadow-lg"
+                onClick={handleRefresh}
+                disabled={isRefreshing}
+              >
+                <RefreshCw
+                  className={cn("size-3.5", isRefreshing && "animate-spin")}
+                />
+              </Button>
+            </TooltipTrigger>
+            <TooltipContent side="top">
+              {isRefreshing ? "Refreshing..." : "Refresh dashboard"}
+            </TooltipContent>
+          </Tooltip>
+        </div>
       </div>
     );
   }
@@ -144,7 +189,10 @@ export function MonitoringPanel({
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2.5">
               <span
-                className={cn("size-2.5 rounded-full shrink-0", statusIndicatorClass)}
+                className={cn(
+                  "size-2.5 rounded-full shrink-0",
+                  statusIndicatorClass
+                )}
               />
               <span className="text-sm">{statusText}</span>
             </div>
@@ -165,14 +213,19 @@ export function MonitoringPanel({
           {isMonitoring && healthState === "failed" && (
             <div className="flex items-center gap-2 text-xs text-amber-500">
               <AlertTriangle className="size-3.5 shrink-0" />
-              <span>SSE lost. Transactions fallback to polling; holdings auto-refresh continues.</span>
+              <span>
+                SSE lost. Transactions fallback to polling; holdings
+                auto-refresh continues.
+              </span>
             </div>
           )}
 
           {isMonitoring && healthState === "degraded" && (
             <div className="flex items-center gap-2 text-xs text-amber-500">
               <AlertTriangle className="size-3.5 shrink-0" />
-              <span>Live transactions are delayed; holdings keep auto-refreshing.</span>
+              <span>
+                Live transactions are delayed; holdings keep auto-refreshing.
+              </span>
             </div>
           )}
 

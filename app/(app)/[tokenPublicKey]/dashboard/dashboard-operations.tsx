@@ -34,14 +34,24 @@ interface DashboardOperationsProps {
 
 function BotActions({ tokenPublicKey }: { tokenPublicKey: string }) {
   return (
-    <div className="flex items-center gap-1.5 ml-auto shrink-0">
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+    <div className="grid w-full shrink-0 grid-cols-2 gap-1.5 sm:ml-auto sm:flex sm:w-auto sm:items-center">
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        asChild
+      >
         <Link href={`/${tokenPublicKey}/volume-bot`}>
           <IconList className="size-3.5" />
           Sessions
         </Link>
       </Button>
-      <Button variant="outline" size="sm" className="h-7 gap-1.5 text-xs" asChild>
+      <Button
+        variant="outline"
+        size="sm"
+        className="h-8 gap-1.5 text-xs"
+        asChild
+      >
         <Link href={`/${tokenPublicKey}/volume-bot/new`}>
           <IconPlus className="size-3.5" />
           New Session
@@ -88,9 +98,12 @@ export function DashboardOperations({
 
   if (activeSessions.length > 0) {
     return (
-      <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5 text-sm">
+      <div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between">
         {activeSessions.map((bot) => (
-          <div key={bot.id} className="flex items-center gap-3 flex-wrap">
+          <div
+            key={bot.id}
+            className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5"
+          >
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-green-500 animate-pulse shrink-0" />
               <IconRobot className="size-4 text-muted-foreground" />
@@ -98,12 +111,10 @@ export function DashboardOperations({
                 Volume bot running
               </span>
             </div>
-            <span className="text-muted-foreground">·</span>
             <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
               <IconArrowsExchange className="size-3.5" />
               {bot.totalTrades} trades
             </span>
-            <span className="text-muted-foreground">·</span>
             <span
               className={`font-mono tabular-nums ${
                 bot.totalPnlSol >= 0 ? "text-green-500" : "text-red-500"
@@ -112,16 +123,13 @@ export function DashboardOperations({
               {bot.totalPnlSol >= 0 ? "+" : ""}
               {formatSol(bot.totalPnlSol)} SOL
             </span>
-            <span className="text-muted-foreground">·</span>
             <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
               <IconClock className="size-3.5" />
               {formatRuntime(bot.runtimeSeconds)}
             </span>
-            <span className="text-muted-foreground">·</span>
             <span className="text-muted-foreground">
               {bot.activeWallets}/{bot.walletCount} wallets
             </span>
-            <span className="text-muted-foreground">·</span>
             <SessionLink tokenPublicKey={tokenPublicKey} sessionId={bot.id} />
           </div>
         ))}
@@ -131,45 +139,41 @@ export function DashboardOperations({
   }
 
   return (
-    <div className="flex items-center gap-3 rounded-lg border bg-card px-4 py-2.5 text-sm">
-      <span className="size-2 rounded-full bg-muted-foreground/40 shrink-0" />
-      <IconRobot className="size-4 text-muted-foreground" />
-      <span className="text-muted-foreground">
-        No active volume bot session.
-      </span>
-      {lastFinished ? (
-        <>
-          <span className="text-muted-foreground">Last session:</span>
-          <span className="text-muted-foreground tabular-nums">
-            {formatTimeAgo(lastFinished.stoppedAt ?? lastFinished.startedAt ?? new Date())}
-          </span>
-          <span className="text-muted-foreground">·</span>
-          <span className="tabular-nums text-muted-foreground">
-            {lastFinished.totalTrades} trades
-          </span>
-          <span className="text-muted-foreground">·</span>
-          <span
-            className={`font-mono tabular-nums ${
-              lastFinished.totalPnlSol >= 0
-                ? "text-green-500"
-                : "text-red-500"
-            }`}
-          >
-            {lastFinished.totalPnlSol >= 0 ? "+" : ""}
-            {formatSol(lastFinished.totalPnlSol)} SOL
-          </span>
-          <span className="text-muted-foreground">·</span>
-          <SessionLink tokenPublicKey={tokenPublicKey} sessionId={lastFinished.id} />
-          {lastFinished.status === "FAILED" && (
-            <>
-              <span className="text-muted-foreground">·</span>
+    <div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
+        <span className="size-2 rounded-full bg-muted-foreground/40 shrink-0" />
+        <IconRobot className="size-4 text-muted-foreground" />
+        <span className="text-muted-foreground">
+          No active volume bot session.
+        </span>
+        {lastFinished ? (
+          <>
+            <span className="text-muted-foreground">Last session:</span>
+            <span className="text-muted-foreground tabular-nums">
+              {formatTimeAgo(lastFinished.stoppedAt ?? lastFinished.startedAt ?? new Date())}
+            </span>
+            <span className="tabular-nums text-muted-foreground">
+              {lastFinished.totalTrades} trades
+            </span>
+            <span
+              className={`font-mono tabular-nums ${
+                lastFinished.totalPnlSol >= 0
+                  ? "text-green-500"
+                  : "text-red-500"
+              }`}
+            >
+              {lastFinished.totalPnlSol >= 0 ? "+" : ""}
+              {formatSol(lastFinished.totalPnlSol)} SOL
+            </span>
+            <SessionLink tokenPublicKey={tokenPublicKey} sessionId={lastFinished.id} />
+            {lastFinished.status === "FAILED" && (
               <span className="text-red-500">failed</span>
-            </>
-          )}
-        </>
-      ) : (
-        <span className="text-muted-foreground">No previous sessions.</span>
-      )}
+            )}
+          </>
+        ) : (
+          <span className="text-muted-foreground">No previous sessions.</span>
+        )}
+      </div>
       <BotActions tokenPublicKey={tokenPublicKey} />
     </div>
   );

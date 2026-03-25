@@ -5,12 +5,7 @@ import {
   getSafeRedirectPath,
 } from "@/lib/utils/auth-redirect";
 
-const publicRoutes = [
-  "/",
-  "/auth",
-  "/api/trpc",
-  "/api/webhooks/",
-];
+const publicRoutes = ["/", "/auth", "/api/trpc", "/api/webhooks/"];
 
 export function proxy(request: NextRequest) {
   const token = request.cookies.get("auth-token")?.value;
@@ -40,5 +35,7 @@ export function proxy(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+  matcher: [
+    "/((?!_next/static|_next/image|favicon.ico|favicon.png|.*\\..*).*)",
+  ],
 };
