@@ -1,7 +1,7 @@
 "use client";
 
 import { useParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -92,6 +92,9 @@ export default function VolumeBotRunPage() {
     }
   );
 
+  const utils = trpc.useUtils();
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
+
   const stopMutation = trpc.volumeBot.stop.useMutation({
     onSuccess: () => {
       toast.success("Stop requested");
@@ -172,6 +175,20 @@ export default function VolumeBotRunPage() {
     session?.status === "RUNNING" ||
     session?.status === "STOP_REQUESTED" ||
     session?.status === "STOPPING";
+
+  const prevIsActiveRef = useRef<boolean | null>(null);
+  useEffect(() => {
+    if (prevIsActiveRef.current === null) {
+      prevIsActiveRef.current = isActive;
+      return;
+    }
+    if (prevIsActiveRef.current && !isActive) {
+      refreshMainBalance.mutateAsync({}).then(() => {
+        utils.wallet.getMain.invalidate();
+      });
+    }
+    prevIsActiveRef.current = isActive;
+  }, [isActive, refreshMainBalance, utils.wallet.getMain]);
 
   const baseRuntime = session?.runtimeSeconds ?? 0;
   const runtimeSeconds = baseRuntime + (isActive ? elapsedSeconds : 0);

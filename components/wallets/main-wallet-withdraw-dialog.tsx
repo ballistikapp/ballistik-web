@@ -48,6 +48,7 @@ export function MainWalletWithdrawDialog({
 }: MainWalletWithdrawDialogProps) {
   const utils = trpc.useUtils();
   const withdrawMutation = trpc.wallet.withdrawMainSol.useMutation();
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
   const [destinationPublicKey, setDestinationPublicKey] = useState("");
   const [amountInput, setAmountInput] = useState("");
   const [useMax, setUseMax] = useState(false);
@@ -105,7 +106,9 @@ export function MainWalletWithdrawDialog({
       toast.success("Withdraw submitted", {
         description: `${result.amountSol.toFixed(6)} SOL sent.`,
       });
-      await utils.wallet.getMain.invalidate();
+      refreshMainBalance.mutateAsync({}).then(() => {
+        utils.wallet.getMain.invalidate();
+      });
       handleOpenChange(false);
     } catch (error) {
       const message =

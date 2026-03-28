@@ -89,6 +89,7 @@ export function AccountSendDialog({
     );
 
   const sendMutation = trpc.wallet.sendSol.useMutation();
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
 
   const walletsLoading = operationalLoading || devLoading;
 
@@ -205,7 +206,9 @@ export function AccountSendDialog({
       }
 
       handleOpenChange(false);
-      utils.wallet.getMain.invalidate();
+      refreshMainBalance.mutateAsync({}).then(() => {
+        utils.wallet.getMain.invalidate();
+      });
       utils.wallet.getOperationalByToken.invalidate({
         tokenPublicKey: selectedTokenPk,
       });

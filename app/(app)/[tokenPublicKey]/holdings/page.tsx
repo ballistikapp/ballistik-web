@@ -1,6 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { inferRouterOutputs } from "@trpc/server";
+import type { AppRouter } from "@/server/trpc/routers/_app";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
@@ -343,11 +345,30 @@ export default function Page() {
     }
   };
 
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
+
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;
   const shouldAutoOpen =
     Boolean(activeExitId) && dismissedExitId !== activeExitId;
   const isExitDialogOpen = manualExitDialogOpen || shouldAutoOpen;
+
+  type ExitStatus = NonNullable<inferRouterOutputs<AppRouter>["holding"]["exitStatus"]>["status"];
+  const prevExitStatusRef = useRef<ExitStatus | null>(null);
+  useEffect(() => {
+    if (!exitStatus) return;
+    const wasRunning =
+      prevExitStatusRef.current === "PENDING" ||
+      prevExitStatusRef.current === "RUNNING";
+    const isTerminal =
+      exitStatus !== "PENDING" && exitStatus !== "RUNNING";
+    prevExitStatusRef.current = exitStatus;
+    if (!wasRunning || !isTerminal) return;
+    void handleRefresh({ showToast: false });
+    refreshMainBalance.mutateAsync({}).then(() => {
+      utils.wallet.getMain.invalidate();
+    });
+  }, [exitStatus, handleRefresh, refreshMainBalance, utils.wallet.getMain]);
 
   const handleOpenExitDialog = () => {
     setManualExitDialogOpen(true);

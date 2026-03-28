@@ -444,6 +444,9 @@ export function DashboardClient() {
       },
     }
   );
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
+  const prevExitStatusRef = useRef<string | null>(null);
+
   const [fullRefreshing, setFullRefreshing] = useState(false);
 
   const handleFullRefresh = useCallback(async () => {
@@ -613,6 +616,21 @@ export function DashboardClient() {
     },
     [activeExitId, exitStatus]
   );
+
+  useEffect(() => {
+    if (!exitStatus) return;
+    const wasRunning =
+      prevExitStatusRef.current === "PENDING" ||
+      prevExitStatusRef.current === "RUNNING";
+    const isTerminal =
+      exitStatus !== "PENDING" && exitStatus !== "RUNNING";
+    prevExitStatusRef.current = exitStatus;
+    if (!wasRunning || !isTerminal) return;
+    refetchStats();
+    refreshMainBalance.mutateAsync({}).then(() => {
+      void refetchStats();
+    });
+  }, [exitStatus, refetchStats, refreshMainBalance]);
 
   const walletsWithBalance =
     statsData?.holdingsBreakdown.userWallets.filter(
