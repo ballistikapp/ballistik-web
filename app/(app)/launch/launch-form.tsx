@@ -147,7 +147,7 @@ const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
 const readImageDimensions = (file: File) =>
   new Promise<{ width: number; height: number }>((resolve, reject) => {
     const url = URL.createObjectURL(file);
-    const image = new Image();
+    const image = document.createElement("img");
     image.onload = () => {
       resolve({ width: image.width, height: image.height });
       URL.revokeObjectURL(url);
