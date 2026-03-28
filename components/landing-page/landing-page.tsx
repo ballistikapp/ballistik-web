@@ -141,6 +141,88 @@ export function LandingPage() {
         </section>
 
         <section
+          id="platforms"
+          className="flex w-full flex-col items-center gap-10 px-4 py-20 md:px-6 md:py-28"
+        >
+          <motion.h2
+            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            Launch across platforms.
+          </motion.h2>
+
+          <motion.p
+            className="mx-auto max-w-2xl text-center text-lg text-neutral-500 -mt-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+          >
+            Start on pump.fun today. SPL and EVM support is next.
+          </motion.p>
+
+          <motion.div
+            className="relative mx-auto w-full max-w-4xl overflow-hidden rounded-2xl border border-neutral-700/80 bg-linear-to-b from-neutral-900/80 to-black"
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.35 }}
+          >
+            <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.06),transparent_40%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.04),transparent_35%)]" />
+
+            <div className="relative grid grid-cols-1 divide-y divide-neutral-800/80 md:grid-cols-3 md:divide-x md:divide-y-0">
+              <div className="flex flex-col items-center gap-5 px-8 py-14">
+                <Image
+                  src="/logos/pumpfun.svg"
+                  alt="pump.fun"
+                  width={56}
+                  height={56}
+                  className="size-14"
+                />
+                <p className="text-lg font-semibold text-neutral-100">
+                  pump.fun
+                </p>
+              </div>
+
+              <div className="relative flex flex-col items-center px-8 py-14">
+                <div className="flex flex-col items-center gap-5 opacity-[0.15]">
+                  <Image
+                    src="/logos/solana.svg"
+                    alt="Solana"
+                    width={56}
+                    height={56}
+                    className="size-14"
+                  />
+                  <p className="text-lg font-semibold text-neutral-100">SPL</p>
+                </div>
+                <span className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-600 bg-neutral-800 px-3 py-0.5 text-xs font-medium text-neutral-300">
+                  Coming soon
+                </span>
+              </div>
+
+              <div className="relative flex flex-col items-center px-8 py-14">
+                <div className="flex flex-col items-center gap-5 opacity-[0.15]">
+                  <Image
+                    src="/logos/ethereum.svg"
+                    alt="Ethereum"
+                    width={56}
+                    height={56}
+                    className="size-14"
+                  />
+                  <p className="text-lg font-semibold text-neutral-100">EVM</p>
+                </div>
+                <span className="absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 rounded-full border border-neutral-600 bg-neutral-800 px-3 py-0.5 text-xs font-medium text-neutral-300">
+                  Coming soon
+                </span>
+              </div>
+            </div>
+          </motion.div>
+        </section>
+
+        <section
           id="pricing"
           className="flex flex-col gap-10 w-full py-20 md:py-32 px-4 md:px-6"
         >
@@ -164,7 +246,7 @@ export function LandingPage() {
             on supported flows.
           </motion.p>
           <div className="h-10" />
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-[0.95fr_1.05fr]">
+          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2">
             <motion.div
               className="flex flex-col gap-6 rounded-2xl border border-neutral-800 bg-neutral-950/60 p-8"
               initial={{ opacity: 0, y: 40 }}
@@ -209,18 +291,18 @@ export function LandingPage() {
             </motion.div>
 
             <motion.div
-              className="relative flex flex-col gap-6 overflow-hidden rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/80 to-black p-8"
+              className="relative flex flex-col gap-6 rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/80 to-black p-8"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.55 }}
             >
-              <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
-              <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+              <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
                 <span className="rounded-full border border-neutral-600 bg-neutral-800 px-3 py-0.5 text-xs font-medium text-neutral-300">
                   Pro Plan
                 </span>
               </div>
+              <div className="pointer-events-none absolute inset-0 rounded-2xl bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_35%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
               <div className="relative">
                 <p className="text-xs font-semibold uppercase tracking-widest text-neutral-500 mb-2">
                   Pro
