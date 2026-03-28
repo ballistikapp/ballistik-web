@@ -12,7 +12,20 @@ import {
   Sparkles,
   Wallet,
   ChevronRight,
+  ChevronsUpDown,
 } from "lucide-react";
+import Image from "next/image";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandGroup,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
 import {
   PageSection,
@@ -670,6 +683,81 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         }}
         className="space-y-0"
       >
+        {/* Platform Selector */}
+        <section id="platform" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <h2 className="text-xl font-normal md:text-2xl">Platform</h2>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant="outline"
+                role="combobox"
+                className="w-full justify-between sm:w-72"
+              >
+                <span className="flex items-center gap-2.5">
+                  <Image
+                    src="/logos/pumpfun.svg"
+                    alt="pump.fun"
+                    width={20}
+                    height={20}
+                    className="size-5"
+                  />
+                  <span>pump.fun</span>
+                </span>
+                <ChevronsUpDown className="size-4 shrink-0 opacity-50" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent
+              className="w-(--radix-popover-trigger-width) p-0"
+              align="start"
+            >
+              <Command>
+                <CommandList>
+                  <CommandGroup>
+                    <CommandItem value="pumpfun" data-checked="true">
+                      <Image
+                        src="/logos/pumpfun.svg"
+                        alt="pump.fun"
+                        width={20}
+                        height={20}
+                        className="size-5"
+                      />
+                      pump.fun
+                    </CommandItem>
+                    <CommandItem value="spl" disabled>
+                      <Image
+                        src="/logos/solana.svg"
+                        alt="Solana"
+                        width={20}
+                        height={20}
+                        className="size-5 opacity-40"
+                      />
+                      <span className="opacity-60">SPL</span>
+                      <span className="ml-auto rounded-full border border-border bg-muted px-2 py-px text-[10px] font-medium text-muted-foreground">
+                        Soon
+                      </span>
+                    </CommandItem>
+                    <CommandItem value="evm" disabled>
+                      <Image
+                        src="/logos/ethereum.svg"
+                        alt="Ethereum"
+                        width={20}
+                        height={20}
+                        className="size-5 opacity-40"
+                      />
+                      <span className="opacity-60">EVM</span>
+                      <span className="ml-auto rounded-full border border-border bg-muted px-2 py-px text-[10px] font-medium text-muted-foreground">
+                        Soon
+                      </span>
+                    </CommandItem>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+        </section>
+
+        <PageSectionDivider />
+
         {/* Step 1: Token Details */}
         <section id="token-details" className="scroll-mt-4">
           <PageSection>

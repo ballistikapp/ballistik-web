@@ -28,6 +28,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
   Empty,
@@ -99,6 +100,8 @@ interface DataTableProps<TData, TValue> {
   pageCount?: number;
   rowCount?: number;
   isRefreshing?: boolean;
+  onRowClick?: (row: TData) => void;
+  rowClassName?: (row: TData) => string | undefined;
 }
 
 export function DataTable<TData, TValue>({
@@ -121,6 +124,8 @@ export function DataTable<TData, TValue>({
   pageCount,
   rowCount,
   isRefreshing = false,
+  onRowClick,
+  rowClassName,
 }: DataTableProps<TData, TValue>) {
   const urlState = useDataTableParams({
     defaultPageSize: initialPagination.pageSize,
@@ -259,6 +264,15 @@ export function DataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  className={cn(
+                    onRowClick && "cursor-pointer",
+                    rowClassName?.(row.original)
+                  )}
+                  onClick={
+                    onRowClick
+                      ? () => onRowClick(row.original)
+                      : undefined
+                  }
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>

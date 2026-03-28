@@ -69,28 +69,8 @@ function statusBadgeClass(status: string) {
   }
 }
 
-function createCloneColumns(options: {
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}): ColumnDef<LaunchRow>[] {
+function createCloneColumns(): ColumnDef<LaunchRow>[] {
   return [
-    {
-      id: "select",
-      header: () => <span className="sr-only">Select</span>,
-      cell: ({ row }) => (
-        <div className="flex items-center justify-center">
-          <input
-            type="radio"
-            name="clone-select"
-            checked={row.original.id === options.selectedId}
-            onChange={() => options.onSelect(row.original.id)}
-            className="size-4 accent-primary cursor-pointer"
-          />
-        </div>
-      ),
-      enableSorting: false,
-      enableHiding: false,
-    },
     {
       id: "token",
       accessorFn: (row) => `${row.tokenName} ${row.tokenSymbol}`,
@@ -224,10 +204,7 @@ export function CloneTokenDialog({
     }
   }, [open]);
 
-  const columns = React.useMemo(
-    () => createCloneColumns({ selectedId, onSelect: setSelectedId }),
-    [selectedId]
-  );
+  const columns = React.useMemo(() => createCloneColumns(), []);
 
   const selectedLaunch = React.useMemo(
     () => launches?.find((l) => l.id === selectedId) ?? null,
@@ -256,6 +233,12 @@ export function CloneTokenDialog({
           isLoading={isLoading}
           getRowId={(row) => row.id}
           searchableColumns={["token", "publicKey"]}
+          onRowClick={(row) => setSelectedId(row.id)}
+          rowClassName={(row) =>
+            row.id === selectedId
+              ? "bg-primary/5 border-primary/20 hover:bg-primary/5 cursor-default"
+              : undefined
+          }
           toolbar={(table) => (
             <DataTableSearch
               table={table}

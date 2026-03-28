@@ -1,11 +1,16 @@
 "use client";
 
 import * as React from "react";
-import { Copy } from "lucide-react";
+import { Copy, Loader2 } from "lucide-react";
 import { LaunchForm } from "./launch-form";
 import { CloneTokenDialog } from "./clone-token-dialog";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { trpc } from "@/lib/trpc/client";
 import {
   getLaunchPresetName,
@@ -26,9 +31,12 @@ export default function LaunchPage() {
     unknown
   > | null>(null);
   const [formKey, setFormKey] = React.useState(0);
-  const { data: launches } = trpc.launch.getUserLaunches.useQuery();
+  const { data: launches, isLoading: isLoadingLaunches } =
+    trpc.launch.getUserLaunches.useQuery();
 
-  const hasTokens = launches?.some((launch) => Boolean(launch.tokenPublicKey)) ?? false;
+  const hasTokens =
+    launches?.some((launch) => Boolean(launch.tokenPublicKey)) ?? false;
+  const isPassive = !isLoadingLaunches && !hasTokens;
 
   const handleClone = (input: Record<string, unknown>) => {
     setCloneValues(input);
@@ -45,17 +53,34 @@ export default function LaunchPage() {
         title="New Token Launch"
         className="flex-row items-center gap-3"
         actions={
-          hasTokens ? (
-            <Button
-              size="lg"
-              variant="outline"
-              className="shrink-0"
-              onClick={() => setCloneDialogOpen(true)}
-            >
-              <Copy className="size-4 mr-2 text-primary" />
-              Clone Token
-            </Button>
-          ) : null
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="inline-flex">
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className={`relative shrink-0 ${isPassive ? "opacity-40 pointer-events-none" : ""}`}
+                  disabled={isPassive}
+                  onClick={() => setCloneDialogOpen(true)}
+                >
+                  {isLoadingLaunches && (
+                    <Loader2 className="absolute size-4 animate-spin" />
+                  )}
+                  <Copy
+                    className={`size-4 mr-2 ${isLoadingLaunches ? "opacity-0" : isPassive ? "" : "text-primary"}`}
+                  />
+                  <span className={isLoadingLaunches ? "opacity-0" : ""}>
+                    Clone Token
+                  </span>
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {isPassive && (
+              <TooltipContent>
+                No previous tokens to clone
+              </TooltipContent>
+            )}
+          </Tooltip>
         }
       />
 
