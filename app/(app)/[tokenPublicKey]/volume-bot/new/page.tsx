@@ -1556,12 +1556,28 @@ export default function VolumeBotStartPage() {
                 />
                 <InputGroupAddon align="inline-end">SOL</InputGroupAddon>
               </InputGroup>
-              {generatedWalletCount > 0 && (
-                <div className="text-xs text-muted-foreground tabular-nums">
-                  {generatedWalletCount} × {fundingPerGeneratedWallet} ={" "}
-                  <span className="text-foreground font-medium">
-                    {totalFunding.toFixed(2)} SOL
+              {suggestedFunding !== undefined && (
+                <div className="flex items-center gap-1.5 text-xs text-muted-foreground tabular-nums">
+                  <span>
+                    Recommended:{" "}
+                    <span className="text-foreground font-medium">
+                      {suggestedFunding.toFixed(2)} SOL
+                    </span>
                   </span>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <InfoIcon className="size-3 shrink-0 cursor-help text-muted-foreground/70" />
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs">
+                      <p>
+                        Calculated from the total expected trade volume per
+                        wallet over the session duration, adjusted with a buffer
+                        for net buy pressure and a 10% safety margin. Funding
+                        below this amount may cause wallets to run out of SOL
+                        before the session ends.
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
               )}
             </div>
