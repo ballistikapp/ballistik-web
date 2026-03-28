@@ -4,7 +4,7 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/utils";
 
 type PageHeaderProps = {
-  title: string;
+  title: ReactNode;
   rightContent?: ReactNode;
   actions?: ReactNode;
   className?: string;
@@ -23,7 +23,11 @@ export function PageHeader({
         className
       )}
     >
-      <h1 className="text-2xl leading-tight md:text-4xl">{title}</h1>
+      {typeof title === "string" ? (
+        <h1 className="text-2xl leading-tight md:text-4xl">{title}</h1>
+      ) : (
+        title
+      )}
       {rightContent ?? actions}
     </div>
   );

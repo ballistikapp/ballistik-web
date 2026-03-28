@@ -160,62 +160,75 @@ export default function AccountPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title={currentUser.name || "Account"}
-        rightContent={
-          <div className="flex w-full flex-col items-start gap-3 md:items-end md:gap-4">
-            {isEditingName ? (
-              <div className="flex w-full flex-wrap items-center gap-2 md:w-auto md:flex-nowrap">
-                <Input
-                  value={nameValue}
-                  onChange={(e) => setNameValue(e.target.value)}
-                  className="h-10 w-full max-w-xs text-xl font-medium md:text-2xl"
-                  maxLength={50}
-                  autoFocus
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") handleSaveName();
-                    if (e.key === "Escape") handleCancelEditName();
-                  }}
-                  disabled={updateNameMutation.isPending}
-                />
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={handleSaveName}
-                  disabled={updateNameMutation.isPending}
-                >
-                  {updateNameMutation.isPending ? (
-                    <Spinner className="size-4" />
-                  ) : (
-                    <IconCheck className="size-4" />
-                  )}
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8"
-                  onClick={handleCancelEditName}
-                  disabled={updateNameMutation.isPending}
-                >
-                  <IconX className="size-4" />
-                </Button>
-              </div>
-            ) : (
+        title={
+          isEditingName ? (
+            <div className="flex items-center gap-2">
+              <Input
+                value={nameValue}
+                onChange={(e) => setNameValue(e.target.value)}
+                className="h-10 w-full max-w-xs text-xl font-medium md:text-2xl"
+                maxLength={50}
+                autoFocus
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") handleSaveName();
+                  if (e.key === "Escape") handleCancelEditName();
+                }}
+                disabled={updateNameMutation.isPending}
+              />
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-8 w-8 self-start text-muted-foreground hover:text-foreground md:self-end"
-                onClick={handleStartEditName}
+                className="h-8 w-8"
+                onClick={handleSaveName}
+                disabled={updateNameMutation.isPending}
               >
-                <IconPencil className="size-4" />
+                {updateNameMutation.isPending ? (
+                  <Spinner className="size-4" />
+                ) : (
+                  <IconCheck className="size-4" />
+                )}
               </Button>
-            )}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={handleCancelEditName}
+                disabled={updateNameMutation.isPending}
+              >
+                <IconX className="size-4" />
+              </Button>
+            </div>
+          ) : (
+            <div className="flex items-center gap-4">
+              <h1 className="truncate text-2xl leading-tight md:text-4xl">
+                {currentUser.name || "Account"}
+              </h1>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="icon"
+                    className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                    onClick={handleStartEditName}
+                  >
+                    <IconPencil className="size-4" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Edit Name</TooltipContent>
+              </Tooltip>
+            </div>
+          )
+        }
+        rightContent={
+          <div className="flex w-full flex-col items-start gap-3 md:items-end md:gap-4">
             <div className="text-left md:text-right">
               <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
                 WALLET BALANCE
               </p>
               <p className="font-mono leading-none">
-                <span className="text-2xl md:text-4xl">{balanceSol.toFixed(4)}</span>{" "}
+                <span className="text-2xl md:text-4xl">
+                  {balanceSol.toFixed(4)}
+                </span>{" "}
                 <span className="text-base text-muted-foreground">SOL</span>
               </p>
             </div>
