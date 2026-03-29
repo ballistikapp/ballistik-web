@@ -119,7 +119,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
           disabled={isSidebarCollapsed}
           className="data-[state=open]:bg-sidebar-accent data-[state=open]:text-sidebar-accent-foreground py-6 disabled:opacity-100"
         >
-          <div className="flex aspect-square size-10 items-center justify-center rounded-xl overflow-hidden shrink-0 bg-sidebar-primary text-sidebar-primary-foreground">
+          <div className="flex aspect-square size-10 items-center justify-center rounded-xl overflow-hidden shrink-0">
             {selectedToken?.imageUrl ? (
               <Image
                 src={selectedToken.imageUrl}
@@ -163,7 +163,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                   }}
                   className="gap-2 py-3"
                 >
-                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden shrink-0 bg-sidebar-primary text-sidebar-primary-foreground">
+                  <div className="flex aspect-square size-8 items-center justify-center rounded-lg overflow-hidden shrink-0">
                     {token.imageUrl ? (
                       <Image
                         src={token.imageUrl}

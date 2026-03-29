@@ -106,6 +106,9 @@ export function WalletTransferDialog({
   const handleReturnOptionChange = (value: string) => {
     if (value === "amount" || value === "max") {
       setReturnOption(value);
+      if (value === "max" && hasBalance) {
+        setAmount(totalBalance.toFixed(4));
+      }
     }
   };
 

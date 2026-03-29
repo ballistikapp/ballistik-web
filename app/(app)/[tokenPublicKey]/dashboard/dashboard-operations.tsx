@@ -91,9 +91,7 @@ export function DashboardOperations({
   );
 
   const lastFinished = operations.botSessions.find(
-    (s) =>
-      s.status === "STOPPED" ||
-      s.status === "FAILED"
+    (s) => s.status === "STOPPED" || s.status === "FAILED"
   );
 
   if (activeSessions.length > 0) {
@@ -107,9 +105,7 @@ export function DashboardOperations({
             <div className="flex items-center gap-2">
               <span className="size-2 rounded-full bg-green-500 animate-pulse shrink-0" />
               <IconRobot className="size-4 text-muted-foreground" />
-              <span className="font-medium">
-                Volume bot running
-              </span>
+              <span className="font-medium">Volume bot running</span>
             </div>
             <span className="flex items-center gap-1 tabular-nums text-muted-foreground">
               <IconArrowsExchange className="size-3.5" />
@@ -139,7 +135,7 @@ export function DashboardOperations({
   }
 
   return (
-    <div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 text-sm sm:flex-row sm:items-start sm:justify-between">
+    <div className="flex flex-col gap-3 rounded-lg border bg-card px-4 py-3 text-sm sm:flex-row sm:items-center sm:justify-between">
       <div className="flex min-w-0 flex-1 flex-wrap items-center gap-x-3 gap-y-1.5">
         <span className="size-2 rounded-full bg-muted-foreground/40 shrink-0" />
         <IconRobot className="size-4 text-muted-foreground" />
@@ -150,7 +146,9 @@ export function DashboardOperations({
           <>
             <span className="text-muted-foreground">Last session:</span>
             <span className="text-muted-foreground tabular-nums">
-              {formatTimeAgo(lastFinished.stoppedAt ?? lastFinished.startedAt ?? new Date())}
+              {formatTimeAgo(
+                lastFinished.stoppedAt ?? lastFinished.startedAt ?? new Date()
+              )}
             </span>
             <span className="tabular-nums text-muted-foreground">
               {lastFinished.totalTrades} trades
@@ -165,7 +163,10 @@ export function DashboardOperations({
               {lastFinished.totalPnlSol >= 0 ? "+" : ""}
               {formatSol(lastFinished.totalPnlSol)} SOL
             </span>
-            <SessionLink tokenPublicKey={tokenPublicKey} sessionId={lastFinished.id} />
+            <SessionLink
+              tokenPublicKey={tokenPublicKey}
+              sessionId={lastFinished.id}
+            />
             {lastFinished.status === "FAILED" && (
               <span className="text-red-500">failed</span>
             )}

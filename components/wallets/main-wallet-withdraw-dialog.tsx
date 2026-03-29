@@ -155,7 +155,7 @@ export function MainWalletWithdrawDialog({
                     size="sm"
                     onClick={() => {
                       setUseMax(true);
-                      setAmountInput("");
+                      setAmountInput(balanceSol.toFixed(6));
                     }}
                   >
                     Max
