@@ -68,7 +68,7 @@
 ### Token Launch Extension Points
 
 - Add fee collection and Jito tip handling if needed.
-- Document volume bot workflows in `docs/volume-bot-implementation.md`.
+- Document volume bot workflows in `docs/implementation/volume-bot-implementation.md`.
 
 ### Bundle ALT Expansion
 

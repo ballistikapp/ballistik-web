@@ -1,38 +1,47 @@
 ---
-description: "Project context, tech stack, and architecture principles"
+description: "Product context, business goals, and tech stack"
 alwaysApply: true
 ---
 
 # Project Context
 
-**sollabs-web** is a modern Solana token launch and management platform built with a clean, type-safe architecture.
+## What This Is
 
-## Architecture Principles
+**sollabs-web** is a Solana token launch and operations platform. It lets users create pump.fun tokens, manage bundled launches with multiple buyer wallets, run volume bots, track holdings and transactions, and manage exits — all from a single dashboard.
 
-When implementing features:
+## Target Users
 
-1. **Documentation First**: Read and update `docs/implementation/` before coding
-2. **Type Safety**: End-to-end type safety via tRPC and Zod
-3. **Layered Design**: Clear separation between schemas, services, routers, and UI
-4. **Error Handling**: Explicit error handling with custom AppError system
-5. **Code Quality**: Maintainable, testable, and well-structured code
+Power users who launch and manage Solana tokens. They need speed, control, and reliability over hand-holding. The UI should be information-dense and efficient, not dumbed down.
+
+## Business Model
+
+- **Free tier**: Basic token launch and management
+- **Pro tier** ($4.95 SOL/week): Extended cooldowns, relaxed rate limits, gRPC access for real-time monitoring, and premium features
+- **Usage fees**: Collected on launch and volume bot wallet operations via a fee collector wallet
+
+## Core Features
+
+- **Auth**: Private-key login, JWT sessions with refresh token rotation
+- **Token Launch**: Multi-step pipeline with dev wallet, bundler wallets, Jito bundles, vanity mints, recovery flow
+- **Wallets**: Operational wallets per token (dev, bundler, volume, distribution), main wallet, SOL transfers
+- **Holdings & Exits**: Token holdings tracking, sell flow, batch exit jobs with Jito bundles
+- **Transactions**: On-chain transaction tracking with refresh from RPC/Shyft
+- **Volume Bot**: Automated trading sessions with configurable timing, presets, wallet management, reclaim flows
+- **Dashboard**: Stats, DeFi pools, price chart, optional real-time monitoring via gRPC
+- **Billing**: Pro subscription purchase via SOL transaction, entitlement via JWT claims
+- **Realtime**: tRPC subscriptions for balance/transaction/volume-bot updates, Shyft webhooks for ingestion
 
 ## Tech Stack
 
-- **Framework**: Next.js 16.1.1 (App Router)
-- **Language**: TypeScript (strict mode)
+- **Framework**: Next.js (App Router), TypeScript (strict)
 - **Database**: PostgreSQL with Prisma ORM
-- **API**: tRPC for type-safe APIs
-- **Validation**: Zod schemas
-- **UI**: React 19, Tailwind CSS, shadcn/ui components
-- **State**: TanStack Query (React Query)
-- **Blockchain**: Solana (@solana/web3.js)
+- **API**: tRPC with superjson, Zod validation
+- **UI**: React, Tailwind CSS, shadcn/ui, TanStack Query, TanStack Table, TanStack Form
+- **Blockchain**: @solana/web3.js, @coral-xyz/anchor, pumpdotfun-sdk, jito-ts, @triton-one/yellowstone-grpc
+- **External**: Shyft (gRPC, REST, DeFi, webhooks), Pinata (IPFS media), DexScreener (chart data)
 
-## Core Architecture
+## Deployment
 
-- **API**: tRPC for end-to-end type safety
-- **Database**: Prisma ORM with PostgreSQL
-- **Validation**: Centralized Zod schemas shared across layers
-- **Error Handling**: Custom AppError system for user-facing errors
-- **Layering**: Services contain business logic, routers handle API endpoints
-- **Type Safety**: Infer types from Zod schemas, avoid manual type definitions
+- Railway with two environments: `staging` branch → staging, `main` branch → production
+- Each environment has its own PostgreSQL instance
+- Local dev uses staging database

@@ -30,6 +30,11 @@ This directory contains detailed implementation documentation for all features i
 - [Volume Bot Implementation](./volume-bot-implementation.md) — volume bot sessions and wallet management
 - [Dashboard Monitoring](./dashboard-monitoring.md) — dashboard monitoring mode, subscriptions, and polling behavior
 
+### Billing
+
+- [Subscription Implementation](./subscription-implementation.md) — Pro subscription purchase and entitlement
+- [Pricing Implementation](./pricing-implementation.md) — usage-fee schedule, scope rules, and enforcement model
+
 ## Infrastructure
 
 ### External Services
@@ -39,9 +44,9 @@ This directory contains detailed implementation documentation for all features i
 ### System Configuration
 
 - [Config Implementation](./config-implementation.md) — configuration and env parsing
-- [Pricing Implementation](./pricing-implementation.md) — usage-fee schedule, scope rules, and enforcement model
 - [Logging Implementation](./logging-implementation.md) — structured logging setup
 - [API Abuse Protection](./api-abuse-protection.md) — request identity, rate-limit tiers, and endpoint hardening
+- [Test Run Logging](./test-run-logging.md) — JSONL test-run event capture and manual template
 
 ## Related Documentation
 

@@ -1,0 +1,85 @@
+---
+description: "Code standards, architecture, type safety, and error handling"
+alwaysApply: true
+---
+
+# Core Standards
+
+## Architecture: Layered tRPC Stack
+
+All backend features follow this layering:
+
+1. **Schemas** (`server/schemas/`) — Zod validation, shared across layers. Infer types from schemas (`z.infer<>`) instead of manual type definitions.
+2. **Services** (`server/services/`) — Business logic. No HTTP/request concerns. Use Prisma for DB. Return typed outputs.
+3. **Routers** (`server/trpc/routers/`) — Thin API layer. Validate input with schemas, call services, handle errors. Register in `_app.ts`.
+4. **Components** — UI only. Fetch data via tRPC hooks (`trpc.[router].[procedure].useQuery()` / `.useMutation()`).
+
+## Directory Layout
+
+```
+app/              → Next.js App Router pages
+  (app)/          → Protected app routes (authenticated)
+  api/trpc/       → tRPC HTTP handler
+server/
+  schemas/        → Zod schemas (shared validation)
+  services/       → Business logic layer
+  trpc/           → tRPC setup and routers
+  solana/         → Blockchain-specific code (Jito, gRPC, pump.fun)
+  errors/         → AppError
+  security/       → Rate limiting, abuse protection
+  events/         → Cross-layer event emitters
+components/
+  ui/             → shadcn/ui primitives
+  layout/         → App shell, sidebar, header
+  [feature]/      → Feature-specific components
+lib/
+  generated/prisma/ → Prisma client (generated)
+  config/         → Environment, cache, RPC, launch, volume-bot configs
+  trpc/           → Client-side tRPC setup + React Query provider
+  auth/           → JWT and refresh token helpers
+  solana/         → Connection, RPC limiter
+  utils/          → Formatting, async helpers
+contexts/         → React context providers
+hooks/            → Custom React hooks
+prisma/           → Schema and migrations
+docs/             → Implementation docs, backlog, deployment
+```
+
+## tRPC Procedures
+
+Available procedure types (defined in `server/trpc/trpc.ts`):
+
+- `publicProcedure` — No auth, no rate limit
+- `publicRateLimitedProcedure` — No auth, rate limited (120/min)
+- `authRateLimitedProcedure` — No auth required, stricter rate limit (12/min, for auth flows)
+- `protectedProcedure` — Requires auth, rate limited (180/min)
+- `protectedRateLimitedProcedure` — Same as protected (alias)
+- `expensiveProtectedProcedure` — Requires auth, tight limit (24/min, for costly operations)
+- `sensitiveProcedure` — Requires auth, tightest limit (8/min, for private key access etc.)
+
+Choose the appropriate procedure type based on the endpoint's auth needs and cost.
+
+## Error Handling
+
+- Use `AppError` from `server/errors/` for user-facing errors. It maps to tRPC error codes automatically via middleware.
+- Internal/unexpected errors are caught by the error formatter and return a generic message to the client.
+- Never expose internal error details, stack traces, or sensitive data to the client.
+
+## Code Style
+
+- **File naming**: kebab-case for files, PascalCase for React components
+- **Imports**: Absolute imports with `@/` prefix. Group external libraries first, then internal.
+- **Exports**: Named exports over default exports
+- **Types**: Prefer `unknown` over `any`. Infer from Zod schemas. Don't suppress TypeScript errors.
+- **Async**: Use async/await, not promise chains
+- **Formatting**: 2 spaces, ESLint/Prettier
+
+## Quality Defaults
+
+- Validate all inputs with Zod schemas
+- Use `superjson` transformer (already configured) for Date/Map/Set serialization
+- Use React Server Components where possible
+- Implement loading states and error boundaries
+- Use TanStack Query caching effectively
+- Never log sensitive data (private keys, JWTs, API keys)
+- Never commit `.env` files

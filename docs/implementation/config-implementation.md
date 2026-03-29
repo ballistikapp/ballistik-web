@@ -68,11 +68,11 @@
 
 `lib/config/cache.config.ts` defines:
 
-- `staleMs` — staleness thresholds for transactions (30s), holdings (30s), and wallets (60s)
-- `cooldownMs` — debounce intervals for balance refresh, with separate values for subscription-aware and polling modes
-- `ttlMs` — TTL for in-memory caches (bonding curve: 5s, Shyft API responses: 10s)
+- `staleMs` — staleness thresholds: transactions (300s), holdings (300s), wallets (300s)
+- `cooldownMs` — debounce intervals: wallet balances (5s, 30s with subscription), holding refresh (15s, 60s with subscription), transaction refresh (15s, 60s with subscription)
+- `ttlMs` — TTL for in-memory caches: bonding curve (5s), Shyft API responses (10s)
 
-When tRPC subscriptions are active, cooldowns are relaxed (e.g. 30s for wallet balances instead of 10s) because real-time updates supplement polling.
+When tRPC subscriptions are active, cooldowns are relaxed because real-time updates supplement polling.
 
 ## Extending
 

@@ -1,0 +1,51 @@
+---
+description: "Prisma schema, migration, and database conventions"
+globs:
+  - "prisma/**"
+  - "server/services/**"
+  - "server/schemas/**"
+---
+
+# Database Conventions
+
+## Prisma Setup
+
+- Schema: `prisma/schema.prisma`
+- Generated client: `@/lib/generated/prisma` (custom output path)
+- Connection: PostgreSQL via `DATABASE_URL`
+- Run `prisma generate` after any schema change
+- Run `prisma migrate dev` to create migrations — never create migration files manually
+
+## Schema Patterns
+
+- Use `@id @default(cuid())` for primary keys (except `Wallet` and `Token` which use `publicKey` as PK)
+- Use `@@map("ModelName")` to control table names
+- Use `@@index` for columns used in WHERE/ORDER BY — especially composite indexes for common query patterns
+- Use `@@unique` for business-level uniqueness constraints
+- Use `@updatedAt` for automatic update timestamps
+- Define explicit relation names when a model has multiple relations to the same target
+
+## Existing Models
+
+Core: `User`, `Wallet`, `Token`, `TokenDevWallet`
+Auth: `AuthSession`, `RefreshToken`
+Billing: `ProSubscriptionPayment`
+Launch: `Launch`, `LaunchLog`, `LaunchRecoveryWallet`
+Trading: `Holding`, `Transaction`, `TokenTransaction`
+Exit: `HoldingExit`, `HoldingExitLog`
+Volume Bot: `VolumeBotSession`, `VolumeBotWallet`, `VolumeBotLog`, `VolumeBotPreset`
+Infrastructure: `RefreshCache`, `ShyftCallback`, `VanityMint`
+
+## Query Patterns
+
+- Use Prisma relations for joins, avoid raw SQL unless there's a performance reason
+- Use `select` to limit returned fields when you don't need the full model
+- Paginate large result sets (use cursor-based or offset pagination as appropriate)
+- Use transactions (`prisma.$transaction`) for operations that must be atomic
+- Use `upsert` or `createMany` with `skipDuplicates` for bulk operations
+
+## Migrations
+
+**Do NOT run migrations or generate migration files.** Only modify `prisma/schema.prisma` — the user handles migrations manually.
+
+After schema changes, run `prisma generate` to update the client, but never run `prisma migrate dev`, `prisma migrate deploy`, `prisma db push`, or any other migration command.

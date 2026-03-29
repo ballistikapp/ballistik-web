@@ -1,0 +1,60 @@
+---
+description: "How the agent should interact, make decisions, and manage complexity"
+alwaysApply: true
+---
+
+# Agent Behavior
+
+## Decision-Making: Ask Before Deciding
+
+When a change touches more than 2-3 files or introduces a new pattern, **stop and present decision points** before implementing. For each decision point:
+
+- State the choice concisely
+- Give options with trade-offs (one sentence each)
+- Recommend one, but let the user decide
+
+Do NOT silently choose an architecture, abstraction level, or pattern. The user decides how complex the code should be and which cases it should cover.
+
+For complex features, follow this workflow:
+
+1. **Decision points first** — surface what the user needs to decide
+2. **Plan** — after decisions are made, present a concrete implementation plan
+3. **Implement** — only after the plan is approved
+
+Simple changes (single file, clear scope, follows existing patterns) can be implemented directly.
+
+## Complexity & Abstraction
+
+**Do not add abstraction for hypothetical future use cases.** Write code for what is needed now, following the current scope and roadmap.
+
+- Default to the simplest solution unless the user explicitly asks for more
+- Before proposing architecture, assess scope: is this a one-off, a pattern that repeats 2-3 times, or a core system?
+- Match abstraction level to actual usage: don't create a generic framework for something used once
+- If you see a case where more abstraction would genuinely help, present it as an option with trade-offs — don't just build it
+- Avoid premature generalization, excessive indirection, wrapper layers that add no value, and config-driven designs when hardcoding is fine
+
+The goal: clean, readable code that is easy to understand and modify. Not code that tries to handle every possible future scenario.
+
+## Scope Analysis
+
+Before implementing, always consider:
+
+- What does the existing codebase already do in this area?
+- What is the minimal change that achieves the goal?
+- Does this need a new pattern, or does an existing pattern apply?
+- What are the edge cases that actually matter vs. theoretical ones?
+
+When the user provides a task, analyze the actual scope before jumping to implementation. If the scope is ambiguous, ask.
+
+## Documentation Workflow
+
+Read `docs/implementation/` before making any non-trivial changes. Update implementation docs when changes affect:
+
+- Data models (Prisma schema)
+- API endpoints (tRPC procedures)
+- Business logic flows (service layer)
+- System architecture or external integrations
+
+Skip doc updates only for minor UI tweaks, trivial bug fixes, or behavior-preserving refactors. When in doubt, update the docs.
+
+Commit documentation changes together with code changes.

@@ -1,0 +1,57 @@
+---
+description: "Solana blockchain integration patterns"
+globs:
+  - "server/solana/**"
+  - "server/services/launch*"
+  - "server/services/holding*"
+  - "server/services/volume-bot*"
+  - "server/services/price*"
+  - "lib/solana/**"
+---
+
+# Solana Patterns
+
+## Code Location
+
+All blockchain-specific code lives in `server/solana/` and `lib/solana/`. Keep Solana logic out of React components — components call services via tRPC, services call Solana modules.
+
+## Key Modules
+
+- `lib/solana/connection.ts` — Shared Solana RPC connection
+- `lib/solana/rpc-limiter.ts` — Rate limiting for RPC calls
+- `server/solana/jito-bundle.ts` — Jito bundle submission and confirmation
+- `server/solana/jito-client.ts` — Jito block engine client
+- `server/solana/bundle-create-and-buy.ts` — Bundle creation for token launch
+- `server/solana/bundle-transaction-builder.ts` — Transaction construction for bundles
+- `server/solana/launch-dev-buy.ts` — Dev wallet buy transaction
+- `server/solana/pump-transaction-builders.ts` — Pump.fun buy/sell transaction builders
+- `server/solana/pump-quotes.ts` — Bonding curve price quotes
+- `server/solana/pump-idl.ts` / `pump-new-idl.ts` — Pump.fun program IDL
+- `server/solana/grpc-manager.ts` — Yellowstone gRPC connection management
+- `server/solana/grpc-utils.ts` — gRPC helper utilities
+- `server/solana/shyft-grpc.ts` — Shyft gRPC integration
+- `server/solana/token-transactions-grpc.ts` — Transaction monitoring via gRPC
+- `server/solana/volume-bot-grpc.ts` — Volume bot gRPC monitoring
+
+## Conventions
+
+- Handle RPC errors and implement retries — Solana RPC is unreliable
+- Use `rpc-limiter` to avoid hitting rate limits
+- Validate transaction signatures before processing results
+- Use Jito bundles for atomic multi-transaction operations (launch, exit)
+- Bundle tips are configured via `lib/config/jito.config.ts`
+- gRPC (Yellowstone) is used for real-time transaction monitoring; access is gated by user plan
+- Shyft provides complementary data: REST APIs, DeFi pool info, webhook-based ingestion
+
+## Transaction Building
+
+- Build transactions in `server/solana/`, not in services
+- Services orchestrate the flow: prepare data → call transaction builder → submit → handle result
+- Keep transaction construction pure (deterministic given inputs)
+- Test transaction builders independently (see `*.test.ts` files in `server/solana/`)
+
+## Error Handling
+
+- Solana transaction errors should be caught and mapped to `AppError` with user-friendly messages
+- Log RPC errors with context (endpoint, method, duration) but never log private keys
+- Handle common failure modes: insufficient funds, slippage exceeded, transaction expired, RPC timeout

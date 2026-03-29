@@ -1,0 +1,107 @@
+---
+description: "Patterns and templates for building new features"
+globs:
+  - "server/**"
+  - "app/**"
+  - "components/**"
+---
+
+# Feature Patterns
+
+## Creating a New Feature
+
+Follow the layered stack: Schema → Service → Router → UI.
+
+### 1. Schema (`server/schemas/[feature].schema.ts`)
+
+```typescript
+import { z } from "zod";
+
+export const createFeatureSchema = z.object({
+  name: z.string().min(1),
+});
+
+export type CreateFeatureInput = z.infer<typeof createFeatureSchema>;
+```
+
+Re-export from `server/schemas/index.ts`.
+
+### 2. Service (`server/services/[feature].service.ts`)
+
+```typescript
+import type { CreateFeatureInput } from "@/server/schemas";
+import { prisma } from "@/lib/generated/prisma";
+import { AppError } from "@/server/errors";
+
+export const featureService = {
+  async create(input: CreateFeatureInput) {
+    return await prisma.feature.create({ data: input });
+  },
+};
+```
+
+Re-export from `server/services/index.ts`.
+
+### 3. Router (`server/trpc/routers/[feature].router.ts`)
+
+```typescript
+import { router, protectedProcedure } from "../trpc";
+import { createFeatureSchema } from "@/server/schemas";
+import { featureService } from "@/server/services";
+
+export const featureRouter = router({
+  create: protectedProcedure
+    .input(createFeatureSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await featureService.create(input);
+    }),
+});
+```
+
+### 4. Register in `server/trpc/routers/_app.ts`
+
+Add the router to `baseRouters`.
+
+### 5. UI Component
+
+Use tRPC hooks to call the API:
+
+```typescript
+const createFeature = trpc.feature.create.useMutation();
+const { data } = trpc.feature.list.useQuery();
+```
+
+## Existing Routers
+
+`auth`, `token`, `wallet`, `launch`, `holding`, `transaction`, `refreshCache`, `volumeBot`, `subscription`, `dashboard`, `billing`, `testRunLog`. Plus `test` in non-production.
+
+## Procedure Selection Guide
+
+| Endpoint type | Procedure |
+|---|---|
+| Public read (no auth needed) | `publicProcedure` |
+| Auth flow (login, register) | `authRateLimitedProcedure` |
+| Standard authenticated action | `protectedProcedure` |
+| Expensive operation (launch, volume bot) | `expensiveProtectedProcedure` |
+| Private key access, key export | `sensitiveProcedure` |
+
+## Job Pattern (Launch, Exit, Volume Bot)
+
+Long-running operations follow a consistent pattern:
+
+- **Start**: Create a job record (status: PENDING → RUNNING), execute async
+- **Status**: Poll via tRPC query
+- **Logs**: Append log entries to a related log table (e.g. `LaunchLog`, `HoldingExitLog`, `VolumeBotLog`)
+- **Cancel**: Set cancel flag, check in loop
+- **Retry**: Create new job linked to the failed one
+
+## Implementation Checklist
+
+- [ ] Read relevant docs in `docs/implementation/`
+- [ ] Create/update Prisma schema if needed
+- [ ] Add Zod schemas in `server/schemas/`
+- [ ] Implement service in `server/services/`
+- [ ] Create router in `server/trpc/routers/`
+- [ ] Register router in `_app.ts`
+- [ ] Build UI components
+- [ ] Update implementation docs
