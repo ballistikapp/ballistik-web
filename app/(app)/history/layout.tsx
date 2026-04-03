@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Main Wallet",
+  title: "History",
 };
 
-export default function AccountLayout({
+export default function HistoryLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

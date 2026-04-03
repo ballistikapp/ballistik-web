@@ -2,8 +2,10 @@
 
 import * as React from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
+import { trpc } from "@/lib/trpc/client";
 import { copyToClipboard } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -64,6 +66,9 @@ export function LaunchProgressDialog({
   onRetry,
   retryPending = false,
 }: LaunchProgressDialogProps) {
+  const router = useRouter();
+  const utils = trpc.useUtils();
+
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
   const canCancel = status === "PENDING" || status === "RUNNING";
@@ -80,6 +85,18 @@ export function LaunchProgressDialog({
     status,
     result: launch?.result,
   });
+
+  const handleGoToToken = React.useCallback(() => {
+    if (!tokenPublicKey) return;
+    void (async () => {
+      await Promise.all([
+        utils.dashboard.getStats.invalidate({ tokenPublicKey }),
+        utils.dashboard.getDefiPools.invalidate({ tokenPublicKey }),
+        utils.token.getByPublicKey.invalidate({ publicKey: tokenPublicKey }),
+      ]);
+      router.push(`/${tokenPublicKey}/dashboard`);
+    })();
+  }, [router, tokenPublicKey, utils]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -123,10 +140,8 @@ export function LaunchProgressDialog({
               </div>
               <div className="flex justify-end">
                 {hasTokenLink ? (
-                  <Button asChild size="sm">
-                    <Link href={`/${tokenPublicKey}/dashboard`}>
-                      Go to token
-                    </Link>
+                  <Button size="sm" onClick={handleGoToToken}>
+                    Go to token
                   </Button>
                 ) : (
                   <Button size="sm" disabled>

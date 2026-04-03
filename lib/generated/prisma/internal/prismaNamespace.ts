@@ -406,7 +406,8 @@ export const ModelName = {
   Transaction: 'Transaction',
   TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
-  ShyftCallback: 'ShyftCallback'
+  ShyftCallback: 'ShyftCallback',
+  AppTransaction: 'AppTransaction'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -422,7 +423,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "proSubscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback"
+    modelProps: "testTable" | "user" | "proSubscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -2128,6 +2129,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    AppTransaction: {
+      payload: Prisma.$AppTransactionPayload<ExtArgs>
+      fields: Prisma.AppTransactionFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AppTransactionFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AppTransactionFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        findFirst: {
+          args: Prisma.AppTransactionFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AppTransactionFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        findMany: {
+          args: Prisma.AppTransactionFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>[]
+        }
+        create: {
+          args: Prisma.AppTransactionCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        createMany: {
+          args: Prisma.AppTransactionCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AppTransactionCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>[]
+        }
+        delete: {
+          args: Prisma.AppTransactionDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        update: {
+          args: Prisma.AppTransactionUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        deleteMany: {
+          args: Prisma.AppTransactionDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AppTransactionUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AppTransactionUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>[]
+        }
+        upsert: {
+          args: Prisma.AppTransactionUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AppTransactionPayload>
+        }
+        aggregate: {
+          args: Prisma.AppTransactionAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAppTransaction>
+        }
+        groupBy: {
+          args: Prisma.AppTransactionGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AppTransactionGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AppTransactionCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AppTransactionCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2537,6 +2612,33 @@ export const ShyftCallbackScalarFieldEnum = {
 export type ShyftCallbackScalarFieldEnum = (typeof ShyftCallbackScalarFieldEnum)[keyof typeof ShyftCallbackScalarFieldEnum]
 
 
+export const AppTransactionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  type: 'type',
+  source: 'source',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  bundleId: 'bundleId',
+  walletPublicKey: 'walletPublicKey',
+  fromAddress: 'fromAddress',
+  toAddress: 'toAddress',
+  solAmount: 'solAmount',
+  tokenAmount: 'tokenAmount',
+  pricePerToken: 'pricePerToken',
+  jitoTipLamports: 'jitoTipLamports',
+  referenceId: 'referenceId',
+  description: 'description',
+  errorMessage: 'errorMessage',
+  blockTime: 'blockTime',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AppTransactionScalarFieldEnum = (typeof AppTransactionScalarFieldEnum)[keyof typeof AppTransactionScalarFieldEnum]
+
+
 export const SortOrder = {
   asc: 'asc',
   desc: 'desc'
@@ -2893,6 +2995,34 @@ export type ListEnumRefreshScopeFieldRefInput<$PrismaModel> = FieldRefInputType<
 
 
 /**
+ * Reference to a field of type 'AppTransactionType'
+ */
+export type EnumAppTransactionTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AppTransactionType'>
+    
+
+
+/**
+ * Reference to a field of type 'AppTransactionType[]'
+ */
+export type ListEnumAppTransactionTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AppTransactionType[]'>
+    
+
+
+/**
+ * Reference to a field of type 'AppTransactionSource'
+ */
+export type EnumAppTransactionSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AppTransactionSource'>
+    
+
+
+/**
+ * Reference to a field of type 'AppTransactionSource[]'
+ */
+export type ListEnumAppTransactionSourceFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AppTransactionSource[]'>
+    
+
+
+/**
  * Reference to a field of type 'Float'
  */
 export type FloatFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Float'>
@@ -3023,6 +3153,7 @@ export type GlobalOmitConfig = {
   tokenTransaction?: Prisma.TokenTransactionOmit
   refreshCache?: Prisma.RefreshCacheOmit
   shyftCallback?: Prisma.ShyftCallbackOmit
+  appTransaction?: Prisma.AppTransactionOmit
 }
 
 /* Types for Logging */

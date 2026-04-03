@@ -28,6 +28,7 @@ import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { walletService } from "@/server/services/wallet.service";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { dashboardEvents } from "@/server/events/dashboard-events";
 import { persistVolumeBotLog } from "@/server/services/log-persistence.service";
@@ -381,6 +382,8 @@ export const processVolumeBotWalletRange = async (
   const maxRetries =
     config.behaviorConfig.maxRetries ?? globalConfig.defaultMaxRetries;
 
+  let tradeTrackId: string | null = null;
+
   try {
     await testRunLogService.appendServerEvent({
       eventType: "trade_attempt",
@@ -400,6 +403,20 @@ export const processVolumeBotWalletRange = async (
         slippageLimitBps: config.behaviorConfig.slippageBps,
       },
     });
+    tradeTrackId = await appTransactionService
+      .create({
+        userId: session.userId,
+        type: action === "BUY" ? "TRADE_BUY" : "TRADE_SELL",
+        source: "VOLUME_BOT",
+        tokenPublicKey: session.tokenPublicKey,
+        walletPublicKey: volumeWallet.walletPublicKey,
+        fromAddress: volumeWallet.walletPublicKey,
+        solAmount: action === "BUY" ? tradeAmountSol : null,
+        referenceId: session.id,
+      })
+      .then((r) => r.id)
+      .catch(() => null);
+
     if (action === "BUY") {
       const buyLamports = BigInt(Math.floor(tradeAmountSol * 1_000_000_000));
       let minTokensOut = new BN(1);
@@ -570,6 +587,7 @@ export const processVolumeBotWalletRange = async (
     }
 
     if (signature) {
+      if (tradeTrackId) await appTransactionService.confirm(tradeTrackId, { signature }).catch(() => {});
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "volume-bot-worker",
@@ -782,6 +800,7 @@ export const processVolumeBotWalletRange = async (
     return nextTickAt;
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
+    if (tradeTrackId) await appTransactionService.fail(tradeTrackId, { errorMessage: message }).catch(() => {});
     log.error(`[Worker] ${walletPk} range ${rangeIndex}: ERROR - ${message}`);
     if (error instanceof Error && error.stack) {
       log.error(`[Worker] ${walletPk} range ${rangeIndex}: Stack:`, error.stack);
@@ -1004,7 +1023,20 @@ export const closeVolumeBotAccounts = async (sessionId: string) => {
       tx.recentBlockhash = blockhash;
       tx.lastValidBlockHeight = lastValidBlockHeight;
       tx.feePayer = walletKeypair.publicKey;
+      const closeTrackId = await appTransactionService
+        .create({
+          userId: session.userId,
+          type: "ACCOUNT_ATA_CLOSE",
+          source: "VOLUME_BOT",
+          tokenPublicKey: session.tokenPublicKey,
+          walletPublicKey: volumeWallet.walletPublicKey,
+          fromAddress: volumeWallet.walletPublicKey,
+          referenceId: session.id,
+        })
+        .then((r) => r.id)
+        .catch(() => null);
       const signature = await sendAndConfirmTransaction(connection, tx, [walletKeypair]);
+      if (closeTrackId) await appTransactionService.confirm(closeTrackId, { signature }).catch(() => {});
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "volume-bot-worker",

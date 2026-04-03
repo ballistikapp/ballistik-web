@@ -627,10 +627,12 @@ export function DashboardClient() {
     prevExitStatusRef.current = exitStatus;
     if (!wasRunning || !isTerminal) return;
     refetchStats();
+    void refetchDefi();
     refreshMainBalance.mutateAsync({}).then(() => {
       void refetchStats();
+      void refetchDefi();
     });
-  }, [exitStatus, refetchStats, refreshMainBalance]);
+  }, [exitStatus, refetchDefi, refetchStats, refreshMainBalance]);
 
   const walletsWithBalance =
     statsData?.holdingsBreakdown.userWallets.filter(

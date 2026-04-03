@@ -14,9 +14,11 @@ import {
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
 } from "@/server/solana/pump-transaction-builders";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 
 type BundleLaunchInput = {
   launchId?: string;
+  userId?: string;
   creator: Keypair;
   mint: Keypair;
   metadata: PumpMetadataUpload;
@@ -141,6 +143,35 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     instructionCounts: txs.map((tx) => tx.instructions.length),
   });
 
+  const createTrackId = input.userId
+    ? await appTransactionService.create({
+        userId: input.userId,
+        type: "TRADE_CREATE",
+        source: "LAUNCH",
+        tokenPublicKey: input.mint.publicKey.toBase58(),
+        walletPublicKey: input.creator.publicKey.toBase58(),
+        fromAddress: input.creator.publicKey.toBase58(),
+        referenceId: input.launchId,
+      }).then((r) => r.id).catch(() => null)
+    : null;
+
+  const buyTrackIds: string[] = [];
+  if (input.userId) {
+    for (let i = 0; i < buyerWallets.length; i++) {
+      const id = await appTransactionService.create({
+        userId: input.userId,
+        type: "TRADE_BUY",
+        source: "LAUNCH",
+        tokenPublicKey: input.mint.publicKey.toBase58(),
+        walletPublicKey: buyerWallets[i].publicKey.toBase58(),
+        fromAddress: buyerWallets[i].publicKey.toBase58(),
+        solAmount: Number(buyAmountsLamport[i]) / 1_000_000_000,
+        referenceId: input.launchId,
+      }).then((r) => r.id).catch(() => null);
+      if (id) buyTrackIds.push(id);
+    }
+  }
+
   try {
     const result = await sendJitoBundle(
       txs,
@@ -153,6 +184,14 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
         adaptiveTipEscalation: input.adaptiveTipEscalation,
       }
     );
+    if (createTrackId && result.signatures[0]) {
+      await appTransactionService.confirm(createTrackId, { signature: result.signatures[0] }).catch(() => {});
+    }
+    const allBuyIds = buyTrackIds;
+    if (allBuyIds.length > 0 && result.signatures.length > 0) {
+      const bundleSig = result.signatures[result.signatures.length - 1] ?? result.signatures[0];
+      await appTransactionService.confirmMany(allBuyIds, { signature: bundleSig }).catch(() => {});
+    }
     logger.info("Bundle confirmed", {
       ...logContext,
       bundleId: result.bundleId,
@@ -161,6 +200,10 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     return result;
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const allTrackIds = [createTrackId, ...buyTrackIds].filter(Boolean) as string[];
+    if (allTrackIds.length > 0) {
+      await appTransactionService.failMany(allTrackIds, { errorMessage }).catch(() => {});
+    }
     logger.error("Bundle send failed", {
       ...logContext,
       errorMessage,

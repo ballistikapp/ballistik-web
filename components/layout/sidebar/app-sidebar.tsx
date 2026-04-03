@@ -4,7 +4,7 @@ import * as React from "react";
 import { IconCreditCard } from "@tabler/icons-react";
 import { trpc } from "@/lib/trpc/client";
 import {
-  buildAndManageRoutes,
+  accountRoutes,
   helpRoutes,
   NavMain,
   tokenWorkspaceRoutes,
@@ -12,7 +12,6 @@ import {
 import {
   Sidebar,
   SidebarContent,
-  SidebarFooter,
   SidebarHeader,
 } from "@/components/ui/sidebar";
 import type { UserTokenItems } from "@/server/services/token.service";
@@ -39,9 +38,9 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
     subscriptionOverviewQuery.data?.plan ?? currentUser?.plan ?? null;
   const subscriptionPlanBadge =
     resolvedPlan === "PRO" ? "Pro" : resolvedPlan === "FREE" ? "Free" : undefined;
-  const buildAndManageItems = React.useMemo(
+  const accountItems = React.useMemo(
     () => [
-      ...buildAndManageRoutes,
+      ...accountRoutes,
       {
         title: "Subscription",
         url: "/account/subscription",
@@ -65,18 +64,13 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
           currentToken={effectiveTokenPublicKey}
         />
         <NavMain
-          title="Build & Manage"
-          items={buildAndManageItems}
+          title="Account"
+          items={accountItems}
           currentToken={effectiveTokenPublicKey}
-          className="mt-6"
+          className="mt-auto pt-6"
         />
-        <NavMain title="Contact & Help" items={helpRoutes} className="mt-6" />
+        <NavMain title="Contact & Help" items={helpRoutes} className="pt-2" />
       </SidebarContent>
-      <SidebarFooter className="pt-0">
-        <p className="text-center text-2xl font-bold tracking-wide text-sidebar-foreground/80 md:text-3xl lg:text-4xl group-data-[collapsible=icon]:hidden">
-          BALLISTIK
-        </p>
-      </SidebarFooter>
     </Sidebar>
   );
 });

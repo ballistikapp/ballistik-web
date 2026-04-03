@@ -162,3 +162,34 @@ export const RefreshScope = {
 } as const
 
 export type RefreshScope = (typeof RefreshScope)[keyof typeof RefreshScope]
+
+
+export const AppTransactionType = {
+  TRADE_BUY: 'TRADE_BUY',
+  TRADE_SELL: 'TRADE_SELL',
+  TRADE_CREATE: 'TRADE_CREATE',
+  TRANSFER_FUND: 'TRANSFER_FUND',
+  TRANSFER_RETURN: 'TRANSFER_RETURN',
+  TRANSFER_RECLAIM: 'TRANSFER_RECLAIM',
+  TRANSFER_WITHDRAW: 'TRANSFER_WITHDRAW',
+  FEE_USAGE: 'FEE_USAGE',
+  FEE_PRO: 'FEE_PRO',
+  TOKEN_DISTRIBUTE: 'TOKEN_DISTRIBUTE',
+  TOKEN_CONSOLIDATE: 'TOKEN_CONSOLIDATE',
+  ACCOUNT_ATA_CREATE: 'ACCOUNT_ATA_CREATE',
+  ACCOUNT_ATA_CLOSE: 'ACCOUNT_ATA_CLOSE'
+} as const
+
+export type AppTransactionType = (typeof AppTransactionType)[keyof typeof AppTransactionType]
+
+
+export const AppTransactionSource = {
+  LAUNCH: 'LAUNCH',
+  EXIT: 'EXIT',
+  VOLUME_BOT: 'VOLUME_BOT',
+  HOLDING: 'HOLDING',
+  WALLET: 'WALLET',
+  BILLING: 'BILLING'
+} as const
+
+export type AppTransactionSource = (typeof AppTransactionSource)[keyof typeof AppTransactionSource]

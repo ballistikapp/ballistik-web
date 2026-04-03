@@ -27,6 +27,8 @@ import type {
   WithdrawMainSolResult,
 } from "@/server/schemas/wallet.schema";
 import { withActionLock } from "@/server/security/api-abuse";
+import { appTransactionService } from "@/server/services/app-transaction.service";
+import type { AppTransactionSource } from "@/lib/generated/prisma/client";
 
 const log = logger.child({ service: "wallet" });
 
@@ -207,7 +209,8 @@ export const walletService = {
     userId: string,
     destinationPublicKey: string,
     amountSol?: number,
-    useMax?: boolean
+    useMax?: boolean,
+    source?: AppTransactionSource
   ): Promise<WithdrawMainSolResult> {
     const actionKey = `wallet:withdraw-main-sol:${userId}`;
     return await withActionLock(actionKey, async () => {
@@ -299,15 +302,34 @@ export const walletService = {
         };
       };
 
+      const trackId = await appTransactionService
+        .create({
+          userId,
+          type: "TRANSFER_WITHDRAW",
+          source: source ?? "WALLET",
+          walletPublicKey: sender.publicKey.toBase58(),
+          fromAddress: sender.publicKey.toBase58(),
+          toAddress: destinationPublicKey,
+          solAmount: amountSol,
+        })
+        .then((r) => r.id)
+        .catch(() => null);
+
       let submitted: { signature: string; amountSol: number };
       try {
-        submitted = await submitTransfer();
-      } catch (error) {
-        if (error instanceof TransactionExpiredBlockheightExceededError) {
+        try {
           submitted = await submitTransfer();
-        } else {
-          throw error;
+        } catch (error) {
+          if (error instanceof TransactionExpiredBlockheightExceededError) {
+            submitted = await submitTransfer();
+          } else {
+            throw error;
+          }
         }
+        if (trackId) await appTransactionService.confirm(trackId, { signature: submitted.signature }).catch(() => {});
+      } catch (error) {
+        if (trackId) await appTransactionService.fail(trackId, { errorMessage: error instanceof Error ? error.message : "Unknown error" }).catch(() => {});
+        throw error;
       }
 
       try {
@@ -773,7 +795,8 @@ export const walletService = {
     tokenPublicKey: string,
     userId: string,
     walletPublicKeys: string[],
-    amountSol: number
+    amountSol: number,
+    source?: AppTransactionSource
   ): Promise<WalletTransferResult> {
     const actionKey = `wallet:send-sol:${userId}:${tokenPublicKey}`;
     return await withActionLock(actionKey, async () => {
@@ -838,6 +861,19 @@ export const walletService = {
       targets,
       transferConcurrency,
       async (publicKey) => {
+        const trackId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_FUND",
+            source: source ?? "WALLET",
+            tokenPublicKey,
+            walletPublicKey: sender.publicKey.toBase58(),
+            fromAddress: sender.publicKey.toBase58(),
+            toAddress: publicKey,
+            solAmount: amountSol,
+          })
+          .then((r) => r.id)
+          .catch(() => null);
         try {
           const destination = new PublicKey(publicKey);
           const sendTransfer = async () => {
@@ -867,6 +903,7 @@ export const walletService = {
 
           try {
             const signature = await sendTransfer();
+            if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
             return {
               publicKey,
               status: "SUBMITTED" as const,
@@ -876,6 +913,7 @@ export const walletService = {
             if (error instanceof TransactionExpiredBlockheightExceededError) {
               try {
                 const signature = await sendTransfer();
+                if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
                 return {
                   publicKey,
                   status: "SUBMITTED" as const,
@@ -887,6 +925,7 @@ export const walletService = {
                     ? retryError.message
                     : String(retryError);
                 log.error("Retry transfer failed", { errorMessage: message });
+                if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
                 return {
                   publicKey,
                   status: "FAILED" as const,
@@ -898,6 +937,7 @@ export const walletService = {
             const message =
               error instanceof Error ? error.message : String(error);
             log.error("Transfer failed", { errorMessage: message });
+            if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
             return {
               publicKey,
               status: "FAILED" as const,
@@ -980,7 +1020,8 @@ export const walletService = {
     userId: string,
     walletPublicKeys: string[],
     amountSol?: number,
-    useMax?: boolean
+    useMax?: boolean,
+    source?: AppTransactionSource
   ): Promise<WalletTransferResult> {
     const actionKey = `wallet:return-sol:${userId}:${tokenPublicKey}`;
     return await withActionLock(actionKey, async () => {
@@ -1114,6 +1155,19 @@ export const walletService = {
       transferConcurrency,
       async (wallet) => {
         const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+        const trackId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_RETURN",
+            source: source ?? "WALLET",
+            tokenPublicKey,
+            walletPublicKey: wallet.publicKey,
+            fromAddress: wallet.publicKey,
+            toAddress: mainWallet.publicKey,
+            solAmount: amountSol,
+          })
+          .then((r) => r.id)
+          .catch(() => null);
 
         const computeLamports = async (blockhash: string) => {
           if (useMax) {
@@ -1197,12 +1251,14 @@ export const walletService = {
         try {
           const signature = await sendTransfer();
           if (!signature) {
+            if (trackId) await appTransactionService.fail(trackId, { errorMessage: "Zero balance" }).catch(() => {});
             return {
               publicKey: wallet.publicKey,
               status: "SKIPPED" as const,
               signature: null,
             };
           }
+          if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
           return {
             publicKey: wallet.publicKey,
             status: "SUBMITTED" as const,
@@ -1213,12 +1269,14 @@ export const walletService = {
             try {
               const signature = await sendTransfer();
               if (!signature) {
+                if (trackId) await appTransactionService.fail(trackId, { errorMessage: "Zero balance" }).catch(() => {});
                 return {
                   publicKey: wallet.publicKey,
                   status: "SKIPPED" as const,
                   signature: null,
                 };
               }
+              if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
               return {
                 publicKey: wallet.publicKey,
                 status: "SUBMITTED" as const,
@@ -1230,6 +1288,7 @@ export const walletService = {
                   ? retryError.message
                   : String(retryError);
               log.error("Retry transfer failed", { errorMessage: message });
+              if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
               return {
                 publicKey: wallet.publicKey,
                 status: "FAILED" as const,
@@ -1241,6 +1300,7 @@ export const walletService = {
           const message =
             error instanceof Error ? error.message : String(error);
           log.error("Transfer failed", { errorMessage: message });
+          if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
           return {
             publicKey: wallet.publicKey,
             status: "FAILED" as const,

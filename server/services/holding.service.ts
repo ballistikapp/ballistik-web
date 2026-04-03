@@ -27,6 +27,7 @@ import {
 import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import type {
@@ -305,7 +306,9 @@ async function getCachedTokenSupply(
 async function returnSolToMainWallet(
   connection: Connection,
   wallets: WalletWithKey[],
-  mainWalletKeypair: Keypair
+  mainWalletKeypair: Keypair,
+  userId?: string,
+  tokenPublicKey?: string
 ) {
   const rentExemptMinimumLamports =
     await connection.getMinimumBalanceForRentExemption(0, "confirmed");
@@ -421,6 +424,21 @@ async function returnSolToMainWallet(
         reclaimMode === "main-sponsored"
           ? mainWalletKeypair.publicKey
           : owner.publicKey;
+      const returnTrackId = userId
+        ? await appTransactionService
+            .create({
+              userId,
+              type: "TRANSFER_RETURN",
+              source: "HOLDING",
+              tokenPublicKey,
+              walletPublicKey: wallet.publicKey,
+              fromAddress: wallet.publicKey,
+              toAddress: mainWalletKeypair.publicKey.toBase58(),
+              solAmount: lamports / 1_000_000_000,
+            })
+            .then((r) => r.id)
+            .catch(() => null)
+        : null;
       const signature = await sendAndConfirmTransaction(
         connection,
         transferTx,
@@ -431,6 +449,7 @@ async function returnSolToMainWallet(
           commitment: "confirmed",
         }
       );
+      if (returnTrackId) await appTransactionService.confirm(returnTrackId, { signature }).catch(() => {});
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "holding.service",
@@ -908,6 +927,7 @@ export const holdingService = {
       wallets,
       rpcConfig.tuning.sellConcurrency,
       async (wallet) => {
+        let sellTrackId: string | null = null;
         try {
           const balance = await getTokenBalanceForWallet(
             connection,
@@ -979,6 +999,19 @@ export const holdingService = {
           sellTx.recentBlockhash = blockhash;
           sellTx.lastValidBlockHeight = lastValidBlockHeight;
           sellTx.feePayer = feePayer.publicKey;
+          sellTrackId = await appTransactionService
+            .create({
+              userId,
+              type: "TRADE_SELL",
+              source: "HOLDING",
+              tokenPublicKey: token.publicKey,
+              walletPublicKey: wallet.publicKey,
+              fromAddress: wallet.publicKey,
+              solAmount: null,
+              tokenAmount: Number(sellAmount),
+            })
+            .then((r) => r.id)
+            .catch(() => null);
           const signature = await retryRpcWithTimeout(
             () =>
               sendAndConfirmTransaction(connection, sellTx, signers, {
@@ -986,6 +1019,7 @@ export const holdingService = {
               }),
             rpcConfig.tuning.confirmTimeoutMs
           );
+          if (sellTrackId) await appTransactionService.confirm(sellTrackId, { signature }).catch(() => {});
           await testRunLogService.appendServerEvent({
             eventType: "wallet_transaction",
             source: "holding.service",
@@ -1018,6 +1052,7 @@ export const holdingService = {
           console.error(
             `[Sell] ${wallet.publicKey} FAILED for ${input.tokenPublicKey}: ${message}`
           );
+          if (sellTrackId) await appTransactionService.fail(sellTrackId, { errorMessage: message }).catch(() => {});
           return {
             walletPublicKey: wallet.publicKey,
             status: "FAILED",
@@ -1083,9 +1118,21 @@ export const holdingService = {
               feePayer.publicKey.toBase58() === owner.publicKey.toBase58()
                 ? [feePayer]
                 : [feePayer, owner];
+            const closeTrackId = await appTransactionService
+              .create({
+                userId,
+                type: "ACCOUNT_ATA_CLOSE",
+                source: "HOLDING",
+                tokenPublicKey: token.publicKey,
+                walletPublicKey: wallet.publicKey,
+                fromAddress: wallet.publicKey,
+              })
+              .then((r) => r.id)
+              .catch(() => null);
             const signature = await sendAndConfirmTransaction(connection, closeTx, signers, {
               commitment: "confirmed",
             });
+            if (closeTrackId) await appTransactionService.confirm(closeTrackId, { signature }).catch(() => {});
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "holding.service",
@@ -1119,7 +1166,7 @@ export const holdingService = {
 
     const solRecovery =
       shouldReturnSolToMainWallet && mainWalletKeypair
-        ? await returnSolToMainWallet(connection, wallets, mainWalletKeypair)
+        ? await returnSolToMainWallet(connection, wallets, mainWalletKeypair, userId, input.tokenPublicKey)
         : null;
 
     const refreshWalletPublicKeys = Array.from(

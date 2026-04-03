@@ -141,6 +141,8 @@ The stats cache (`Map<string, CachedStats>`, 10s TTL, keyed by `tokenPublicKey:u
 - A token balance update is written to DB (best-effort `onTokenBalanceUpdate`)
 - Automatic holdings refresh completes (`holding.refreshByToken` / `holding.monitoringRefreshByToken`)
 - Transactions are auto-ingested (from `ingestionQueue.flush`)
+- Launch completes successfully (`launch.service` `finalizeLaunch` when status is `SUCCEEDED`)
+- A holding exit reaches a terminal state (`holding-exit.service`: success, failure, cancel, or early “no balances” exit)
 
 This ensures the next `getStats` call bypasses the cache and reads fresh DB data.
 

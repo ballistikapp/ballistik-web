@@ -38,6 +38,7 @@ model User {
   volumeBotPresets VolumeBotPreset[] @relation("VolumeBotPresetUser")
   vanityMints VanityMint[] @relation("VanityMintUser")
   refreshCaches RefreshCache[]
+  appTransactions AppTransaction[] @relation("AppTransactionUser")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
@@ -156,6 +157,7 @@ model Token {
   holdingExits HoldingExit[] @relation("HoldingExitToken")
   volumeBotSessions VolumeBotSession[] @relation("VolumeBotSessionToken")
   vanityMints VanityMint[]
+  appTransactions AppTransaction[] @relation("AppTransactionToken")
   @@index([userId, createdAt])
   @@map("Token")
 }
@@ -547,4 +549,64 @@ model ShyftCallback {
   projectId String?
   createdAt DateTime @default(now())
   @@map("ShyftCallback")
+}
+
+enum AppTransactionType {
+  TRADE_BUY
+  TRADE_SELL
+  TRADE_CREATE
+  TRANSFER_FUND
+  TRANSFER_RETURN
+  TRANSFER_RECLAIM
+  TRANSFER_WITHDRAW
+  FEE_USAGE
+  FEE_PRO
+  TOKEN_DISTRIBUTE
+  TOKEN_CONSOLIDATE
+  ACCOUNT_ATA_CREATE
+  ACCOUNT_ATA_CLOSE
+}
+
+enum AppTransactionSource {
+  LAUNCH
+  EXIT
+  VOLUME_BOT
+  HOLDING
+  WALLET
+  BILLING
+}
+
+model AppTransaction {
+  id                   String                @id @default(cuid())
+  userId               String
+  user                 User                  @relation("AppTransactionUser", fields: [userId], references: [id])
+  tokenPublicKey       String?
+  token                Token?                @relation("AppTransactionToken", fields: [tokenPublicKey], references: [publicKey])
+  type                 AppTransactionType
+  source               AppTransactionSource
+  status               TransactionStatus
+  transactionSignature String?
+  bundleId             String?
+  walletPublicKey      String?
+  fromAddress          String?
+  toAddress            String?
+  solAmount            Decimal?
+  tokenAmount          Decimal?
+  pricePerToken        Decimal?
+  jitoTipLamports      Int?
+  referenceId          String?
+  description          String?
+  errorMessage         String?
+  blockTime            DateTime?
+  createdAt            DateTime              @default(now())
+  updatedAt            DateTime              @updatedAt
+  @@index([userId, createdAt])
+  @@index([userId, tokenPublicKey, createdAt])
+  @@index([userId, source, createdAt])
+  @@index([userId, type, createdAt])
+  @@index([transactionSignature])
+  @@index([bundleId])
+  @@index([referenceId])
+  @@index([status])
+  @@map("AppTransaction")
 }

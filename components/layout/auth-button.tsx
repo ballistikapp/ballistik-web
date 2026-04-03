@@ -8,7 +8,6 @@ import {
   IconCreditCard,
   IconDotsVertical,
   IconLogout,
-  IconUser,
   IconCopy,
   IconRefresh,
   IconWallet,
@@ -51,12 +50,13 @@ export function AuthButton() {
       staleTime: cacheConfig.staleMs.wallets,
     }
   );
-  const subscriptionOverviewQuery = trpc.billing.getSubscriptionOverview.useQuery(
-    {},
-    {
-      enabled: isLoggedIn,
-    }
-  );
+  const subscriptionOverviewQuery =
+    trpc.billing.getSubscriptionOverview.useQuery(
+      {},
+      {
+        enabled: isLoggedIn,
+      }
+    );
   const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation({
     onSuccess: () => {
       mainWalletQuery.refetch();
@@ -216,6 +216,33 @@ export function AuthButton() {
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
 
+          <DropdownMenuGroup>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setDepositDialogOpen(true);
+              }}
+            >
+              <IconArrowDownLeft />
+              Deposit
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onSelect={(event) => {
+                event.preventDefault();
+                setWithdrawDialogOpen(true);
+              }}
+            >
+              <IconArrowUpRight />
+              Withdraw
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <Link href="/account">
+                <IconWallet />
+                Go to Main Wallet
+              </Link>
+            </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
           {effectivePlan ? (
             <>
               <DropdownMenuLabel className="flex flex-col gap-1">
@@ -241,33 +268,6 @@ export function AuthButton() {
             </>
           ) : null}
 
-          <DropdownMenuGroup>
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                setDepositDialogOpen(true);
-              }}
-            >
-              <IconArrowDownLeft />
-              Deposit
-            </DropdownMenuItem>
-            <DropdownMenuItem
-              onSelect={(event) => {
-                event.preventDefault();
-                setWithdrawDialogOpen(true);
-              }}
-            >
-              <IconArrowUpRight />
-              Withdraw
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <Link href="/account">
-                <IconUser />
-                My Account
-              </Link>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-          <DropdownMenuSeparator />
           <DropdownMenuItem onClick={handleLogout}>
             <IconLogout />
             Log out

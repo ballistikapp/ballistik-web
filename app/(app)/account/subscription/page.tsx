@@ -289,7 +289,7 @@ export default function AccountSubscriptionPage() {
                   {ctaLabel}
                 </Button>
                 <Button variant="outline" size="lg" asChild>
-                  <Link href="/account">View account</Link>
+                  <Link href="/account">View Main Wallet</Link>
                 </Button>
               </div>
             </div>

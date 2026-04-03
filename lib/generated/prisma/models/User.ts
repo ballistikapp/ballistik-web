@@ -217,6 +217,7 @@ export type UserWhereInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetListRelationFilter
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
+  appTransactions?: Prisma.AppTransactionListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -239,6 +240,7 @@ export type UserOrderByWithRelationInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetOrderByRelationAggregateInput
   vanityMints?: Prisma.VanityMintOrderByRelationAggregateInput
   refreshCaches?: Prisma.RefreshCacheOrderByRelationAggregateInput
+  appTransactions?: Prisma.AppTransactionOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -264,6 +266,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   volumeBotPresets?: Prisma.VolumeBotPresetListRelationFilter
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
+  appTransactions?: Prisma.AppTransactionListRelationFilter
 }, "id" | "mainWalletPublicKey">
 
 export type UserOrderByWithAggregationInput = {
@@ -313,6 +316,7 @@ export type UserCreateInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -334,6 +338,7 @@ export type UserUncheckedCreateInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserUpdateInput = {
@@ -355,6 +360,7 @@ export type UserUpdateInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -376,6 +382,7 @@ export type UserUncheckedUpdateInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -637,6 +644,20 @@ export type UserUpdateOneRequiredWithoutRefreshCachesNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutRefreshCachesInput, Prisma.UserUpdateWithoutRefreshCachesInput>, Prisma.UserUncheckedUpdateWithoutRefreshCachesInput>
 }
 
+export type UserCreateNestedOneWithoutAppTransactionsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAppTransactionsInput, Prisma.UserUncheckedCreateWithoutAppTransactionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAppTransactionsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutAppTransactionsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutAppTransactionsInput, Prisma.UserUncheckedCreateWithoutAppTransactionsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutAppTransactionsInput
+  upsert?: Prisma.UserUpsertWithoutAppTransactionsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAppTransactionsInput, Prisma.UserUpdateWithoutAppTransactionsInput>, Prisma.UserUncheckedUpdateWithoutAppTransactionsInput>
+}
+
 export type UserCreateWithoutProSubscriptionPaymentsInput = {
   id?: string
   name: string
@@ -655,6 +676,7 @@ export type UserCreateWithoutProSubscriptionPaymentsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutProSubscriptionPaymentsInput = {
@@ -675,6 +697,7 @@ export type UserUncheckedCreateWithoutProSubscriptionPaymentsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutProSubscriptionPaymentsInput = {
@@ -711,6 +734,7 @@ export type UserUpdateWithoutProSubscriptionPaymentsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutProSubscriptionPaymentsInput = {
@@ -731,6 +755,7 @@ export type UserUncheckedUpdateWithoutProSubscriptionPaymentsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutAuthSessionsInput = {
@@ -751,6 +776,7 @@ export type UserCreateWithoutAuthSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutAuthSessionsInput = {
@@ -771,6 +797,7 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutAuthSessionsInput = {
@@ -807,6 +834,7 @@ export type UserUpdateWithoutAuthSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuthSessionsInput = {
@@ -827,6 +855,7 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutWalletsInput = {
@@ -847,6 +876,7 @@ export type UserCreateWithoutWalletsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutWalletsInput = {
@@ -867,6 +897,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutWalletsInput = {
@@ -892,6 +923,7 @@ export type UserCreateWithoutMainWalletInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutMainWalletInput = {
@@ -912,6 +944,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutMainWalletInput = {
@@ -948,6 +981,7 @@ export type UserUpdateWithoutWalletsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWalletsInput = {
@@ -968,6 +1002,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserUpsertWithoutMainWalletInput = {
@@ -999,6 +1034,7 @@ export type UserUpdateWithoutMainWalletInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMainWalletInput = {
@@ -1019,6 +1055,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutTokensInput = {
@@ -1039,6 +1076,7 @@ export type UserCreateWithoutTokensInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutTokensInput = {
@@ -1059,6 +1097,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutTokensInput = {
@@ -1095,6 +1134,7 @@ export type UserUpdateWithoutTokensInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTokensInput = {
@@ -1115,6 +1155,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutLaunchesInput = {
@@ -1135,6 +1176,7 @@ export type UserCreateWithoutLaunchesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutLaunchesInput = {
@@ -1155,6 +1197,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutLaunchesInput = {
@@ -1191,6 +1234,7 @@ export type UserUpdateWithoutLaunchesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutLaunchesInput = {
@@ -1211,6 +1255,7 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutHoldingExitsInput = {
@@ -1231,6 +1276,7 @@ export type UserCreateWithoutHoldingExitsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutHoldingExitsInput = {
@@ -1251,6 +1297,7 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutHoldingExitsInput = {
@@ -1287,6 +1334,7 @@ export type UserUpdateWithoutHoldingExitsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutHoldingExitsInput = {
@@ -1307,6 +1355,7 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutVolumeBotSessionsInput = {
@@ -1327,6 +1376,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
@@ -1347,6 +1397,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutVolumeBotSessionsInput = {
@@ -1383,6 +1434,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
@@ -1403,6 +1455,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutVolumeBotPresetsInput = {
@@ -1423,6 +1476,7 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
@@ -1443,6 +1497,7 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutVolumeBotPresetsInput = {
@@ -1479,6 +1534,7 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
@@ -1499,6 +1555,7 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutVanityMintsInput = {
@@ -1519,6 +1576,7 @@ export type UserCreateWithoutVanityMintsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutVanityMintsInput = {
@@ -1539,6 +1597,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutVanityMintsInput = {
@@ -1575,6 +1634,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVanityMintsInput = {
@@ -1595,6 +1655,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
 }
 
 export type UserCreateWithoutRefreshCachesInput = {
@@ -1615,6 +1676,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshCachesInput = {
@@ -1635,6 +1697,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshCachesInput = {
@@ -1671,6 +1734,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshCachesInput = {
@@ -1691,6 +1755,107 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+}
+
+export type UserCreateWithoutAppTransactionsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutAppTransactionsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  proStartedAt?: Date | string | null
+  proExpiresAt?: Date | string | null
+  mainWalletPublicKey: string
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutAppTransactionsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutAppTransactionsInput, Prisma.UserUncheckedCreateWithoutAppTransactionsInput>
+}
+
+export type UserUpsertWithoutAppTransactionsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutAppTransactionsInput, Prisma.UserUncheckedUpdateWithoutAppTransactionsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutAppTransactionsInput, Prisma.UserUncheckedCreateWithoutAppTransactionsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutAppTransactionsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutAppTransactionsInput, Prisma.UserUncheckedUpdateWithoutAppTransactionsInput>
+}
+
+export type UserUpdateWithoutAppTransactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutAppTransactionsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  proStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  proExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  proSubscriptionPayments?: Prisma.ProSubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
 }
 
 
@@ -1709,6 +1874,7 @@ export type UserCountOutputType = {
   volumeBotPresets: number
   vanityMints: number
   refreshCaches: number
+  appTransactions: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1722,6 +1888,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   volumeBotPresets?: boolean | UserCountOutputTypeCountVolumeBotPresetsArgs
   vanityMints?: boolean | UserCountOutputTypeCountVanityMintsArgs
   refreshCaches?: boolean | UserCountOutputTypeCountRefreshCachesArgs
+  appTransactions?: boolean | UserCountOutputTypeCountAppTransactionsArgs
 }
 
 /**
@@ -1804,6 +1971,13 @@ export type UserCountOutputTypeCountRefreshCachesArgs<ExtArgs extends runtime.Ty
   where?: Prisma.RefreshCacheWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountAppTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.AppTransactionWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -1825,6 +1999,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   volumeBotPresets?: boolean | Prisma.User$volumeBotPresetsArgs<ExtArgs>
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
+  appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -1876,6 +2051,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   volumeBotPresets?: boolean | Prisma.User$volumeBotPresetsArgs<ExtArgs>
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
+  appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1899,6 +2075,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     volumeBotPresets: Prisma.$VolumeBotPresetPayload<ExtArgs>[]
     vanityMints: Prisma.$VanityMintPayload<ExtArgs>[]
     refreshCaches: Prisma.$RefreshCachePayload<ExtArgs>[]
+    appTransactions: Prisma.$AppTransactionPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2314,6 +2491,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   volumeBotPresets<T extends Prisma.User$volumeBotPresetsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$volumeBotPresetsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VolumeBotPresetPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   vanityMints<T extends Prisma.User$vanityMintsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$vanityMintsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VanityMintPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshCaches<T extends Prisma.User$refreshCachesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshCachesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshCachePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  appTransactions<T extends Prisma.User$appTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$appTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AppTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2984,6 +3162,30 @@ export type User$refreshCachesArgs<ExtArgs extends runtime.Types.Extensions.Inte
   take?: number
   skip?: number
   distinct?: Prisma.RefreshCacheScalarFieldEnum | Prisma.RefreshCacheScalarFieldEnum[]
+}
+
+/**
+ * User.appTransactions
+ */
+export type User$appTransactionsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the AppTransaction
+   */
+  select?: Prisma.AppTransactionSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the AppTransaction
+   */
+  omit?: Prisma.AppTransactionOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.AppTransactionInclude<ExtArgs> | null
+  where?: Prisma.AppTransactionWhereInput
+  orderBy?: Prisma.AppTransactionOrderByWithRelationInput | Prisma.AppTransactionOrderByWithRelationInput[]
+  cursor?: Prisma.AppTransactionWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.AppTransactionScalarFieldEnum | Prisma.AppTransactionScalarFieldEnum[]
 }
 
 /**

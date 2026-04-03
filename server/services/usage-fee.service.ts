@@ -15,11 +15,16 @@ import { logger } from "@/lib/logger";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { testRunLogService } from "@/server/services/test-run-log.service";
+import { appTransactionService } from "@/server/services/app-transaction.service";
+import type { AppTransactionSource, AppTransactionType } from "@/lib/generated/prisma/client";
 
 type CollectUsageFeeInput = {
   userId: string;
   totalFeeSol: number;
   reason: string;
+  txSource?: AppTransactionSource;
+  tokenPublicKey?: string;
+  referenceId?: string;
 };
 
 type CollectUsageFeeResult = {
@@ -154,20 +159,43 @@ export const usageFeeService = {
       );
     };
 
+    const feeType: AppTransactionType = input.reason === "pro.weekly" ? "FEE_PRO" : "FEE_USAGE";
+    const feeSource: AppTransactionSource = input.txSource ?? (input.reason === "pro.weekly" ? "BILLING" : "WALLET");
+    const trackId = await appTransactionService
+      .create({
+        userId: input.userId,
+        type: feeType,
+        source: feeSource,
+        walletPublicKey: sender.publicKey.toBase58(),
+        fromAddress: sender.publicKey.toBase58(),
+        toAddress: collectorPublicKey.toBase58(),
+        solAmount: input.totalFeeSol,
+        tokenPublicKey: input.tokenPublicKey,
+        referenceId: input.referenceId,
+      })
+      .then((r) => r.id)
+      .catch(() => null);
+
     let signature: string;
     try {
-      signature = await sendTransfer();
-    } catch (error) {
-      if (error instanceof TransactionExpiredBlockheightExceededError) {
+      try {
         signature = await sendTransfer();
-      } else if (isInsufficientBalanceError(error)) {
-        throw new AppError(
-          "Insufficient balance in your main wallet to purchase the Pro plan.",
-          400
-        );
-      } else {
-        throw error;
+      } catch (error) {
+        if (error instanceof TransactionExpiredBlockheightExceededError) {
+          signature = await sendTransfer();
+        } else if (isInsufficientBalanceError(error)) {
+          throw new AppError(
+            "Insufficient balance in your main wallet to purchase the Pro plan.",
+            400
+          );
+        } else {
+          throw error;
+        }
       }
+      if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+    } catch (error) {
+      if (trackId) await appTransactionService.fail(trackId, { errorMessage: error instanceof Error ? error.message : "Unknown error" }).catch(() => {});
+      throw error;
     }
 
     log.info("Usage fee collected", {

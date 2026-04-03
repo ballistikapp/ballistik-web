@@ -73,7 +73,8 @@ export const ModelName = {
   Transaction: 'Transaction',
   TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
-  ShyftCallback: 'ShyftCallback'
+  ShyftCallback: 'ShyftCallback',
+  AppTransaction: 'AppTransaction'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -460,6 +461,33 @@ export const ShyftCallbackScalarFieldEnum = {
 } as const
 
 export type ShyftCallbackScalarFieldEnum = (typeof ShyftCallbackScalarFieldEnum)[keyof typeof ShyftCallbackScalarFieldEnum]
+
+
+export const AppTransactionScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  type: 'type',
+  source: 'source',
+  status: 'status',
+  transactionSignature: 'transactionSignature',
+  bundleId: 'bundleId',
+  walletPublicKey: 'walletPublicKey',
+  fromAddress: 'fromAddress',
+  toAddress: 'toAddress',
+  solAmount: 'solAmount',
+  tokenAmount: 'tokenAmount',
+  pricePerToken: 'pricePerToken',
+  jitoTipLamports: 'jitoTipLamports',
+  referenceId: 'referenceId',
+  description: 'description',
+  errorMessage: 'errorMessage',
+  blockTime: 'blockTime',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type AppTransactionScalarFieldEnum = (typeof AppTransactionScalarFieldEnum)[keyof typeof AppTransactionScalarFieldEnum]
 
 
 export const SortOrder = {

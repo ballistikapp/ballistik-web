@@ -7,11 +7,11 @@ import {
   IconBrandTelegram,
   IconCoins,
   IconExternalLink,
+  IconHistory,
   IconLayoutDashboard,
   IconList,
   IconPlus,
   IconRobot,
-  IconUserCircle,
   IconWallet,
 } from "@tabler/icons-react";
 
@@ -32,6 +32,7 @@ export type NavMainItem = {
   title: string;
   url: string;
   icon?: Icon;
+  iconClassName?: string;
   scope?: "token" | "global";
   external?: boolean;
   badge?: string;
@@ -68,13 +69,20 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
     icon: IconRobot,
     scope: "token",
   },
-];
-
-export const buildAndManageRoutes: NavMainItem[] = [
   {
-    title: "Launch",
+    title: "Launch New Coin",
     url: "/launch",
     icon: IconPlus,
+    iconClassName: "text-primary",
+    scope: "global",
+  },
+];
+
+export const accountRoutes: NavMainItem[] = [
+  {
+    title: "Main Wallet",
+    url: "/account",
+    icon: IconWallet,
     scope: "global",
   },
   {
@@ -84,9 +92,9 @@ export const buildAndManageRoutes: NavMainItem[] = [
     scope: "global",
   },
   {
-    title: "Account",
-    url: "/account",
-    icon: IconUserCircle,
+    title: "History",
+    url: "/history",
+    icon: IconHistory,
     scope: "global",
   },
 ];
@@ -145,8 +153,14 @@ export const NavMain = React.memo(function NavMain({
                     target={item.external ? "_blank" : undefined}
                     rel={item.external ? "noreferrer" : undefined}
                   >
-                    {item.icon && <item.icon className="size-10 shrink-0" />}
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                    {item.icon && (
+                      <item.icon
+                        className={cn("size-10 shrink-0", item.iconClassName)}
+                      />
+                    )}
+                    <span className="min-w-0 flex-1 truncate">
+                      {item.title}
+                    </span>
                     {item.badge ? (
                       <SidebarMenuBadge className="right-2 rounded-full border border-sidebar-border/70 bg-sidebar-accent/60 px-2 text-[10px] font-semibold uppercase tracking-[0.08em]">
                         {item.badge}

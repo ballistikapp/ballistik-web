@@ -12,6 +12,7 @@ import { subscriptionRouter } from "./subscription.router";
 import { dashboardRouter } from "./dashboard.router";
 import { testRunLogRouter } from "./test-run-log.router";
 import { billingRouter } from "./billing.router";
+import { appTransactionRouter } from "./app-transaction.router";
 
 const baseRouters = {
   auth: authRouter,
@@ -25,6 +26,7 @@ const baseRouters = {
   subscription: subscriptionRouter,
   dashboard: dashboardRouter,
   billing: billingRouter,
+  appTransaction: appTransactionRouter,
   testRunLog: testRunLogRouter,
 };
 

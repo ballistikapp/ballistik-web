@@ -201,7 +201,7 @@ export default function AccountPage() {
           ) : (
             <div className="flex items-center gap-4">
               <h1 className="truncate text-2xl leading-tight md:text-4xl">
-                {currentUser.name || "Account"}
+                {currentUser.name || "Main Wallet"}
               </h1>
               <Tooltip>
                 <TooltipTrigger asChild>
@@ -309,9 +309,6 @@ export default function AccountPage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 lg:justify-end">
-          <Button variant="outline" size="lg" asChild>
-            <Link href="/account/subscription">Manage Subscription</Link>
-          </Button>
           <Button
             variant="outline"
             size="lg"

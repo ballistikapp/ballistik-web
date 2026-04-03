@@ -33,12 +33,14 @@ import type {
 } from "@/server/schemas/holding.schema";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 import { UserPlan } from "@/lib/generated/prisma/client";
 import {
   computeSponsoredRecoverableLamports,
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
+import { invalidateStatsCache } from "@/server/services/dashboard.service";
 
 const cancelledExits = new Set<string>();
 
@@ -264,10 +266,14 @@ async function fundUnderfundedWallets({
   wallets,
   mainWallet,
   exitId,
+  userId,
+  tokenPublicKey,
 }: {
   wallets: WalletRecord[];
   mainWallet: Keypair;
   exitId: string;
+  userId?: string;
+  tokenPublicKey?: string;
 }) {
   const connection = getSolanaConnection();
   const walletsToFund: { publicKey: PublicKey; needed: number }[] = [];
@@ -322,9 +328,30 @@ async function fundUnderfundedWallets({
     tx.feePayer = mainWallet.publicKey;
 
     try {
+      const batchTrackIds: string[] = [];
+      if (userId) {
+        for (const item of batch) {
+          const id = await appTransactionService
+            .create({
+              userId,
+              type: "TRANSFER_FUND",
+              source: "EXIT",
+              tokenPublicKey,
+              walletPublicKey: mainWallet.publicKey.toBase58(),
+              fromAddress: mainWallet.publicKey.toBase58(),
+              toAddress: item.publicKey.toBase58(),
+              solAmount: item.needed / 1_000_000_000,
+              referenceId: exitId,
+            })
+            .then((r) => r.id)
+            .catch(() => null);
+          if (id) batchTrackIds.push(id);
+        }
+      }
       const signature = await sendAndConfirmTransaction(connection, tx, [mainWallet], {
         commitment: "confirmed",
       });
+      if (batchTrackIds.length > 0) await appTransactionService.confirmMany(batchTrackIds, { signature }).catch(() => {});
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "holding-exit.service",
@@ -479,6 +506,8 @@ async function closeAtasAndRecoverSol({
   returnSolToMainWallet,
   exitId,
   isCancelled,
+  userId,
+  tokenPublicKey,
 }: {
   wallets: WalletRecord[];
   mint: PublicKey;
@@ -486,6 +515,8 @@ async function closeAtasAndRecoverSol({
   returnSolToMainWallet: boolean;
   exitId: string;
   isCancelled: () => boolean;
+  userId?: string;
+  tokenPublicKey?: string;
 }) {
   const connection = getSolanaConnection();
   const cleanupWallets = wallets.filter(
@@ -599,10 +630,22 @@ async function closeAtasAndRecoverSol({
             );
             closeTx.recentBlockhash = latestBlockhash.blockhash;
             closeTx.feePayer = mainWallet.publicKey;
+            const ataCloseTrackId = userId
+              ? await appTransactionService.create({
+                  userId,
+                  type: "ACCOUNT_ATA_CLOSE",
+                  source: "EXIT",
+                  tokenPublicKey,
+                  walletPublicKey: wallet.publicKey,
+                  fromAddress: wallet.publicKey,
+                  referenceId: exitId,
+                }).then((r) => r.id).catch(() => null)
+              : null;
             const signature = await sendAndConfirmTransaction(connection, closeTx, [
               mainWallet,
               owner,
             ]);
+            if (ataCloseTrackId) await appTransactionService.confirm(ataCloseTrackId, { signature }).catch(() => {});
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "holding-exit.service",
@@ -666,6 +709,19 @@ async function closeAtasAndRecoverSol({
                 reclaimMode === "main-sponsored"
                   ? mainWallet.publicKey
                   : owner.publicKey;
+              const solRecoverTrackId = userId
+                ? await appTransactionService.create({
+                    userId,
+                    type: "TRANSFER_RETURN",
+                    source: "EXIT",
+                    tokenPublicKey,
+                    walletPublicKey: wallet.publicKey,
+                    fromAddress: wallet.publicKey,
+                    toAddress: mainWallet.publicKey.toBase58(),
+                    solAmount: lamports / 1_000_000_000,
+                    referenceId: exitId,
+                  }).then((r) => r.id).catch(() => null)
+                : null;
               const signature = await sendAndConfirmTransaction(
                 connection,
                 transferTx,
@@ -676,6 +732,7 @@ async function closeAtasAndRecoverSol({
                   commitment: "confirmed",
                 }
               );
+              if (solRecoverTrackId) await appTransactionService.confirm(solRecoverTrackId, { signature }).catch(() => {});
               await testRunLogService.appendServerEvent({
                 eventType: "wallet_transaction",
                 source: "holding-exit.service",
@@ -789,6 +846,7 @@ async function runExitFlow(exitId: string) {
         errorMessage: "No token balances found",
         completedAt: new Date(),
       });
+      invalidateStatsCache(exit.tokenPublicKey);
       return;
     }
 
@@ -830,6 +888,8 @@ async function runExitFlow(exitId: string) {
         wallets: walletsToCheck,
         mainWallet: mainKeypair,
         exitId,
+        userId: exit.userId,
+        tokenPublicKey: exit.tokenPublicKey,
       });
 
     checkCancelled();
@@ -875,6 +935,19 @@ async function runExitFlow(exitId: string) {
           });
 
           checkCancelled();
+          const bundleSellTrackId = await appTransactionService
+            .create({
+              userId: exit.userId,
+              type: "TRADE_SELL",
+              source: "EXIT",
+              tokenPublicKey: exit.tokenPublicKey,
+              walletPublicKey: seller.publicKey,
+              fromAddress: seller.publicKey,
+              tokenAmount: Number(chunkTotal),
+              referenceId: exitId,
+            })
+            .then((r) => r.id)
+            .catch(() => null);
           const bundleResult = await sendJitoBundle(
             transactions,
             signerGroups,
@@ -887,6 +960,11 @@ async function runExitFlow(exitId: string) {
               ).allowed,
             }
           );
+          if (bundleSellTrackId && bundleResult.signatures.length > 0) {
+            await appTransactionService
+              .confirm(bundleSellTrackId, { signature: bundleResult.signatures[0] })
+              .catch(() => {});
+          }
           await testRunLogService.appendServerEvent({
             eventType: "wallet_transaction",
             source: "holding-exit.service",
@@ -984,6 +1062,8 @@ async function runExitFlow(exitId: string) {
       returnSolToMainWallet,
       exitId,
       isCancelled: () => isExitCancelled(exitId),
+      userId: exit.userId,
+      tokenPublicKey: exit.tokenPublicKey,
     });
 
     const refreshWalletPublicKeys = Array.from(
@@ -1060,6 +1140,7 @@ async function runExitFlow(exitId: string) {
       tokenPublicKey: exit.tokenPublicKey,
       scope: "HOLDINGS",
     });
+    invalidateStatsCache(exit.tokenPublicKey);
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     await appendExitLog(exitId, "ERROR", "Exit failed", "error", {
@@ -1070,6 +1151,7 @@ async function runExitFlow(exitId: string) {
       errorMessage: message,
       completedAt: new Date(),
     });
+    invalidateStatsCache(exit.tokenPublicKey);
   }
 }
 
@@ -1187,6 +1269,7 @@ export const holdingExitService = {
       errorMessage: "Cancelled by user",
       completedAt: new Date(),
     });
+    invalidateStatsCache(exit.tokenPublicKey);
 
     return { success: true };
   },

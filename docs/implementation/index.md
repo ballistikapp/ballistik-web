@@ -19,6 +19,7 @@ This directory contains detailed implementation documentation for all features i
 
 - [Wallets Implementation](./wallets-implementation.md) — wallet data model, services, and UI behavior
 - [Transactions Implementation](./transactions-implementation.md) — transaction refresh and pricing logic
+- [App Transactions](./app-transactions-implementation.md) — unified operational ledger for all on-chain operations
 
 ### Holdings & Trading
 

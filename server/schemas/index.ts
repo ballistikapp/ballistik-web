@@ -13,3 +13,4 @@ export * from "./volume-bot.schema";
 export * from "./dashboard.schema";
 export * from "./test-run-log.schema";
 export * from "./billing.schema";
+export * from "./app-transaction.schema";
