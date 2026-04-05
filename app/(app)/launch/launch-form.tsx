@@ -190,6 +190,9 @@ function calculateLaunchTotals(values: {
   const bundleBuyTotal = values.bundleBuyEnabled
     ? values.bundlerWalletCount * values.bundlerBuyAmountSol
     : 0;
+  const effectiveJitoTipSol = values.bundleBuyEnabled
+    ? values.jitoTipAmountSol
+    : 0;
   const usageFees = values.platformFeeWaived
     ? waiveLaunchUsageFees(
         calculateLaunchUsageFees({
@@ -212,7 +215,7 @@ function calculateLaunchTotals(values: {
   const totalCostSol =
     values.devBuyAmountSol +
     bundleBuyTotal +
-    values.jitoTipAmountSol +
+    effectiveJitoTipSol +
     usageFees.totalFeeSol;
   const distributionWallets =
     values.bundlerWalletCount * values.distributionWalletMultiplier;
@@ -1737,14 +1740,16 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 {values.devBuyAmountSol.toFixed(4)} SOL
                               </span>
                             </div>
-                            <div className="grid grid-cols-[140px_1fr] gap-2">
-                              <span className="text-muted-foreground">
-                                Jito Tip
-                              </span>
-                              <span>
-                                {values.jitoTipAmountSol.toFixed(4)} SOL
-                              </span>
-                            </div>
+                            {values.bundleBuyEnabled && (
+                              <div className="grid grid-cols-[140px_1fr] gap-2">
+                                <span className="text-muted-foreground">
+                                  Jito Tip
+                                </span>
+                                <span>
+                                  {values.jitoTipAmountSol.toFixed(4)} SOL
+                                </span>
+                              </div>
+                            )}
                             {values.bundleBuyEnabled && (
                               <>
                                 <div className="grid grid-cols-[140px_1fr] gap-2">

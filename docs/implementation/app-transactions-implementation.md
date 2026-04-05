@@ -4,7 +4,7 @@
 
 `AppTransaction` is a unified operational ledger that captures every on-chain operation the app produces. It tracks the full lifecycle of transactions from PENDING through CONFIRMED or FAILED.
 
-This table does **not** replace `TokenTransaction`, which tracks market activity (including external traders) and powers dashboard P&L, price charts, and volume metrics. App-initiated trades appear in both tables — they serve different query patterns.
+This table does **not** replace `TokenTransaction`, which tracks market activity (including external traders) and powers price charts, volume metrics, and sell-side P&L. App-initiated trades appear in both tables — they serve different query patterns. The dashboard P&L uses both sources: sell volumes from `TokenTransaction` and dev buy + fee data from `AppTransaction` (see [Dashboard P&L Integration](#dashboard-pl-integration)).
 
 ## Data Model
 
@@ -14,7 +14,7 @@ This table does **not** replace `TokenTransaction`, which tracks market activity
 |-------|------|-------------|
 | `id` | String (cuid) | Primary key |
 | `userId` | String | Owner user |
-| `tokenPublicKey` | String? | Associated token (null for fees, withdrawals) |
+| `tokenPublicKey` | String? | Associated token (null for global withdrawals; populated for fee records linked to a specific token) |
 | `type` | AppTransactionType | Two-level category enum |
 | `source` | AppTransactionSource | Feature that generated this transaction |
 | `status` | TransactionStatus | PENDING → CONFIRMED or FAILED |
@@ -108,15 +108,26 @@ The `referenceId` field is a soft polymorphic link. Interpret it using `source`:
 
 ### `appTransaction.list`
 
-Protected procedure. Returns cursor-based paginated results ordered by `createdAt DESC`.
+Protected procedure. Returns offset-based paginated results ordered by `createdAt DESC`.
 
 **Input filters** (all optional):
 - `tokenPublicKey` — filter by token
 - `source` — filter by feature (LAUNCH, EXIT, etc.)
 - `type` — filter by operation type (TRADE_BUY, TRANSFER_FUND, etc.)
 - `status` — filter by status (PENDING, CONFIRMED, FAILED)
-- `cursor` — cursor for pagination
-- `limit` — page size (1–100, default 50)
+- `search` — free text search across `description`, `walletPublicKey`, `transactionSignature` (case-insensitive)
+- `page` — page number (default 1)
+- `pageSize` — page size (1–100, default 25)
+
+**Returns**: `{ items: AppTransaction[], totalCount: number }`
+
+### `appTransaction.costBreakdown`
+
+Protected procedure. Aggregates confirmed `AppTransaction` data for a token, grouped by `type` and `source`. Used by the P&L details dialog.
+
+**Input**: `{ tokenPublicKey: string }`
+
+**Returns**: `{ byType, bySource, summary: { totalFees, totalFunding, totalReturns, totalBuys, totalSells, netPnl, totalTransactions } }`
 
 ## Indexes
 
@@ -128,6 +139,46 @@ Protected procedure. Returns cursor-based paginated results ordered by `createdA
 - `[bundleId]` — Jito bundle grouping
 - `[referenceId]` — join to related records
 - `[status]` — pending/failed queries
+
+## Dashboard P&L Integration
+
+The token dashboard P&L combines data from two sources:
+
+- **Sell volume**: `TokenTransaction.groupBy` where `isOwned: true`, `transactionType: 'SELL'`
+- **Buy volume**: `TokenTransaction` owned buy volume + `AppTransaction.TRADE_BUY` (source: `LAUNCH`) sum. The dev buy during token creation is recorded as a `TRADE_BUY` in `AppTransaction` with the exact configured dev buy amount. This is more accurate than the `TokenTransaction.CREATE` row, which includes creation overhead.
+- **Fees**: `AppTransaction` aggregation of `FEE_USAGE` and `FEE_PRO` types for the token, plus Jito tips from `jitoTipLamports`.
+
+P&L formula:
+
+```
+totalBuyVolume = ownedBuyVolume (TokenTransaction) + devBuySol (AppTransaction)
+pnl = ownedSellVolume - totalBuyVolume - totalFees
+```
+
+This is computed in `dashboard.service.ts` via `getOperationalCosts()`, which runs three parallel queries against `AppTransaction`:
+1. Fee aggregation (grouped by type for `FEE_USAGE` / `FEE_PRO`)
+2. Jito tip aggregation (sum of `jitoTipLamports`)
+3. Dev buy aggregation (`TRADE_BUY` where source is `LAUNCH`)
+
+The P&L card shows a clickable details dialog (`pnl-details-dialog.tsx`) breaking down: bought, sold, trading P&L, platform fees, pro fees, Jito tips, and net P&L.
+
+### `tokenPublicKey` on fee records
+
+Fee collection via `usage-fee.service.ts` accepts an optional `tokenPublicKey`. Callers must pass it so that `getOperationalCosts` can find fee records for a specific token:
+
+- `launch.service.ts` → passes `tokenPublicKey` from `finalizeLaunch` params
+- `volume-bot.service.ts` → passes `token.publicKey` from the resolved token
+- `pro-subscription.service.ts` → no token context (global fee, not per-token)
+
+## History UI
+
+The History page (`/history`) displays all `AppTransaction` records for the authenticated user in a `DataTable` with:
+
+- **Server-side filtering**: source, type, status dropdowns + free text search (debounced)
+- **Offset pagination**: page/pageSize managed via `nuqs` URL state
+- **Columns**: type (color-coded badge), source, status (with indicator dot), description, wallet (internal link when `tokenPublicKey` present), SOL amount, signature (Solscan link), bundle ID (Jito explorer link), time (exact + relative)
+
+Located in `app/(app)/history/` with `page.tsx` (data fetching + toolbar) and `columns.tsx` (column definitions).
 
 ## Instrumented Call Sites
 

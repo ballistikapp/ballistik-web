@@ -46,6 +46,17 @@ Before implementing, always consider:
 
 When the user provides a task, analyze the actual scope before jumping to implementation. If the scope is ambiguous, ask.
 
+## Robustness Self-Check
+
+Before implementing and before finalizing, explicitly ask:
+
+- Is this implementation robust for the real inputs, states, and failure modes that matter here?
+- Which edge cases are actually in scope, and are they handled or clearly called out?
+- Is there a simpler implementation that achieves the same result safely?
+- Am I adding complexity for hypothetical future cases instead of current requirements?
+
+Prefer the simplest implementation that is still robust for the relevant edge cases. If an edge case is not handled, say so explicitly rather than silently assuming it does not matter.
+
 ## Documentation Workflow
 
 Read `docs/implementation/` before making any non-trivial changes. Update implementation docs when changes affect:

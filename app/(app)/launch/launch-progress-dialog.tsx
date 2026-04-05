@@ -68,6 +68,11 @@ export function LaunchProgressDialog({
 }: LaunchProgressDialogProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
+  const { mutateAsync: refreshBalances } = trpc.wallet.refreshBalances.useMutation();
+  const { mutateAsync: refreshHoldings } = trpc.holding.refreshByToken.useMutation();
+  const { mutateAsync: refreshTransactions } =
+    trpc.transaction.refreshByToken.useMutation();
+  const [preparingDashboard, setPreparingDashboard] = React.useState(false);
 
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
@@ -89,14 +94,31 @@ export function LaunchProgressDialog({
   const handleGoToToken = React.useCallback(() => {
     if (!tokenPublicKey) return;
     void (async () => {
-      await Promise.all([
-        utils.dashboard.getStats.invalidate({ tokenPublicKey }),
-        utils.dashboard.getDefiPools.invalidate({ tokenPublicKey }),
-        utils.token.getByPublicKey.invalidate({ publicKey: tokenPublicKey }),
-      ]);
-      router.push(`/${tokenPublicKey}/dashboard`);
+      setPreparingDashboard(true);
+      try {
+        await Promise.allSettled([
+          refreshBalances({ tokenPublicKey, force: true }),
+          refreshHoldings({ tokenPublicKey }),
+          refreshTransactions({ tokenPublicKey }),
+        ]);
+        await Promise.all([
+          utils.dashboard.getStats.invalidate({ tokenPublicKey }),
+          utils.dashboard.getDefiPools.invalidate({ tokenPublicKey }),
+          utils.token.getByPublicKey.invalidate({ publicKey: tokenPublicKey }),
+        ]);
+        router.push(`/${tokenPublicKey}/dashboard`);
+      } finally {
+        setPreparingDashboard(false);
+      }
     })();
-  }, [router, tokenPublicKey, utils]);
+  }, [
+    refreshBalances,
+    refreshHoldings,
+    refreshTransactions,
+    router,
+    tokenPublicKey,
+    utils,
+  ]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -140,8 +162,12 @@ export function LaunchProgressDialog({
               </div>
               <div className="flex justify-end">
                 {hasTokenLink ? (
-                  <Button size="sm" onClick={handleGoToToken}>
-                    Go to token
+                  <Button
+                    size="sm"
+                    onClick={handleGoToToken}
+                    disabled={preparingDashboard}
+                  >
+                    {preparingDashboard ? "Preparing dashboard..." : "Go to token"}
                   </Button>
                 ) : (
                   <Button size="sm" disabled>

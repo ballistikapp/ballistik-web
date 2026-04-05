@@ -90,6 +90,7 @@ export default function Page() {
     trpc.holding.sellByToken.useMutation();
   const { mutateAsync: refreshWalletBalances } =
     trpc.wallet.refreshBalances.useMutation();
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
   const startExitMutation = trpc.holding.startExit.useMutation();
   const cancelExitMutation = trpc.holding.cancelExit.useMutation();
   const activeExitQuery = trpc.holding.getActiveExit.useQuery(
@@ -166,6 +167,33 @@ export default function Page() {
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const lastSnapshotKeyRef = useRef<string | null>(null);
+
+  const refreshRelatedWalletData = useCallback(
+    async (walletPublicKeys?: string[]) => {
+      if (!tokenPublicKey) return;
+      await Promise.all([
+        refreshWalletBalances({
+          tokenPublicKey,
+          walletPublicKeys,
+          force: true,
+        }),
+        refreshMainBalance.mutateAsync({}),
+      ]);
+      await Promise.all([
+        utils.wallet.getMain.invalidate(),
+        utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
+        utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
+      ]);
+    },
+    [
+      refreshMainBalance,
+      refreshWalletBalances,
+      tokenPublicKey,
+      utils.wallet.getDevByToken,
+      utils.wallet.getMain,
+      utils.wallet.getOperationalByToken,
+    ]
+  );
 
   const logHoldingsEvent = useCallback(
     (event: Parameters<typeof appendTestRunEvent.mutate>[0]) => {
@@ -278,11 +306,9 @@ export default function Page() {
         id: toastId,
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
-      await refreshWalletBalances({
-        tokenPublicKey,
-        walletPublicKeys: returnSolToMainWallet ? undefined : walletPublicKeys,
-        force: true,
-      });
+      await refreshRelatedWalletData(
+        returnSolToMainWallet ? undefined : walletPublicKeys
+      );
       logHoldingsEvent({
         eventType: "trade_result",
         action: "sell-from-holdings-page",
@@ -294,7 +320,6 @@ export default function Page() {
         actualValue: result,
       });
       void utils.holding.listByToken.invalidate({ tokenPublicKey });
-      utils.wallet.getMain.invalidate();
       setSellDialogOpen(false);
     } catch (error) {
       logHoldingsEvent({
@@ -345,8 +370,6 @@ export default function Page() {
     }
   };
 
-  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
-
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;
   const shouldAutoOpen =
@@ -364,11 +387,15 @@ export default function Page() {
       exitStatus !== "PENDING" && exitStatus !== "RUNNING";
     prevExitStatusRef.current = exitStatus;
     if (!wasRunning || !isTerminal) return;
-    void handleRefresh({ showToast: false });
-    refreshMainBalance.mutateAsync({}).then(() => {
-      utils.wallet.getMain.invalidate();
-    });
-  }, [exitStatus, handleRefresh, refreshMainBalance, utils.wallet.getMain]);
+    void (async () => {
+      try {
+        await handleRefresh({ showToast: false });
+        await refreshRelatedWalletData();
+      } catch {
+        toast.error("Exit finished, but wallet balances could not be refreshed");
+      }
+    })();
+  }, [exitStatus, handleRefresh, refreshRelatedWalletData]);
 
   const handleOpenExitDialog = () => {
     setManualExitDialogOpen(true);

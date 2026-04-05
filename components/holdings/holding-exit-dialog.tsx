@@ -74,12 +74,12 @@ export function HoldingExitDialog({
   onCancel,
 }: HoldingExitDialogProps) {
   const [tip, setTip] = React.useState("0.005");
-  const [returnSolToMainWallet, setReturnSolToMainWallet] = React.useState(false);
+  const [returnSolToMainWallet, setReturnSolToMainWallet] = React.useState(true);
 
   React.useEffect(() => {
     if (!open) {
       setTip("0.005");
-      setReturnSolToMainWallet(false);
+      setReturnSolToMainWallet(true);
     }
   }, [open]);
 
@@ -99,7 +99,6 @@ export function HoldingExitDialog({
   const status = exit?.status ?? "PENDING";
   const progress = exit?.progress ?? 0;
   const currentStep = exit?.currentStep ?? "Ready";
-  const logs = exit?.logs ?? [];
   const canClose =
     status === "SUCCEEDED" || status === "FAILED" || status === "RUNNING";
   const summary = exit?.result as
@@ -137,6 +136,19 @@ export function HoldingExitDialog({
   const showProgress = Boolean(exit);
   const showSummary = status === "SUCCEEDED" && summary;
   const showError = status === "FAILED" && exit?.errorMessage;
+  const activityItems = React.useMemo(
+    () =>
+      [...(exit?.logs ?? [])]
+        .sort(
+          (left, right) =>
+            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+        )
+        .map((log, index) => ({
+          ...log,
+          isLatest: index === 0,
+        })),
+    [exit?.logs]
+  );
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -304,28 +316,52 @@ export function HoldingExitDialog({
             <div className="space-y-2">
               <div className="text-sm font-medium">Activity</div>
               <div className="max-h-72 overflow-y-auto rounded-md border p-3 space-y-2">
-                {logs.length ? (
-                  logs.map((log) => (
-                    <div key={log.id} className="flex items-start gap-3 text-sm">
-                      <Badge
-                        variant={
-                          log.level === "ERROR" ? "destructive" : "secondary"
-                        }
-                      >
-                        {log.level}
-                      </Badge>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-foreground wrap-break-word">
-                          {log.message}
-                        </div>
-                        {log.step && (
-                          <div className="text-xs text-muted-foreground wrap-break-word">
-                            {log.step}
+                {activityItems.length ? (
+                  activityItems.map((log) => (
+                    <div
+                      key={log.id}
+                      className={`rounded-md border px-3 py-2 text-sm ${
+                        log.isLatest
+                          ? "border-primary/40 bg-primary/5 shadow-sm"
+                          : log.level === "ERROR"
+                            ? "border-destructive/30 bg-destructive/5"
+                            : "border-border/70"
+                      }`}
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                          <div
+                            className={`wrap-break-word ${
+                              log.isLatest
+                                ? "font-medium text-foreground"
+                                : "text-foreground"
+                            }`}
+                          >
+                            {log.message}
                           </div>
-                        )}
-                      </div>
-                      <div className="text-xs text-muted-foreground shrink-0">
-                        {new Date(log.createdAt).toLocaleTimeString()}
+                          <div className="mt-1 flex flex-wrap items-center gap-2">
+                            <Badge
+                              variant={
+                                log.level === "ERROR" ? "destructive" : "secondary"
+                              }
+                            >
+                              {log.level}
+                            </Badge>
+                            {log.isLatest ? (
+                              <span className="text-xs font-medium text-primary">
+                                Latest
+                              </span>
+                            ) : null}
+                            {log.step ? (
+                              <div className="text-xs text-muted-foreground wrap-break-word">
+                                {log.step}
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                        <div className="text-xs text-muted-foreground shrink-0">
+                          {new Date(log.createdAt).toLocaleTimeString()}
+                        </div>
                       </div>
                     </div>
                   ))

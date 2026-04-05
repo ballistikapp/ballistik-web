@@ -44,3 +44,7 @@ export const listAppTransactionsSchema = z.object({
 export type ListAppTransactionsInput = z.infer<
   typeof listAppTransactionsSchema
 >;
+
+export const costBreakdownSchema = z.object({
+  tokenPublicKey: z.string().min(1),
+});

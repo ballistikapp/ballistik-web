@@ -140,39 +140,54 @@ async function getWalletKeys(tokenPublicKey: string, userId: string) {
   return { operationalWalletKeys, devWalletKeys, userWalletPubkeys };
 }
 
-async function getTreasuryData(tokenPublicKey: string, userId: string) {
-  const [walletAgg, devWalletAgg, runningVolumeBots] = await Promise.all([
-    prisma.wallet.aggregate({
-      where: {
-        tokenPublicKey,
-        userId,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
-      },
-      _sum: { balanceSol: true },
-      _count: { publicKey: true },
+async function getOperationalCosts(tokenPublicKey: string, userId: string) {
+  const confirmedWhere = { userId, tokenPublicKey, status: "CONFIRMED" as const };
+
+  const [feeAgg, jitoTipAgg, devBuyAgg, launchFundAgg, launchReturnAgg] = await Promise.all([
+    prisma.appTransaction.groupBy({
+      by: ["type"],
+      where: { ...confirmedWhere, type: { in: ["FEE_USAGE", "FEE_PRO"] } },
+      _sum: { solAmount: true },
     }),
-    prisma.$queryRaw<Array<{ sum: Prisma.Decimal | null; count: bigint }>>`
-      SELECT COALESCE(SUM(w."balanceSol"), 0) as sum, COUNT(*) as count
-      FROM "TokenDevWallet" tdw
-      JOIN "Wallet" w ON w."publicKey" = tdw."walletPublicKey"
-      WHERE tdw."tokenPublicKey" = ${tokenPublicKey}
-    `,
-    prisma.volumeBotSession.count({
-      where: { tokenPublicKey, userId, status: "RUNNING" },
+    prisma.appTransaction.aggregate({
+      where: { ...confirmedWhere, jitoTipLamports: { not: null } },
+      _sum: { jitoTipLamports: true },
+    }),
+    prisma.appTransaction.aggregate({
+      where: { ...confirmedWhere, type: "TRADE_BUY", source: "LAUNCH" },
+      _sum: { solAmount: true },
+    }),
+    prisma.appTransaction.aggregate({
+      where: { ...confirmedWhere, type: "TRANSFER_FUND", source: "LAUNCH" },
+      _sum: { solAmount: true },
+    }),
+    prisma.appTransaction.aggregate({
+      where: { ...confirmedWhere, type: "TRANSFER_RETURN", source: "LAUNCH" },
+      _sum: { solAmount: true },
     }),
   ]);
 
-  const operationalSol = Number(walletAgg._sum.balanceSol ?? 0);
-  const devSol = devWalletAgg[0] ? Number(devWalletAgg[0].sum ?? 0) : 0;
-  const operationalCount = walletAgg._count.publicKey;
-  const devCount = devWalletAgg[0] ? Number(devWalletAgg[0].count) : 0;
+  const platformFees = round4(Number(
+    feeAgg.find((f) => f.type === "FEE_USAGE")?._sum.solAmount ?? 0
+  ));
+  const proFees = round4(Number(
+    feeAgg.find((f) => f.type === "FEE_PRO")?._sum.solAmount ?? 0
+  ));
+  const jitoTipsSol = round4(
+    Number(jitoTipAgg._sum.jitoTipLamports ?? 0) / 1e9
+  );
+  const devBuySol = round4(Number(devBuyAgg._sum.solAmount ?? 0));
+  const launchFunding = round4(Number(launchFundAgg._sum.solAmount ?? 0));
+  const launchReturns = round4(Number(launchReturnAgg._sum.solAmount ?? 0));
+  const creationCostSol = round4(Math.max(0, launchFunding - launchReturns - devBuySol));
 
   return {
-    totalSol: round4(operationalSol + devSol),
-    operationalSol: round4(operationalSol),
-    devSol: round4(devSol),
-    walletCount: operationalCount + devCount,
-    runningVolumeBots,
+    platformFees,
+    proFees,
+    jitoTipsSol,
+    totalFees: round4(platformFees + proFees),
+    devBuySol,
+    creationCostSol,
   };
 }
 
@@ -235,7 +250,7 @@ async function getHoldingsBreakdown(
 ) {
   const walletFilter = Array.from(userWalletPubkeys);
 
-  const [userHoldings, topHolders] = await Promise.all([
+  const [userHoldings, currentHolders] = await Promise.all([
     walletFilter.length > 0
       ? prisma.holding.findMany({
           where: {
@@ -250,7 +265,7 @@ async function getHoldingsBreakdown(
           orderBy: [{ lastUpdated: "desc" }, { createdAt: "desc" }],
         })
       : Promise.resolve([]),
-    holdersService.getTopHolders(tokenPublicKey),
+    holdersService.getCurrentHolders(tokenPublicKey),
   ]);
   const uniqueUserHoldings = dedupeUserHoldingsByWallet(userHoldings);
   const totalTokenHoldings = uniqueUserHoldings.reduce(
@@ -292,7 +307,7 @@ async function getHoldingsBreakdown(
     })
     .sort((a, b) => b.holdingPercent - a.holdingPercent);
 
-  const externalHolders = topHolders
+  const externalHolders = currentHolders
     .filter((h) => !excludedAddresses.has(h.ownerWallet))
     .map((h) => ({
       ownerWallet: h.ownerWallet,
@@ -482,9 +497,6 @@ async function buildStatsResponse(
   const bondingCurveTokens = currentPrice?.realTokenReserves ?? 0;
   const circulatingSupply = tokenTotalSupply - bondingCurveTokens;
 
-  const defaultTreasury = {
-    totalSol: 0, operationalSol: 0, devSol: 0, walletCount: 0, runningVolumeBots: 0,
-  };
   const defaultVolumes = {
     ownedBuyVolume: 0, ownedSellVolume: 0, marketBuyVolume: 0, marketSellVolume: 0, totalTxCount: 0,
   };
@@ -499,8 +511,10 @@ async function buildStatsResponse(
 
   const isComplete = currentPrice?.isComplete ?? false;
 
+  const defaultCosts = { platformFees: 0, proFees: 0, jitoTipsSol: 0, totalFees: 0, devBuySol: 0, creationCostSol: 0 };
+
   const results = await Promise.allSettled([
-    getTreasuryData(tokenPublicKey, userId),
+    getOperationalCosts(tokenPublicKey, userId),
     getVolumeMetrics(tokenPublicKey),
     getHoldingsBreakdown(tokenPublicKey, userWalletPubkeys, priceSol, circulatingSupply, currentPrice),
     getOperations(tokenPublicKey, userId),
@@ -508,7 +522,7 @@ async function buildStatsResponse(
     isComplete ? Promise.resolve([]) : getPriceHistory(tokenPublicKey),
   ]);
 
-  const treasury = results[0].status === "fulfilled" ? results[0].value : defaultTreasury;
+  const costs = results[0].status === "fulfilled" ? results[0].value : defaultCosts;
   const volumes = results[1].status === "fulfilled" ? results[1].value : defaultVolumes;
   const holdingsBreakdown = results[2].status === "fulfilled" ? results[2].value : defaultHoldings;
   const operations = results[3].status === "fulfilled" ? results[3].value : { botSessions: [] };
@@ -518,7 +532,7 @@ async function buildStatsResponse(
 
   for (const [i, r] of results.entries()) {
     if (r.status === "rejected") {
-      const names = ["treasury", "volumes", "holdings", "operations", "transactions", "priceHistory"];
+      const names = ["costs", "volumes", "holdings", "operations", "transactions", "priceHistory"];
       failedSubQueries.push(names[i] ?? `unknown-${i}`);
       log.error(`Dashboard sub-query failed: ${names[i]}`, {
         tokenPublicKey,
@@ -528,9 +542,8 @@ async function buildStatsResponse(
   }
 
   const holdingsValue = holdingsBreakdown.holdingsValueSol;
-  const pnl = round4(
-    volumes.ownedSellVolume + holdingsValue - volumes.ownedBuyVolume
-  );
+  const totalBuyVolume = round4(volumes.ownedBuyVolume + costs.devBuySol);
+  const pnl = round4(volumes.ownedSellVolume - totalBuyVolume - costs.totalFees - costs.creationCostSol);
 
   const marketCapSol = round4(priceSol * tokenTotalSupply);
 
@@ -545,7 +558,6 @@ async function buildStatsResponse(
       failedSubQueries,
       priceSol,
       marketCapSol,
-      treasuryTotalSol: treasury.totalSol,
       activityTransactions: volumes.totalTxCount,
       ownedWalletCount: holdingsBreakdown.userWallets.length,
       recentTransactionCount: recentTransactions.length,
@@ -563,16 +575,19 @@ async function buildStatsResponse(
       launchCompletedAt: successfulLaunch?.completedAt ?? null,
     },
     metrics: {
-      treasury,
       holdingsValue: {
         valueSol: holdingsValue,
         tokenCount: holdingsBreakdown.totalTokenHoldings,
       },
       pnl: {
         net: pnl,
-        totalBuyVolume: volumes.ownedBuyVolume,
+        totalBuyVolume,
         totalSellVolume: volumes.ownedSellVolume,
-        holdingsValue,
+        platformFees: costs.platformFees,
+        proFees: costs.proFees,
+        jitoTipsSol: costs.jitoTipsSol,
+        totalFees: costs.totalFees,
+        creationCostSol: costs.creationCostSol,
       },
       activity: {
         totalVolume: round4(
@@ -581,7 +596,6 @@ async function buildStatsResponse(
         buyVolume: volumes.marketBuyVolume,
         sellVolume: volumes.marketSellVolume,
         transactionCount: volumes.totalTxCount,
-        runningVolumeBots: treasury.runningVolumeBots,
       },
     },
     holdingsBreakdown: {

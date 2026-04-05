@@ -2436,6 +2436,7 @@ async function finalizeLaunch(
         reason: "launch.success",
         txSource: "LAUNCH",
         referenceId: launchId,
+        tokenPublicKey,
       });
       await appendLog(launchId, "INFO", "Usage fee collected", "fees", {
         skipped: usageFeeResult.skipped,

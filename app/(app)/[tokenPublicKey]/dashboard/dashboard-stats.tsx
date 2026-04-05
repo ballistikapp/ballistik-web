@@ -1,12 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import {
-  IconWallet,
+  IconChartBar,
   IconCoins,
   IconTrendingUp,
   IconTrendingDown,
   IconActivity,
-  IconRobot,
+  IconInfoCircle,
 } from "@tabler/icons-react";
 import {
   Card,
@@ -16,14 +17,14 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { formatSol, formatTokenCount } from "@/lib/utils/format";
-
-interface TreasuryData {
-  totalSol: number;
-  operationalSol: number;
-  devSol: number;
-  walletCount: number;
-}
+import {
+  formatMarketCap,
+  formatPriceSol,
+  formatSol,
+  formatTokenCount,
+  formatUsd,
+} from "@/lib/utils/format";
+import { PnlDetailsDialog } from "./pnl-details-dialog";
 
 interface HoldingsData {
   valueSol: number;
@@ -34,7 +35,11 @@ interface PnlData {
   net: number;
   totalBuyVolume: number;
   totalSellVolume: number;
-  holdingsValue: number;
+  platformFees: number;
+  proFees: number;
+  jitoTipsSol: number;
+  totalFees: number;
+  creationCostSol: number;
 }
 
 interface ActivityData {
@@ -44,9 +49,15 @@ interface ActivityData {
   transactionCount: number;
 }
 
+interface HeaderData {
+  priceSol: number;
+  marketCapSol: number;
+  marketCapUsd: number;
+}
+
 interface DashboardStatsProps {
+  header: HeaderData;
   metrics: {
-    treasury: TreasuryData;
     holdingsValue: HoldingsData;
     pnl: PnlData;
     activity: ActivityData;
@@ -57,68 +68,32 @@ interface DashboardStatsProps {
 }
 
 export function DashboardStats({
+  header,
   metrics,
   onOpenExitDialog,
   exitDisabled = false,
   exitPending = false,
 }: DashboardStatsProps) {
-  const { treasury, holdingsValue, pnl, activity } = metrics;
+  const { holdingsValue, pnl, activity } = metrics;
   const isProfitable = pnl.net >= 0;
+  const [pnlDialogOpen, setPnlDialogOpen] = useState(false);
 
   return (
     <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
       <Card className="@container/card">
         <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
-            <IconWallet className="size-4" />
-            SOL Treasury
+            <IconChartBar className="size-4" />
+            Market Cap
           </CardDescription>
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
-            {formatSol(treasury.totalSol)} SOL
-          </CardTitle>
-          <div className="flex flex-col gap-1.5 mt-1">
-            <span className="text-xs text-muted-foreground tabular-nums">
-              Dev: {formatSol(treasury.devSol)} · Op:{" "}
-              {formatSol(treasury.operationalSol)}
-            </span>
-            <div className="flex gap-1.5 flex-wrap">
-              <Badge
-                variant="outline"
-                className="text-muted-foreground text-xs"
-              >
-                {treasury.walletCount} wallet
-                {treasury.walletCount !== 1 ? "s" : ""}
-              </Badge>
-            </div>
-          </div>
-        </CardHeader>
-      </Card>
-
-      <Card className="@container/card">
-        <CardHeader>
-          <CardDescription className="flex items-center gap-1.5">
-            {isProfitable ? (
-              <IconTrendingUp className="size-4 text-green-500" />
-            ) : (
-              <IconTrendingDown className="size-4 text-red-500" />
-            )}
-            P&L
-          </CardDescription>
-          <CardTitle
-            className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${
-              isProfitable ? "text-green-500" : "text-red-500"
-            }`}
-          >
-            {isProfitable ? "+" : ""}
-            {formatSol(pnl.net)} SOL
+            {header.marketCapUsd > 0
+              ? formatUsd(header.marketCapUsd)
+              : `${formatMarketCap(header.marketCapSol)} SOL`}
           </CardTitle>
           <div className="flex flex-col gap-1 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
-              Spent: {formatSol(pnl.totalBuyVolume)} · Received:{" "}
-              {formatSol(pnl.totalSellVolume)}
-            </span>
-            <span className="text-xs text-muted-foreground tabular-nums">
-              Unrealized: {formatSol(pnl.holdingsValue)} SOL
+              Price: {formatPriceSol(header.priceSol)} SOL
             </span>
           </div>
         </CardHeader>
@@ -150,6 +125,48 @@ export function DashboardStats({
           </div>
         </CardHeader>
       </Card>
+
+      <Card
+        className="group @container/card cursor-pointer transition-colors hover:bg-muted/50"
+        onClick={() => setPnlDialogOpen(true)}
+      >
+        <CardHeader>
+          <CardDescription className="flex items-center gap-1.5">
+            {isProfitable ? (
+              <IconTrendingUp className="size-4 text-green-500" />
+            ) : (
+              <IconTrendingDown className="size-4 text-red-500" />
+            )}
+            P&L
+          </CardDescription>
+          <CardTitle
+            className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${
+              isProfitable ? "text-green-500" : "text-red-500"
+            }`}
+          >
+            {isProfitable ? "+" : ""}
+            {formatSol(pnl.net)} SOL
+          </CardTitle>
+          <div className="flex flex-col gap-1 mt-1">
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Spent: {formatSol(pnl.totalBuyVolume + pnl.totalFees + pnl.creationCostSol)} · Received:{" "}
+              {formatSol(pnl.totalSellVolume)}
+            </span>
+            <div className="flex items-center justify-end gap-1.5 mt-1">
+              <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
+                Click for details
+              </span>
+              <IconInfoCircle className="size-3.5 text-muted-foreground/40 transition-colors group-hover:text-muted-foreground" />
+            </div>
+          </div>
+        </CardHeader>
+      </Card>
+
+      <PnlDetailsDialog
+        open={pnlDialogOpen}
+        onOpenChange={setPnlDialogOpen}
+        pnl={pnl}
+      />
 
       <Card className="@container/card">
         <CardHeader className="h-full flex flex-col">

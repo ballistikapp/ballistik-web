@@ -2,21 +2,28 @@
 
 ## Overview
 
-The token dashboard (`/[tokenPublicKey]/dashboard`) is the central monitoring page for a token. It displays real-time price, treasury balances, P&L, holdings breakdown, volume bot status, recent transactions, DeFi pool data, and a candlestick price chart.
+The token dashboard (`/[tokenPublicKey]/dashboard`) is the central monitoring page for a token. It displays real-time price, P&L (with fee breakdown), holdings breakdown, volume bot status, recent transactions, DeFi pool data, and a candlestick price chart.
 
-### Data Source: TokenTransaction
+### Data Sources
 
-All transaction-based metrics (volumes, P&L, price history, recent activity) use the `TokenTransaction` model. This model includes both user-owned and external transactions, with an `isOwned` boolean and `walletType` field for filtering.
+The dashboard uses two transaction models:
 
-- **User-scoped metrics** (P&L, buy/sell volumes in the P&L card): filtered by `isOwned: true`
-- **Market-wide metrics** (Activity card volumes, transaction counts, price chart): use all transactions
+- **`TokenTransaction`**: Market activity (including external traders). Powers price charts, volume/activity metrics, recent transactions, sell-side P&L, and market buy volume. Filtered by `isOwned: true` for user-scoped metrics.
+- **`AppTransaction`**: Operational ledger. Provides the dev buy amount (`TRADE_BUY` from `LAUNCH` source) and fee aggregation (`FEE_USAGE`, `FEE_PRO`, Jito tips) for the P&L calculation. See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration) for details.
+
+External holders on the dashboard are sourced separately from live SPL token accounts, not from `TokenTransaction`. `holdersService.getCurrentHolders()` first attempts a live Solana RPC holder lookup, supports both classic SPL Token and Token-2022 account programs, reads owner + amount bytes, aggregates balances by owner wallet, and sorts the result descending. If the current RPC provider blocks the required index methods, the service falls back to reconstructing current holder balances from confirmed `TokenTransaction` buy/create/sell deltas and emits a concise warning log so the provider limitation remains visible during operations. `dashboard.getStats` then excludes user-managed wallets and the bonding curve wallet so the `External Holders` panel reflects current non-user holders rather than historical traders as closely as current data sources allow.
 
 ### Refresh Modes
 
 The dashboard supports two data refresh modes controlled by a floating "Monitoring Panel":
 
-- **Monitoring OFF** (default for tokens launched >1 hour ago): Polls `dashboard.getStats` every 30 seconds.
+- **Monitoring OFF** (default for tokens launched >1 hour ago): skips live subscriptions and relies on manual refresh by default, with a recent-launch auto-refresh window described below.
 - **Monitoring ON** (default for tokens launched <1 hour ago): Subscribes to SSE streams for live transaction/activity signals and refetches dashboard data on events. Holdings freshness is maintained via automatic `holding.refreshByToken` runs triggered by monitoring events plus a bounded safety interval.
+
+When monitoring is OFF, launch recency still matters:
+
+- **Recent launch (<1 hour)**: on first dashboard open, a full chain refresh runs automatically so the page does not rely on stale post-launch snapshots. After that, the open page keeps auto-refreshing every 30 seconds.
+- **Older token**: the dashboard does not background-refresh while monitoring is OFF. It fetches the initial DB snapshot on page load, then waits for manual refresh unless dashboard data is unavailable.
 
 ## Architecture
 
@@ -32,7 +39,7 @@ Volume Bot Worker (trade events) ───┤    (tRPC)                 (debounc
                                      │    (debounced + single-flight + freshness TTL)
                                      ├──► Stats Cache Invalidation
                                      │
-                                     └──► 30s polling fallback (always active)
+                                     └──► Monitoring poll / recency auto-refresh
 ```
 
 ### Service Layer Structure
@@ -46,9 +53,9 @@ getStats(input, userId)
 │   └── getWalletKeys()         → operational + dev + main wallet public keys
 │
 └── Phase 2 (parallel, depends on Phase 1 for price & wallet keys):
-    ├── getTreasuryData()       → SOL balances, wallet counts, running bots
+    ├── getOperationalCosts()   → fees, Jito tips, dev buy via AppTransaction
     ├── getVolumeMetrics()      → buy/sell volumes via TokenTransaction.groupBy
-    ├── getHoldingsBreakdown()  → user wallets, external holders, unrealized P&L
+    ├── getHoldingsBreakdown()  → user wallets, external holders, holdings value
     ├── getOperations()         → volume bot sessions
     ├── getRecentTransactions() → last 15 TokenTransactions (grouped by signature, ordered by blockTime)
     └── getPriceHistory()       → time+price points from transactions (skipped when isComplete)
@@ -90,11 +97,25 @@ For tokens where `isComplete === true` (graduated from bonding curve):
 ### P&L Calculation
 
 ```
-P&L = ownedSellVolume + holdingsValue - ownedBuyVolume
+totalBuyVolume = ownedBuyVolume + devBuySol
+P&L = ownedSellVolume - totalBuyVolume - totalFees
 ```
 
 - `ownedBuyVolume` / `ownedSellVolume`: from `TokenTransaction.groupBy` where `isOwned: true`, `status: 'CONFIRMED'`
-- `holdingsValue`: `totalTokenBalance × currentPrice` from user-filtered `Holding` records
+- `devBuySol`: from `AppTransaction.aggregate` where `type: 'TRADE_BUY'`, `source: 'LAUNCH'` — the exact dev buy amount configured at launch time. This is used instead of the `TokenTransaction.CREATE` row, which includes creation overhead in its `solAmount`.
+- `totalFees`: platform fees (`FEE_USAGE`) + pro fees (`FEE_PRO`) from `AppTransaction.groupBy`
+- Jito tips are displayed in the P&L details dialog but not subtracted from net P&L (they are included in the on-chain transaction costs, not a separate fee)
+
+The P&L is purely realized — unrealized holdings value is not included. Holdings value is displayed separately on its own card.
+
+### P&L Details Dialog
+
+Clicking the P&L card opens a breakdown dialog (`pnl-details-dialog.tsx`) showing:
+- **Trading section**: bought (total spent), sold (total received), trading P&L
+- **Costs section**: platform fees, pro subscription fees, Jito tips
+- **Net P&L**: trading P&L minus fees
+
+All data comes from the `pnl` object in the `dashboard.getStats` response — no additional API call.
 
 ### Data Flow: Monitoring Mode ON
 
@@ -110,7 +131,7 @@ P&L = ownedSellVolume + holdingsValue - ownedBuyVolume
    - always debounces `refetchStats()` for low-latency UI updates
    - triggers debounced `holding.monitoringRefreshByToken` on meaningful events (`onIngestionComplete`, `onVolumeBotUpdate`) plus a bounded safety interval while monitoring is ON.
 7. `holding.monitoringRefreshByToken` reuses `holding.refreshByToken` with per-user+token single-flight and freshness TTL guards, then invalidates stats cache after successful writes.
-8. 30-second polling remains active as a safety net.
+8. 30-second polling remains active as a safety net while monitoring is ON.
 9. SSE errors and stale/idle conditions are tracked and surfaced in the Monitoring Panel as `Healthy`, `Degraded`, or `Disconnected`.
 
 ### Auto-Ingestion (`server/services/ingestion-queue.service.ts`)
@@ -148,10 +169,13 @@ This ensures the next `getStats` call bypasses the cache and reads fresh DB data
 
 ### Data Flow: Monitoring Mode OFF
 
-1. `dashboard.getStats` query has `refetchInterval: 30_000`. Each poll re-reads DB snapshots — it does NOT fetch live data from the chain.
-2. No SSE connections are opened.
-3. The monitoring panel shows a countdown to the next poll.
-4. SOL balances and token holdings in DB are stale snapshots from the last manual refresh or gRPC live update.
+1. No SSE connections are opened.
+2. Recent launches run a one-time full chain refresh on first dashboard open, then a recurring 30-second auto-refresh while the page remains open.
+3. Older tokens do not auto-refresh in the background when monitoring is OFF.
+4. Monitoring-off refreshes that hit the chain use:
+   - `wallet.refreshBalances` on manual refresh and the recent-launch initial auto refresh
+   - `holding.refreshByToken` and `transaction.refreshByToken` on recent-launch recurring auto refreshes
+5. The monitoring panel shows a countdown only when monitoring is OFF and the token is still in the recent-launch auto-refresh window.
 
 ### Manual Refresh (Mode-Aware)
 
@@ -217,7 +241,13 @@ This keeps response size bounded and avoids client-side pagination over large re
 2. No direct RPC call from this action — transactions are stream-driven and holdings are already auto-refreshed in the background by the hybrid pipeline.
 3. Shown as a small text link (not a prominent button) since it's rarely needed.
 
-The dashboard header's refresh button always performs a full chain refresh regardless of mode.
+The dashboard header's refresh button always performs a full chain refresh regardless of mode. The header also shows a freshness indicator immediately to the left of the refresh button so users can see how recently the current dashboard snapshot was updated.
+
+### Launch and Exit Freshness
+
+- The launch progress dialog's `Go to token` action performs the same full refresh sequence (`wallet.refreshBalances`, `holding.refreshByToken`, `transaction.refreshByToken`) before routing to the dashboard so freshly launched tokens do not open with zeroed holdings or activity cards.
+- When a holding exit transitions from `PENDING`/`RUNNING` to a terminal state while the dashboard is open, the dashboard automatically triggers that same full refresh path instead of only re-reading cached DB snapshots.
+- Recent launches opened with monitoring OFF also run an initial full refresh on page load, then use recurring auto refresh without repeated wallet SOL balance refreshes.
 
 ## Key Components
 
@@ -226,7 +256,8 @@ The dashboard header's refresh button always performs a full chain refresh regar
 - Fixed position, bottom-right corner.
 - Two states: **expanded** (full controls) and **minimized** (small pill).
 - Four panel health states:
-  - **Monitoring OFF**: "Refresh now" button (full chain refresh) + "Next in Xs" countdown.
+  - **Monitoring OFF / recent launch**: "Refresh now" button (full chain refresh) + "Next in Xs" countdown.
+  - **Monitoring OFF / older token**: "Refresh now" button (full chain refresh) with a manual-only status and no countdown.
   - **Monitoring ON (healthy)**: "Re-read dashboard" text link (lightweight DB re-read). No countdown.
   - **Monitoring ON (degraded)**: "Refresh now" button + warning when stream freshness is delayed.
   - **Monitoring ON (disconnected)**: "Refresh now" button (full chain refresh) + disconnection warning.

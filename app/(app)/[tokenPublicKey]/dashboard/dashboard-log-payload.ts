@@ -7,13 +7,6 @@ type DashboardStatsLike = {
     launchCompletedAt: Date | string | null;
   };
   metrics: {
-    treasury: {
-      totalSol: number;
-      operationalSol: number;
-      devSol: number;
-      walletCount: number;
-      runningVolumeBots: number;
-    };
     holdingsValue: {
       valueSol: number;
       tokenCount: number;
@@ -22,14 +15,17 @@ type DashboardStatsLike = {
       net: number;
       totalBuyVolume: number;
       totalSellVolume: number;
-      holdingsValue: number;
+      platformFees: number;
+      proFees: number;
+      jitoTipsSol: number;
+      totalFees: number;
+      creationCostSol: number;
     };
     activity: {
       totalVolume: number;
       buyVolume: number;
       sellVolume: number;
       transactionCount: number;
-      runningVolumeBots: number;
     };
   };
   holdingsBreakdown: {
@@ -74,7 +70,6 @@ export function buildDashboardSummaryPayload(input: {
       isComplete: statsData.header.isComplete,
       launchCompletedAt: statsData.header.launchCompletedAt,
     },
-    treasury: statsData.metrics.treasury,
     activity: statsData.metrics.activity,
     holdingsValue: statsData.metrics.holdingsValue,
     pnl: statsData.metrics.pnl,

@@ -65,7 +65,7 @@ The `refreshByToken` service is optimized for speed:
 - Zero-balance rows appear when the wallet has an open ATA for the token.
 - Sell dialog includes an option to close empty ATAs after the sell (enabled only for 100% sells and checked by default when the dialog opens).
 - Sell dialog includes a "Return SOL to main wallet" toggle with a short description that it returns the maximum available SOL from processed wallets back to the main wallet, and it is checked by default when the dialog opens.
-- Client mutations invalidate `holding.listByToken` via `trpc.useUtils()` so mounted consumers refetch.
+- After sell and exit flows complete from the holdings page, the client refreshes holdings and related wallet balances, then invalidates the affected wallet queries so the next wallet view reflects the latest balances.
 - `subscription.onTokenBalanceUpdate` is available server-side for real-time token balance events; the holdings page currently relies on staleness checks and explicit refresh/invalidation.
 - This pass is application-level only; no schema migration is introduced for holdings dedupe.
 

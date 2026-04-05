@@ -60,6 +60,12 @@ function shouldDefaultMonitoring(
   return Date.now() - launchTime.getTime() < MONITORING_HOUR_THRESHOLD;
 }
 
+function formatRefreshAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60 * 60) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / (60 * 60))}h ago`;
+}
+
 export function DashboardClient() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
 
@@ -78,6 +84,8 @@ export function DashboardClient() {
   const holdingsRefreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
     null
   );
+  const recentInitialRefreshTokenRef = useRef<string | null>(null);
+  const missingDataRefreshTokenRef = useRef<string | null>(null);
   const lastMonitoringActivityAtRef = useRef<number | null>(null);
   const lastDashboardTriggerRef = useRef("initial-load");
   const lastLoggedStatsUpdateAtRef = useRef<number | null>(null);
@@ -92,29 +100,6 @@ export function DashboardClient() {
     { enabled: !!tokenPublicKey }
   );
 
-  const {
-    data: statsData,
-    isLoading: statsLoading,
-    refetch: refetchStats,
-    isFetching: statsRefreshing,
-    dataUpdatedAt,
-  } = trpc.dashboard.getStats.useQuery(
-    { tokenPublicKey: tokenPublicKey || "" },
-    {
-      enabled: !!tokenPublicKey && !!tokenData,
-      refetchInterval: POLL_INTERVAL,
-    }
-  );
-
-  const { data: defiData, refetch: refetchDefi } =
-    trpc.dashboard.getDefiPools.useQuery(
-      { tokenPublicKey: tokenPublicKey || "" },
-      {
-        enabled: !!tokenPublicKey && !!statsData?.header.isComplete,
-        refetchInterval: POLL_INTERVAL,
-      }
-    );
-
   const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
     enabled: !!tokenPublicKey,
   });
@@ -127,13 +112,45 @@ export function DashboardClient() {
       ? userMonitoringOverride.enabled
       : storedMonitoringOverride;
   const liveMonitoringAllowed = grpcStatusQuery.data?.available ?? false;
-  const desiredMonitoring =
-    activeMonitoringOverride ??
-    (statsData
-      ? shouldDefaultMonitoring(statsData.header.launchCompletedAt)
-      : false);
+
+  const {
+    data: statsData,
+    isLoading: statsLoading,
+    refetch: refetchStats,
+    isFetching: statsRefreshing,
+    dataUpdatedAt,
+  } = trpc.dashboard.getStats.useQuery(
+    { tokenPublicKey: tokenPublicKey || "" },
+    {
+      enabled: !!tokenPublicKey && !!tokenData,
+      refetchInterval: (query) => {
+        const launchCompletedAt = query.state.data?.header.launchCompletedAt;
+        const shouldMonitorByDefault =
+          shouldDefaultMonitoring(launchCompletedAt);
+        const monitoringEnabled =
+          (activeMonitoringOverride ?? shouldMonitorByDefault) &&
+          liveMonitoringAllowed;
+        return monitoringEnabled ? POLL_INTERVAL : false;
+      },
+    }
+  );
+
+  const isRecentLaunch = statsData
+    ? shouldDefaultMonitoring(statsData.header.launchCompletedAt)
+    : false;
+  const desiredMonitoring = activeMonitoringOverride ?? isRecentLaunch;
   const isMonitoring = desiredMonitoring && liveMonitoringAllowed;
+  const nonMonitoringAutoRefreshEnabled = isRecentLaunch && !isMonitoring;
   const monitoringInitialized = Boolean(statsData && tokenPublicKey);
+
+  const { data: defiData, refetch: refetchDefi } =
+    trpc.dashboard.getDefiPools.useQuery(
+      { tokenPublicKey: tokenPublicKey || "" },
+      {
+        enabled: !!tokenPublicKey && !!statsData?.header.isComplete,
+        refetchInterval: isMonitoring ? POLL_INTERVAL : false,
+      }
+    );
   const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
     enabled: !!tokenPublicKey,
   });
@@ -146,6 +163,7 @@ export function DashboardClient() {
     trpc.holding.monitoringRefreshByToken.useMutation();
   const { mutateAsync: refreshTransactions } =
     trpc.transaction.refreshByToken.useMutation();
+  const [recentAutoRefreshing, setRecentAutoRefreshing] = useState(false);
 
   const handleToggleMonitoring = useCallback(
     async (enabled: boolean) => {
@@ -236,10 +254,9 @@ export function DashboardClient() {
   }, [isMonitoring]);
 
   useEffect(() => {
-    if (!isMonitoring) return;
     const timer = setInterval(() => setNowMs(Date.now()), 5_000);
     return () => clearInterval(timer);
-  }, [isMonitoring]);
+  }, []);
 
   useEffect(() => {
     if (!isMonitoring) return;
@@ -444,47 +461,78 @@ export function DashboardClient() {
       },
     }
   );
-  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
   const prevExitStatusRef = useRef<string | null>(null);
 
   const [fullRefreshing, setFullRefreshing] = useState(false);
 
-  const handleFullRefresh = useCallback(async () => {
+  const rereadDashboardData = useCallback(() => {
+    refetchToken();
+    refetchStats();
+    refetchDefi();
+  }, [refetchDefi, refetchStats, refetchToken]);
+
+  const runChainRefresh = useCallback(async ({
+    action,
+    trigger,
+    refreshMode,
+    includeWalletBalances,
+    setPending,
+  }: {
+    action: string;
+    trigger: string;
+    refreshMode: "full" | "auto";
+    includeWalletBalances: boolean;
+    setPending: (value: boolean) => void;
+  }) => {
     if (!tokenPublicKey) return;
-    setFullRefreshing(true);
+    setPending(true);
     logDashboardEvent(
       {
         eventType: "dashboard_refresh",
-        action: "handleFullRefresh",
-        refreshMode: "full",
+        action,
+        refreshMode,
         status: "started",
       },
-      { trigger: "full-refresh" }
+      { trigger }
     );
     let hasFailure = false;
     let outcomes: string[] = [];
     try {
-      const results = await Promise.allSettled([
-        refreshBalances({ tokenPublicKey, force: true }),
-        refreshHoldings({ tokenPublicKey }),
-        refreshTransactions({ tokenPublicKey }),
-      ]);
-      outcomes = results.map((result) => result.status);
+      const tasks = [
+        ...(includeWalletBalances
+          ? [
+              {
+                label: "wallets",
+                promise: refreshBalances({ tokenPublicKey, force: true }),
+              },
+            ]
+          : []),
+        {
+          label: "holdings",
+          promise: refreshHoldings({ tokenPublicKey }),
+        },
+        {
+          label: "transactions",
+          promise: refreshTransactions({ tokenPublicKey }),
+        },
+      ];
+      const results = await Promise.allSettled(tasks.map((task) => task.promise));
+      outcomes = tasks.map(
+        (task, index) => `${task.label}:${results[index]?.status ?? "unknown"}`
+      );
       hasFailure = results.some((result) => result.status === "rejected");
     } finally {
-      refetchToken();
-      refetchStats();
-      refetchDefi();
+      rereadDashboardData();
       logDashboardEvent({
         eventType: "dashboard_refresh",
-        action: "handleFullRefresh",
-        refreshMode: "full",
+        action,
+        refreshMode,
         status: hasFailure ? "failed" : "completed",
         actualValue: {
           outcomes,
         },
       });
-      setFullRefreshing(false);
+      setPending(false);
     }
   }, [
     logDashboardEvent,
@@ -492,10 +540,28 @@ export function DashboardClient() {
     refreshBalances,
     refreshHoldings,
     refreshTransactions,
-    refetchToken,
-    refetchStats,
-    refetchDefi,
+    rereadDashboardData,
   ]);
+
+  const handleFullRefresh = useCallback(async (trigger = "full-refresh") => {
+    await runChainRefresh({
+      action: "handleFullRefresh",
+      trigger,
+      refreshMode: "full",
+      includeWalletBalances: true,
+      setPending: setFullRefreshing,
+    });
+  }, [runChainRefresh]);
+
+  const handleRecentAutoRefresh = useCallback(async () => {
+    await runChainRefresh({
+      action: "handleRecentAutoRefresh",
+      trigger: "recent-launch-auto-refresh",
+      refreshMode: "auto",
+      includeWalletBalances: false,
+      setPending: setRecentAutoRefreshing,
+    });
+  }, [runChainRefresh]);
 
   const handleLightRefresh = useCallback(() => {
     logDashboardEvent(
@@ -507,10 +573,8 @@ export function DashboardClient() {
       },
       { trigger: "light-refresh" }
     );
-    refetchToken();
-    refetchStats();
-    refetchDefi();
-  }, [logDashboardEvent, refetchDefi, refetchStats, refetchToken]);
+    rereadDashboardData();
+  }, [logDashboardEvent, rereadDashboardData]);
 
   useEffect(() => {
     if (!isMonitoring || !monitoringInitialized) return;
@@ -521,6 +585,46 @@ export function DashboardClient() {
     monitoringInitialized,
     handleLightRefresh,
     scheduleMonitoringHoldingsRefresh,
+  ]);
+
+  useEffect(() => {
+    if (!tokenPublicKey || !monitoringInitialized) return;
+    if (isMonitoring || !nonMonitoringAutoRefreshEnabled) return;
+    if (recentInitialRefreshTokenRef.current === tokenPublicKey) return;
+    recentInitialRefreshTokenRef.current = tokenPublicKey;
+    void handleFullRefresh("recent-launch-initial-load");
+  }, [
+    tokenPublicKey,
+    monitoringInitialized,
+    isMonitoring,
+    nonMonitoringAutoRefreshEnabled,
+    handleFullRefresh,
+  ]);
+
+  useEffect(() => {
+    if (!tokenPublicKey || isMonitoring || !nonMonitoringAutoRefreshEnabled) return;
+    const timer = setInterval(() => {
+      void handleRecentAutoRefresh();
+    }, POLL_INTERVAL);
+    return () => clearInterval(timer);
+  }, [
+    tokenPublicKey,
+    isMonitoring,
+    nonMonitoringAutoRefreshEnabled,
+    handleRecentAutoRefresh,
+  ]);
+
+  useEffect(() => {
+    if (!tokenPublicKey || !tokenData || statsLoading || statsData) return;
+    if (missingDataRefreshTokenRef.current === tokenPublicKey) return;
+    missingDataRefreshTokenRef.current = tokenPublicKey;
+    void handleFullRefresh("missing-dashboard-data");
+  }, [
+    tokenData,
+    tokenPublicKey,
+    statsLoading,
+    statsData,
+    handleFullRefresh,
   ]);
 
   useEffect(() => {
@@ -545,10 +649,10 @@ export function DashboardClient() {
     lastSseEventAt !== null && nowMs - lastSseEventAt > STALE_THRESHOLD_MS;
   const monitoringDisabledMessage =
     grpcStatusQuery.data?.accessReason === "not_pro"
-      ? "Upgrade to Pro to activate live monitoring. Dashboard will keep polling every 30 seconds."
+      ? "Upgrade to Pro to activate live monitoring."
       : grpcStatusQuery.data?.accessReason === "grpc_disabled" ||
           grpcStatusQuery.data?.accessReason === "grpc_not_configured"
-        ? "Live monitoring is currently unavailable. Dashboard will keep polling every 30 seconds."
+        ? "Live monitoring is currently unavailable."
         : null;
   const monitoringHealthState: MonitoringHealthState = !isMonitoring
     ? "off"
@@ -559,6 +663,18 @@ export function DashboardClient() {
         : "healthy";
   const needsFullRefresh =
     !isMonitoring || monitoringHealthState === "failed" || monitoringHealthState === "degraded";
+  const refreshAgeSeconds =
+    dataUpdatedAt > 0 ? Math.max(Math.floor((nowMs - dataUpdatedAt) / 1000), 0) : null;
+  const refreshStatusLabel =
+    fullRefreshing || recentAutoRefreshing
+      ? "Refreshing..."
+      : statsRefreshing
+        ? "Updating..."
+        : refreshAgeSeconds === null
+          ? "Waiting for data"
+          : `Last refresh ${formatRefreshAge(refreshAgeSeconds)}`;
+  const isAnyRefreshActive =
+    fullRefreshing || recentAutoRefreshing || statsRefreshing;
 
   const handleRefresh = useCallback(async () => {
     if (needsFullRefresh) {
@@ -626,13 +742,8 @@ export function DashboardClient() {
       exitStatus !== "PENDING" && exitStatus !== "RUNNING";
     prevExitStatusRef.current = exitStatus;
     if (!wasRunning || !isTerminal) return;
-    refetchStats();
-    void refetchDefi();
-    refreshMainBalance.mutateAsync({}).then(() => {
-      void refetchStats();
-      void refetchDefi();
-    });
-  }, [exitStatus, refetchDefi, refetchStats, refreshMainBalance]);
+    void handleFullRefresh("exit-terminal-refresh");
+  }, [exitStatus, handleFullRefresh]);
 
   const walletsWithBalance =
     statsData?.holdingsBreakdown.userWallets.filter(
@@ -744,11 +855,12 @@ export function DashboardClient() {
         <>
           <DashboardHeader
             token={tokenData}
-            header={statsData.header}
             onRefresh={handleFullRefresh}
-            isRefreshing={fullRefreshing || statsRefreshing}
+            isRefreshing={isAnyRefreshActive}
+            refreshStatusLabel={refreshStatusLabel}
           />
           <DashboardStats
+            header={statsData.header}
             metrics={statsData.metrics}
             onOpenExitDialog={handleOpenExitDialog}
             exitDisabled={
@@ -809,8 +921,7 @@ export function DashboardClient() {
           }
           onToggleMonitoring={handleToggleMonitoring}
           onRefresh={handleRefresh}
-          isRefreshing={fullRefreshing || statsRefreshing}
-          isFullRefresh={needsFullRefresh}
+          isRefreshing={isAnyRefreshActive}
           healthState={monitoringHealthState}
           dataUpdatedAt={dataUpdatedAt}
         />

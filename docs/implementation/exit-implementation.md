@@ -156,8 +156,9 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 - Dialog shows a detailed pre-flight description of each exit step
 - Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
 - Exit preflight totals should reflect deduped holdings data so shared main/dev launches do not inflate wallet counts or token totals.
-- Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior
-- Activity logs are shown in real time
+- Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior, and it is checked by default when the dialog opens
+- Activity logs are shown in real time with newest entries first and the latest update visually emphasized in the progress feed
 - Summary shows totals including chunk outcomes (total/successful/failed chunks), wallets, bundles, tokens, ATAs closed, SOL recovered, and total Jito tip
 - Users can cancel an active exit via `holding.cancelExit`
+- When an exit reaches a terminal state from the holdings page, the client refreshes holdings plus related wallet balances so follow-up views reflect the completed cleanup
 - This pass keeps exit execution logic unchanged and instead aligns preflight inputs with deduped holdings data.

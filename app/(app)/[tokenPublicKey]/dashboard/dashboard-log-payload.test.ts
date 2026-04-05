@@ -14,29 +14,25 @@ const statsData = {
     launchCompletedAt: "2026-03-20T09:00:00.000Z",
   },
   metrics: {
-    treasury: {
-      totalSol: 10,
-      operationalSol: 7,
-      devSol: 3,
-      walletCount: 4,
-      runningVolumeBots: 1,
-    },
     holdingsValue: {
       valueSol: 22,
       tokenCount: 1000,
     },
     pnl: {
-      net: 3,
+      net: -3,
       totalBuyVolume: 12,
       totalSellVolume: 9,
-      holdingsValue: 22,
+      platformFees: 0.12,
+      proFees: 0,
+      jitoTipsSol: 0.001,
+      totalFees: 0.12,
+      creationCostSol: 0.025,
     },
     activity: {
       totalVolume: 99,
       buyVolume: 50,
       sellVolume: 49,
       transactionCount: 11,
-      runningVolumeBots: 1,
     },
   },
   holdingsBreakdown: {

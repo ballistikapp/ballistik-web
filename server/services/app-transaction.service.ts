@@ -268,6 +268,58 @@ export const appTransactionService = {
 
     return { items, totalCount };
   },
+
+  async costBreakdown(userId: string, tokenPublicKey: string) {
+    const rows = await prisma.appTransaction.groupBy({
+      by: ["type", "source"],
+      where: {
+        userId,
+        tokenPublicKey,
+        status: "CONFIRMED",
+        solAmount: { not: null },
+      },
+      _sum: { solAmount: true },
+      _count: { id: true },
+    });
+
+    const byType: Record<string, { solAmount: number; count: number }> = {};
+    const bySource: Record<string, { solAmount: number; count: number }> = {};
+
+    for (const row of rows) {
+      const sol = Number(row._sum.solAmount ?? 0);
+      const count = row._count.id;
+
+      if (!byType[row.type]) byType[row.type] = { solAmount: 0, count: 0 };
+      byType[row.type].solAmount += sol;
+      byType[row.type].count += count;
+
+      if (!bySource[row.source]) bySource[row.source] = { solAmount: 0, count: 0 };
+      bySource[row.source].solAmount += sol;
+      bySource[row.source].count += count;
+    }
+
+    const totalFees = (byType["FEE_USAGE"]?.solAmount ?? 0) + (byType["FEE_PRO"]?.solAmount ?? 0);
+    const totalFunding = (byType["TRANSFER_FUND"]?.solAmount ?? 0);
+    const totalReturns = (byType["TRANSFER_RETURN"]?.solAmount ?? 0) + (byType["TRANSFER_RECLAIM"]?.solAmount ?? 0);
+    const totalBuys = (byType["TRADE_BUY"]?.solAmount ?? 0);
+    const totalSells = (byType["TRADE_SELL"]?.solAmount ?? 0);
+
+    const totalTransactions = rows.reduce((sum, r) => sum + r._count.id, 0);
+
+    return {
+      byType,
+      bySource,
+      summary: {
+        totalFees,
+        totalFunding,
+        totalReturns,
+        totalBuys,
+        totalSells,
+        netPnl: totalSells - totalBuys,
+        totalTransactions,
+      },
+    };
+  },
 };
 
 // ---------------------------------------------------------------------------

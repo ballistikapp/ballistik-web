@@ -519,6 +519,7 @@ export const volumeBotService = {
       totalFeeSol: usageFees.totalFeeSol,
       reason: "volume-bot.start",
       txSource: "VOLUME_BOT",
+      tokenPublicKey: token.publicKey,
     });
 
     const session = await prisma.$transaction(async (tx) => {
