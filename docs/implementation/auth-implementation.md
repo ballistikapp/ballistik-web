@@ -102,6 +102,8 @@ Server persistence:
 ## Trust Boundaries
 
 - `proxy.ts` remains a convenience gate, not a source of auth truth.
+- `/auth` stays public at the proxy layer so stale access-token cookies cannot block sign-in.
+- Authenticated redirects away from `/auth` are handled in `app/auth/layout.tsx`, where the JWT is actually verified.
 - Procedure-level checks and service-level session state are authoritative.
 - Session creation/rotation/revocation operations are service-owned.
 
