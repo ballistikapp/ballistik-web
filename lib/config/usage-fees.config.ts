@@ -4,7 +4,7 @@ export const descriptionAttributionRemovalFeeSol = 0.1;
 export const bundleBuyFeeSol = 0.1;
 
 export type LaunchUsageFeeInput = {
-  devWalletOption: "import" | "generate" | "use_main";
+  devWalletOption: "system" | "import" | "generate" | "use_main";
   bundleBuyEnabled: boolean;
   bundlerWalletCount: number;
   distributionWalletMultiplier: number;

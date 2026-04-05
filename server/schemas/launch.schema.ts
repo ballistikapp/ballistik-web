@@ -18,7 +18,7 @@ export const launchTokenSchema = z.object({
   twitter: z.string().optional(),
   telegram: z.string().optional(),
   website: z.string().optional(),
-  devWalletOption: z.enum(["import", "generate", "use_main"]),
+  devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
   devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
@@ -44,6 +44,8 @@ export const launchTokenSchema = z.object({
     .max(5, "Distribution multiplier must be 5 or less"),
 });
 
+export type DevWalletOption = LaunchTokenInput["devWalletOption"];
+
 export const launchStatusSchema = z.object({
   launchId: z.string().min(1),
 });
@@ -53,7 +55,7 @@ export const launchRetrySchema = z.object({
 });
 
 export const launchPreviewCostsSchema = z.object({
-  devWalletOption: z.enum(["import", "generate", "use_main"]),
+  devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
   devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),

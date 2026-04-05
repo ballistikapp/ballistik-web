@@ -13,6 +13,8 @@ import {
   Wallet,
   ChevronRight,
   ChevronsUpDown,
+  Shield,
+  Lock,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -27,6 +29,7 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import {
   PageSection,
   PageSectionDivider,
@@ -89,7 +92,7 @@ const formSchema = z
     twitter: z.string(),
     telegram: z.string(),
     website: z.string(),
-    devWalletOption: z.enum(["import", "generate", "use_main"]),
+    devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
     importedDevWalletKey: z.string(),
     devBuyAmountSol: z
       .number()
@@ -176,7 +179,7 @@ const readVideoDimensions = (file: File) =>
   });
 
 function calculateLaunchTotals(values: {
-  devWalletOption: "import" | "generate" | "use_main";
+  devWalletOption: "system" | "import" | "generate" | "use_main";
   devBuyAmountSol: number;
   jitoTipAmountSol: number;
   bundleBuyEnabled: boolean;
@@ -557,7 +560,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     twitter: "",
     telegram: "",
     website: "",
-    devWalletOption: "generate" as "import" | "generate" | "use_main",
+    devWalletOption: "system" as "system" | "import" | "generate" | "use_main",
     importedDevWalletKey: "",
     devBuyAmountSol: 0.5,
     jitoTipAmountSol: 0.001,
@@ -687,7 +690,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         className="space-y-0"
       >
         {/* Platform Selector */}
-        <section id="platform" className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+        <section
+          id="platform"
+          className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between sm:gap-4"
+        >
           <h2 className="text-xl font-normal md:text-2xl">Platform</h2>
           <Popover>
             <PopoverTrigger asChild>
@@ -1174,55 +1180,181 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   </Tooltip>
                 </div>
                 <form.Field name="devWalletOption">
-                  {(field) => (
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={() => field.handleChange("import")}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                          field.state.value === "import"
-                            ? "border-primary bg-primary/5 font-medium"
-                            : "border-muted hover:border-muted-foreground/50"
+                  {(field) => {
+                    const isPro = currentUser?.plan === "PRO";
+                    const proOnlyClass = !isPro
+                      ? "opacity-50 cursor-not-allowed"
+                      : "";
+                    const proUpgradeTooltip =
+                      "Upgrade to Pro plan to use Import, Generate, or Main Wallet options.";
+                    return (
+                      <div className="flex flex-wrap gap-2">
+                        <button
+                          type="button"
+                          onClick={() => field.handleChange("system")}
+                          className={cn(
+                            "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                            field.state.value === "system"
+                              ? "border-primary bg-primary/5 font-medium"
+                              : "border-muted hover:border-muted-foreground/50"
+                          )}
+                        >
+                          <Shield className="h-4 w-4" />
+                          System Wallet
+                        </button>
+                        {isPro ? (
+                          <button
+                            type="button"
+                            onClick={() => field.handleChange("import")}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                              field.state.value === "import"
+                                ? "border-primary bg-primary/5 font-medium"
+                                : "border-muted hover:border-muted-foreground/50"
+                            )}
+                          >
+                            <Import className="h-4 w-4" />
+                            Import
+                          </button>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="relative inline-flex">
+                                <button
+                                  type="button"
+                                  disabled
+                                  className={cn(
+                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                    field.state.value === "import"
+                                      ? "border-primary bg-primary/5 font-medium"
+                                      : "border-muted",
+                                    proOnlyClass
+                                  )}
+                                >
+                                  <Import className="h-4 w-4" />
+                                  Import
+                                </button>
+                                <Badge
+                                  variant="secondary"
+                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
+                                >
+                                  <Lock className="h-2 w-2" />
+                                  PRO
+                                </Badge>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {proUpgradeTooltip}
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      >
-                        <Import className="h-4 w-4" />
-                        Import
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => field.handleChange("generate")}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                          field.state.value === "generate"
-                            ? "border-primary bg-primary/5 font-medium"
-                            : "border-muted hover:border-muted-foreground/50"
+                        {isPro ? (
+                          <button
+                            type="button"
+                            onClick={() => field.handleChange("generate")}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                              field.state.value === "generate"
+                                ? "border-primary bg-primary/5 font-medium"
+                                : "border-muted hover:border-muted-foreground/50"
+                            )}
+                          >
+                            <Sparkles className="h-4 w-4" />
+                            Generate
+                          </button>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="relative inline-flex">
+                                <button
+                                  type="button"
+                                  disabled
+                                  className={cn(
+                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                    field.state.value === "generate"
+                                      ? "border-primary bg-primary/5 font-medium"
+                                      : "border-muted",
+                                    proOnlyClass
+                                  )}
+                                >
+                                  <Sparkles className="h-4 w-4" />
+                                  Generate
+                                </button>
+                                <Badge
+                                  variant="secondary"
+                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
+                                >
+                                  <Lock className="h-2 w-2" />
+                                  PRO
+                                </Badge>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {proUpgradeTooltip}
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      >
-                        <Sparkles className="h-4 w-4" />
-                        Generate
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => field.handleChange("use_main")}
-                        className={cn(
-                          "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                          field.state.value === "use_main"
-                            ? "border-primary bg-primary/5 font-medium"
-                            : "border-muted hover:border-muted-foreground/50"
+                        {isPro ? (
+                          <button
+                            type="button"
+                            onClick={() => field.handleChange("use_main")}
+                            className={cn(
+                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                              field.state.value === "use_main"
+                                ? "border-primary bg-primary/5 font-medium"
+                                : "border-muted hover:border-muted-foreground/50"
+                            )}
+                          >
+                            <Wallet className="h-4 w-4" />
+                            Main Wallet
+                          </button>
+                        ) : (
+                          <Tooltip>
+                            <TooltipTrigger asChild>
+                              <span className="relative inline-flex">
+                                <button
+                                  type="button"
+                                  disabled
+                                  className={cn(
+                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                    field.state.value === "use_main"
+                                      ? "border-primary bg-primary/5 font-medium"
+                                      : "border-muted",
+                                    proOnlyClass
+                                  )}
+                                >
+                                  <Wallet className="h-4 w-4" />
+                                  Main Wallet
+                                </button>
+                                <Badge
+                                  variant="secondary"
+                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
+                                >
+                                  <Lock className="h-2 w-2" />
+                                  PRO
+                                </Badge>
+                              </span>
+                            </TooltipTrigger>
+                            <TooltipContent side="top">
+                              {proUpgradeTooltip}
+                            </TooltipContent>
+                          </Tooltip>
                         )}
-                      >
-                        <Wallet className="h-4 w-4" />
-                        Main Wallet
-                      </button>
-                    </div>
-                  )}
+                      </div>
+                    );
+                  }}
                 </form.Field>
                 <form.Subscribe
                   selector={(state) => state.values.devWalletOption}
                 >
                   {(devWalletOption) => (
                     <div className="mt-2 h-9">
+                      {devWalletOption === "system" && (
+                        <p className="text-sm text-muted-foreground flex items-center h-full">
+                          Platform-provided dev wallet will be used for this
+                          launch
+                        </p>
+                      )}
                       {devWalletOption === "import" && (
                         <form.Field name="importedDevWalletKey">
                           {(field) => {
@@ -1725,11 +1857,13 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 Dev Wallet
                               </span>
                               <span>
-                                {values.devWalletOption === "import"
-                                  ? "Imported wallet"
-                                  : values.devWalletOption === "generate"
-                                    ? "Will be generated"
-                                    : "Main Wallet (used as dev)"}
+                                {values.devWalletOption === "system"
+                                  ? "System Wallet"
+                                  : values.devWalletOption === "import"
+                                    ? "Imported wallet"
+                                    : values.devWalletOption === "generate"
+                                      ? "Will be generated"
+                                      : "Main Wallet (used as dev)"}
                               </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">

@@ -60,6 +60,7 @@ import {
   computeSponsoredRecoverableLamports,
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
+import type { DevWalletOption } from "@/server/schemas/launch.schema";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -332,7 +333,7 @@ function buildLaunchRecoveryData(
     mainWalletPublicKey,
     devWalletPublicKey,
     usesMainWalletAsDev,
-    devWalletManaged: input.devWalletOption === "generate",
+    devWalletManaged: input.devWalletOption === "generate" || input.devWalletOption === "system",
     bundlerWallets: bundlerWalletKeypairs.map((wallet) =>
       wallet.publicKey.toBase58()
     ),
@@ -357,7 +358,7 @@ function buildLaunchRecoveryWalletRows(
       walletPublicKey: devWalletPublicKey,
       walletType: "DEV",
       role: "DEV",
-      isManaged: input.devWalletOption === "generate",
+      isManaged: input.devWalletOption === "generate" || input.devWalletOption === "system",
     });
   }
   rows.push(
@@ -947,6 +948,19 @@ function keypairFromPrivateKey(privateKey: string) {
   return Keypair.fromSecretKey(bs58.decode(privateKey));
 }
 
+function getSystemDevWalletKeypair(): Keypair {
+  const { SYSTEM_DEV_WALLET_PRIVATE_KEY } = getEnv();
+  return keypairFromPrivateKey(SYSTEM_DEV_WALLET_PRIVATE_KEY);
+}
+
+function normalizeDevWalletOptionForPlan(
+  option: DevWalletOption,
+  plan: ContextUser["plan"]
+): DevWalletOption {
+  if (plan === UserPlan.PRO) return option;
+  return "system";
+}
+
 async function mintAccountExistsOnChain(mint: PublicKey) {
   try {
     const connection = getSolanaConnection();
@@ -1434,12 +1448,24 @@ async function resolvePreflightDevWalletBalance(params: {
   input: LaunchCostInput;
   mainWalletPublicKey: string;
 }) {
-  if (params.input.devWalletOption !== "import") {
+  if (params.input.devWalletOption === "system") {
+    const systemKeypair = getSystemDevWalletKeypair();
     return {
-      devWalletPublicKey:
-        params.input.devWalletOption === "use_main"
-          ? params.mainWalletPublicKey
-          : Keypair.generate().publicKey.toBase58(),
+      devWalletPublicKey: systemKeypair.publicKey.toBase58(),
+      currentLamports: BigInt(0),
+    };
+  }
+
+  if (params.input.devWalletOption === "use_main") {
+    return {
+      devWalletPublicKey: params.mainWalletPublicKey,
+      currentLamports: BigInt(0),
+    };
+  }
+
+  if (params.input.devWalletOption === "generate") {
+    return {
+      devWalletPublicKey: Keypair.generate().publicKey.toBase58(),
       currentLamports: BigInt(0),
     };
   }
@@ -1638,6 +1664,21 @@ async function resolveDevWallet(
 ) {
   let devWalletKeypair = mainWalletKeypair;
   let devWalletPublicKey = mainWalletPublicKey;
+
+  if (input.devWalletOption === "system") {
+    devWalletKeypair = getSystemDevWalletKeypair();
+    devWalletPublicKey = devWalletKeypair.publicKey.toBase58();
+    await prisma.wallet.upsert({
+      where: { publicKey: devWalletPublicKey },
+      update: {},
+      create: {
+        publicKey: devWalletPublicKey,
+        privateKey: "",
+        type: "DEV",
+        isSystemWallet: true,
+      },
+    });
+  }
 
   if (input.devWalletOption === "import") {
     if (!input.importedDevWalletKey?.trim()) {
@@ -3009,7 +3050,11 @@ export type UserLaunchRow = {
 
 export const launchService = {
   async previewCosts(input: LaunchPreviewCostsInput, user: RequestUser) {
-    return await calculateLaunchCostPreview(input, user);
+    const normalizedInput = {
+      ...input,
+      devWalletOption: normalizeDevWalletOptionForPlan(input.devWalletOption, user.plan),
+    };
+    return await calculateLaunchCostPreview(normalizedInput, user);
   },
 
   async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
@@ -3118,11 +3163,15 @@ export const launchService = {
   },
 
   async startLaunch(input: LaunchTokenInput, user: RequestUser) {
+    const enforcedInput: LaunchTokenInput = {
+      ...input,
+      devWalletOption: normalizeDevWalletOptionForPlan(input.devWalletOption, user.plan),
+    };
     const idempotencyKey = [
       "launch-start",
       user.id,
-      input.tokenName.trim().toLowerCase(),
-      normalizeSymbol(input.tokenSymbol),
+      enforcedInput.tokenName.trim().toLowerCase(),
+      normalizeSymbol(enforcedInput.tokenSymbol),
     ].join(":");
     const actionKey = `launch:start:${user.id}`;
 
@@ -3144,7 +3193,7 @@ export const launchService = {
           }
 
           const normalizedInput =
-            await normalizeLaunchInputMediaForStorage(input);
+            await normalizeLaunchInputMediaForStorage(enforcedInput);
           await ensureLaunchFundingAvailable(normalizedInput, user);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
@@ -3227,7 +3276,10 @@ export const launchService = {
           400
         );
       }
-      const retryInput = parsedInput.data;
+      const retryInput: LaunchTokenInput = {
+        ...parsedInput.data,
+        devWalletOption: normalizeDevWalletOptionForPlan(parsedInput.data.devWalletOption, user.plan),
+      };
       await ensureLaunchFundingAvailable(retryInput, user);
       const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
         user,
@@ -3832,7 +3884,7 @@ export const launchService = {
         distributionWallets
       );
       managedLaunchWallets = [
-        ...(input.devWalletOption === "generate" &&
+        ...((input.devWalletOption === "generate" || input.devWalletOption === "system") &&
         devWalletPublicKey !== user.mainWallet.publicKey
           ? [devWalletKeypair]
           : []),

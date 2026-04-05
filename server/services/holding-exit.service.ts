@@ -41,6 +41,7 @@ import {
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
+import { getEnv } from "@/lib/config/env";
 
 const cancelledExits = new Set<string>();
 
@@ -56,6 +57,7 @@ function markExitCancelled(exitId: string) {
 type WalletRecord = {
   publicKey: string;
   privateKey: string;
+  isSystemWallet?: boolean;
 };
 
 type WalletBalance = {
@@ -161,16 +163,16 @@ async function getAllowedWalletsWithKeys(
         tokenPublicKey,
         type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
       },
-      select: { publicKey: true, privateKey: true },
+      select: { publicKey: true, privateKey: true, isSystemWallet: true },
     }),
     prisma.tokenDevWallet.findFirst({
       where: { tokenPublicKey },
-      select: { wallet: { select: { publicKey: true, privateKey: true } } },
+      select: { wallet: { select: { publicKey: true, privateKey: true, isSystemWallet: true } } },
     }),
     prisma.user.findUnique({
       where: { id: userId },
       select: {
-        mainWallet: { select: { publicKey: true, privateKey: true } },
+        mainWallet: { select: { publicKey: true, privateKey: true, isSystemWallet: true } },
       },
     }),
   ]);
@@ -180,9 +182,15 @@ async function getAllowedWalletsWithKeys(
     throw new AppError("Main wallet not found", 400);
   }
 
+  const resolvedDevWallet = devWallet?.wallet
+    ? devWallet.wallet.isSystemWallet
+      ? { ...devWallet.wallet, privateKey: getEnv().SYSTEM_DEV_WALLET_PRIVATE_KEY, isSystemWallet: true as const }
+      : devWallet.wallet
+    : null;
+
   const allWallets: WalletRecord[] = [
     mainWallet,
-    ...(devWallet?.wallet ? [devWallet.wallet] : []),
+    ...(resolvedDevWallet ? [resolvedDevWallet] : []),
     ...operationalWallets,
   ].filter((wallet) => Boolean(wallet.privateKey));
 

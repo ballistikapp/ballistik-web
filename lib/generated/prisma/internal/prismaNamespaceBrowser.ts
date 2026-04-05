@@ -168,7 +168,8 @@ export const WalletScalarFieldEnum = {
   tokenPublicKey: 'tokenPublicKey',
   balanceSol: 'balanceSol',
   balanceRefreshedAt: 'balanceRefreshedAt',
-  isImported: 'isImported'
+  isImported: 'isImported',
+  isSystemWallet: 'isSystemWallet'
 } as const
 
 export type WalletScalarFieldEnum = (typeof WalletScalarFieldEnum)[keyof typeof WalletScalarFieldEnum]

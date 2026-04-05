@@ -43,7 +43,7 @@ Total launch usage fee is the sum of:
 
 Generated wallet count for launch:
 
-- `+1` when `devWalletOption = generate`
+- `+1` when `devWalletOption = generate` (not counted for `system`, `import`, or `use_main`)
 - `+bundlerWalletCount` when bundle buy is enabled
 - `+bundlerWalletCount * (distributionWalletMultiplier - 1)` when distribution multiplier is greater than `1`
 

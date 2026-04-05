@@ -95,7 +95,8 @@ export function AccountSendDialog({
 
   const availableWallets: WalletOption[] = useMemo(() => {
     const result: WalletOption[] = [];
-    if (devWallet && devWallet.type !== "MAIN_WALLET") {
+    const isSystemDev = devWallet && "isSystemWallet" in devWallet && devWallet.isSystemWallet;
+    if (devWallet && devWallet.type !== "MAIN_WALLET" && !isSystemDev) {
       result.push({
         publicKey: devWallet.publicKey,
         type: devWallet.type,

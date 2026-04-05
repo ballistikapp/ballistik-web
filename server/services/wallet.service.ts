@@ -113,6 +113,7 @@ export const walletService = {
             balanceRefreshedAt: true,
             createdAt: true,
             updatedAt: true,
+            isSystemWallet: true,
           },
         },
       },
@@ -426,6 +427,7 @@ export const walletService = {
         createdAt: true,
         updatedAt: true,
         tokenPublicKey: true,
+        isSystemWallet: true,
       },
     });
 
@@ -464,6 +466,7 @@ export const walletService = {
         balanceRefreshedAt: wallet.balanceRefreshedAt,
         createdAt: wallet.createdAt,
         updatedAt: wallet.updatedAt,
+        isSystemWallet: wallet.isSystemWallet,
       },
       mainWallet,
     };
@@ -510,11 +513,16 @@ export const walletService = {
         type: true,
         tokenPublicKey: true,
         privateKey: true,
+        isSystemWallet: true,
       },
     });
 
     if (!wallet) {
       throw new AppError("Wallet not found", 404);
+    }
+
+    if (wallet.isSystemWallet) {
+      throw new AppError("Private key not available for system wallets", 403);
     }
 
     if (wallet.type === "DEV") {
@@ -581,6 +589,7 @@ export const walletService = {
               balanceSol: true,
               balanceRefreshedAt: true,
               type: true,
+              isSystemWallet: true,
             },
           },
         },
@@ -600,6 +609,11 @@ export const walletService = {
       }),
     ]);
 
+    const devWalletForRefresh =
+      devWallet?.wallet && !devWallet.wallet.isSystemWallet
+        ? devWallet.wallet
+        : null;
+
     const availableWallets: Array<{
       publicKey: string;
       balanceSol: number;
@@ -609,7 +623,7 @@ export const walletService = {
       new Map(
         [
           ...(user?.mainWallet ? [user.mainWallet] : []),
-          ...(devWallet?.wallet ? [devWallet.wallet] : []),
+          ...(devWalletForRefresh ? [devWalletForRefresh] : []),
           ...operationalWallets,
         ]
           .map((wallet) => ({
@@ -825,7 +839,7 @@ export const walletService = {
       }),
       prisma.tokenDevWallet.findFirst({
         where: { tokenPublicKey },
-        select: { wallet: { select: { publicKey: true } } },
+        select: { wallet: { select: { publicKey: true, isSystemWallet: true } } },
       }),
     ]);
 
@@ -836,7 +850,8 @@ export const walletService = {
 
     const devWalletPublicKey =
       devWallet?.wallet?.publicKey &&
-      devWallet.wallet.publicKey !== mainWallet.publicKey
+      devWallet.wallet.publicKey !== mainWallet.publicKey &&
+      !devWallet.wallet.isSystemWallet
         ? devWallet.wallet.publicKey
         : null;
     const allowedWallets = new Set([
@@ -1051,7 +1066,7 @@ export const walletService = {
       prisma.tokenDevWallet.findFirst({
         where: { tokenPublicKey },
         select: {
-          wallet: { select: { publicKey: true, privateKey: true, type: true } },
+          wallet: { select: { publicKey: true, privateKey: true, type: true, isSystemWallet: true } },
         },
       }),
     ]);
@@ -1064,7 +1079,8 @@ export const walletService = {
     const mainPublicKey = new PublicKey(mainWallet.publicKey);
     const devWalletTarget =
       devWallet?.wallet &&
-      devWallet.wallet.publicKey !== mainWallet.publicKey
+      devWallet.wallet.publicKey !== mainWallet.publicKey &&
+      !devWallet.wallet.isSystemWallet
         ? devWallet.wallet
         : null;
     const allowedWallets = new Map(

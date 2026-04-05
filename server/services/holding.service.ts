@@ -36,6 +36,7 @@ import type {
   SellHoldingsByTokenInput,
 } from "@/server/schemas/holding.schema";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
+import { getEnv } from "@/lib/config/env";
 
 type WalletRecord = {
   publicKey: string;
@@ -44,6 +45,7 @@ type WalletRecord = {
 
 type WalletWithKey = WalletRecord & {
   privateKey: string;
+  isSystemWallet?: boolean;
 };
 
 const HOLDING_MUTATION_BATCH_SIZE = 100;
@@ -212,34 +214,45 @@ async function getAllowedWalletsWithKeys(
         tokenPublicKey,
         type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
       },
-      select: { publicKey: true, type: true, privateKey: true },
+      select: { publicKey: true, type: true, privateKey: true, isSystemWallet: true },
     }),
     prisma.tokenDevWallet.findFirst({
       where: { tokenPublicKey },
       select: {
-        wallet: { select: { publicKey: true, type: true, privateKey: true } },
+        wallet: { select: { publicKey: true, type: true, privateKey: true, isSystemWallet: true } },
       },
     }),
     prisma.user.findUnique({
       where: { id: userId },
       select: {
         mainWallet: {
-          select: { publicKey: true, type: true, privateKey: true },
+          select: { publicKey: true, type: true, privateKey: true, isSystemWallet: true },
         },
       },
     }),
   ]);
 
-  const allWallets: WalletWithKey[] = [
+  const resolvedDevWallet = devWallet?.wallet
+    ? devWallet.wallet.isSystemWallet
+      ? { ...devWallet.wallet, privateKey: getEnv().SYSTEM_DEV_WALLET_PRIVATE_KEY, isSystemWallet: true as const }
+      : devWallet.wallet
+    : null;
+
+  const allWallets = [
     ...(user?.mainWallet ? [user.mainWallet] : []),
-    ...(devWallet?.wallet ? [devWallet.wallet] : []),
+    ...(resolvedDevWallet ? [resolvedDevWallet] : []),
     ...operationalWallets,
   ];
 
   const walletMap = new Map<string, WalletWithKey>();
   allWallets.forEach((wallet) => {
     if (wallet.privateKey) {
-      walletMap.set(wallet.publicKey, wallet);
+      walletMap.set(wallet.publicKey, {
+        publicKey: wallet.publicKey,
+        type: wallet.type,
+        privateKey: wallet.privateKey,
+        isSystemWallet: wallet.isSystemWallet,
+      });
     }
   });
 
@@ -496,6 +509,55 @@ async function returnSolToMainWallet(
     totalSol: totalLamports / 1_000_000_000,
     results,
   };
+}
+
+async function sweepSystemDevRealizedSol(
+  connection: Connection,
+  sellSignature: string,
+  systemDevKeypair: Keypair,
+  mainWalletKeypair: Keypair
+) {
+  let tx: Awaited<ReturnType<Connection["getTransaction"]>> = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    tx = await connection.getTransaction(sellSignature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    if (tx) break;
+    await new Promise((r) => setTimeout(r, 1000));
+  }
+  if (!tx?.meta) return;
+
+  const accountKeys = tx.transaction.message.getAccountKeys();
+  const sellerIndex = accountKeys.staticAccountKeys.findIndex(
+    (key) => key.toBase58() === systemDevKeypair.publicKey.toBase58()
+  );
+  if (sellerIndex < 0) return;
+
+  const preLamports = tx.meta.preBalances[sellerIndex] ?? 0;
+  const postLamports = tx.meta.postBalances[sellerIndex] ?? 0;
+  const realizedLamports = postLamports - preLamports;
+  if (realizedLamports <= 0) return;
+
+  const transferFeeLamports = 5000;
+  const sweepLamports = realizedLamports - transferFeeLamports;
+  if (sweepLamports <= 0) return;
+
+  const sweepTx = new Transaction().add(
+    SystemProgram.transfer({
+      fromPubkey: systemDevKeypair.publicKey,
+      toPubkey: mainWalletKeypair.publicKey,
+      lamports: sweepLamports,
+    })
+  );
+  const { blockhash, lastValidBlockHeight } =
+    await connection.getLatestBlockhash("confirmed");
+  sweepTx.recentBlockhash = blockhash;
+  sweepTx.lastValidBlockHeight = lastValidBlockHeight;
+  sweepTx.feePayer = systemDevKeypair.publicKey;
+  await sendAndConfirmTransaction(connection, sweepTx, [systemDevKeypair], {
+    commitment: "confirmed",
+  });
 }
 
 type BalanceResult = {
@@ -904,11 +966,12 @@ export const holdingService = {
       throw new AppError("No valid wallets selected", 400);
     }
 
+    const hasSystemDevWallet = wallets.some((w) => w.isSystemWallet);
     const connection = getSolanaConnection();
     const mintPublicKey = new PublicKey(token.publicKey);
     const sellPercentage = Math.floor(input.sellPercentage);
     const shouldCloseAta = Boolean(input.closeAta);
-    const shouldReturnSolToMainWallet = Boolean(input.returnSolToMainWallet);
+    const shouldReturnSolToMainWallet = hasSystemDevWallet || Boolean(input.returnSolToMainWallet);
     const mainWalletRecord = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1037,6 +1100,21 @@ export const holdingService = {
               feePayerPublicKey: feePayer.publicKey.toBase58(),
             },
           });
+
+          if (wallet.isSystemWallet && mainWalletKeypair) {
+            try {
+              await sweepSystemDevRealizedSol(
+                connection,
+                signature,
+                seller,
+                mainWalletKeypair
+              );
+            } catch (sweepError) {
+              console.error(
+                `[Sell] System dev SOL sweep failed for ${wallet.publicKey}: ${sweepError instanceof Error ? sweepError.message : String(sweepError)}`
+              );
+            }
+          }
 
           return {
             walletPublicKey: wallet.publicKey,

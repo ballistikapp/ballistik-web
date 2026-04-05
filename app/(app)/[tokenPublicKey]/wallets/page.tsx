@@ -104,24 +104,29 @@ export default function Page() {
     () => operationalWalletsData?.wallets ?? [],
     [operationalWalletsData?.wallets]
   );
+  const isSystemDevWallet = Boolean(
+    devWallet && "isSystemWallet" in devWallet && devWallet.isSystemWallet
+  );
+  const custodyDevWallet = isSystemDevWallet ? null : devWallet;
+  const displayDevWallet = devWallet;
   const isSharedMainDevWallet = Boolean(
     mainWallet &&
-      devWallet &&
-      mainWallet.publicKey === devWallet.publicKey
+      custodyDevWallet &&
+      mainWallet.publicKey === custodyDevWallet.publicKey
   );
-  const sharedWallet = isSharedMainDevWallet ? mainWallet ?? devWallet : null;
+  const sharedWallet = isSharedMainDevWallet ? mainWallet ?? custodyDevWallet : null;
   const allWallets = useMemo(
     () =>
       Array.from(
         new Map(
           [
             ...(mainWallet ? [mainWallet] : []),
-            ...(devWallet ? [devWallet] : []),
+            ...(custodyDevWallet ? [custodyDevWallet] : []),
             ...wallets,
           ].map((wallet) => [wallet.publicKey, wallet])
         ).values()
       ),
-    [devWallet, mainWallet, wallets]
+    [custodyDevWallet, mainWallet, wallets]
   );
   const totalSolBalance = useMemo(
     () =>
@@ -637,17 +642,17 @@ export default function Page() {
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Dev Wallet</CardTitle>
-                <Badge variant="secondary">Dev</Badge>
-              </CardHeader>
-              <CardContent className="flex flex-col gap-4">
-                <div className="flex items-start gap-1">
-                  <div className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
-                    {devWallet?.publicKey || "Not available"}
-                  </div>
-                  {devWallet && (
+            {displayDevWallet && (
+              <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                  <CardTitle>Dev Wallet</CardTitle>
+                  <Badge variant="secondary">Dev</Badge>
+                </CardHeader>
+                <CardContent className="flex flex-col gap-4">
+                  <div className="flex items-start gap-1">
+                    <div className="break-all font-mono text-xs text-muted-foreground sm:text-sm">
+                      {displayDevWallet.publicKey}
+                    </div>
                     <Tooltip>
                       <TooltipTrigger asChild>
                         <Button
@@ -656,7 +661,7 @@ export default function Page() {
                           className="text-muted-foreground hover:text-foreground size-7"
                           onClick={() =>
                             void copyToClipboard(
-                              devWallet.publicKey,
+                              displayDevWallet.publicKey,
                               "Dev wallet public key"
                             )
                           }
@@ -669,114 +674,123 @@ export default function Page() {
                       </TooltipTrigger>
                       <TooltipContent>Copy public key</TooltipContent>
                     </Tooltip>
-                  )}
-                </div>
-                <div className="flex flex-col gap-2">
-                  <div className="text-2xl font-mono">
-                    {Number(devWallet?.balanceSol ?? 0).toFixed(4)} SOL
                   </div>
-                  <div className="text-xs text-muted-foreground">
-                    Last refreshed{" "}
-                    {formatRefreshTime(devWallet?.balanceRefreshedAt)}
-                  </div>
-                </div>
-                <div className="flex justify-end gap-2">
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="icon"
-                        onClick={() =>
-                          devWallet && handleRefreshBalances([devWallet.publicKey])
-                        }
-                        disabled={isRefreshingBalances || !devWallet}
+                  <div className="flex flex-col gap-2">
+                    {isSystemDevWallet ? (
+                      <Badge
+                        variant="secondary"
+                        className="w-fit border border-border/60 bg-secondary/60 text-muted-foreground"
                       >
-                        {isRefreshingBalances ? (
-                          <Spinner className="size-4" />
-                        ) : (
-                          <IconRefresh className="size-4" />
-                        )}
-                        <span className="sr-only">Refresh dev wallet</span>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Refresh</TooltipContent>
-                  </Tooltip>
-                  {devWallet && tokenPublicKey && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" asChild>
-                          <Link
-                            href={`/${tokenPublicKey}/wallets/${devWallet.publicKey}`}
+                        System Wallet
+                      </Badge>
+                    ) : (
+                      <>
+                        <div className="text-2xl font-mono">
+                          {Number(displayDevWallet.balanceSol ?? 0).toFixed(4)} SOL
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                          Last refreshed{" "}
+                          {formatRefreshTime(displayDevWallet.balanceRefreshedAt)}
+                        </div>
+                      </>
+                    )}
+                  </div>
+                  {!isSystemDevWallet && (
+                    <div className="flex justify-end gap-2">
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              handleRefreshBalances([displayDevWallet.publicKey])
+                            }
+                            disabled={isRefreshingBalances}
                           >
-                            <IconEye className="size-4" />
-                            <span className="sr-only">View dev wallet</span>
-                          </Link>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>View wallet</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {devWallet && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button variant="outline" size="icon" asChild>
-                          <a
-                            href={`https://solscan.io/account/${devWallet.publicKey}`}
-                            target="_blank"
-                            rel="noreferrer"
+                            {isRefreshingBalances ? (
+                              <Spinner className="size-4" />
+                            ) : (
+                              <IconRefresh className="size-4" />
+                            )}
+                            <span className="sr-only">Refresh dev wallet</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Refresh</TooltipContent>
+                      </Tooltip>
+                      {tokenPublicKey && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Button variant="outline" size="icon" asChild>
+                              <Link
+                                href={`/${tokenPublicKey}/wallets/${displayDevWallet.publicKey}`}
+                              >
+                                <IconEye className="size-4" />
+                                <span className="sr-only">View dev wallet</span>
+                              </Link>
+                            </Button>
+                          </TooltipTrigger>
+                          <TooltipContent>View wallet</TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button variant="outline" size="icon" asChild>
+                            <a
+                              href={`https://solscan.io/account/${displayDevWallet.publicKey}`}
+                              target="_blank"
+                              rel="noreferrer"
+                            >
+                              <Image
+                                src="/logos/solscan-logo-dark.svg"
+                                alt=""
+                                aria-hidden="true"
+                                width={16}
+                                height={16}
+                                className="size-4"
+                              />
+                              <span className="sr-only">
+                                Open dev wallet in Solscan
+                              </span>
+                            </a>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>View on Solscan</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleOpenSend([displayDevWallet.publicKey])}
                           >
-                            <Image
-                              src="/logos/solscan-logo-dark.svg"
-                              alt=""
-                              aria-hidden="true"
-                              width={16}
-                              height={16}
-                              className="size-4"
-                            />
+                            <IconArrowUpRight className="size-4" />
+                            <span className="sr-only">Send SOL to dev wallet</span>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Send SOL</TooltipContent>
+                      </Tooltip>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() =>
+                              handleOpenReturn([displayDevWallet.publicKey])
+                            }
+                          >
+                            <IconArrowDownRight className="size-4" />
                             <span className="sr-only">
-                              Open dev wallet in Solscan
+                              Return SOL from dev wallet
                             </span>
-                          </a>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>View on Solscan</TooltipContent>
-                    </Tooltip>
+                          </Button>
+                        </TooltipTrigger>
+                        <TooltipContent>Return SOL</TooltipContent>
+                      </Tooltip>
+                    </div>
                   )}
-                  {devWallet && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleOpenSend([devWallet.publicKey])}
-                        >
-                          <IconArrowUpRight className="size-4" />
-                          <span className="sr-only">Send SOL to dev wallet</span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Send SOL</TooltipContent>
-                    </Tooltip>
-                  )}
-                  {devWallet && (
-                    <Tooltip>
-                      <TooltipTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="icon"
-                          onClick={() => handleOpenReturn([devWallet.publicKey])}
-                        >
-                          <IconArrowDownRight className="size-4" />
-                          <span className="sr-only">
-                            Return SOL from dev wallet
-                          </span>
-                        </Button>
-                      </TooltipTrigger>
-                      <TooltipContent>Return SOL</TooltipContent>
-                    </Tooltip>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            )}
           </>
         )}
       </div>

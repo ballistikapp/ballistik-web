@@ -37,7 +37,7 @@ interface LaunchOverviewDialogProps {
     twitter: string;
     telegram: string;
     website: string;
-    devWalletOption: "import" | "generate" | "use_main";
+    devWalletOption: "system" | "import" | "generate" | "use_main";
     importedDevWalletKey: string;
     devBuyAmountSol: number;
     jitoTipAmountSol: number;
@@ -249,11 +249,13 @@ export function LaunchOverviewDialog({
                 <div className="grid grid-cols-[140px_1fr] gap-2">
                   <span className="text-muted-foreground">Dev Wallet</span>
                   <span>
-                    {launchInput.devWalletOption === "import"
-                      ? "Imported wallet"
-                      : launchInput.devWalletOption === "generate"
-                        ? "Will be generated"
-                        : "Main Wallet (used as dev)"}
+                    {launchInput.devWalletOption === "system"
+                      ? "System Wallet"
+                      : launchInput.devWalletOption === "import"
+                        ? "Imported wallet"
+                        : launchInput.devWalletOption === "generate"
+                          ? "Will be generated"
+                          : "Main Wallet (used as dev)"}
                   </span>
                 </div>
                 <div className="grid grid-cols-[140px_1fr] gap-2">

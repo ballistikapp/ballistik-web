@@ -277,7 +277,9 @@ export default function WalletPage() {
   }
 
   const { wallet, token } = data;
+  const isSystemWallet = "isSystemWallet" in wallet && wallet.isSystemWallet;
   const isMainWallet = wallet.type === "MAIN_WALLET";
+  const showWalletActions = !isMainWallet && !isSystemWallet;
   const isSharedMainDevWallet =
     isMainWallet && devWallet?.publicKey === wallet.publicKey;
   const walletTitle = {
@@ -366,14 +368,16 @@ export default function WalletPage() {
               <IconCopy className="size-4" />
               Copy Public Key
             </Button>
-            <Button
-              size="sm"
-              variant="destructive"
-              onClick={() => setPrivateKeyDialogOpen(true)}
-            >
-              <IconEye className="mr-2 size-4" />
-              Show Private Key
-            </Button>
+            {!isSystemWallet && (
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => setPrivateKeyDialogOpen(true)}
+              >
+                <IconEye className="mr-2 size-4" />
+                Show Private Key
+              </Button>
+            )}
             <Button size="sm" variant="ghost" asChild>
               <Link
                 href={`https://solscan.io/account/${wallet.publicKey}`}
@@ -394,31 +398,29 @@ export default function WalletPage() {
           </div>
         </div>
 
-        <div className="space-y-2 lg:text-right">
-          <p className="text-sm text-muted-foreground">Actions</p>
-          <div className="flex flex-wrap gap-2 lg:justify-end">
-            {!isMainWallet && (
-              <>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setSendDialogOpen(true)}
-                >
-                  <IconArrowUpRight className="mr-2 size-4" />
-                  Send SOL
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setReturnDialogOpen(true)}
-                >
-                  <IconArrowDownRight className="mr-2 size-4" />
-                  Return SOL
-                </Button>
-              </>
-            )}
+        {showWalletActions && (
+          <div className="space-y-2 lg:text-right">
+            <p className="text-sm text-muted-foreground">Actions</p>
+            <div className="flex flex-wrap gap-2 lg:justify-end">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setSendDialogOpen(true)}
+              >
+                <IconArrowUpRight className="mr-2 size-4" />
+                Send SOL
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setReturnDialogOpen(true)}
+              >
+                <IconArrowDownRight className="mr-2 size-4" />
+                Return SOL
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
 
       <div className="my-8 border-t" />

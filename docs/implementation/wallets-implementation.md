@@ -11,12 +11,31 @@ When a token launch uses `devWalletOption = use_main`, the token's dev wallet an
 - `Wallet.tokenPublicKey` is used for operational wallets (bundler/volume/distribution).
 - Dev wallets are shared across tokens via `TokenDevWallet` join model.
 - Main wallet is user-scoped via `User.mainWallet`.
+- `Wallet.isSystemWallet` (`Boolean @default(false)`) marks the platform-provided dev wallet.
+- System dev wallet stores an empty string `""` as `privateKey` (placeholder — never decoded). The `isSystemWallet` flag prevents any code from trying to use it. The actual signing key is loaded from env.
 
 Prisma changes:
 
 - `Wallet.tokenPublicKey` (nullable)
+- `Wallet.isSystemWallet` (`Boolean @default(false)`)
 - `Token.operationalWallets` (relation to `Wallet`)
 - `TokenDevWallet` join model for dev wallet sharing
+
+### System Dev Wallet
+
+The system dev wallet is a platform-provided keypair stored in the `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. Its DB `Wallet` row has `privateKey: ""` (empty placeholder) and `isSystemWallet: true`. It is used as the default dev wallet for free-tier launches and is available to Pro users as an explicit option.
+
+The system dev wallet is excluded from:
+- Wallet pages, wallet detail, wallet balance totals
+- Private key export (`wallet.getPrivateKey` rejects it)
+- Manual send/return SOL flows
+- Wallet balance refresh and live balance subscriptions
+- Volume bot eligibility
+
+The system dev wallet is included in:
+- Holdings, dashboard holdings, and transactions (token-position views)
+- Sell and exit flows (with forced SOL recovery to user's main wallet)
+- Launch funding and cleanup
 
 ## Volume Bot Wallets
 

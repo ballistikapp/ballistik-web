@@ -196,7 +196,7 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
   const launchFeeBreakdown = launchInput
     ? (() => {
         const fees = calculateLaunchUsageFees({
-          devWalletOption: (launchInput.devWalletOption as "import" | "generate" | "use_main") ?? "generate",
+          devWalletOption: (launchInput.devWalletOption as "system" | "import" | "generate" | "use_main") ?? "generate",
           bundleBuyEnabled: Boolean(launchInput.bundleBuyEnabled),
           bundlerWalletCount: Number(launchInput.bundlerWalletCount ?? 0),
           distributionWalletMultiplier: Number(launchInput.distributionWalletMultiplier ?? 0),

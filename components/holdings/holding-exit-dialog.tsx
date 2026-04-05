@@ -37,7 +37,10 @@ type HoldingExitDialogProps = {
   totalBalance: number;
   isSubmitting?: boolean;
   isCancelling?: boolean;
-  onConfirm: (jitoTipSol: number, returnSolToMainWallet: boolean) => Promise<void>;
+  onConfirm: (
+    jitoTipSol: number,
+    returnSolToMainWallet: boolean
+  ) => Promise<void>;
   onCancel?: () => Promise<void>;
 };
 
@@ -74,7 +77,8 @@ export function HoldingExitDialog({
   onCancel,
 }: HoldingExitDialogProps) {
   const [tip, setTip] = React.useState("0.005");
-  const [returnSolToMainWallet, setReturnSolToMainWallet] = React.useState(true);
+  const [returnSolToMainWallet, setReturnSolToMainWallet] =
+    React.useState(true);
 
   React.useEffect(() => {
     if (!open) {
@@ -124,13 +128,17 @@ export function HoldingExitDialog({
   const localTipSol =
     Number.isFinite(parsedTip) && parsedTip >= 0 ? parsedTip : 0;
   const activeTipSol =
-    typeof exitInput?.jitoTipSol === "number" ? exitInput.jitoTipSol : localTipSol;
+    typeof exitInput?.jitoTipSol === "number"
+      ? exitInput.jitoTipSol
+      : localTipSol;
   const activeReturnSolToMainWallet =
     typeof exitInput?.returnSolToMainWallet === "boolean"
       ? exitInput.returnSolToMainWallet
       : returnSolToMainWallet;
   const estimatedBundles =
-    walletsWithBalance > 0 ? Math.ceil(walletsWithBalance / EXIT_CHUNK_SIZE) : 0;
+    walletsWithBalance > 0
+      ? Math.ceil(walletsWithBalance / EXIT_CHUNK_SIZE)
+      : 0;
   const estimatedTotalTipSol = activeTipSol * estimatedBundles;
 
   const showProgress = Boolean(exit);
@@ -141,7 +149,8 @@ export function HoldingExitDialog({
       [...(exit?.logs ?? [])]
         .sort(
           (left, right) =>
-            new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime()
+            new Date(right.createdAt).getTime() -
+            new Date(left.createdAt).getTime()
         )
         .map((log, index) => ({
           ...log,
@@ -202,7 +211,9 @@ export function HoldingExitDialog({
               <Checkbox
                 id="exitReturnSolToMainWallet"
                 checked={returnSolToMainWallet}
-                onCheckedChange={(value) => setReturnSolToMainWallet(Boolean(value))}
+                onCheckedChange={(value) =>
+                  setReturnSolToMainWallet(Boolean(value))
+                }
               />
               <div className="grid gap-1">
                 <Label htmlFor="exitReturnSolToMainWallet">
@@ -216,18 +227,26 @@ export function HoldingExitDialog({
             </div>
             <div className="rounded-md border p-3 space-y-2 text-xs text-muted-foreground">
               <div className="font-medium text-foreground">What exit does</div>
-              <p>1) Collects token balances from all managed wallets with tokens.</p>
-              <p>2) Bundles transfers + sell instructions and submits through Jito.</p>
+              <p>
+                1) Collects token balances from all managed wallets with tokens.
+              </p>
+              <p>
+                2) Bundles transfers + sell instructions and submits through
+                Jito.
+              </p>
               <p>3) Closes empty token accounts.</p>
               <p>
-                4) {returnSolToMainWallet ? "Returns" : "Optionally returns"} SOL from
-                processed wallets to main wallet.
+                4) {returnSolToMainWallet ? "Returns" : "Optionally returns"}{" "}
+                SOL from processed wallets to main wallet.
               </p>
               <p>
                 Jito tip is paid per bundle. Estimated bundles:{" "}
-                <span className="font-mono">{estimatedBundles}</span>, estimated total
-                tip:{" "}
-                <span className="font-mono">{estimatedTotalTipSol.toFixed(4)} SOL</span>.
+                <span className="font-mono">{estimatedBundles}</span>, estimated
+                total tip:{" "}
+                <span className="font-mono">
+                  {estimatedTotalTipSol.toFixed(4)} SOL
+                </span>
+                .
               </p>
             </div>
           </div>
@@ -267,7 +286,10 @@ export function HoldingExitDialog({
                       <span>Wallets funded</span>
                       <span className="font-mono">
                         {summary?.walletsFunded} (
-                        {((summary?.fundingLamports ?? 0) / 1_000_000_000).toFixed(4)} SOL)
+                        {(
+                          (summary?.fundingLamports ?? 0) / 1_000_000_000
+                        ).toFixed(4)}{" "}
+                        SOL)
                       </span>
                     </div>
                   )}
@@ -307,7 +329,7 @@ export function HoldingExitDialog({
             <div className="rounded-md border p-3 text-xs text-muted-foreground">
               Tip per bundle:{" "}
               <span className="font-mono">{activeTipSol.toFixed(4)} SOL</span>
-              <span className="mx-2">|</span>
+              <br />
               SOL return to main wallet:{" "}
               <span className="font-mono">
                 {activeReturnSolToMainWallet ? "Enabled" : "Disabled"}
@@ -342,16 +364,13 @@ export function HoldingExitDialog({
                           <div className="mt-1 flex flex-wrap items-center gap-2">
                             <Badge
                               variant={
-                                log.level === "ERROR" ? "destructive" : "secondary"
+                                log.level === "ERROR"
+                                  ? "destructive"
+                                  : "secondary"
                               }
                             >
                               {log.level}
                             </Badge>
-                            {log.isLatest ? (
-                              <span className="text-xs font-medium text-primary">
-                                Latest
-                              </span>
-                            ) : null}
                             {log.step ? (
                               <div className="text-xs text-muted-foreground wrap-break-word">
                                 {log.step}

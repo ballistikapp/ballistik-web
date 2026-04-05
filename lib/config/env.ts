@@ -20,6 +20,7 @@ const envSchema = z.object({
     .transform((value) => value !== "false"),
   APP_URL: z.string().url(),
   FEE_COLLECTOR_WALLET_ADDRESS: z.string().min(1),
+  SYSTEM_DEV_WALLET_PRIVATE_KEY: z.string().min(1),
 });
 
 const dbEnvSchema = z.object({
@@ -72,6 +73,7 @@ export const getEnv = (): Env => {
     MONITORING_PIPELINE_V2: process.env.MONITORING_PIPELINE_V2,
     APP_URL: process.env.APP_URL,
     FEE_COLLECTOR_WALLET_ADDRESS: process.env.FEE_COLLECTOR_WALLET_ADDRESS,
+    SYSTEM_DEV_WALLET_PRIVATE_KEY: process.env.SYSTEM_DEV_WALLET_PRIVATE_KEY,
   });
   return cachedEnv;
 };

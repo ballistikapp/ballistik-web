@@ -108,6 +108,7 @@ model Wallet {
   balanceSol Decimal @default(0)
   balanceRefreshedAt DateTime?
   isImported Boolean @default(false)
+  isSystemWallet Boolean @default(false)
   holdings Holding[] @relation("WalletHoldings")
   transactions Transaction[] @relation("WalletTransactions")
   tokenTransactions TokenTransaction[] @relation("WalletTokenTransactions")

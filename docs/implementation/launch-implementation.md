@@ -97,11 +97,16 @@ Used as the funding wallet (no selection in UI).
 
 Based on `devWalletOption`:
 
+- `system`: platform-provided dev wallet from `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. The DB stores a metadata-only `Wallet` row (`privateKey: ""` placeholder, `isSystemWallet: true`). Free-tier users are locked to this option; Pro users can also select it explicitly.
 - `use_main`: main wallet
 - `generate`: server creates a new `DEV` wallet
 - `import`: server validates and stores imported key as `DEV`
 
+Server-side enforcement: for free-tier users, `devWalletOption` is normalized to `system` regardless of client input. This applies to `previewCosts`, `startLaunch`, and `retryLaunch`.
+
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
+
+When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
 
 ### Bundler Wallets
 
@@ -391,8 +396,9 @@ Allows users to pre-populate the launch form with configuration from a previous 
 ## Launch Presets
 
 - Launch supports URL-driven presets via the `preset` query parameter.
-- `preset=free` initializes a free configuration (`devWalletOption = use_main`, bundle buy disabled, vanity disabled, attribution removal disabled).
-- Missing or unknown `preset` values default to the regular preset (`devWalletOption = generate`, bundle buy enabled, `bundlerWalletCount = 10`, vanity enabled, attribution removal disabled).
+- `preset=free` initializes a free configuration (`devWalletOption = system`, bundle buy disabled, vanity disabled, attribution removal disabled).
+- Missing or unknown `preset` values default to the regular preset (`devWalletOption = system`, bundle buy enabled, `bundlerWalletCount = 10`, vanity enabled, attribution removal disabled).
+- Free-tier users are always normalized to `devWalletOption = system` on the server regardless of preset or client input.
 - Preset values are applied before clone values; cloning overrides preset initialization.
 - Unauthenticated visits preserve preset URLs through auth redirects using the `redirect` query param (for example `/launch?preset=free` -> `/auth?redirect=%2Flaunch%3Fpreset%3Dfree` -> back to `/launch?preset=free` after login/signup).
 

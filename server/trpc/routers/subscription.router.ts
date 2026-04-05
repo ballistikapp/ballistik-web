@@ -62,11 +62,11 @@ async function getMonitoredWalletPubkeys(
   const [operationalWallets, devWallets, user] = await Promise.all([
     prisma.wallet.findMany({
       where: { tokenPublicKey },
-      select: { publicKey: true },
+      select: { publicKey: true, isSystemWallet: true },
     }),
     prisma.tokenDevWallet.findMany({
       where: { tokenPublicKey },
-      select: { walletPublicKey: true },
+      select: { walletPublicKey: true, wallet: { select: { isSystemWallet: true } } },
     }),
     prisma.user.findUnique({
       where: { id: userId },
@@ -75,8 +75,12 @@ async function getMonitoredWalletPubkeys(
   ]);
 
   const allPubkeys = new Set<string>();
-  for (const wallet of operationalWallets) allPubkeys.add(wallet.publicKey);
-  for (const wallet of devWallets) allPubkeys.add(wallet.walletPublicKey);
+  for (const wallet of operationalWallets) {
+    if (!wallet.isSystemWallet) allPubkeys.add(wallet.publicKey);
+  }
+  for (const dw of devWallets) {
+    if (!dw.wallet.isSystemWallet) allPubkeys.add(dw.walletPublicKey);
+  }
   if (user?.mainWallet?.publicKey) allPubkeys.add(user.mainWallet.publicKey);
 
   if (!walletPublicKeys?.length) return allPubkeys;
