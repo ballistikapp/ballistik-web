@@ -1,3 +1,4 @@
+import "server-only";
 import { PublicKey } from "@solana/web3.js";
 import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
@@ -519,6 +520,20 @@ async function getPriceHistory(tokenPublicKey: string) {
   return downsamplePriceHistory(filteredPoints, PRICE_HISTORY_TARGET_POINTS);
 }
 
+async function getClaimedCreatorRewards(tokenPublicKey: string, userId: string): Promise<number> {
+  const agg = await prisma.appTransaction.aggregate({
+    where: {
+      userId,
+      tokenPublicKey,
+      type: "REWARD_PAYOUT",
+      source: "CREATOR_REWARD",
+      status: "CONFIRMED",
+    },
+    _sum: { solAmount: true },
+  });
+  return round4(Number(agg._sum.solAmount ?? 0));
+}
+
 async function buildStatsResponse(
   tokenPublicKey: string,
   userId: string
@@ -558,6 +573,7 @@ async function buildStatsResponse(
     getOperations(tokenPublicKey, userId),
     getRecentTransactions(tokenPublicKey),
     isComplete ? Promise.resolve([]) : getPriceHistory(tokenPublicKey),
+    getClaimedCreatorRewards(tokenPublicKey, userId),
   ]);
 
   const costs = results[0].status === "fulfilled" ? results[0].value : defaultCosts;
@@ -566,11 +582,12 @@ async function buildStatsResponse(
   const operations = results[3].status === "fulfilled" ? results[3].value : { botSessions: [] };
   const recentTransactions = results[4].status === "fulfilled" ? results[4].value : [];
   const priceHistory = results[5].status === "fulfilled" ? results[5].value : [];
+  const creatorRewardsClaimed = results[6].status === "fulfilled" ? results[6].value : 0;
   const failedSubQueries: string[] = [];
 
   for (const [i, r] of results.entries()) {
     if (r.status === "rejected") {
-      const names = ["costs", "volumes", "holdings", "operations", "transactions", "priceHistory"];
+      const names = ["costs", "volumes", "holdings", "operations", "transactions", "priceHistory", "creatorRewards"];
       failedSubQueries.push(names[i] ?? `unknown-${i}`);
       log.error(`Dashboard sub-query failed: ${names[i]}`, {
         tokenPublicKey,
@@ -581,7 +598,8 @@ async function buildStatsResponse(
 
   const holdingsValue = holdingsBreakdown.holdingsValueSol;
   const totalBuyVolume = round4(volumes.ownedBuyVolume + costs.devBuySol);
-  const pnl = round4(volumes.ownedSellVolume - totalBuyVolume - costs.totalFees - costs.creationCostSol);
+  const creatorRewardsClaimedSol = round4(creatorRewardsClaimed);
+  const pnl = round4(volumes.ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - costs.totalFees - costs.creationCostSol);
 
   const marketCapSol = round4(priceSol * tokenTotalSupply);
 
@@ -621,6 +639,7 @@ async function buildStatsResponse(
         net: pnl,
         totalBuyVolume,
         totalSellVolume: volumes.ownedSellVolume,
+        creatorRewardsClaimedSol,
         platformFees: costs.platformFees,
         launchFees: costs.launchFees,
         launchFeeBreakdown: costs.launchFeeBreakdown,

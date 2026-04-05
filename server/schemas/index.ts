@@ -14,3 +14,4 @@ export * from "./dashboard.schema";
 export * from "./test-run-log.schema";
 export * from "./billing.schema";
 export * from "./app-transaction.schema";
+export * from "./creator-rewards.schema";

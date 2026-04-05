@@ -1,3 +1,4 @@
+import "server-only";
 type FailureRecoveryResult = {
   publicKey: string;
   status: "returned" | "skipped" | "failed";

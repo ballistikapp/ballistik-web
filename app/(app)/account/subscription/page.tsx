@@ -24,6 +24,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 
+type PurchaseTarget = "DEVELOPER" | "PRO" | null;
+
 function formatDateTime(value: Date | string | null | undefined) {
   if (!value) {
     return "—";
@@ -37,15 +39,55 @@ function formatSignature(signature: string) {
   return `${signature.slice(0, 8)}...${signature.slice(-8)}`;
 }
 
+function planLabel(plan: string) {
+  if (plan === "PRO") return "Pro";
+  if (plan === "DEVELOPER") return "Developer";
+  return "Free";
+}
+
+const DEVELOPER_FEATURES = [
+  {
+    label: "CREATOR REWARDS ELIGIBILITY",
+    description:
+      "Collect creator rewards with a single click as your token grows.",
+    accent: true,
+  },
+  {
+    label: "25% off platform fees.",
+    description:
+      "Reduced platform fees on supported launch and volume-bot flows.",
+    accent: false,
+  },
+];
+
+const PRO_FEATURES = [
+  {
+    label: "No platform fees.",
+    description:
+      "Platform fees are fully removed on launch and volume-bot flows.",
+    accent: true,
+  },
+  {
+    label: "Live monitoring.",
+    description: "Track dashboard activity in real time via gRPC.",
+    accent: false,
+  },
+  {
+    label: "Faster execution.",
+    description: "Use gRPC-backed confirmation paths where supported.",
+    accent: false,
+  },
+];
+
 export default function AccountSubscriptionPage() {
   const utils = trpc.useUtils();
   const refreshTriggeredRef = useRef(false);
-  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [confirmTarget, setConfirmTarget] = useState<PurchaseTarget>(null);
 
   const overviewQuery = trpc.billing.getSubscriptionOverview.useQuery({});
   const historyQuery = trpc.billing.getHistory.useQuery({ limit: 20 });
   const refreshSessionMutation = trpc.auth.refreshSession.useMutation();
-  const purchaseMutation = trpc.billing.purchaseWeeklyPro.useMutation();
+  const purchaseMutation = trpc.billing.purchaseSubscription.useMutation();
 
   const overview = overviewQuery.data;
   const history = historyQuery.data ?? [];
@@ -79,20 +121,41 @@ export default function AccountSubscriptionPage() {
     utils.billing.getSubscriptionOverview,
   ]);
 
-  const ctaLabel = useMemo(() => {
-    if (overview?.status === "ACTIVE") {
-      return "Extend Pro";
+  const confirmChargeLabel = useMemo(() => {
+    if (!overview || !confirmTarget) return "";
+    if (
+      confirmTarget === "PRO" &&
+      overview.plan === "DEVELOPER" &&
+      overview.upgradeChargeSol != null
+    ) {
+      return `${overview.upgradeChargeSol.toFixed(2)} SOL`;
     }
-    if (overview?.status === "EXPIRED") {
-      return "Renew Pro";
+    if (confirmTarget === "DEVELOPER")
+      return `${overview.developerPriceSol.toFixed(2)} SOL`;
+    return `${overview.proPriceSol.toFixed(2)} SOL`;
+  }, [overview, confirmTarget]);
+
+  const confirmDescription = useMemo(() => {
+    if (!overview || !confirmTarget) return "";
+    const planName = planLabel(confirmTarget);
+    if (
+      confirmTarget === "PRO" &&
+      overview.plan === "DEVELOPER" &&
+      overview.upgradeCredit != null &&
+      overview.upgradeCredit > 0
+    ) {
+      return `Upgrade to ${planName} for ${confirmChargeLabel}. A credit of ${overview.upgradeCredit.toFixed(2)} SOL has been applied for your remaining Developer days.`;
     }
-    return "Subscribe to Pro";
-  }, [overview?.status]);
+    return `This will charge ${confirmChargeLabel} from your main wallet and activate ${planName} for 7 days.`;
+  }, [overview, confirmTarget, confirmChargeLabel]);
 
   const handlePurchase = async () => {
+    if (!confirmTarget) return;
     try {
-      const result = await purchaseMutation.mutateAsync({});
-      setConfirmOpen(false);
+      const result = await purchaseMutation.mutateAsync({
+        plan: confirmTarget,
+      });
+      setConfirmTarget(null);
       let refreshFailed = false;
       try {
         await refreshSessionMutation.mutateAsync({});
@@ -105,14 +168,15 @@ export default function AccountSubscriptionPage() {
         utils.billing.getHistory.invalidate(),
         utils.wallet.getMain.invalidate(),
       ]);
+      const planName = planLabel(confirmTarget);
       toast.success(
         refreshFailed
-          ? `Payment confirmed. Refresh your session to see Pro access until ${formatDateTime(result.proExpiresAt)}.`
-          : `Pro is active until ${formatDateTime(result.proExpiresAt)}`
+          ? `Payment confirmed. Refresh your session to see ${planName} access until ${formatDateTime(result.paidPlanExpiresAt)}.`
+          : `${planName} is active until ${formatDateTime(result.paidPlanExpiresAt)}`
       );
     } catch (error) {
       toast.error(
-        error instanceof Error ? error.message : "Failed to purchase Pro"
+        error instanceof Error ? error.message : "Failed to complete purchase"
       );
     }
   };
@@ -138,6 +202,10 @@ export default function AccountSubscriptionPage() {
     );
   }
 
+  const isDeveloper = overview.plan === "DEVELOPER";
+  const isPro = overview.plan === "PRO";
+  const isPaid = isDeveloper || isPro;
+
   return (
     <>
       <div className="flex flex-col gap-6">
@@ -147,68 +215,48 @@ export default function AccountSubscriptionPage() {
             <div className="w-full text-left md:text-right">
               <div className="flex flex-wrap items-center gap-2 md:justify-end">
                 <Badge
-                  variant={overview.plan === "PRO" ? "default" : "secondary"}
+                  variant={isPaid ? "default" : "secondary"}
                   className="h-8 rounded-full px-4 text-sm font-semibold"
                 >
-                  {overview.plan === "PRO" ? "Pro" : "Free"}
+                  {planLabel(overview.plan)}
                 </Badge>
               </div>
-              <p className="mt-3 text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground md:mt-4">
-                WEEKLY PRICE
-              </p>
-              <p className="font-mono leading-none">
-                <span className="text-2xl md:text-4xl">{overview.priceSol.toFixed(2)}</span>{" "}
-                <span className="text-base text-muted-foreground">SOL</span>
-              </p>
+              {isPaid && overview.paidPlanExpiresAt && (
+                <p className="mt-2 text-xs text-muted-foreground">
+                  Active until {formatDateTime(overview.paidPlanExpiresAt)}
+                </p>
+              )}
             </div>
           }
         />
 
         <PageSection className="pt-6 md:pt-8">
-          <div className="grid gap-12 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:items-start">
+          <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
+            {/* Developer Tier */}
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-5 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] sm:p-6 md:p-8">
               <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
               <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.18)_1px,transparent_1px)] bg-size-[18px_18px] opacity-30 mask-[radial-gradient(circle_at_center,black,transparent_75%)]" />
               <div className="relative space-y-6 md:space-y-8">
                 <div className="space-y-3">
                   <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500">
-                    Weekly Pro
+                    Weekly Developer
                   </p>
                   <PageSectionHeader
-                    title="Pro Features"
+                    title="Developer"
                     className="items-start"
                     meta={
-                      <span className="rounded-full border border-white/10 bg-white/5 px-3 py-1 text-[11px] uppercase tracking-[0.12em] text-neutral-300">
-                        Account-wide access
+                      <span className="font-mono text-2xl md:text-3xl text-neutral-100">
+                        {overview.developerPriceSol.toFixed(2)}{" "}
+                        <span className="text-base text-neutral-400">
+                          SOL / week
+                        </span>
                       </span>
                     }
                   />
-                  <p className="max-w-md text-sm text-neutral-400">
-                    Faster tooling, live monitoring, and cleaner execution with
-                    fewer platform charges on supported flows.
-                  </p>
                 </div>
 
                 <div className="grid gap-3">
-                  {[
-                    {
-                      label: "No fees.",
-                      description:
-                        "Platform fees are removed on supported launch and volume-bot flows.",
-                      accent: true,
-                    },
-                    {
-                      label: "Live monitoring.",
-                      description: "Track dashboard activity in real time.",
-                      accent: false,
-                    },
-                    {
-                      label: "Faster execution.",
-                      description:
-                        "Use gRPC-backed confirmation paths where supported.",
-                      accent: false,
-                    },
-                  ].map((feature) => (
+                  {DEVELOPER_FEATURES.map((feature) => (
                     <div
                       key={feature.label}
                       className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3"
@@ -226,73 +274,152 @@ export default function AccountSubscriptionPage() {
                         >
                           {feature.label}
                         </strong>
-                        <span className="mt-1 block">{feature.description}</span>
+                        <span className="mt-1 block">
+                          {feature.description}
+                        </span>
                       </span>
                     </div>
                   ))}
                 </div>
 
-                <p className="text-sm text-neutral-500">
-                  Each purchase extends Pro by 7 days. There is no auto-renewal
-                  in this version.
-                </p>
+                <div>
+                  {isDeveloper ? (
+                    <Button
+                      onClick={() => setConfirmTarget("DEVELOPER")}
+                      disabled={isBusy}
+                      className="w-full"
+                      size="lg"
+                    >
+                      Extend Developer
+                    </Button>
+                  ) : isPro ? (
+                    <Button
+                      variant="outline"
+                      disabled
+                      className="w-full"
+                      size="lg"
+                    >
+                      Pro is active
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setConfirmTarget("DEVELOPER")}
+                      disabled={isBusy}
+                      className="w-full"
+                      size="lg"
+                    >
+                      Subscribe to Developer
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
-            <div className="space-y-8">
-              <div className="space-y-3">
-                <h2 className="text-2xl font-normal">Weekly Pro access</h2>
-                <p className="max-w-2xl text-sm text-muted-foreground">
-                  Pro unlocks live monitoring, faster gRPC-backed tooling, and
-                  removes platform fees on supported flows.
-                </p>
-              </div>
-
-              <div className="grid gap-5 sm:grid-cols-2 sm:gap-8">
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
-                    PLAN
+            {/* Pro Tier */}
+            <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-5 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] sm:p-6 md:p-8">
+              <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.14),transparent_36%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.08),transparent_32%)]" />
+              <div className="absolute inset-0 bg-[radial-gradient(rgba(255,255,255,0.18)_1px,transparent_1px)] bg-size-[18px_18px] opacity-30 mask-[radial-gradient(circle_at_center,black,transparent_75%)]" />
+              <div className="relative space-y-6 md:space-y-8">
+                <div className="space-y-3">
+                  <p className="text-[11px] uppercase tracking-[0.22em] text-neutral-500">
+                    Weekly Pro
                   </p>
-                  <p className="text-xl">
-                    {overview.plan === "PRO" ? "Pro" : "Free"}
-                  </p>
+                  <PageSectionHeader
+                    title="Pro"
+                    className="items-start"
+                    meta={
+                      <span className="font-mono text-2xl md:text-3xl text-neutral-100">
+                        {isDeveloper && overview.upgradeChargeSol != null ? (
+                          <>
+                            <span className="line-through text-neutral-500 mr-2">
+                              {overview.proPriceSol.toFixed(2)}
+                            </span>
+                            {overview.upgradeChargeSol.toFixed(2)}
+                          </>
+                        ) : (
+                          overview.proPriceSol.toFixed(2)
+                        )}{" "}
+                        <span className="text-base text-neutral-400">
+                          SOL / week
+                        </span>
+                      </span>
+                    }
+                  />
+                  {isDeveloper &&
+                    overview.upgradeCredit != null &&
+                    overview.upgradeCredit > 0 && (
+                      <p className="text-xs text-emerald-400">
+                        Includes {overview.upgradeCredit.toFixed(2)} SOL credit
+                        for remaining Developer days
+                      </p>
+                    )}
                 </div>
-                <div className="space-y-2">
-                  <p className="text-xs uppercase tracking-tighter font-mono font-semibold text-muted-foreground">
-                    EXPIRES
-                  </p>
-                  <p className="text-xl">
-                    {overview.proExpiresAt
-                      ? formatDateTime(overview.proExpiresAt)
-                      : "Not active"}
-                  </p>
+
+                <div className="grid gap-3">
+                  {PRO_FEATURES.map((feature) => (
+                    <div
+                      key={feature.label}
+                      className="flex items-start gap-3 rounded-2xl border border-white/8 bg-white/3 px-4 py-3"
+                    >
+                      <span
+                        className={`mt-1.5 size-2 rounded-full ${
+                          feature.accent ? "bg-primary" : "bg-neutral-200"
+                        }`}
+                      />
+                      <span className="text-sm text-neutral-200">
+                        <strong
+                          className={`font-semibold uppercase tracking-[0.08em] ${
+                            feature.accent ? "text-primary" : "text-neutral-50"
+                          }`}
+                        >
+                          {feature.label}
+                        </strong>
+                        <span className="mt-1 block">
+                          {feature.description}
+                        </span>
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              </div>
 
-              <div className="space-y-2 text-sm text-muted-foreground">
-                <p>
-                  Pro removes platform fees only. Network, protocol, rent, and
-                  Jito costs still apply when relevant.
+                <p className="text-sm text-neutral-300">
+                  + Everything Developer plan offers
                 </p>
-                <p>
-                  There is no auto-renewal. When your period ends, you can renew
-                  manually from this page.
-                </p>
-              </div>
 
-              <div className="flex flex-wrap items-center gap-3">
-                <Button
-                  onClick={() => setConfirmOpen(true)}
-                  disabled={isBusy}
-                  size="lg"
-                >
-                  {ctaLabel}
-                </Button>
-                <Button variant="outline" size="lg" asChild>
-                  <Link href="/account">View Main Wallet</Link>
-                </Button>
+                <div>
+                  {isPro ? (
+                    <Button
+                      onClick={() => setConfirmTarget("PRO")}
+                      disabled={isBusy}
+                      className="w-full"
+                      size="lg"
+                    >
+                      Extend Pro
+                    </Button>
+                  ) : (
+                    <Button
+                      onClick={() => setConfirmTarget("PRO")}
+                      disabled={isBusy}
+                      className="w-full"
+                      size="lg"
+                    >
+                      {isDeveloper ? "Upgrade to Pro" : "Subscribe to Pro"}
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
+          </div>
+
+          <div className="mt-8 space-y-2 text-sm text-muted-foreground">
+            <p>
+              Paid plans remove or reduce platform fees only. Network, protocol,
+              rent, and Jito costs still apply when relevant.
+            </p>
+            <p>
+              There is no auto-renewal. When your period ends, you can renew
+              manually from this page.
+            </p>
           </div>
 
           <PageSectionDivider className="my-14 md:my-24" />
@@ -302,7 +429,7 @@ export default function AccountSubscriptionPage() {
               title="Billing history"
               meta={
                 <p className="text-sm text-muted-foreground">
-                  Recent weekly Pro purchases charged from your main wallet.
+                  Recent subscription purchases charged from your main wallet.
                 </p>
               }
             />
@@ -314,7 +441,7 @@ export default function AccountSubscriptionPage() {
               </div>
             ) : history.length === 0 ? (
               <div className="border-t pt-10 pb-6 text-sm text-muted-foreground">
-                No Pro purchases yet.
+                No purchases yet.
               </div>
             ) : (
               <div className="border-t pt-4">
@@ -324,8 +451,11 @@ export default function AccountSubscriptionPage() {
                     className="flex flex-col gap-4 border-b py-6 md:flex-row md:items-center md:justify-between"
                   >
                     <div className="space-y-1">
-                      <div className="font-medium">
+                      <div className="flex items-center gap-2 font-medium">
                         {Number(entry.amountSol).toFixed(2)} SOL
+                        <Badge variant="outline" className="text-xs">
+                          {planLabel(entry.plan)}
+                        </Badge>
                       </div>
                       <div className="text-sm text-muted-foreground">
                         Active from {formatDateTime(entry.startsAt)} until{" "}
@@ -350,32 +480,44 @@ export default function AccountSubscriptionPage() {
         </PageSection>
       </div>
 
-      <Dialog open={confirmOpen} onOpenChange={setConfirmOpen}>
+      <Dialog
+        open={confirmTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setConfirmTarget(null);
+        }}
+      >
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle>{ctaLabel}</DialogTitle>
-            <DialogDescription>
-              This will charge {overview.priceSol.toFixed(2)} SOL from your main
-              wallet and activate Pro for 7 days.
-            </DialogDescription>
+            <DialogTitle>
+              {confirmTarget === "PRO" && isDeveloper
+                ? "Upgrade to Pro"
+                : confirmTarget
+                  ? `${overview.plan === confirmTarget ? "Extend" : "Subscribe to"} ${planLabel(confirmTarget)}`
+                  : ""}
+            </DialogTitle>
+            <DialogDescription>{confirmDescription}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 text-sm text-muted-foreground">
             <p>
-              Pro removes platform fees only. Network, protocol, rent, and Jito
-              costs still apply when relevant.
+              {confirmTarget === "PRO"
+                ? "Pro removes platform fees entirely and unlocks live monitoring and gRPC-backed tooling."
+                : "Developer provides a 25% platform fee discount and lets you choose a creator-reward-eligible dev wallet at launch."}
             </p>
-            {overview.proExpiresAt ? (
+            <p>
+              Network, protocol, rent, and Jito costs still apply when relevant.
+            </p>
+            {overview.paidPlanExpiresAt ? (
               <p>
                 Your current access{" "}
                 {overview.status === "ACTIVE" ? "ends" : "ended"} on{" "}
-                {formatDateTime(overview.proExpiresAt)}.
+                {formatDateTime(overview.paidPlanExpiresAt)}.
               </p>
             ) : null}
           </div>
           <DialogFooter>
             <Button
               variant="outline"
-              onClick={() => setConfirmOpen(false)}
+              onClick={() => setConfirmTarget(null)}
               disabled={isBusy}
             >
               Cancel
@@ -387,7 +529,7 @@ export default function AccountSubscriptionPage() {
                   Processing...
                 </>
               ) : (
-                `Confirm and pay ${overview.priceSol.toFixed(2)} SOL`
+                `Confirm and pay ${confirmChargeLabel}`
               )}
             </Button>
           </DialogFooter>

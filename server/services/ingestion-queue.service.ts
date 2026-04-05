@@ -1,3 +1,4 @@
+import "server-only";
 import { transactionService } from "@/server/services/transaction.service";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
 import { dashboardEvents } from "@/server/events/dashboard-events";

@@ -50,10 +50,10 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
- * Model ProSubscriptionPayment
+ * Model SubscriptionPayment
  * 
  */
-export type ProSubscriptionPayment = Prisma.ProSubscriptionPaymentModel
+export type SubscriptionPayment = Prisma.SubscriptionPaymentModel
 /**
  * Model AuthSession
  * 
@@ -159,3 +159,18 @@ export type ShyftCallback = Prisma.ShyftCallbackModel
  * 
  */
 export type AppTransaction = Prisma.AppTransactionModel
+/**
+ * Model CreatorRewardBalance
+ * 
+ */
+export type CreatorRewardBalance = Prisma.CreatorRewardBalanceModel
+/**
+ * Model CreatorRewardWalletSettlement
+ * 
+ */
+export type CreatorRewardWalletSettlement = Prisma.CreatorRewardWalletSettlementModel
+/**
+ * Model CreatorRewardAccrual
+ * 
+ */
+export type CreatorRewardAccrual = Prisma.CreatorRewardAccrualModel

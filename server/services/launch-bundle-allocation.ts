@@ -1,3 +1,4 @@
+import "server-only";
 type FixedTotalBundleAllocationParams = {
   walletCount: number;
   totalLamports: bigint;

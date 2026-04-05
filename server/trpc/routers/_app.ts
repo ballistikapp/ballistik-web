@@ -13,6 +13,7 @@ import { dashboardRouter } from "./dashboard.router";
 import { testRunLogRouter } from "./test-run-log.router";
 import { billingRouter } from "./billing.router";
 import { appTransactionRouter } from "./app-transaction.router";
+import { creatorRewardRouter } from "./creator-rewards.router";
 
 const baseRouters = {
   auth: authRouter,
@@ -27,6 +28,7 @@ const baseRouters = {
   dashboard: dashboardRouter,
   billing: billingRouter,
   appTransaction: appTransactionRouter,
+  creatorReward: creatorRewardRouter,
   testRunLog: testRunLogRouter,
 };
 

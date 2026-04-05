@@ -1,3 +1,4 @@
+import "server-only";
 import { PublicKey } from "@solana/web3.js";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { logger } from "@/lib/logger";

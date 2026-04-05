@@ -33,6 +33,7 @@ const sourceOptions = [
   { value: "HOLDING", label: "Holding" },
   { value: "WALLET", label: "Wallet" },
   { value: "BILLING", label: "Billing" },
+  { value: "CREATOR_REWARD", label: "Creator Rewards" },
 ] as const;
 
 const typeGroups = [
@@ -57,7 +58,7 @@ const typeGroups = [
     label: "Fee",
     items: [
       { value: "FEE_USAGE", label: "Platform Fee" },
-      { value: "FEE_PRO", label: "Pro Fee" },
+      { value: "FEE_SUBSCRIPTION", label: "Subscription Fee" },
     ],
   },
   {
@@ -72,6 +73,13 @@ const typeGroups = [
     items: [
       { value: "ACCOUNT_ATA_CREATE", label: "ATA Create" },
       { value: "ACCOUNT_ATA_CLOSE", label: "ATA Close" },
+    ],
+  },
+  {
+    label: "Rewards",
+    items: [
+      { value: "REWARD_CLAIM", label: "Claim Rewards" },
+      { value: "REWARD_PAYOUT", label: "Reward Payout" },
     ],
   },
 ] as const;

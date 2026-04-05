@@ -9,7 +9,7 @@ The token dashboard (`/[tokenPublicKey]/dashboard`) is the central monitoring pa
 The dashboard uses two transaction models:
 
 - **`TokenTransaction`**: Market activity (including external traders). Powers price charts, volume/activity metrics, recent transactions, sell-side P&L, and market buy volume. Filtered by `isOwned: true` for user-scoped metrics.
-- **`AppTransaction`**: Operational ledger. Provides the dev buy amount (`TRADE_BUY` from `LAUNCH` source) and fee aggregation (`FEE_USAGE`, `FEE_PRO`, Jito tips) for the P&L calculation. See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration) for details.
+- **`AppTransaction`**: Operational ledger. Provides the dev buy amount (`TRADE_BUY` from `LAUNCH` source), fee aggregation (`FEE_USAGE`, `FEE_PRO`, Jito tips), and claimed creator rewards (`REWARD_PAYOUT` from `CREATOR_REWARD` source) for the P&L calculation. See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration) for details.
 
 External holders on the dashboard are sourced separately from live SPL token accounts, not from `TokenTransaction`. `holdersService.getCurrentHolders()` first attempts a live Solana RPC holder lookup, supports both classic SPL Token and Token-2022 account programs, reads owner + amount bytes, aggregates balances by owner wallet, and sorts the result descending. If the current RPC provider blocks the required index methods, the service falls back to reconstructing current holder balances from confirmed `TokenTransaction` buy/create/sell deltas and emits a concise warning log so the provider limitation remains visible during operations. `dashboard.getStats` then excludes user-managed wallets and the bonding curve wallet so the `External Holders` panel reflects current non-user holders rather than historical traders as closely as current data sources allow.
 
@@ -98,7 +98,8 @@ For tokens where `isComplete === true` (graduated from bonding curve):
 
 ```
 totalBuyVolume = ownedBuyVolume + devBuySol
-P&L = ownedSellVolume - totalBuyVolume - totalFees
+creatorRewardsClaimedSol = sum of confirmed REWARD_PAYOUT (CREATOR_REWARD source)
+P&L = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
 ```
 
 - `ownedBuyVolume` / `ownedSellVolume`: from `TokenTransaction.groupBy` where `isOwned: true`, `status: 'CONFIRMED'`

@@ -1,3 +1,4 @@
+import "server-only";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
@@ -31,6 +32,7 @@ import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import {
   calculateVolumeBotUsageFees,
   waiveVolumeBotUsageFees,
+  discountVolumeBotUsageFees,
 } from "@/lib/config/usage-fees.config";
 import { usageFeeService } from "@/server/services/usage-fee.service";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
@@ -446,15 +448,15 @@ export const volumeBotService = {
     if (missingKey) {
       throw new AppError("Selected wallet is missing a private key", 400);
     }
-    const usageFees = grpcAccessService.isPlatformFeeWaived(user)
-      ? waiveVolumeBotUsageFees(
-          calculateVolumeBotUsageFees(
-            input.config.walletConfig.generatedWalletCount
-          )
-        )
-      : calculateVolumeBotUsageFees(
-          input.config.walletConfig.generatedWalletCount
-        );
+    const rawVolumeFees = calculateVolumeBotUsageFees(
+      input.config.walletConfig.generatedWalletCount
+    );
+    const volumeDiscountRate = grpcAccessService.getPlatformFeeDiscountRate(user);
+    const usageFees = volumeDiscountRate >= 1
+      ? waiveVolumeBotUsageFees(rawVolumeFees)
+      : volumeDiscountRate > 0
+        ? discountVolumeBotUsageFees(rawVolumeFees, volumeDiscountRate)
+        : rawVolumeFees;
     validateSchedule(
       input.config,
       input.scheduledStartAt,
@@ -961,15 +963,15 @@ export const volumeBotService = {
     );
     const minimumIntervalSeconds =
       grpcAccessService.getVolumeBotMinIntervalSeconds(user);
-    const usageFees = grpcAccessService.isPlatformFeeWaived(user)
-      ? waiveVolumeBotUsageFees(
-          calculateVolumeBotUsageFees(
-            input.config.walletConfig.generatedWalletCount
-          )
-        )
-      : calculateVolumeBotUsageFees(
-          input.config.walletConfig.generatedWalletCount
-        );
+    const rawPreflightFees = calculateVolumeBotUsageFees(
+      input.config.walletConfig.generatedWalletCount
+    );
+    const preflightDiscountRate = grpcAccessService.getPlatformFeeDiscountRate(user);
+    const usageFees = preflightDiscountRate >= 1
+      ? waiveVolumeBotUsageFees(rawPreflightFees)
+      : preflightDiscountRate > 0
+        ? discountVolumeBotUsageFees(rawPreflightFees, preflightDiscountRate)
+        : rawPreflightFees;
     const netSolDirection = computeNetSolDirection(input.config.ranges);
     const hasSellRanges = input.config.ranges.some(
       (range) => range.direction !== "buy"

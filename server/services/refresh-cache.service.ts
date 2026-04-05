@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import { type RefreshScope } from "@/lib/generated/prisma/enums";
 import type { GetRefreshCacheInput } from "@/server/schemas/refresh-cache.schema";

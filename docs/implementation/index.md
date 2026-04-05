@@ -25,6 +25,7 @@ This directory contains detailed implementation documentation for all features i
 
 - [Holdings Implementation](./holdings-implementation.md) — holdings refresh, sell flow, and UI
 - [Exit Implementation](./exit-implementation.md) — holdings exit flow
+- [Creator Rewards](./creator-rewards-implementation.md) — Pump creator fee claiming, shared-wallet settlement, and P&L integration
 
 ### Automation
 

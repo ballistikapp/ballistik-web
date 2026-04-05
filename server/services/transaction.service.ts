@@ -1,3 +1,4 @@
+import "server-only";
 import { Prisma, prisma } from "@/lib/prisma";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";

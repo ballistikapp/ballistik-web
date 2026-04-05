@@ -45,6 +45,13 @@ prisma/           → Schema and migrations
 docs/             → Implementation docs, backlog, deployment
 ```
 
+## Client/Server Boundary
+
+- `server/` modules are **server-only**. Every file in `server/services/` imports `"server-only"` and will break the build if pulled into a client bundle.
+- **Never import runtime values** from `server/` in client code (`app/` components, `components/`, `hooks/`, `contexts/`). `import type` is allowed.
+- Shared constants, config values, and pure helpers that both client and server need must live in `lib/config/` (e.g. `usage-fees.config.ts`, `subscription.config.ts`), not in `server/services/`.
+- An ESLint rule (`@typescript-eslint/no-restricted-imports`) enforces this boundary. It will error on runtime imports from `@/server/**` in client-facing files.
+
 ## tRPC Procedures
 
 Available procedure types (defined in `server/trpc/trpc.ts`):

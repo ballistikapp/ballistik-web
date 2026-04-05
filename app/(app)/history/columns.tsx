@@ -31,28 +31,55 @@ const typeLabels: Record<string, string> = {
   TRANSFER_RECLAIM: "Reclaim",
   TRANSFER_WITHDRAW: "Withdraw",
   FEE_USAGE: "Platform Fee",
-  FEE_PRO: "Pro Fee",
+  FEE_SUBSCRIPTION: "Subscription Fee",
   TOKEN_DISTRIBUTE: "Distribute",
   TOKEN_CONSOLIDATE: "Consolidate",
   ACCOUNT_ATA_CREATE: "ATA Create",
   ACCOUNT_ATA_CLOSE: "ATA Close",
+  REWARD_CLAIM: "Claim Rewards",
+  REWARD_PAYOUT: "Reward Payout",
 };
 
-const typeColors: Record<string, string> = {
-  TRADE_BUY: "border-green-500/30 bg-green-500/10 text-green-400",
-  TRADE_SELL: "border-red-500/30 bg-red-500/10 text-red-400",
-  TRADE_CREATE: "border-blue-500/30 bg-blue-500/10 text-blue-400",
-  TRANSFER_FUND: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  TRANSFER_RETURN: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  TRANSFER_RECLAIM: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  TRANSFER_WITHDRAW: "border-amber-500/30 bg-amber-500/10 text-amber-400",
-  FEE_USAGE: "border-purple-500/30 bg-purple-500/10 text-purple-400",
-  FEE_PRO: "border-purple-500/30 bg-purple-500/10 text-purple-400",
-  TOKEN_DISTRIBUTE: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
-  TOKEN_CONSOLIDATE: "border-cyan-500/30 bg-cyan-500/10 text-cyan-400",
-  ACCOUNT_ATA_CREATE: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
-  ACCOUNT_ATA_CLOSE: "border-zinc-500/30 bg-zinc-500/10 text-zinc-400",
+/** Soft chromatic tints — not the semantic `muted` token. */
+const typeBadgeClass: Record<string, string> = {
+  TRADE_BUY:
+    "border-transparent bg-emerald-500/10 text-emerald-800/90 hover:bg-emerald-500/10 dark:text-emerald-400/85",
+  TRADE_SELL:
+    "border-transparent bg-rose-500/10 text-rose-800/90 hover:bg-rose-500/10 dark:text-rose-400/85",
+  TRADE_CREATE:
+    "border-transparent bg-sky-500/10 text-sky-800/90 hover:bg-sky-500/10 dark:text-sky-400/85",
+  TRANSFER_FUND:
+    "border-transparent bg-amber-500/10 text-amber-900/90 hover:bg-amber-500/10 dark:text-amber-400/80",
+  TRANSFER_RETURN:
+    "border-transparent bg-amber-500/10 text-amber-900/90 hover:bg-amber-500/10 dark:text-amber-400/80",
+  TRANSFER_RECLAIM:
+    "border-transparent bg-amber-500/10 text-amber-900/90 hover:bg-amber-500/10 dark:text-amber-400/80",
+  TRANSFER_WITHDRAW:
+    "border-transparent bg-amber-500/10 text-amber-900/90 hover:bg-amber-500/10 dark:text-amber-400/80",
+  FEE_USAGE:
+    "border-transparent bg-violet-500/10 text-violet-800/90 hover:bg-violet-500/10 dark:text-violet-400/85",
+  FEE_SUBSCRIPTION:
+    "border-transparent bg-violet-500/10 text-violet-800/90 hover:bg-violet-500/10 dark:text-violet-400/85",
+  TOKEN_DISTRIBUTE:
+    "border-transparent bg-teal-500/10 text-teal-800/90 hover:bg-teal-500/10 dark:text-teal-400/85",
+  TOKEN_CONSOLIDATE:
+    "border-transparent bg-teal-500/10 text-teal-800/90 hover:bg-teal-500/10 dark:text-teal-400/85",
+  ACCOUNT_ATA_CREATE:
+    "border-transparent bg-zinc-500/10 text-zinc-700/90 hover:bg-zinc-500/10 dark:text-zinc-400/90",
+  ACCOUNT_ATA_CLOSE:
+    "border-transparent bg-zinc-500/10 text-zinc-700/90 hover:bg-zinc-500/10 dark:text-zinc-400/90",
+  REWARD_CLAIM:
+    "border-transparent bg-fuchsia-500/10 text-fuchsia-800/90 hover:bg-fuchsia-500/10 dark:text-fuchsia-400/85",
+  REWARD_PAYOUT:
+    "border-transparent bg-fuchsia-500/10 text-fuchsia-800/90 hover:bg-fuchsia-500/10 dark:text-fuchsia-400/85",
 };
+
+function typeBadgeClassFor(type: string): string {
+  return (
+    typeBadgeClass[type] ??
+    "border-transparent bg-zinc-500/10 text-zinc-700/90 hover:bg-zinc-500/10 dark:text-zinc-400/90"
+  );
+}
 
 const sourceLabels: Record<string, string> = {
   LAUNCH: "Launch",
@@ -61,6 +88,7 @@ const sourceLabels: Record<string, string> = {
   HOLDING: "Holding",
   WALLET: "Wallet",
   BILLING: "Billing",
+  CREATOR_REWARD: "Creator Rewards",
 };
 
 const statusConfig: Record<string, { label: string; dotClass: string }> = {
@@ -98,10 +126,7 @@ export function getColumns(): ColumnDef<AppTransaction>[] {
       cell: ({ row }) => {
         const type = row.original.type;
         return (
-          <Badge
-            variant="outline"
-            className={typeColors[type] ?? "text-foreground"}
-          >
+          <Badge variant="secondary" className={typeBadgeClassFor(type)}>
             {typeLabels[type] ?? type}
           </Badge>
         );
@@ -114,9 +139,9 @@ export function getColumns(): ColumnDef<AppTransaction>[] {
         <DataTableColumnHeader column={column} title="Source" />
       ),
       cell: ({ row }) => (
-        <Badge variant="secondary">
+        <span className="text-sm">
           {sourceLabels[row.original.source] ?? row.original.source}
-        </Badge>
+        </span>
       ),
     },
     {

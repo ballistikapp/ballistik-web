@@ -37,6 +37,8 @@ The system dev wallet is included in:
 - Sell and exit flows (with forced SOL recovery to user's main wallet)
 - Launch funding and cleanup
 
+Creator rewards are **not available** for tokens using the system dev wallet — the service returns `eligible: false` and the dashboard card is hidden.
+
 ## Volume Bot Wallets
 
 - Volume bot wallets are still `Wallet` rows with `type = VOLUME`.

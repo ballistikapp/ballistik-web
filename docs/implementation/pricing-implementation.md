@@ -20,8 +20,30 @@
 - Vanity mint fee applies only when vanity mint is enabled for launch.
 - Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
 - Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
-- Pro waives platform fees only. Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not waived.
-- Weekly Pro access costs `4.95 SOL` for 7 days and is charged from the user's main wallet to the existing fee collector wallet.
+
+## Plan-Based Fee Policy
+
+Fee adjustment is determined by the user's active plan via `grpcAccessService.getPlatformFeeDiscountRate(user)`:
+
+| Plan | Discount Rate | Effect |
+|------|--------------|--------|
+| `FREE` | 0% | Full platform fees |
+| `DEVELOPER` | 25% | 25% off the total platform fee |
+| `PRO` | 100% (waived) | No platform fees |
+
+- The discount is applied to the **total platform fee**, not per line item.
+- Individual fee line items remain at their nominal values for display.
+- `discountLaunchUsageFees(breakdown, rate)` and `discountVolumeBotUsageFees(breakdown, rate)` apply the discount to the total.
+- `waiveLaunchUsageFees(breakdown)` and `waiveVolumeBotUsageFees(breakdown)` zero out all fees for Pro.
+- The same fee-decision logic must be applied consistently to quote generation (client preview + server preview) and actual fee collection.
+- Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not affected by any plan.
+
+## Subscription Pricing
+
+- `DEVELOPER` costs `1.95 SOL` per week.
+- `PRO` costs `4.95 SOL` per week.
+- Upgrading from `DEVELOPER` to `PRO` credits remaining Developer days (rounded up).
+- Subscription charges use the same collector-wallet payment rail as usage fees.
 
 ## Configuration
 
@@ -29,6 +51,7 @@
   - `FEE_COLLECTOR_WALLET_ADDRESS`
 - Runtime env parsing is handled in `lib/config/env.ts`.
 - Shared fee constants and breakdown helpers are defined in `lib/config/usage-fees.config.ts`.
+- Subscription pricing constants are defined in `server/services/pro-subscription.service.ts`.
 
 ## Calculation Model
 
@@ -58,9 +81,9 @@ Total usage fee is:
 - Usage fees are computed server-side and transferred from the user's main wallet to the configured collector wallet.
 - Fee collection is part of protected server workflows and is never trusted to client-side calculations.
 - Fee collection validates collector wallet configuration before transfer.
-- Fee exemption is decided from the authenticated user's JWT `plan` claim during the request path.
+- Fee exemption/discount is decided from the authenticated user's JWT `plan` claim during the request path.
 - `User.plan` in the database is the source of truth for newly issued access tokens, but active access tokens continue to honor their embedded plan claim until refresh/expiry.
-- Weekly Pro purchases reuse the same collector-wallet payment rail as other platform charges; no external billing provider is involved in v1.
+- Subscription charges reuse the same collector-wallet payment rail; no external billing provider is involved in v1.
 
 ## UI Visibility Requirements
 
@@ -70,6 +93,8 @@ Total usage fee is:
 - Launch surfaces must show attribution-removal fee and bundle-buy fee as separate line items.
 - Launch review and confirmation fee panels must always render all launch fee line items, even when a fee is not active.
 - Inactive fee rows should be visually de-emphasized while still displaying nominal fee amounts.
+- When a discount is active (Developer plan), the total fee row shows the discounted value and a message indicating the discount rate.
+- When fees are waived (Pro plan), the total fee row shows zero and a message confirming the waiver.
 
 ## Operation Cost Quote Semantics
 
@@ -87,22 +112,15 @@ All pre-operation quotes use a shared vocabulary across launch and volume bot:
 - **Edit-time estimate**: fast client-side estimate used while users edit forms. This can be conservative.
 - **Confirm-time quote**: server-generated live quote using current balances and rent values. This is the authoritative amount shown before user confirmation.
 - Runtime-sensitive categories (for example trade execution fees and variable bundle buys) must be labeled as ranges or caveats when they cannot be exact at confirm time.
-
-## Pro Plan Behavior
-
-- Launch previews and starts return zero platform usage fees for Pro users.
-- Volume bot preflight and start return zero platform usage fees for Pro users.
-- The same fee-waiver decision must be applied consistently to quote generation and actual fee collection.
-- UI should still show non-waived operational costs so the user understands expected network spend.
-- Pro is account-wide and lasts 7 days per purchase.
-- There is no auto-renewal in v1; renewal is a manual repeat purchase.
-- Billing history should show the Pro purchase amount, transaction signature, purchase time, and expiration time.
+- Fee discount rounding: `roundSol()` rounds to lamport precision (9 decimal places) once on the final discounted total.
 
 ## Related Files
 
 - `lib/config/env.ts`
 - `lib/config/usage-fees.config.ts`
+- `server/services/pro-subscription.service.ts`
 - `server/services/usage-fee.service.ts`
+- `server/services/grpc-access.service.ts`
 - `server/services/launch.service.ts`
 - `server/services/volume-bot.service.ts`
 - `app/(app)/launch/launch-form.tsx`

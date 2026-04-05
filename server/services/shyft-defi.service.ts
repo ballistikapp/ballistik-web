@@ -1,3 +1,4 @@
+import "server-only";
 import { getEnv } from "@/lib/config/env";
 
 const SHYFT_DEFI_API_BASE = "https://defi.shyft.to/v0";

@@ -14,6 +14,7 @@ export type LaunchUsageFeeInput = {
 
 export type LaunchUsageFeeBreakdown = {
   platformFeeWaived: boolean;
+  platformFeeDiscountRate: number;
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
   vanityMintFeeSol: number;
@@ -24,6 +25,7 @@ export type LaunchUsageFeeBreakdown = {
 
 export type VolumeBotUsageFeeBreakdown = {
   platformFeeWaived: boolean;
+  platformFeeDiscountRate: number;
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
   totalFeeSol: number;
@@ -70,6 +72,7 @@ export function calculateLaunchUsageFees(
     bundleBuyFeeValue;
   return {
     platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
     generatedWalletCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     vanityMintFeeSol: vanityFeeValue,
@@ -86,6 +89,7 @@ export function calculateVolumeBotUsageFees(
   const generatedWalletFeeValue = normalizedCount * generatedWalletFeeSol;
   return {
     platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
     generatedWalletCount: normalizedCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     totalFeeSol: generatedWalletFeeValue,
@@ -98,6 +102,7 @@ export function waiveLaunchUsageFees(
   return {
     ...breakdown,
     platformFeeWaived: true,
+    platformFeeDiscountRate: 1,
     generatedWalletFeeSol: 0,
     vanityMintFeeSol: 0,
     descriptionAttributionRemovalFeeSol: 0,
@@ -112,7 +117,36 @@ export function waiveVolumeBotUsageFees(
   return {
     ...breakdown,
     platformFeeWaived: true,
+    platformFeeDiscountRate: 1,
     generatedWalletFeeSol: 0,
     totalFeeSol: 0,
+  };
+}
+
+function roundSol(amount: number): number {
+  return Math.round(amount * 1_000_000_000) / 1_000_000_000;
+}
+
+export function discountLaunchUsageFees(
+  breakdown: LaunchUsageFeeBreakdown,
+  discountRate: number
+): LaunchUsageFeeBreakdown {
+  const multiplier = 1 - discountRate;
+  return {
+    ...breakdown,
+    platformFeeDiscountRate: discountRate,
+    totalFeeSol: roundSol(breakdown.totalFeeSol * multiplier),
+  };
+}
+
+export function discountVolumeBotUsageFees(
+  breakdown: VolumeBotUsageFeeBreakdown,
+  discountRate: number
+): VolumeBotUsageFeeBreakdown {
+  const multiplier = 1 - discountRate;
+  return {
+    ...breakdown,
+    platformFeeDiscountRate: discountRate,
+    totalFeeSol: roundSol(breakdown.totalFeeSol * multiplier),
   };
 }

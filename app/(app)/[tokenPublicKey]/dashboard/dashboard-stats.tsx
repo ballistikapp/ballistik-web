@@ -35,6 +35,7 @@ interface PnlData {
   net: number;
   totalBuyVolume: number;
   totalSellVolume: number;
+  creatorRewardsClaimedSol: number;
   platformFees: number;
   launchFees: number;
   launchFeeBreakdown: {
@@ -159,7 +160,7 @@ export function DashboardStats({
           <div className="flex flex-col gap-1 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
               Spent: {formatSol(pnl.totalBuyVolume + pnl.totalFees + pnl.creationCostSol)} · Received:{" "}
-              {formatSol(pnl.totalSellVolume)}
+              {formatSol(pnl.totalSellVolume + pnl.creatorRewardsClaimedSol)}
             </span>
             <div className="flex items-center justify-end gap-1.5 mt-1">
               <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">

@@ -11,6 +11,7 @@
 
 export const UserPlan = {
   FREE: 'FREE',
+  DEVELOPER: 'DEVELOPER',
   PRO: 'PRO'
 } as const
 
@@ -173,11 +174,13 @@ export const AppTransactionType = {
   TRANSFER_RECLAIM: 'TRANSFER_RECLAIM',
   TRANSFER_WITHDRAW: 'TRANSFER_WITHDRAW',
   FEE_USAGE: 'FEE_USAGE',
-  FEE_PRO: 'FEE_PRO',
+  FEE_SUBSCRIPTION: 'FEE_SUBSCRIPTION',
   TOKEN_DISTRIBUTE: 'TOKEN_DISTRIBUTE',
   TOKEN_CONSOLIDATE: 'TOKEN_CONSOLIDATE',
   ACCOUNT_ATA_CREATE: 'ACCOUNT_ATA_CREATE',
-  ACCOUNT_ATA_CLOSE: 'ACCOUNT_ATA_CLOSE'
+  ACCOUNT_ATA_CLOSE: 'ACCOUNT_ATA_CLOSE',
+  REWARD_CLAIM: 'REWARD_CLAIM',
+  REWARD_PAYOUT: 'REWARD_PAYOUT'
 } as const
 
 export type AppTransactionType = (typeof AppTransactionType)[keyof typeof AppTransactionType]
@@ -189,7 +192,8 @@ export const AppTransactionSource = {
   VOLUME_BOT: 'VOLUME_BOT',
   HOLDING: 'HOLDING',
   WALLET: 'WALLET',
-  BILLING: 'BILLING'
+  BILLING: 'BILLING',
+  CREATOR_REWARD: 'CREATOR_REWARD'
 } as const
 
 export type AppTransactionSource = (typeof AppTransactionSource)[keyof typeof AppTransactionSource]

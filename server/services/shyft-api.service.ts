@@ -1,3 +1,4 @@
+import "server-only";
 import { getEnv } from "@/lib/config/env";
 
 const SHYFT_API_BASE = "https://api.shyft.to/sol/v1";

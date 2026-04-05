@@ -65,9 +65,9 @@ export function AuthButton() {
   const mainWalletBalanceSol = Number(mainWalletQuery.data?.balanceSol ?? 0);
   const subscriptionOverview = subscriptionOverviewQuery.data;
   const effectivePlan = subscriptionOverview?.plan ?? currentUser?.plan ?? null;
-  const isProPlan = effectivePlan === "PRO";
-  const proExpiresAtLabel = subscriptionOverview?.proExpiresAt
-    ? format(new Date(subscriptionOverview.proExpiresAt), "MMM d, yyyy")
+  const isPaidPlan = effectivePlan === "PRO" || effectivePlan === "DEVELOPER";
+  const planExpiresAtLabel = subscriptionOverview?.paidPlanExpiresAt
+    ? format(new Date(subscriptionOverview.paidPlanExpiresAt), "MMM d, yyyy")
     : null;
 
   const logoutMutation = trpc.auth.logout.useMutation({
@@ -247,20 +247,24 @@ export function AuthButton() {
             <>
               <DropdownMenuLabel className="flex flex-col gap-1">
                 <div>
-                  <Badge variant={isProPlan ? "default" : "secondary"}>
-                    {isProPlan ? "Pro Plan" : "Free Plan"}
+                  <Badge variant={isPaidPlan ? "default" : "secondary"}>
+                    {effectivePlan === "PRO"
+                      ? "Pro Plan"
+                      : effectivePlan === "DEVELOPER"
+                        ? "Developer Plan"
+                        : "Free Plan"}
                   </Badge>
                 </div>
-                {isProPlan && proExpiresAtLabel ? (
+                {isPaidPlan && planExpiresAtLabel ? (
                   <span className="text-xs text-muted-foreground">
-                    Active until {proExpiresAtLabel}
+                    Active until {planExpiresAtLabel}
                   </span>
                 ) : null}
               </DropdownMenuLabel>
               <DropdownMenuItem asChild>
                 <Link href="/account/subscription">
                   <IconCreditCard />
-                  {isProPlan ? "Manage Subscription" : "Upgrade to Pro Plan"}
+                  {isPaidPlan ? "Manage Subscription" : "View Plans"}
                 </Link>
               </DropdownMenuItem>
 

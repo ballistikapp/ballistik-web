@@ -6,15 +6,15 @@ import {
 import {
   billingHistorySchema,
   billingOverviewSchema,
-  purchaseWeeklyProSchema,
+  purchaseSubscriptionSchema,
 } from "@/server/schemas";
-import { proSubscriptionService } from "@/server/services/pro-subscription.service";
+import { subscriptionService } from "@/server/services/pro-subscription.service";
 
 export const billingRouter = router({
   getSubscriptionOverview: protectedRateLimitedProcedure
     .input(billingOverviewSchema)
     .query(async ({ ctx }) => {
-      return await proSubscriptionService.getSubscriptionOverview(
+      return await subscriptionService.getSubscriptionOverview(
         ctx.user.id,
         ctx.user.plan
       );
@@ -22,11 +22,14 @@ export const billingRouter = router({
   getHistory: protectedRateLimitedProcedure
     .input(billingHistorySchema)
     .query(async ({ input, ctx }) => {
-      return await proSubscriptionService.listHistory(ctx.user.id, input.limit);
+      return await subscriptionService.listHistory(ctx.user.id, input.limit);
     }),
-  purchaseWeeklyPro: expensiveProtectedProcedure
-    .input(purchaseWeeklyProSchema)
-    .mutation(async ({ ctx }) => {
-      return await proSubscriptionService.purchaseWeeklyPro(ctx.user.id);
+  purchaseSubscription: expensiveProtectedProcedure
+    .input(purchaseSubscriptionSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await subscriptionService.purchaseSubscription(
+        ctx.user.id,
+        input.plan
+      );
     }),
 });

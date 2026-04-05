@@ -1,3 +1,4 @@
+import "server-only";
 /**
  * Central export point for all services
  * Add new services here as you create them
@@ -11,3 +12,4 @@ export * from "./holding.service";
 export * from "./transaction.service";
 export * from "./storage.service";
 export * from "./test-run-log.service";
+export * from "./creator-rewards.service";

@@ -13,6 +13,30 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  {
+    files: [
+      "app/**/*.{ts,tsx}",
+      "components/**/*.{ts,tsx}",
+      "hooks/**/*.{ts,tsx}",
+      "contexts/**/*.{ts,tsx}",
+    ],
+    ignores: ["app/api/**", "app/**/page.tsx", "app/**/layout.tsx", "app/page.tsx", "app/layout.tsx"],
+    rules: {
+      "@typescript-eslint/no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/server/*", "@/server/**"],
+              allowTypeImports: true,
+              message:
+                "Client code must not import runtime values from server modules. Move shared constants/types to lib/config/ or use `import type`.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ]);
 
 export default eslintConfig;

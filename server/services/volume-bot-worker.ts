@@ -1,3 +1,4 @@
+import "server-only";
 import { BN } from "@coral-xyz/anchor";
 import {
   ComputeBudgetProgram,

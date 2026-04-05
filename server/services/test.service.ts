@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import type { CreateTestInput, TestTableOutput } from "@/server/schemas";
 import { AppError } from "@/server/errors";

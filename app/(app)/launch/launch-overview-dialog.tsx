@@ -374,11 +374,16 @@ export function LaunchOverviewDialog({
                       {preview.lineItems.usageFeesSol.toFixed(4)} SOL
                     </span>
                   </div>
-                  {preview.platformFeeWaived && (
+                  {preview.platformFeeWaived ? (
                     <div className="mt-2 text-xs text-emerald-400">
                       Pro active. Platform fees are waived for this launch.
                     </div>
-                  )}
+                  ) : preview.platformFeeDiscountRate != null && preview.platformFeeDiscountRate > 0 ? (
+                    <div className="mt-2 text-xs text-emerald-400">
+                      Developer active. Platform fees are reduced by{" "}
+                      {Math.round(preview.platformFeeDiscountRate * 100)}%.
+                    </div>
+                  ) : null}
                   <div className="mt-2 space-y-2">
                     <div
                       className={`flex items-center justify-between ${

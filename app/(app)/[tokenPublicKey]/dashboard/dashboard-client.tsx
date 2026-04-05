@@ -15,6 +15,7 @@ import { DashboardDefiPools } from "./dashboard-defi-pools";
 import { PriceChart } from "./price-chart";
 import { MonitoringPanel } from "@/components/dashboard/monitoring-panel";
 import { HoldingExitDialog } from "@/components/holdings/holding-exit-dialog";
+import { CreatorRewardsCard } from "./creator-rewards-card";
 import {
   buildDashboardFullSnapshotPayload,
   buildDashboardSummaryPayload,
@@ -81,9 +82,9 @@ export function DashboardClient() {
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const holdingsRefreshDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(
-    null
-  );
+  const holdingsRefreshDebounceRef = useRef<ReturnType<
+    typeof setTimeout
+  > | null>(null);
   const recentInitialRefreshTokenRef = useRef<string | null>(null);
   const missingDataRefreshTokenRef = useRef<string | null>(null);
   const lastMonitoringActivityAtRef = useRef<number | null>(null);
@@ -151,9 +152,12 @@ export function DashboardClient() {
         refetchInterval: isMonitoring ? POLL_INTERVAL : false,
       }
     );
-  const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
-    enabled: !!tokenPublicKey,
-  });
+  const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(
+    undefined,
+    {
+      enabled: !!tokenPublicKey,
+    }
+  );
   const appendTestRunEvent = trpc.testRunLog.appendEvent.useMutation();
   const { mutateAsync: refreshBalances } =
     trpc.wallet.refreshBalances.useMutation();
@@ -175,7 +179,7 @@ export function DashboardClient() {
           if (!data?.available) {
             toast.error(
               data?.accessReason === "not_pro"
-                ? "Upgrade to Pro on your subscription page to activate live monitoring"
+                ? "Upgrade to Pro to activate live monitoring"
                 : "Real-time monitoring is unavailable"
             );
             return;
@@ -204,7 +208,12 @@ export function DashboardClient() {
         setGrpcConnected(null);
       }
     },
-    [appendTestRunEvent, grpcStatusQuery, testRunLogConfig?.enabled, tokenPublicKey]
+    [
+      appendTestRunEvent,
+      grpcStatusQuery,
+      testRunLogConfig?.enabled,
+      tokenPublicKey,
+    ]
   );
 
   const logDashboardEvent = useCallback(
@@ -309,7 +318,11 @@ export function DashboardClient() {
               ? { name: error.name, message: error.message }
               : String(error),
         });
-        console.error("monitoring holdings refresh failed", { source, force, error });
+        console.error("monitoring holdings refresh failed", {
+          source,
+          force,
+          error,
+        });
       } finally {
         refetchStats();
       }
@@ -352,7 +365,9 @@ export function DashboardClient() {
         {
           eventType: "dashboard_subscription_event",
           action: source,
-          trigger: options?.triggerHoldingsRefresh ? "refresh-and-refetch" : "refetch",
+          trigger: options?.triggerHoldingsRefresh
+            ? "refresh-and-refetch"
+            : "refetch",
           actualValue: _payload,
         },
         { trigger: `sse:${source}` }
@@ -365,19 +380,22 @@ export function DashboardClient() {
     [debouncedRefetch, logDashboardEvent, scheduleMonitoringHoldingsRefresh]
   );
 
-  const handleSubscriptionError = useCallback((source: string, error: unknown) => {
-    console.error("subscription error", { source, error });
-    logDashboardEvent({
-      eventType: "run_issue",
-      action: "subscription-error",
-      trigger: source,
-      error:
-        error instanceof Error
-          ? { name: error.name, message: error.message }
-          : String(error),
-    });
-    setSseError(true);
-  }, [logDashboardEvent]);
+  const handleSubscriptionError = useCallback(
+    (source: string, error: unknown) => {
+      console.error("subscription error", { source, error });
+      logDashboardEvent({
+        eventType: "run_issue",
+        action: "subscription-error",
+        trigger: source,
+        error:
+          error instanceof Error
+            ? { name: error.name, message: error.message }
+            : String(error),
+      });
+      setSseError(true);
+    },
+    [logDashboardEvent]
+  );
 
   trpc.subscription.onNewTransaction.useSubscription(
     { tokenPublicKey: tokenPublicKey || "" },
@@ -411,7 +429,8 @@ export function DashboardClient() {
         handleSubscriptionData("onTokenBalanceUpdate", event, {
           markActivity: true,
         }),
-      onError: (error) => handleSubscriptionError("onTokenBalanceUpdate", error),
+      onError: (error) =>
+        handleSubscriptionError("onTokenBalanceUpdate", error),
     }
   );
 
@@ -471,87 +490,96 @@ export function DashboardClient() {
     refetchDefi();
   }, [refetchDefi, refetchStats, refetchToken]);
 
-  const runChainRefresh = useCallback(async ({
-    action,
-    trigger,
-    refreshMode,
-    includeWalletBalances,
-    setPending,
-  }: {
-    action: string;
-    trigger: string;
-    refreshMode: "full" | "auto";
-    includeWalletBalances: boolean;
-    setPending: (value: boolean) => void;
-  }) => {
-    if (!tokenPublicKey) return;
-    setPending(true);
-    logDashboardEvent(
-      {
-        eventType: "dashboard_refresh",
-        action,
-        refreshMode,
-        status: "started",
-      },
-      { trigger }
-    );
-    let hasFailure = false;
-    let outcomes: string[] = [];
-    try {
-      const tasks = [
-        ...(includeWalletBalances
-          ? [
-              {
-                label: "wallets",
-                promise: refreshBalances({ tokenPublicKey, force: true }),
-              },
-            ]
-          : []),
-        {
-          label: "holdings",
-          promise: refreshHoldings({ tokenPublicKey }),
-        },
-        {
-          label: "transactions",
-          promise: refreshTransactions({ tokenPublicKey }),
-        },
-      ];
-      const results = await Promise.allSettled(tasks.map((task) => task.promise));
-      outcomes = tasks.map(
-        (task, index) => `${task.label}:${results[index]?.status ?? "unknown"}`
-      );
-      hasFailure = results.some((result) => result.status === "rejected");
-    } finally {
-      rereadDashboardData();
-      logDashboardEvent({
-        eventType: "dashboard_refresh",
-        action,
-        refreshMode,
-        status: hasFailure ? "failed" : "completed",
-        actualValue: {
-          outcomes,
-        },
-      });
-      setPending(false);
-    }
-  }, [
-    logDashboardEvent,
-    tokenPublicKey,
-    refreshBalances,
-    refreshHoldings,
-    refreshTransactions,
-    rereadDashboardData,
-  ]);
-
-  const handleFullRefresh = useCallback(async (trigger = "full-refresh") => {
-    await runChainRefresh({
-      action: "handleFullRefresh",
+  const runChainRefresh = useCallback(
+    async ({
+      action,
       trigger,
-      refreshMode: "full",
-      includeWalletBalances: true,
-      setPending: setFullRefreshing,
-    });
-  }, [runChainRefresh]);
+      refreshMode,
+      includeWalletBalances,
+      setPending,
+    }: {
+      action: string;
+      trigger: string;
+      refreshMode: "full" | "auto";
+      includeWalletBalances: boolean;
+      setPending: (value: boolean) => void;
+    }) => {
+      if (!tokenPublicKey) return;
+      setPending(true);
+      logDashboardEvent(
+        {
+          eventType: "dashboard_refresh",
+          action,
+          refreshMode,
+          status: "started",
+        },
+        { trigger }
+      );
+      let hasFailure = false;
+      let outcomes: string[] = [];
+      try {
+        const tasks = [
+          ...(includeWalletBalances
+            ? [
+                {
+                  label: "wallets",
+                  promise: refreshBalances({ tokenPublicKey, force: true }),
+                },
+              ]
+            : []),
+          {
+            label: "holdings",
+            promise: refreshHoldings({ tokenPublicKey }),
+          },
+          {
+            label: "transactions",
+            promise: refreshTransactions({ tokenPublicKey }),
+          },
+        ];
+        const results = await Promise.allSettled(
+          tasks.map((task) => task.promise)
+        );
+        outcomes = tasks.map(
+          (task, index) =>
+            `${task.label}:${results[index]?.status ?? "unknown"}`
+        );
+        hasFailure = results.some((result) => result.status === "rejected");
+      } finally {
+        rereadDashboardData();
+        logDashboardEvent({
+          eventType: "dashboard_refresh",
+          action,
+          refreshMode,
+          status: hasFailure ? "failed" : "completed",
+          actualValue: {
+            outcomes,
+          },
+        });
+        setPending(false);
+      }
+    },
+    [
+      logDashboardEvent,
+      tokenPublicKey,
+      refreshBalances,
+      refreshHoldings,
+      refreshTransactions,
+      rereadDashboardData,
+    ]
+  );
+
+  const handleFullRefresh = useCallback(
+    async (trigger = "full-refresh") => {
+      await runChainRefresh({
+        action: "handleFullRefresh",
+        trigger,
+        refreshMode: "full",
+        includeWalletBalances: true,
+        setPending: setFullRefreshing,
+      });
+    },
+    [runChainRefresh]
+  );
 
   const handleRecentAutoRefresh = useCallback(async () => {
     await runChainRefresh({
@@ -602,7 +630,8 @@ export function DashboardClient() {
   ]);
 
   useEffect(() => {
-    if (!tokenPublicKey || isMonitoring || !nonMonitoringAutoRefreshEnabled) return;
+    if (!tokenPublicKey || isMonitoring || !nonMonitoringAutoRefreshEnabled)
+      return;
     const timer = setInterval(() => {
       void handleRecentAutoRefresh();
     }, POLL_INTERVAL);
@@ -619,13 +648,7 @@ export function DashboardClient() {
     if (missingDataRefreshTokenRef.current === tokenPublicKey) return;
     missingDataRefreshTokenRef.current = tokenPublicKey;
     void handleFullRefresh("missing-dashboard-data");
-  }, [
-    tokenData,
-    tokenPublicKey,
-    statsLoading,
-    statsData,
-    handleFullRefresh,
-  ]);
+  }, [tokenData, tokenPublicKey, statsLoading, statsData, handleFullRefresh]);
 
   useEffect(() => {
     if (!isMonitoring || !tokenPublicKey) return;
@@ -636,20 +659,27 @@ export function DashboardClient() {
         lastActivityAt !== null &&
         now - lastActivityAt <= MONITORING_ACTIVITY_WINDOW_MS;
       const staleHoldings =
-        dataUpdatedAt === 0 || now - dataUpdatedAt > HOLDINGS_STALE_THRESHOLD_MS;
+        dataUpdatedAt === 0 ||
+        now - dataUpdatedAt > HOLDINGS_STALE_THRESHOLD_MS;
       if (hasRecentActivity || staleHoldings) {
         scheduleMonitoringHoldingsRefresh("safety-interval");
       }
     }, MONITORING_HOLDINGS_SAFETY_INTERVAL_MS);
     return () => clearInterval(timer);
-  }, [dataUpdatedAt, isMonitoring, scheduleMonitoringHoldingsRefresh, tokenPublicKey]);
+  }, [
+    dataUpdatedAt,
+    isMonitoring,
+    scheduleMonitoringHoldingsRefresh,
+    tokenPublicKey,
+  ]);
 
-  const staleByStats = dataUpdatedAt > 0 && nowMs - dataUpdatedAt > STALE_THRESHOLD_MS;
+  const staleByStats =
+    dataUpdatedAt > 0 && nowMs - dataUpdatedAt > STALE_THRESHOLD_MS;
   const staleByEvents =
     lastSseEventAt !== null && nowMs - lastSseEventAt > STALE_THRESHOLD_MS;
   const monitoringDisabledMessage =
     grpcStatusQuery.data?.accessReason === "not_pro"
-      ? "Upgrade to Pro to activate live monitoring."
+      ? "Live monitoring requires Pro. Upgrade to unlock gRPC-backed features."
       : grpcStatusQuery.data?.accessReason === "grpc_disabled" ||
           grpcStatusQuery.data?.accessReason === "grpc_not_configured"
         ? "Live monitoring is currently unavailable."
@@ -662,9 +692,13 @@ export function DashboardClient() {
         ? "degraded"
         : "healthy";
   const needsFullRefresh =
-    !isMonitoring || monitoringHealthState === "failed" || monitoringHealthState === "degraded";
+    !isMonitoring ||
+    monitoringHealthState === "failed" ||
+    monitoringHealthState === "degraded";
   const refreshAgeSeconds =
-    dataUpdatedAt > 0 ? Math.max(Math.floor((nowMs - dataUpdatedAt) / 1000), 0) : null;
+    dataUpdatedAt > 0
+      ? Math.max(Math.floor((nowMs - dataUpdatedAt) / 1000), 0)
+      : null;
   const refreshStatusLabel =
     fullRefreshing || recentAutoRefreshing
       ? "Refreshing..."
@@ -738,8 +772,7 @@ export function DashboardClient() {
     const wasRunning =
       prevExitStatusRef.current === "PENDING" ||
       prevExitStatusRef.current === "RUNNING";
-    const isTerminal =
-      exitStatus !== "PENDING" && exitStatus !== "RUNNING";
+    const isTerminal = exitStatus !== "PENDING" && exitStatus !== "RUNNING";
     prevExitStatusRef.current = exitStatus;
     if (!wasRunning || !isTerminal) return;
     void handleFullRefresh("exit-terminal-refresh");
@@ -755,7 +788,12 @@ export function DashboardClient() {
   const totalBalance = statsData?.holdingsBreakdown.userTotalTokens ?? 0;
 
   useEffect(() => {
-    if (!tokenPublicKey || !testRunLogConfig?.enabled || !testRunLogConfig.runId) return;
+    if (
+      !tokenPublicKey ||
+      !testRunLogConfig?.enabled ||
+      !testRunLogConfig.runId
+    )
+      return;
     if (typeof window === "undefined") return;
     const storageKey = `test-run-started:${testRunLogConfig.runId}`;
     if (window.sessionStorage.getItem(storageKey) === "true") return;
@@ -768,11 +806,26 @@ export function DashboardClient() {
         runId: testRunLogConfig.runId,
       },
     });
-  }, [logDashboardEvent, testRunLogConfig?.enabled, testRunLogConfig?.runId, tokenPublicKey]);
+  }, [
+    logDashboardEvent,
+    testRunLogConfig?.enabled,
+    testRunLogConfig?.runId,
+    tokenPublicKey,
+  ]);
 
   useEffect(() => {
-    if (!tokenPublicKey || !testRunLogConfig?.enabled || !testRunLogConfig.runId) return;
-    if (!activeExitId || !exitStatus || exitStatus === "PENDING" || exitStatus === "RUNNING") {
+    if (
+      !tokenPublicKey ||
+      !testRunLogConfig?.enabled ||
+      !testRunLogConfig.runId
+    )
+      return;
+    if (
+      !activeExitId ||
+      !exitStatus ||
+      exitStatus === "PENDING" ||
+      exitStatus === "RUNNING"
+    ) {
       return;
     }
     if (typeof window === "undefined") return;
@@ -814,7 +867,10 @@ export function DashboardClient() {
         defiData,
       }),
     });
-    if (trigger !== "query-update" && trigger !== "dashboard.debounced-refetch") {
+    if (
+      trigger !== "query-update" &&
+      trigger !== "dashboard.debounced-refetch"
+    ) {
       logDashboardEvent({
         eventType: "dashboard_full_snapshot",
         action: "rendered-dashboard-full-snapshot",
@@ -850,7 +906,7 @@ export function DashboardClient() {
   return (
     <div className="flex flex-col gap-6">
       {statsLoading || !statsData ? (
-        <DashboardLoading compact />
+        <DashboardLoading />
       ) : (
         <>
           <DashboardHeader
@@ -868,10 +924,20 @@ export function DashboardClient() {
             }
             exitPending={startExitMutation.isPending}
           />
-          <DashboardOperations
-            operations={statsData.operations}
-            tokenPublicKey={tokenPublicKey}
-          />
+          <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-2 @5xl/main:items-stretch">
+            <div className="min-w-0">
+              <DashboardOperations
+                operations={statsData.operations}
+                tokenPublicKey={tokenPublicKey}
+              />
+            </div>
+            <div className="min-w-0 empty:hidden">
+              <CreatorRewardsCard
+                tokenPublicKey={tokenPublicKey}
+                onClaimSuccess={rereadDashboardData}
+              />
+            </div>
+          </div>
           <PriceChart
             tokenPublicKey={tokenPublicKey}
             isComplete={statsData.header.isComplete}

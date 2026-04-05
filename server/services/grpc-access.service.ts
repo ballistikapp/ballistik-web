@@ -1,6 +1,8 @@
+import "server-only";
 import { getEnv } from "@/lib/config/env";
 import { UserPlan } from "@/lib/generated/prisma/client";
 import type { ContextUser } from "@/server/schemas/auth.schema";
+import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 
 export type GrpcFeature =
   | "dashboard-live-monitoring"
@@ -67,6 +69,13 @@ export const grpcAccessService = {
 
   isPlatformFeeWaived(user: UserLike) {
     return resolvePlan(user) === UserPlan.PRO;
+  },
+
+  getPlatformFeeDiscountRate(user: UserLike): number {
+    const plan = resolvePlan(user);
+    if (plan === UserPlan.PRO) return 1;
+    if (plan === UserPlan.DEVELOPER) return DEVELOPER_FEE_DISCOUNT_RATE;
+    return 0;
   },
 
   getVolumeBotMinIntervalSeconds(user: UserLike) {

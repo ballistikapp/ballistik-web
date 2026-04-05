@@ -1,3 +1,4 @@
+import "server-only";
 import { PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";

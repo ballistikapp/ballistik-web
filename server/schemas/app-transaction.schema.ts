@@ -9,11 +9,13 @@ const appTransactionTypeValues = [
   "TRANSFER_RECLAIM",
   "TRANSFER_WITHDRAW",
   "FEE_USAGE",
-  "FEE_PRO",
+  "FEE_SUBSCRIPTION",
   "TOKEN_DISTRIBUTE",
   "TOKEN_CONSOLIDATE",
   "ACCOUNT_ATA_CREATE",
   "ACCOUNT_ATA_CLOSE",
+  "REWARD_CLAIM",
+  "REWARD_PAYOUT",
 ] as const;
 
 const appTransactionSourceValues = [
@@ -23,6 +25,7 @@ const appTransactionSourceValues = [
   "HOLDING",
   "WALLET",
   "BILLING",
+  "CREATOR_REWARD",
 ] as const;
 
 const transactionStatusValues = ["PENDING", "CONFIRMED", "FAILED"] as const;

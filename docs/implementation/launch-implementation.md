@@ -97,12 +97,12 @@ Used as the funding wallet (no selection in UI).
 
 Based on `devWalletOption`:
 
-- `system`: platform-provided dev wallet from `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. The DB stores a metadata-only `Wallet` row (`privateKey: ""` placeholder, `isSystemWallet: true`). Free-tier users are locked to this option; Pro users can also select it explicitly.
+- `system`: platform-provided dev wallet from `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. The DB stores a metadata-only `Wallet` row (`privateKey: ""` placeholder, `isSystemWallet: true`). Free-tier users are locked to this option; Developer and Pro users can also select it explicitly.
 - `use_main`: main wallet
 - `generate`: server creates a new `DEV` wallet
 - `import`: server validates and stores imported key as `DEV`
 
-Server-side enforcement: for free-tier users, `devWalletOption` is normalized to `system` regardless of client input. This applies to `previewCosts`, `startLaunch`, and `retryLaunch`.
+Server-side enforcement: for free-tier users, `devWalletOption` is normalized to `system` regardless of client input. Developer and Pro users can use any option. This applies to `previewCosts`, `startLaunch`, and `retryLaunch`.
 
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
 

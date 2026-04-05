@@ -1,0 +1,4 @@
+export const WEEKLY_DEVELOPER_PRICE_SOL = 1.95;
+export const WEEKLY_PRO_PRICE_SOL = 4.95;
+export const WEEKLY_DURATION_DAYS = 7;
+export const DEVELOPER_FEE_DISCOUNT_RATE = 0.25;

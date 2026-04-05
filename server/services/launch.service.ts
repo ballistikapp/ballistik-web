@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import { UserPlan, type Prisma } from "@/lib/generated/prisma/client";
 import { AppError, isAppError } from "@/server/errors";
@@ -13,6 +14,7 @@ import { getLaunchConfig } from "@/lib/config/launch.config";
 import {
   calculateLaunchUsageFees,
   waiveLaunchUsageFees,
+  discountLaunchUsageFees,
 } from "@/lib/config/usage-fees.config";
 import { getEnv } from "@/lib/config/env";
 import { AnchorProvider } from "@coral-xyz/anchor";
@@ -103,9 +105,10 @@ function applyLaunchFeePolicy(
     vanityMint: input.vanityMint,
     removeAttribution: input.removeAttribution,
   });
-  return grpcAccessService.isPlatformFeeWaived(user)
-    ? waiveLaunchUsageFees(usageFees)
-    : usageFees;
+  const discountRate = grpcAccessService.getPlatformFeeDiscountRate(user);
+  if (discountRate >= 1) return waiveLaunchUsageFees(usageFees);
+  if (discountRate > 0) return discountLaunchUsageFees(usageFees, discountRate);
+  return usageFees;
 }
 
 function composeTokenDescription(input: LaunchTokenInput) {
@@ -957,7 +960,7 @@ function normalizeDevWalletOptionForPlan(
   option: DevWalletOption,
   plan: ContextUser["plan"]
 ): DevWalletOption {
-  if (plan === UserPlan.PRO) return option;
+  if (plan === UserPlan.PRO || plan === UserPlan.DEVELOPER) return option;
   return "system";
 }
 
@@ -1292,6 +1295,7 @@ type LaunchFundingPlan = {
 
 type LaunchCostPreview = {
   platformFeeWaived: boolean;
+  platformFeeDiscountRate: number;
   mainWalletBalanceSol: number;
   mainWalletBalanceLamports: string;
   requiredMainWalletSol: number;
@@ -1600,6 +1604,7 @@ async function calculateLaunchCostPreview(
 
   return {
     platformFeeWaived: usageFees.platformFeeWaived,
+    platformFeeDiscountRate: usageFees.platformFeeDiscountRate,
     mainWalletBalanceSol: lamportsToSol(mainBalanceLamports),
     mainWalletBalanceLamports: mainBalanceLamports.toString(),
     requiredMainWalletSol: lamportsToSol(requiredMainLamports),

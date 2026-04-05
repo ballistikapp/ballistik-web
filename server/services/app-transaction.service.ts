@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import type {
@@ -102,8 +103,8 @@ export function generateDescription(
       return `Withdraw ${sol ?? "?"} SOL to ${to ?? "unknown"}`;
     case "FEE_USAGE":
       return `Platform fee: ${sol ?? "?"} SOL`;
-    case "FEE_PRO":
-      return `Pro subscription: ${sol ?? "?"} SOL`;
+    case "FEE_SUBSCRIPTION":
+      return `Subscription: ${sol ?? "?"} SOL`;
     case "TOKEN_DISTRIBUTE":
       return `Distribute tokens to ${to ?? wallet ?? "unknown"}`;
     case "TOKEN_CONSOLIDATE":
@@ -112,6 +113,10 @@ export function generateDescription(
       return `Create token account for ${to ?? wallet ?? "unknown"}`;
     case "ACCOUNT_ATA_CLOSE":
       return `Close token account for ${from ?? wallet ?? "unknown"}`;
+    case "REWARD_CLAIM":
+      return `Claim creator rewards${sol ? ` (${sol} SOL)` : ""} from Pump`;
+    case "REWARD_PAYOUT":
+      return `Creator reward payout${sol ? `: ${sol} SOL` : ""} to main wallet`;
     default:
       return "Transaction";
   }
@@ -298,7 +303,7 @@ export const appTransactionService = {
       bySource[row.source].count += count;
     }
 
-    const totalFees = (byType["FEE_USAGE"]?.solAmount ?? 0) + (byType["FEE_PRO"]?.solAmount ?? 0);
+    const totalFees = (byType["FEE_USAGE"]?.solAmount ?? 0) + (byType["FEE_SUBSCRIPTION"]?.solAmount ?? 0);
     const totalFunding = (byType["TRANSFER_FUND"]?.solAmount ?? 0);
     const totalReturns = (byType["TRANSFER_RETURN"]?.solAmount ?? 0) + (byType["TRANSFER_RECLAIM"]?.solAmount ?? 0);
     const totalBuys = (byType["TRADE_BUY"]?.solAmount ?? 0);

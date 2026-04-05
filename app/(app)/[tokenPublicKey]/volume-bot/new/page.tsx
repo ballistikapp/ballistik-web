@@ -64,8 +64,10 @@ import {
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import {
   calculateVolumeBotUsageFees,
+  discountVolumeBotUsageFees,
   waiveVolumeBotUsageFees,
 } from "@/lib/config/usage-fees.config";
+import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -525,13 +527,13 @@ export default function VolumeBotStartPage() {
     () => selectedWalletPublicKeys.length * topUpAmount,
     [selectedWalletPublicKeys.length, topUpAmount]
   );
-  const localUsageFees = useMemo(
-    () =>
-      currentUser?.plan === "PRO"
-        ? waiveVolumeBotUsageFees(calculateVolumeBotUsageFees(generatedWalletCount))
-        : calculateVolumeBotUsageFees(generatedWalletCount),
-    [currentUser?.plan, generatedWalletCount]
-  );
+  const localUsageFees = useMemo(() => {
+    const rawFees = calculateVolumeBotUsageFees(generatedWalletCount);
+    if (currentUser?.plan === "PRO") return waiveVolumeBotUsageFees(rawFees);
+    if (currentUser?.plan === "DEVELOPER")
+      return discountVolumeBotUsageFees(rawFees, DEVELOPER_FEE_DISCOUNT_RATE);
+    return rawFees;
+  }, [currentUser?.plan, generatedWalletCount]);
 
   const localPreflight = useMemo(() => {
     if (
@@ -1967,6 +1969,7 @@ export default function VolumeBotStartPage() {
             sellWarning ||
             fastestConfiguredInterval < minimumIntervalSeconds ||
             usageFees.platformFeeWaived ||
+            usageFees.platformFeeDiscountRate > 0 ||
             (netSolDirection < 0 && selectedWalletPublicKeys.length === 0)) && (
             <div className="space-y-2.5">
               {selectionSummaryQuery.error && (
@@ -2000,12 +2003,21 @@ export default function VolumeBotStartPage() {
                   </span>
                 </div>
               )}
-              {usageFees.platformFeeWaived && (
+              {usageFees.platformFeeWaived ? (
                 <div className="flex items-start gap-2.5 text-sm text-emerald-400">
                   <InfoIcon className="size-4 shrink-0 mt-0.5" />
                   <span>Pro active. Platform usage fees are waived for this run.</span>
                 </div>
-              )}
+              ) : usageFees.platformFeeDiscountRate > 0 ? (
+                <div className="flex items-start gap-2.5 text-sm text-emerald-400">
+                  <InfoIcon className="size-4 shrink-0 mt-0.5" />
+                  <span>
+                    Developer active. Platform fees are reduced by{" "}
+                    {Math.round(usageFees.platformFeeDiscountRate * 100)}% for
+                    this run.
+                  </span>
+                </div>
+              ) : null}
               {fastestConfiguredInterval < minimumIntervalSeconds && (
                 <div className="space-y-3">
                   <div className="flex items-start gap-2.5 text-sm text-muted-foreground">
@@ -2131,11 +2143,16 @@ export default function VolumeBotStartPage() {
                 {usageFees.totalFeeSol.toFixed(4)} SOL
               </span>
             </div>
-            {usageFees.platformFeeWaived && (
+            {usageFees.platformFeeWaived ? (
               <div className="text-xs text-emerald-400">
                 Pro active. Platform usage fees are waived.
               </div>
-            )}
+            ) : usageFees.platformFeeDiscountRate > 0 ? (
+              <div className="text-xs text-emerald-400">
+                Developer active. Fees reduced by{" "}
+                {Math.round(usageFees.platformFeeDiscountRate * 100)}%.
+              </div>
+            ) : null}
             <div className="flex items-center justify-between">
               <span className="text-muted-foreground">Generated funding</span>
               <span className="font-semibold">

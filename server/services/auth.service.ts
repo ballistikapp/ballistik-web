@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma } from "@/lib/prisma";
 import { Keypair } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -171,7 +172,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
-        plan: resolveEffectiveUserPlan(user.proExpiresAt),
+        plan: resolveEffectiveUserPlan(user.plan, user.paidPlanExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(wallet.balanceSol ?? 0),
         createdAt: user.createdAt,
@@ -273,7 +274,7 @@ export const authService = {
                   id: true,
                   name: true,
                   plan: true,
-                  proExpiresAt: true,
+                  paidPlanExpiresAt: true,
                   mainWalletPublicKey: true,
                 },
               },
@@ -362,7 +363,7 @@ export const authService = {
         tx,
         session.user.id,
         session.user.plan,
-        session.user.proExpiresAt,
+        session.user.paidPlanExpiresAt,
         now
       );
 
@@ -472,7 +473,7 @@ export const authService = {
           id: true,
           name: true,
           plan: true,
-          proExpiresAt: true,
+          paidPlanExpiresAt: true,
           mainWalletPublicKey: true,
           createdAt: true,
           updatedAt: true,
@@ -491,7 +492,7 @@ export const authService = {
       return {
         id: user.id,
         name: user.name,
-        plan: resolveEffectiveUserPlan(user.proExpiresAt),
+        plan: resolveEffectiveUserPlan(user.plan, user.paidPlanExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
         mainWalletBalanceSol: Number(user.mainWallet?.balanceSol ?? 0),
         createdAt: user.createdAt,

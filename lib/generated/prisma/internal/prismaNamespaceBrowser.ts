@@ -53,7 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
-  ProSubscriptionPayment: 'ProSubscriptionPayment',
+  SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
   Wallet: 'Wallet',
@@ -74,7 +74,10 @@ export const ModelName = {
   TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
   ShyftCallback: 'ShyftCallback',
-  AppTransaction: 'AppTransaction'
+  AppTransaction: 'AppTransaction',
+  CreatorRewardBalance: 'CreatorRewardBalance',
+  CreatorRewardWalletSettlement: 'CreatorRewardWalletSettlement',
+  CreatorRewardAccrual: 'CreatorRewardAccrual'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -106,8 +109,8 @@ export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
   plan: 'plan',
-  proStartedAt: 'proStartedAt',
-  proExpiresAt: 'proExpiresAt',
+  paidPlanStartedAt: 'paidPlanStartedAt',
+  paidPlanExpiresAt: 'paidPlanExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -116,9 +119,10 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
-export const ProSubscriptionPaymentScalarFieldEnum = {
+export const SubscriptionPaymentScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  plan: 'plan',
   amountSol: 'amountSol',
   txSignature: 'txSignature',
   startsAt: 'startsAt',
@@ -126,7 +130,7 @@ export const ProSubscriptionPaymentScalarFieldEnum = {
   createdAt: 'createdAt'
 } as const
 
-export type ProSubscriptionPaymentScalarFieldEnum = (typeof ProSubscriptionPaymentScalarFieldEnum)[keyof typeof ProSubscriptionPaymentScalarFieldEnum]
+export type SubscriptionPaymentScalarFieldEnum = (typeof SubscriptionPaymentScalarFieldEnum)[keyof typeof SubscriptionPaymentScalarFieldEnum]
 
 
 export const AuthSessionScalarFieldEnum = {
@@ -490,6 +494,52 @@ export const AppTransactionScalarFieldEnum = {
 } as const
 
 export type AppTransactionScalarFieldEnum = (typeof AppTransactionScalarFieldEnum)[keyof typeof AppTransactionScalarFieldEnum]
+
+
+export const CreatorRewardBalanceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  isSystemWallet: 'isSystemWallet',
+  accruedLamports: 'accruedLamports',
+  paidOutLamports: 'paidOutLamports',
+  lastAccrualSignature: 'lastAccrualSignature',
+  lastAccrualSlot: 'lastAccrualSlot',
+  lastReconciledAt: 'lastReconciledAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CreatorRewardBalanceScalarFieldEnum = (typeof CreatorRewardBalanceScalarFieldEnum)[keyof typeof CreatorRewardBalanceScalarFieldEnum]
+
+
+export const CreatorRewardWalletSettlementScalarFieldEnum = {
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  claimedFromPumpLamports: 'claimedFromPumpLamports',
+  paidOutToUsersLamports: 'paidOutToUsersLamports',
+  lastClaimSignature: 'lastClaimSignature',
+  lastClaimAt: 'lastClaimAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CreatorRewardWalletSettlementScalarFieldEnum = (typeof CreatorRewardWalletSettlementScalarFieldEnum)[keyof typeof CreatorRewardWalletSettlementScalarFieldEnum]
+
+
+export const CreatorRewardAccrualScalarFieldEnum = {
+  id: 'id',
+  tokenPublicKey: 'tokenPublicKey',
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  transactionSignature: 'transactionSignature',
+  slot: 'slot',
+  blockTime: 'blockTime',
+  tradeSide: 'tradeSide',
+  creatorFeeLamports: 'creatorFeeLamports',
+  createdAt: 'createdAt'
+} as const
+
+export type CreatorRewardAccrualScalarFieldEnum = (typeof CreatorRewardAccrualScalarFieldEnum)[keyof typeof CreatorRewardAccrualScalarFieldEnum]
 
 
 export const SortOrder = {

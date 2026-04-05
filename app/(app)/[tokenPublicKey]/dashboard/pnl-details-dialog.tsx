@@ -27,6 +27,7 @@ interface PnlData {
   net: number;
   totalBuyVolume: number;
   totalSellVolume: number;
+  creatorRewardsClaimedSol: number;
   platformFees: number;
   launchFees: number;
   launchFeeBreakdown: LaunchFeeBreakdown | null;
@@ -146,7 +147,7 @@ export function PnlDetailsDialog({
     pnl.creationCostSol +
     pnl.platformFees +
     pnl.jitoTipsSol;
-  const totalReceived = pnl.totalSellVolume;
+  const totalReceived = pnl.totalSellVolume + pnl.creatorRewardsClaimedSol;
   const isNetProfit = pnl.net >= 0;
 
   const launchFeeChildren =
@@ -233,9 +234,17 @@ export function PnlDetailsDialog({
               <Row
                 label="Token Sales"
                 value={`+${formatSol(pnl.totalSellVolume)} SOL`}
-                valueClass={totalReceived > 0 ? "text-green-400" : "text-muted-foreground"}
+                valueClass={pnl.totalSellVolume > 0 ? "text-green-400" : "text-muted-foreground"}
                 tooltip="SOL received from selling tokens on pump.fun"
               />
+              {pnl.creatorRewardsClaimedSol > 0 && (
+                <Row
+                  label="Creator Rewards"
+                  value={`+${formatSol(pnl.creatorRewardsClaimedSol)} SOL`}
+                  valueClass="text-green-400"
+                  tooltip="Claimed creator rewards from pump.fun trading fees"
+                />
+              )}
               <Divider />
               <Row
                 label="Total"
@@ -251,7 +260,7 @@ export function PnlDetailsDialog({
                 value={`${isNetProfit ? "+" : ""}${formatSol(pnl.net)} SOL`}
                 valueClass={pnl.net !== 0 ? (isNetProfit ? "text-green-500" : "text-red-500") : "text-muted-foreground"}
                 bold
-                tooltip="Total realized profit or loss — matches the change in your main wallet balance"
+                tooltip="Total realized profit or loss including claimed creator rewards — matches the change in your main wallet balance"
               />
             </div>
           </div>

@@ -9,6 +9,7 @@ datasource db {
 
 enum UserPlan {
   FREE
+  DEVELOPER
   PRO
 }
 
@@ -24,13 +25,13 @@ model User {
   id String @id @default(cuid())
   name String
   plan UserPlan @default(FREE)
-  proStartedAt DateTime?
-  proExpiresAt DateTime?
+  paidPlanStartedAt DateTime? @map("proStartedAt")
+  paidPlanExpiresAt DateTime? @map("proExpiresAt")
   mainWalletPublicKey String @unique
   mainWallet Wallet @relation("UserMainWallet", fields: [mainWalletPublicKey], references: [publicKey])
   wallets Wallet[] @relation("WalletUser")
   authSessions AuthSession[] @relation("AuthSessionUser")
-  proSubscriptionPayments ProSubscriptionPayment[] @relation("ProSubscriptionPaymentUser")
+  subscriptionPayments SubscriptionPayment[] @relation("SubscriptionPaymentUser")
   tokens Token[] @relation("TokenUser")
   launches Launch[] @relation("LaunchUser")
   holdingExits HoldingExit[] @relation("HoldingExitUser")
@@ -44,10 +45,11 @@ model User {
   @@map("User")
 }
 
-model ProSubscriptionPayment {
+model SubscriptionPayment {
   id String @id @default(cuid())
   userId String
-  user User @relation("ProSubscriptionPaymentUser", fields: [userId], references: [id])
+  user User @relation("SubscriptionPaymentUser", fields: [userId], references: [id])
+  plan UserPlan @default(PRO)
   amountSol Decimal
   txSignature String @unique
   startsAt DateTime
@@ -563,11 +565,13 @@ enum AppTransactionType {
   TRANSFER_RECLAIM
   TRANSFER_WITHDRAW
   FEE_USAGE
-  FEE_PRO
+  FEE_SUBSCRIPTION
   TOKEN_DISTRIBUTE
   TOKEN_CONSOLIDATE
   ACCOUNT_ATA_CREATE
   ACCOUNT_ATA_CLOSE
+  REWARD_CLAIM
+  REWARD_PAYOUT
 }
 
 enum AppTransactionSource {
@@ -577,6 +581,7 @@ enum AppTransactionSource {
   HOLDING
   WALLET
   BILLING
+  CREATOR_REWARD
 }
 
 model AppTransaction {
@@ -612,4 +617,49 @@ model AppTransaction {
   @@index([referenceId])
   @@index([status])
   @@map("AppTransaction")
+}
+
+model CreatorRewardBalance {
+  id                     String   @id @default(cuid())
+  userId                 String
+  tokenPublicKey         String
+  creatorWalletPublicKey String
+  isSystemWallet         Boolean  @default(false)
+  accruedLamports        BigInt   @default(0)
+  paidOutLamports        BigInt   @default(0)
+  lastAccrualSignature   String?
+  lastAccrualSlot        BigInt?
+  lastReconciledAt       DateTime?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+  @@unique([userId, tokenPublicKey])
+  @@index([creatorWalletPublicKey])
+  @@map("CreatorRewardBalance")
+}
+
+model CreatorRewardWalletSettlement {
+  creatorWalletPublicKey  String   @id
+  claimedFromPumpLamports BigInt   @default(0)
+  paidOutToUsersLamports  BigInt   @default(0)
+  lastClaimSignature      String?
+  lastClaimAt             DateTime?
+  createdAt               DateTime @default(now())
+  updatedAt               DateTime @updatedAt
+  @@map("CreatorRewardWalletSettlement")
+}
+
+model CreatorRewardAccrual {
+  id                     String   @id @default(cuid())
+  tokenPublicKey         String
+  creatorWalletPublicKey String
+  transactionSignature   String
+  slot                   BigInt
+  blockTime              DateTime?
+  tradeSide              String
+  creatorFeeLamports     BigInt
+  createdAt              DateTime @default(now())
+  @@unique([tokenPublicKey, transactionSignature, tradeSide])
+  @@index([tokenPublicKey, slot])
+  @@index([creatorWalletPublicKey])
+  @@map("CreatorRewardAccrual")
 }

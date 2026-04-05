@@ -242,11 +242,12 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
           >
-            Start free, or upgrade to Pro for live features and zero platform fees
-            on supported flows.
+            Start free, upgrade to Developer for lower fees and creator rewards,
+            or go Pro for live features and zero platform fees on supported
+            flows.
           </motion.p>
           <div className="h-10" />
-          <div className="mx-auto grid w-full max-w-6xl grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-3">
             <motion.div
               className="flex flex-col gap-6 rounded-2xl border border-neutral-800 bg-neutral-950/60 p-8"
               initial={{ opacity: 0, y: 40 }}
@@ -291,11 +292,60 @@ export function LandingPage() {
             </motion.div>
 
             <motion.div
-              className="relative flex flex-col gap-6 rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/80 to-black p-8"
+              className="flex flex-col gap-6 rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/70 to-black p-8"
               initial={{ opacity: 0, y: 40 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, margin: "-100px" }}
               transition={{ duration: 0.8, ease: "easeOut", delay: 0.55 }}
+            >
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-widest text-neutral-500">
+                  Developer
+                </p>
+                <div className="flex items-end gap-1.5">
+                  <p className="text-4xl font-semibold text-neutral-100">
+                    1.95 SOL
+                  </p>
+                  <p className="mb-1 text-neutral-500">/week</p>
+                </div>
+                <p className="mt-1 text-sm text-neutral-500">
+                  Lower fees and creator-reward-eligible launch setup for active
+                  builders
+                </p>
+              </div>
+              <div className="h-px bg-neutral-800" />
+              <div className="flex flex-col gap-3">
+                {[
+                  "Choose your dev wallet at launch so creator rewards can be claimed easily in the app on wallets you own",
+                  "Get 25% off platform fees on supported launch and volume-bot flows",
+                  "Manual renewal only, with no auto-renewal",
+                ].map((feature) => (
+                  <div
+                    key={feature}
+                    className="flex items-start gap-2.5 text-sm"
+                  >
+                    <span className="mt-1 size-1.5 shrink-0 rounded-full bg-neutral-200" />
+                    <span className="text-neutral-300">{feature}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="mt-auto pt-2">
+                <Link
+                  href="/auth"
+                  className="inline-flex items-center gap-2 text-sm text-neutral-300 transition-colors hover:text-white"
+                >
+                  <span>Get Developer in the App</span>
+                  <ChevronRightIcon className="h-4 w-4" />
+                </Link>
+              </div>
+            </motion.div>
+
+            <motion.div
+              className="relative flex flex-col gap-6 rounded-2xl border border-neutral-700 bg-linear-to-b from-neutral-900/80 to-black p-8"
+              initial={{ opacity: 0, y: 40 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true, margin: "-100px" }}
+              transition={{ duration: 0.8, ease: "easeOut", delay: 0.7 }}
             >
               <div className="absolute -top-3 left-1/2 z-10 -translate-x-1/2">
                 <span className="rounded-full border border-neutral-600 bg-neutral-800 px-3 py-0.5 text-xs font-medium text-neutral-300">
@@ -356,8 +406,9 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.7 }}
           >
-            Pro pricing is public and straightforward. Free stays available for
-            pay-as-you-go usage, while Pro adds faster live features and removes
+            Free stays available for pay-as-you-go usage, Developer lowers
+            platform fees and makes creator rewards easy to claim in the app on
+            wallets you own, and Pro adds faster live features with zero
             platform fees on supported flows.
           </motion.p>
         </section>

@@ -53,6 +53,8 @@ Combined two-level enum. UI derives category by splitting on first underscore.
 | TOKEN | `TOKEN_CONSOLIDATE` | SPL token consolidation |
 | ACCOUNT | `ACCOUNT_ATA_CREATE` | Create associated token account |
 | ACCOUNT | `ACCOUNT_ATA_CLOSE` | Close token account |
+| REWARD | `REWARD_CLAIM` | Collect creator rewards from Pump creator vault |
+| REWARD | `REWARD_PAYOUT` | Transfer claimed rewards to user main wallet |
 
 ### `AppTransactionSource` enum
 
@@ -64,6 +66,7 @@ Combined two-level enum. UI derives category by splitting on first underscore.
 | `HOLDING` | Manual holding operations (sell) |
 | `WALLET` | Manual wallet operations (withdraw, fund, return) |
 | `BILLING` | Fee collection, Pro subscription |
+| `CREATOR_REWARD` | Creator reward claim and payout |
 
 ## Tracking Pattern
 
@@ -103,6 +106,7 @@ The `referenceId` field is a soft polymorphic link. Interpret it using `source`:
 | `BILLING` | `ProSubscriptionPayment.id` |
 | `HOLDING` | — (not used) |
 | `WALLET` | — (not used) |
+| `CREATOR_REWARD` | — (not used; token context via `tokenPublicKey`) |
 
 ## API
 
@@ -152,13 +156,15 @@ P&L formula:
 
 ```
 totalBuyVolume = ownedBuyVolume (TokenTransaction) + devBuySol (AppTransaction)
-pnl = ownedSellVolume - totalBuyVolume - totalFees
+creatorRewardsClaimedSol = sum of confirmed REWARD_PAYOUT solAmount (AppTransaction)
+pnl = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
 ```
 
-This is computed in `dashboard.service.ts` via `getOperationalCosts()`, which runs three parallel queries against `AppTransaction`:
+This is computed in `dashboard.service.ts` via `getOperationalCosts()` and `getClaimedCreatorRewards()`, which run parallel queries against `AppTransaction`:
 1. Fee aggregation (grouped by type for `FEE_USAGE` / `FEE_PRO`)
 2. Jito tip aggregation (sum of `jitoTipLamports`)
 3. Dev buy aggregation (`TRADE_BUY` where source is `LAUNCH`)
+4. Claimed creator rewards (`REWARD_PAYOUT` where source is `CREATOR_REWARD`, status `CONFIRMED`)
 
 The P&L card shows a clickable details dialog (`pnl-details-dialog.tsx`) breaking down: bought, sold, trading P&L, platform fees, pro fees, Jito tips, and net P&L.
 
@@ -191,3 +197,4 @@ Located in `app/(app)/history/` with `page.tsx` (data fetching + toolbar) and `c
 | `holding.service.ts` | 3 | TRADE_SELL, TRANSFER_RETURN, ACCOUNT_ATA_CLOSE |
 | `holding-exit.service.ts` | 3 + 1 bundle | TRANSFER_FUND, ACCOUNT_ATA_CLOSE, TRANSFER_RETURN, TRADE_SELL |
 | `volume-bot-worker.ts` | 3 | TRADE_BUY, TRADE_SELL, ACCOUNT_ATA_CLOSE |
+| `creator-rewards.service.ts` | 2 | REWARD_CLAIM, REWARD_PAYOUT |

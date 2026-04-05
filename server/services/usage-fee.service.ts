@@ -1,3 +1,4 @@
+import "server-only";
 import {
   Keypair,
   PublicKey,
@@ -159,8 +160,9 @@ export const usageFeeService = {
       );
     };
 
-    const feeType: AppTransactionType = input.reason === "pro.weekly" ? "FEE_PRO" : "FEE_USAGE";
-    const feeSource: AppTransactionSource = input.txSource ?? (input.reason === "pro.weekly" ? "BILLING" : "WALLET");
+    const isSubscriptionFee = input.reason === "pro.weekly" || input.reason === "developer.weekly";
+    const feeType: AppTransactionType = isSubscriptionFee ? "FEE_SUBSCRIPTION" : "FEE_USAGE";
+    const feeSource: AppTransactionSource = input.txSource ?? (isSubscriptionFee ? "BILLING" : "WALLET");
     const trackId = await appTransactionService
       .create({
         userId: input.userId,
@@ -185,7 +187,7 @@ export const usageFeeService = {
           signature = await sendTransfer();
         } else if (isInsufficientBalanceError(error)) {
           throw new AppError(
-            "Insufficient balance in your main wallet to purchase the Pro plan.",
+            "Insufficient balance in your main wallet to complete this purchase.",
             400
           );
         } else {

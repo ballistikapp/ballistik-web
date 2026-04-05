@@ -1,3 +1,4 @@
+import "server-only";
 import { getEnv } from "@/lib/config/env";
 import { AppError } from "@/server/errors/app-error";
 import { PinataSDK } from "pinata";

@@ -386,7 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
-  ProSubscriptionPayment: 'ProSubscriptionPayment',
+  SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
   Wallet: 'Wallet',
@@ -407,7 +407,10 @@ export const ModelName = {
   TokenTransaction: 'TokenTransaction',
   RefreshCache: 'RefreshCache',
   ShyftCallback: 'ShyftCallback',
-  AppTransaction: 'AppTransaction'
+  AppTransaction: 'AppTransaction',
+  CreatorRewardBalance: 'CreatorRewardBalance',
+  CreatorRewardWalletSettlement: 'CreatorRewardWalletSettlement',
+  CreatorRewardAccrual: 'CreatorRewardAccrual'
 } as const
 
 export type ModelName = (typeof ModelName)[keyof typeof ModelName]
@@ -423,7 +426,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "proSubscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction"
+    modelProps: "testTable" | "user" | "subscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -575,77 +578,77 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
-    ProSubscriptionPayment: {
-      payload: Prisma.$ProSubscriptionPaymentPayload<ExtArgs>
-      fields: Prisma.ProSubscriptionPaymentFieldRefs
+    SubscriptionPayment: {
+      payload: Prisma.$SubscriptionPaymentPayload<ExtArgs>
+      fields: Prisma.SubscriptionPaymentFieldRefs
       operations: {
         findUnique: {
-          args: Prisma.ProSubscriptionPaymentFindUniqueArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload> | null
+          args: Prisma.SubscriptionPaymentFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload> | null
         }
         findUniqueOrThrow: {
-          args: Prisma.ProSubscriptionPaymentFindUniqueOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         findFirst: {
-          args: Prisma.ProSubscriptionPaymentFindFirstArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload> | null
+          args: Prisma.SubscriptionPaymentFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload> | null
         }
         findFirstOrThrow: {
-          args: Prisma.ProSubscriptionPaymentFindFirstOrThrowArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         findMany: {
-          args: Prisma.ProSubscriptionPaymentFindManyArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+          args: Prisma.SubscriptionPaymentFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>[]
         }
         create: {
-          args: Prisma.ProSubscriptionPaymentCreateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         createMany: {
-          args: Prisma.ProSubscriptionPaymentCreateManyArgs<ExtArgs>
+          args: Prisma.SubscriptionPaymentCreateManyArgs<ExtArgs>
           result: BatchPayload
         }
         createManyAndReturn: {
-          args: Prisma.ProSubscriptionPaymentCreateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+          args: Prisma.SubscriptionPaymentCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>[]
         }
         delete: {
-          args: Prisma.ProSubscriptionPaymentDeleteArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         update: {
-          args: Prisma.ProSubscriptionPaymentUpdateArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         deleteMany: {
-          args: Prisma.ProSubscriptionPaymentDeleteManyArgs<ExtArgs>
+          args: Prisma.SubscriptionPaymentDeleteManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateMany: {
-          args: Prisma.ProSubscriptionPaymentUpdateManyArgs<ExtArgs>
+          args: Prisma.SubscriptionPaymentUpdateManyArgs<ExtArgs>
           result: BatchPayload
         }
         updateManyAndReturn: {
-          args: Prisma.ProSubscriptionPaymentUpdateManyAndReturnArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>[]
+          args: Prisma.SubscriptionPaymentUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>[]
         }
         upsert: {
-          args: Prisma.ProSubscriptionPaymentUpsertArgs<ExtArgs>
-          result: runtime.Types.Utils.PayloadToResult<Prisma.$ProSubscriptionPaymentPayload>
+          args: Prisma.SubscriptionPaymentUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$SubscriptionPaymentPayload>
         }
         aggregate: {
-          args: Prisma.ProSubscriptionPaymentAggregateArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.AggregateProSubscriptionPayment>
+          args: Prisma.SubscriptionPaymentAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateSubscriptionPayment>
         }
         groupBy: {
-          args: Prisma.ProSubscriptionPaymentGroupByArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ProSubscriptionPaymentGroupByOutputType>[]
+          args: Prisma.SubscriptionPaymentGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SubscriptionPaymentGroupByOutputType>[]
         }
         count: {
-          args: Prisma.ProSubscriptionPaymentCountArgs<ExtArgs>
-          result: runtime.Types.Utils.Optional<Prisma.ProSubscriptionPaymentCountAggregateOutputType> | number
+          args: Prisma.SubscriptionPaymentCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.SubscriptionPaymentCountAggregateOutputType> | number
         }
       }
     }
@@ -2203,6 +2206,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         }
       }
     }
+    CreatorRewardBalance: {
+      payload: Prisma.$CreatorRewardBalancePayload<ExtArgs>
+      fields: Prisma.CreatorRewardBalanceFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CreatorRewardBalanceFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CreatorRewardBalanceFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        findFirst: {
+          args: Prisma.CreatorRewardBalanceFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CreatorRewardBalanceFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        findMany: {
+          args: Prisma.CreatorRewardBalanceFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>[]
+        }
+        create: {
+          args: Prisma.CreatorRewardBalanceCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        createMany: {
+          args: Prisma.CreatorRewardBalanceCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CreatorRewardBalanceCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>[]
+        }
+        delete: {
+          args: Prisma.CreatorRewardBalanceDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        update: {
+          args: Prisma.CreatorRewardBalanceUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        deleteMany: {
+          args: Prisma.CreatorRewardBalanceDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CreatorRewardBalanceUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CreatorRewardBalanceUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>[]
+        }
+        upsert: {
+          args: Prisma.CreatorRewardBalanceUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardBalancePayload>
+        }
+        aggregate: {
+          args: Prisma.CreatorRewardBalanceAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCreatorRewardBalance>
+        }
+        groupBy: {
+          args: Prisma.CreatorRewardBalanceGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardBalanceGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CreatorRewardBalanceCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardBalanceCountAggregateOutputType> | number
+        }
+      }
+    }
+    CreatorRewardWalletSettlement: {
+      payload: Prisma.$CreatorRewardWalletSettlementPayload<ExtArgs>
+      fields: Prisma.CreatorRewardWalletSettlementFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CreatorRewardWalletSettlementFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CreatorRewardWalletSettlementFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        findFirst: {
+          args: Prisma.CreatorRewardWalletSettlementFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CreatorRewardWalletSettlementFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        findMany: {
+          args: Prisma.CreatorRewardWalletSettlementFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>[]
+        }
+        create: {
+          args: Prisma.CreatorRewardWalletSettlementCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        createMany: {
+          args: Prisma.CreatorRewardWalletSettlementCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CreatorRewardWalletSettlementCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>[]
+        }
+        delete: {
+          args: Prisma.CreatorRewardWalletSettlementDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        update: {
+          args: Prisma.CreatorRewardWalletSettlementUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        deleteMany: {
+          args: Prisma.CreatorRewardWalletSettlementDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CreatorRewardWalletSettlementUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CreatorRewardWalletSettlementUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>[]
+        }
+        upsert: {
+          args: Prisma.CreatorRewardWalletSettlementUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardWalletSettlementPayload>
+        }
+        aggregate: {
+          args: Prisma.CreatorRewardWalletSettlementAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCreatorRewardWalletSettlement>
+        }
+        groupBy: {
+          args: Prisma.CreatorRewardWalletSettlementGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardWalletSettlementGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CreatorRewardWalletSettlementCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardWalletSettlementCountAggregateOutputType> | number
+        }
+      }
+    }
+    CreatorRewardAccrual: {
+      payload: Prisma.$CreatorRewardAccrualPayload<ExtArgs>
+      fields: Prisma.CreatorRewardAccrualFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.CreatorRewardAccrualFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.CreatorRewardAccrualFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        findFirst: {
+          args: Prisma.CreatorRewardAccrualFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.CreatorRewardAccrualFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        findMany: {
+          args: Prisma.CreatorRewardAccrualFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>[]
+        }
+        create: {
+          args: Prisma.CreatorRewardAccrualCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        createMany: {
+          args: Prisma.CreatorRewardAccrualCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.CreatorRewardAccrualCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>[]
+        }
+        delete: {
+          args: Prisma.CreatorRewardAccrualDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        update: {
+          args: Prisma.CreatorRewardAccrualUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        deleteMany: {
+          args: Prisma.CreatorRewardAccrualDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.CreatorRewardAccrualUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.CreatorRewardAccrualUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>[]
+        }
+        upsert: {
+          args: Prisma.CreatorRewardAccrualUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$CreatorRewardAccrualPayload>
+        }
+        aggregate: {
+          args: Prisma.CreatorRewardAccrualAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateCreatorRewardAccrual>
+        }
+        groupBy: {
+          args: Prisma.CreatorRewardAccrualGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardAccrualGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.CreatorRewardAccrualCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.CreatorRewardAccrualCountAggregateOutputType> | number
+        }
+      }
+    }
   }
 } & {
   other: {
@@ -2255,8 +2480,8 @@ export const UserScalarFieldEnum = {
   id: 'id',
   name: 'name',
   plan: 'plan',
-  proStartedAt: 'proStartedAt',
-  proExpiresAt: 'proExpiresAt',
+  paidPlanStartedAt: 'paidPlanStartedAt',
+  paidPlanExpiresAt: 'paidPlanExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -2265,9 +2490,10 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
-export const ProSubscriptionPaymentScalarFieldEnum = {
+export const SubscriptionPaymentScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
+  plan: 'plan',
   amountSol: 'amountSol',
   txSignature: 'txSignature',
   startsAt: 'startsAt',
@@ -2275,7 +2501,7 @@ export const ProSubscriptionPaymentScalarFieldEnum = {
   createdAt: 'createdAt'
 } as const
 
-export type ProSubscriptionPaymentScalarFieldEnum = (typeof ProSubscriptionPaymentScalarFieldEnum)[keyof typeof ProSubscriptionPaymentScalarFieldEnum]
+export type SubscriptionPaymentScalarFieldEnum = (typeof SubscriptionPaymentScalarFieldEnum)[keyof typeof SubscriptionPaymentScalarFieldEnum]
 
 
 export const AuthSessionScalarFieldEnum = {
@@ -2639,6 +2865,52 @@ export const AppTransactionScalarFieldEnum = {
 } as const
 
 export type AppTransactionScalarFieldEnum = (typeof AppTransactionScalarFieldEnum)[keyof typeof AppTransactionScalarFieldEnum]
+
+
+export const CreatorRewardBalanceScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  tokenPublicKey: 'tokenPublicKey',
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  isSystemWallet: 'isSystemWallet',
+  accruedLamports: 'accruedLamports',
+  paidOutLamports: 'paidOutLamports',
+  lastAccrualSignature: 'lastAccrualSignature',
+  lastAccrualSlot: 'lastAccrualSlot',
+  lastReconciledAt: 'lastReconciledAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CreatorRewardBalanceScalarFieldEnum = (typeof CreatorRewardBalanceScalarFieldEnum)[keyof typeof CreatorRewardBalanceScalarFieldEnum]
+
+
+export const CreatorRewardWalletSettlementScalarFieldEnum = {
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  claimedFromPumpLamports: 'claimedFromPumpLamports',
+  paidOutToUsersLamports: 'paidOutToUsersLamports',
+  lastClaimSignature: 'lastClaimSignature',
+  lastClaimAt: 'lastClaimAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type CreatorRewardWalletSettlementScalarFieldEnum = (typeof CreatorRewardWalletSettlementScalarFieldEnum)[keyof typeof CreatorRewardWalletSettlementScalarFieldEnum]
+
+
+export const CreatorRewardAccrualScalarFieldEnum = {
+  id: 'id',
+  tokenPublicKey: 'tokenPublicKey',
+  creatorWalletPublicKey: 'creatorWalletPublicKey',
+  transactionSignature: 'transactionSignature',
+  slot: 'slot',
+  blockTime: 'blockTime',
+  tradeSide: 'tradeSide',
+  creatorFeeLamports: 'creatorFeeLamports',
+  createdAt: 'createdAt'
+} as const
+
+export type CreatorRewardAccrualScalarFieldEnum = (typeof CreatorRewardAccrualScalarFieldEnum)[keyof typeof CreatorRewardAccrualScalarFieldEnum]
 
 
 export const SortOrder = {
@@ -3148,7 +3420,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   testTable?: Prisma.TestTableOmit
   user?: Prisma.UserOmit
-  proSubscriptionPayment?: Prisma.ProSubscriptionPaymentOmit
+  subscriptionPayment?: Prisma.SubscriptionPaymentOmit
   authSession?: Prisma.AuthSessionOmit
   refreshToken?: Prisma.RefreshTokenOmit
   wallet?: Prisma.WalletOmit
@@ -3170,6 +3442,9 @@ export type GlobalOmitConfig = {
   refreshCache?: Prisma.RefreshCacheOmit
   shyftCallback?: Prisma.ShyftCallbackOmit
   appTransaction?: Prisma.AppTransactionOmit
+  creatorRewardBalance?: Prisma.CreatorRewardBalanceOmit
+  creatorRewardWalletSettlement?: Prisma.CreatorRewardWalletSettlementOmit
+  creatorRewardAccrual?: Prisma.CreatorRewardAccrualOmit
 }
 
 /* Types for Logging */

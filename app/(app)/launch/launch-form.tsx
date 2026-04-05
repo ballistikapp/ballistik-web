@@ -70,9 +70,11 @@ import {
   bundleBuyFeeSol,
   calculateLaunchUsageFees,
   descriptionAttributionRemovalFeeSol,
+  discountLaunchUsageFees,
   waiveLaunchUsageFees,
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
+import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 
 const formSchema = z
   .object({
@@ -188,7 +190,7 @@ function calculateLaunchTotals(values: {
   vanityMint: boolean;
   removeAttribution: boolean;
   distributionWalletMultiplier: number;
-  platformFeeWaived?: boolean;
+  platformFeeDiscountRate?: number;
 }) {
   const bundleBuyTotal = values.bundleBuyEnabled
     ? values.bundlerWalletCount * values.bundlerBuyAmountSol
@@ -196,25 +198,21 @@ function calculateLaunchTotals(values: {
   const effectiveJitoTipSol = values.bundleBuyEnabled
     ? values.jitoTipAmountSol
     : 0;
-  const usageFees = values.platformFeeWaived
-    ? waiveLaunchUsageFees(
-        calculateLaunchUsageFees({
-          devWalletOption: values.devWalletOption,
-          bundleBuyEnabled: values.bundleBuyEnabled,
-          bundlerWalletCount: values.bundlerWalletCount,
-          distributionWalletMultiplier: values.distributionWalletMultiplier,
-          vanityMint: values.vanityMint,
-          removeAttribution: values.removeAttribution,
-        })
-      )
-    : calculateLaunchUsageFees({
-        devWalletOption: values.devWalletOption,
-        bundleBuyEnabled: values.bundleBuyEnabled,
-        bundlerWalletCount: values.bundlerWalletCount,
-        distributionWalletMultiplier: values.distributionWalletMultiplier,
-        vanityMint: values.vanityMint,
-        removeAttribution: values.removeAttribution,
-      });
+  const rawFees = calculateLaunchUsageFees({
+    devWalletOption: values.devWalletOption,
+    bundleBuyEnabled: values.bundleBuyEnabled,
+    bundlerWalletCount: values.bundlerWalletCount,
+    distributionWalletMultiplier: values.distributionWalletMultiplier,
+    vanityMint: values.vanityMint,
+    removeAttribution: values.removeAttribution,
+  });
+  const dr = values.platformFeeDiscountRate ?? 0;
+  const usageFees =
+    dr >= 1
+      ? waiveLaunchUsageFees(rawFees)
+      : dr > 0
+        ? discountLaunchUsageFees(rawFees, dr)
+        : rawFees;
   const totalCostSol =
     values.devBuyAmountSol +
     bundleBuyTotal +
@@ -1181,12 +1179,14 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 </div>
                 <form.Field name="devWalletOption">
                   {(field) => {
-                    const isPro = currentUser?.plan === "PRO";
-                    const proOnlyClass = !isPro
+                    const canSelectDevWallet =
+                      currentUser?.plan === "PRO" ||
+                      currentUser?.plan === "DEVELOPER";
+                    const lockedClass = !canSelectDevWallet
                       ? "opacity-50 cursor-not-allowed"
                       : "";
-                    const proUpgradeTooltip =
-                      "Upgrade to Pro plan to use Import, Generate, or Main Wallet options.";
+                    const upgradeTooltip =
+                      "Upgrade to Developer or Pro plan to use Import, Generate, or Main Wallet options.";
                     return (
                       <div className="flex flex-wrap gap-2">
                         <button
@@ -1202,7 +1202,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           <Shield className="h-4 w-4" />
                           System Wallet
                         </button>
-                        {isPro ? (
+                        {canSelectDevWallet ? (
                           <button
                             type="button"
                             onClick={() => field.handleChange("import")}
@@ -1228,7 +1228,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     field.state.value === "import"
                                       ? "border-primary bg-primary/5 font-medium"
                                       : "border-muted",
-                                    proOnlyClass
+                                    lockedClass
                                   )}
                                 >
                                   <Import className="h-4 w-4" />
@@ -1239,16 +1239,16 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
                                 >
                                   <Lock className="h-2 w-2" />
-                                  PRO
+                                  PAID
                                 </Badge>
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top">
-                              {proUpgradeTooltip}
+                              {upgradeTooltip}
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {isPro ? (
+                        {canSelectDevWallet ? (
                           <button
                             type="button"
                             onClick={() => field.handleChange("generate")}
@@ -1274,7 +1274,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     field.state.value === "generate"
                                       ? "border-primary bg-primary/5 font-medium"
                                       : "border-muted",
-                                    proOnlyClass
+                                    lockedClass
                                   )}
                                 >
                                   <Sparkles className="h-4 w-4" />
@@ -1285,16 +1285,16 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
                                 >
                                   <Lock className="h-2 w-2" />
-                                  PRO
+                                  PAID
                                 </Badge>
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top">
-                              {proUpgradeTooltip}
+                              {upgradeTooltip}
                             </TooltipContent>
                           </Tooltip>
                         )}
-                        {isPro ? (
+                        {canSelectDevWallet ? (
                           <button
                             type="button"
                             onClick={() => field.handleChange("use_main")}
@@ -1320,7 +1320,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     field.state.value === "use_main"
                                       ? "border-primary bg-primary/5 font-medium"
                                       : "border-muted",
-                                    proOnlyClass
+                                    lockedClass
                                   )}
                                 >
                                   <Wallet className="h-4 w-4" />
@@ -1331,12 +1331,12 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
                                 >
                                   <Lock className="h-2 w-2" />
-                                  PRO
+                                  PAID
                                 </Badge>
                               </span>
                             </TooltipTrigger>
                             <TooltipContent side="top">
-                              {proUpgradeTooltip}
+                              {upgradeTooltip}
                             </TooltipContent>
                           </Tooltip>
                         )}
@@ -1745,10 +1745,16 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
             <div>
               <form.Subscribe selector={(state) => state.values}>
                 {(values) => {
+                  const planDiscountRate =
+                    currentUser?.plan === "PRO"
+                      ? 1
+                      : currentUser?.plan === "DEVELOPER"
+                        ? DEVELOPER_FEE_DISCOUNT_RATE
+                        : 0;
                   const { totalCostSol, distributionWallets, usageFees } =
                     calculateLaunchTotals({
                       ...values,
-                      platformFeeWaived: currentUser?.plan === "PRO",
+                      platformFeeDiscountRate: planDiscountRate,
                     });
                   const vanityFeeDisplaySol = values.vanityMint
                     ? usageFees.vanityMintFeeSol
@@ -1947,12 +1953,18 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 {usageFees.totalFeeSol.toFixed(4)} SOL
                               </span>
                             </div>
-                            {usageFees.platformFeeWaived && (
+                            {usageFees.platformFeeWaived ? (
                               <div className="text-xs text-emerald-400">
                                 Pro active. Platform fees are waived for this
                                 launch.
                               </div>
-                            )}
+                            ) : usageFees.platformFeeDiscountRate > 0 ? (
+                              <div className="text-xs text-emerald-400">
+                                Developer active. Platform fees are reduced by{" "}
+                                {Math.round(usageFees.platformFeeDiscountRate * 100)}%
+                                for this launch.
+                              </div>
+                            ) : null}
                             <div
                               className={cn(
                                 "flex items-center justify-between",

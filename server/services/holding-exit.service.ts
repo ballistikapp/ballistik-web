@@ -1,3 +1,4 @@
+import "server-only";
 import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
