@@ -12,6 +12,7 @@ import { shyftDefiService } from "@/server/services/shyft-defi.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import { getEnv } from "@/lib/config/env";
 import { logger } from "@/lib/logger";
+import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
 
 const log = logger.child({ service: "dashboard" });
 
@@ -143,10 +144,10 @@ async function getWalletKeys(tokenPublicKey: string, userId: string) {
 async function getOperationalCosts(tokenPublicKey: string, userId: string) {
   const confirmedWhere = { userId, tokenPublicKey, status: "CONFIRMED" as const };
 
-  const [feeAgg, jitoTipAgg, devBuyAgg, launchFundAgg, launchReturnAgg] = await Promise.all([
+  const [feeAgg, jitoTipAgg, devBuyAgg, launchReturnAgg, launch] = await Promise.all([
     prisma.appTransaction.groupBy({
-      by: ["type"],
-      where: { ...confirmedWhere, type: { in: ["FEE_USAGE", "FEE_PRO"] } },
+      by: ["source"],
+      where: { ...confirmedWhere, type: "FEE_USAGE" },
       _sum: { solAmount: true },
     }),
     prisma.appTransaction.aggregate({
@@ -158,21 +159,31 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
       _sum: { solAmount: true },
     }),
     prisma.appTransaction.aggregate({
-      where: { ...confirmedWhere, type: "TRANSFER_FUND", source: "LAUNCH" },
-      _sum: { solAmount: true },
-    }),
-    prisma.appTransaction.aggregate({
       where: { ...confirmedWhere, type: "TRANSFER_RETURN", source: "LAUNCH" },
       _sum: { solAmount: true },
     }),
+    prisma.launch.findFirst({
+      where: { tokenPublicKey, userId, status: "SUCCEEDED" },
+      select: { id: true, input: true },
+      orderBy: { createdAt: "desc" },
+    }),
   ]);
 
-  const platformFees = round4(Number(
-    feeAgg.find((f) => f.type === "FEE_USAGE")?._sum.solAmount ?? 0
-  ));
-  const proFees = round4(Number(
-    feeAgg.find((f) => f.type === "FEE_PRO")?._sum.solAmount ?? 0
-  ));
+  // TRANSFER_FUND records don't have tokenPublicKey because wallets are
+  // funded before the mint is generated — query by launch referenceId instead
+  const launchFundAgg = launch
+    ? await prisma.appTransaction.aggregate({
+        where: { userId, status: "CONFIRMED", type: "TRANSFER_FUND", source: "LAUNCH", referenceId: launch.id },
+        _sum: { solAmount: true },
+      })
+    : { _sum: { solAmount: null } };
+
+  const feeBySource = (source: string) =>
+    round4(Number(feeAgg.find((f) => f.source === source)?._sum.solAmount ?? 0));
+  const launchFees = feeBySource("LAUNCH");
+  const exitFees = feeBySource("EXIT");
+  const volumeBotFees = feeBySource("VOLUME_BOT");
+  const platformFees = round4(launchFees + exitFees + volumeBotFees);
   const jitoTipsSol = round4(
     Number(jitoTipAgg._sum.jitoTipLamports ?? 0) / 1e9
   );
@@ -181,11 +192,35 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
   const launchReturns = round4(Number(launchReturnAgg._sum.solAmount ?? 0));
   const creationCostSol = round4(Math.max(0, launchFunding - launchReturns - devBuySol));
 
+  const launchInput = launch?.input as Record<string, unknown> | null;
+  const launchFeeBreakdown = launchInput
+    ? (() => {
+        const fees = calculateLaunchUsageFees({
+          devWalletOption: (launchInput.devWalletOption as "import" | "generate" | "use_main") ?? "generate",
+          bundleBuyEnabled: Boolean(launchInput.bundleBuyEnabled),
+          bundlerWalletCount: Number(launchInput.bundlerWalletCount ?? 0),
+          distributionWalletMultiplier: Number(launchInput.distributionWalletMultiplier ?? 0),
+          vanityMint: Boolean(launchInput.vanityMint),
+          removeAttribution: Boolean(launchInput.removeAttribution),
+        });
+        return {
+          generatedWalletFeeSol: fees.generatedWalletFeeSol,
+          generatedWalletCount: fees.generatedWalletCount,
+          vanityMintFeeSol: fees.vanityMintFeeSol,
+          attributionRemovalFeeSol: fees.descriptionAttributionRemovalFeeSol,
+          bundleBuyFeeSol: fees.bundleBuyFeeSol,
+        };
+      })()
+    : null;
+
   return {
     platformFees,
-    proFees,
+    launchFees,
+    launchFeeBreakdown,
+    exitFees,
+    volumeBotFees,
     jitoTipsSol,
-    totalFees: round4(platformFees + proFees),
+    totalFees: platformFees,
     devBuySol,
     creationCostSol,
   };
@@ -405,6 +440,7 @@ async function getRecentTransactions(tokenPublicKey: string) {
       tokenAmount: number;
       pricePerToken: number;
       transactionSignature: string;
+      slot: bigint | null;
       blockTime: Date | null;
       createdAt: Date;
     }>
@@ -422,6 +458,7 @@ async function getRecentTransactions(tokenPublicKey: string) {
         tt."tokenAmount"::double precision AS "tokenAmount",
         tt."pricePerToken"::double precision AS "pricePerToken",
         tt."transactionSignature",
+        tt."slot",
         tt."blockTime",
         tt."createdAt"
       FROM "TokenTransaction" tt
@@ -431,9 +468,10 @@ async function getRecentTransactions(tokenPublicKey: string) {
         tt."transactionSignature",
         CASE WHEN tt."walletPublicKey" = ${bondingCurvePublicKey} THEN 1 ELSE 0 END ASC,
         CASE WHEN tt."walletType" IS NULL THEN 1 ELSE 0 END ASC,
+        tt."slot" DESC NULLS LAST,
         COALESCE(tt."blockTime", tt."createdAt") DESC
     ) grouped
-    ORDER BY COALESCE(grouped."blockTime", grouped."createdAt") DESC
+    ORDER BY grouped."slot" DESC NULLS LAST, COALESCE(grouped."blockTime", grouped."createdAt") DESC
     LIMIT 15
   `;
 }
@@ -451,7 +489,7 @@ async function getPriceHistory(tokenPublicKey: string) {
       blockTime: true,
       createdAt: true,
     },
-    orderBy: [{ blockTime: "asc" }, { createdAt: "asc" }],
+    orderBy: [{ slot: { sort: "asc", nulls: "first" } }, { blockTime: "asc" }, { createdAt: "asc" }],
     take: PRICE_HISTORY_MAX_ROWS,
   });
 
@@ -511,7 +549,7 @@ async function buildStatsResponse(
 
   const isComplete = currentPrice?.isComplete ?? false;
 
-  const defaultCosts = { platformFees: 0, proFees: 0, jitoTipsSol: 0, totalFees: 0, devBuySol: 0, creationCostSol: 0 };
+  const defaultCosts = { platformFees: 0, launchFees: 0, launchFeeBreakdown: null as { generatedWalletFeeSol: number; generatedWalletCount: number; vanityMintFeeSol: number; attributionRemovalFeeSol: number; bundleBuyFeeSol: number } | null, exitFees: 0, volumeBotFees: 0, jitoTipsSol: 0, totalFees: 0, devBuySol: 0, creationCostSol: 0 };
 
   const results = await Promise.allSettled([
     getOperationalCosts(tokenPublicKey, userId),
@@ -584,7 +622,10 @@ async function buildStatsResponse(
         totalBuyVolume,
         totalSellVolume: volumes.ownedSellVolume,
         platformFees: costs.platformFees,
-        proFees: costs.proFees,
+        launchFees: costs.launchFees,
+        launchFeeBreakdown: costs.launchFeeBreakdown,
+        exitFees: costs.exitFees,
+        volumeBotFees: costs.volumeBotFees,
         jitoTipsSol: costs.jitoTipsSol,
         totalFees: costs.totalFees,
         creationCostSol: costs.creationCostSol,

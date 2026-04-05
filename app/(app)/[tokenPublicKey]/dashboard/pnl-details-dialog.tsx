@@ -15,12 +15,23 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 
+interface LaunchFeeBreakdown {
+  generatedWalletFeeSol: number;
+  generatedWalletCount: number;
+  vanityMintFeeSol: number;
+  attributionRemovalFeeSol: number;
+  bundleBuyFeeSol: number;
+}
+
 interface PnlData {
   net: number;
   totalBuyVolume: number;
   totalSellVolume: number;
   platformFees: number;
-  proFees: number;
+  launchFees: number;
+  launchFeeBreakdown: LaunchFeeBreakdown | null;
+  exitFees: number;
+  volumeBotFees: number;
   jitoTipsSol: number;
   totalFees: number;
   creationCostSol: number;
@@ -38,16 +49,18 @@ function Row({
   valueClass,
   bold,
   tooltip,
+  indent,
 }: {
   label: string;
   value: string;
   valueClass?: string;
   bold?: boolean;
   tooltip?: string;
+  indent?: boolean;
 }) {
   return (
     <div
-      className={`flex items-center justify-between py-1.5 ${bold ? "font-medium" : ""}`}
+      className={`flex items-center justify-between py-1.5 ${bold ? "font-medium" : ""} ${indent ? "pl-4" : ""}`}
     >
       <span className="flex items-center gap-1.5 text-muted-foreground">
         {label}
@@ -67,8 +80,60 @@ function Row({
   );
 }
 
+function SectionHeader({ children }: { children: React.ReactNode }) {
+  return (
+    <h4 className="mb-1 text-xs font-medium uppercase tracking-wider text-muted-foreground">
+      {children}
+    </h4>
+  );
+}
+
 function Divider() {
   return <div className="my-1 border-t" />;
+}
+
+function costClass(v: number) {
+  return v > 0 ? "text-red-400" : "text-muted-foreground";
+}
+
+interface CostItem {
+  label: string;
+  value: number;
+  tooltip: string;
+  children?: CostItem[];
+}
+
+function buildLaunchFeeChildren(bd: LaunchFeeBreakdown): CostItem[] {
+  const items: CostItem[] = [];
+  if (bd.generatedWalletFeeSol > 0) {
+    items.push({
+      label: `Generated Wallets (${bd.generatedWalletCount})`,
+      value: bd.generatedWalletFeeSol,
+      tooltip: `Fee for generating ${bd.generatedWalletCount} operational wallets`,
+    });
+  }
+  if (bd.vanityMintFeeSol > 0) {
+    items.push({
+      label: "Vanity Mint",
+      value: bd.vanityMintFeeSol,
+      tooltip: "Fee for generating a vanity token mint address",
+    });
+  }
+  if (bd.attributionRemovalFeeSol > 0) {
+    items.push({
+      label: "Attribution Removal",
+      value: bd.attributionRemovalFeeSol,
+      tooltip: "Fee for removing platform attribution from token description",
+    });
+  }
+  if (bd.bundleBuyFeeSol > 0) {
+    items.push({
+      label: "Bundler",
+      value: bd.bundleBuyFeeSol,
+      tooltip: "Fee for bundled buy with multiple wallets at launch",
+    });
+  }
+  return items;
 }
 
 export function PnlDetailsDialog({
@@ -76,9 +141,52 @@ export function PnlDetailsDialog({
   onOpenChange,
   pnl,
 }: PnlDetailsDialogProps) {
-  const tradingPnl = pnl.totalSellVolume - pnl.totalBuyVolume;
-  const isTradingProfit = tradingPnl >= 0;
+  const totalSpent =
+    pnl.totalBuyVolume +
+    pnl.creationCostSol +
+    pnl.platformFees +
+    pnl.jitoTipsSol;
+  const totalReceived = pnl.totalSellVolume;
   const isNetProfit = pnl.net >= 0;
+
+  const launchFeeChildren =
+    pnl.launchFeeBreakdown && pnl.launchFees > 0
+      ? buildLaunchFeeChildren(pnl.launchFeeBreakdown)
+      : [];
+
+  const costItems: CostItem[] = [
+    {
+      label: "Token Buys",
+      value: pnl.totalBuyVolume,
+      tooltip: "SOL spent on buying tokens, including the initial dev buy at launch",
+    },
+    {
+      label: "Creation Costs",
+      value: pnl.creationCostSol,
+      tooltip: "Token creation overhead including pump.fun creation fee, account rent, and transaction fees",
+    },
+    {
+      label: "Launch Fees",
+      value: pnl.launchFees,
+      tooltip: "Platform fees charged for token launch",
+      children: launchFeeChildren,
+    },
+    {
+      label: "Exit Fees",
+      value: pnl.exitFees,
+      tooltip: "Platform fees charged for token exit operations",
+    },
+    {
+      label: "Volume Bot Fees",
+      value: pnl.volumeBotFees,
+      tooltip: "Platform fees charged for volume bot sessions",
+    },
+    {
+      label: "Jito Tips",
+      value: pnl.jitoTipsSol,
+      tooltip: "Priority tips paid for Jito bundle transactions",
+    },
+  ].filter((item) => item.value > 0);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -90,55 +198,50 @@ export function PnlDetailsDialog({
         <TooltipProvider>
           <div className="flex flex-col gap-4 text-sm">
             <div className="rounded-lg border p-3">
-              <Row
-                label="Bought (Total Spent)"
-                value={`-${formatSol(pnl.totalBuyVolume)} SOL`}
-                valueClass="text-red-400"
-                tooltip="SOL spent on buying tokens, including the initial dev buy at launch"
-              />
-              <Row
-                label="Sold (Total Received)"
-                value={`+${formatSol(pnl.totalSellVolume)} SOL`}
-                valueClass="text-green-400"
-                tooltip="SOL received from selling tokens on pump.fun"
-              />
+              <SectionHeader>Total Spent</SectionHeader>
+              {costItems.map((item) => (
+                <div key={item.label}>
+                  <Row
+                    label={item.label}
+                    value={`-${formatSol(item.value)} SOL`}
+                    valueClass={costClass(item.value)}
+                    tooltip={item.tooltip}
+                  />
+                  {item.children?.map((sub) => (
+                    <Row
+                      key={sub.label}
+                      label={sub.label}
+                      value={`-${formatSol(sub.value)} SOL`}
+                      valueClass={costClass(sub.value)}
+                      tooltip={sub.tooltip}
+                      indent
+                    />
+                  ))}
+                </div>
+              ))}
               <Divider />
               <Row
-                label="Trading P&L"
-                value={`${isTradingProfit ? "+" : ""}${formatSol(tradingPnl)} SOL`}
-                valueClass={isTradingProfit ? "text-green-500" : "text-red-500"}
+                label="Total"
+                value={`-${formatSol(totalSpent)} SOL`}
+                valueClass={costClass(totalSpent)}
                 bold
-                tooltip="Difference between SOL received from sells and SOL spent on buys"
               />
             </div>
 
             <div className="rounded-lg border p-3">
-              <h4 className="mb-2 text-xs font-medium uppercase tracking-wider text-muted-foreground">
-                Costs
-              </h4>
+              <SectionHeader>Total Received</SectionHeader>
               <Row
-                label="Creation Costs"
-                value={`-${formatSol(pnl.creationCostSol)} SOL`}
-                valueClass="text-red-400"
-                tooltip="Token creation overhead including pump.fun creation fee, account rent, and transaction fees"
+                label="Token Sales"
+                value={`+${formatSol(pnl.totalSellVolume)} SOL`}
+                valueClass={totalReceived > 0 ? "text-green-400" : "text-muted-foreground"}
+                tooltip="SOL received from selling tokens on pump.fun"
               />
+              <Divider />
               <Row
-                label="Platform Fees"
-                value={`-${formatSol(pnl.platformFees)} SOL`}
-                valueClass="text-red-400"
-                tooltip="Fees collected by the platform for launch, exit, and volume bot operations"
-              />
-              <Row
-                label="Pro Subscription Fees"
-                value={`-${formatSol(pnl.proFees)} SOL`}
-                valueClass="text-red-400"
-                tooltip="Weekly Pro subscription payments allocated to this token"
-              />
-              <Row
-                label="Jito Tips"
-                value={`-${formatSol(pnl.jitoTipsSol)} SOL`}
-                valueClass="text-red-400"
-                tooltip="Priority tips paid for Jito bundle transactions"
+                label="Total"
+                value={`+${formatSol(totalReceived)} SOL`}
+                valueClass={totalReceived > 0 ? "text-green-400" : "text-muted-foreground"}
+                bold
               />
             </div>
 
@@ -146,7 +249,7 @@ export function PnlDetailsDialog({
               <Row
                 label="Net P&L"
                 value={`${isNetProfit ? "+" : ""}${formatSol(pnl.net)} SOL`}
-                valueClass={isNetProfit ? "text-green-500" : "text-red-500"}
+                valueClass={pnl.net !== 0 ? (isNetProfit ? "text-green-500" : "text-red-500") : "text-muted-foreground"}
                 bold
                 tooltip="Total realized profit or loss — matches the change in your main wallet balance"
               />

@@ -430,6 +430,7 @@ export const TokenTransactionScalarFieldEnum = {
   pricePerToken: 'pricePerToken',
   slippageBps: 'slippageBps',
   feeAmount: 'feeAmount',
+  slot: 'slot',
   blockTime: 'blockTime',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'

@@ -1,8 +1,8 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import {
-  IconExternalLink,
   IconUser,
   IconUsers,
   IconWallet,
@@ -191,7 +191,13 @@ export function DashboardHoldings({
                           rel="noopener noreferrer"
                           className="text-muted-foreground hover:text-foreground transition-colors"
                         >
-                          <IconExternalLink className="size-3" />
+                          <Image
+                            src="/logos/solscan-logo-dark.svg"
+                            alt="Solscan"
+                            width={12}
+                            height={12}
+                            className="size-3"
+                          />
                         </a>
                       </div>
                       <div className="flex items-center gap-3 text-xs text-muted-foreground">
@@ -264,7 +270,13 @@ export function DashboardHoldings({
                         rel="noopener noreferrer"
                         className="text-muted-foreground hover:text-foreground transition-colors"
                       >
-                        <IconExternalLink className="size-3" />
+                        <Image
+                          src="/logos/solscan-logo-dark.svg"
+                          alt="Solscan"
+                          width={12}
+                          height={12}
+                          className="size-3"
+                        />
                       </a>
                     </div>
 

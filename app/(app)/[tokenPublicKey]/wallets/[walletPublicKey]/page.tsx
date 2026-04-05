@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -7,7 +8,6 @@ import {
   IconArrowDownRight,
   IconArrowUpRight,
   IconCopy,
-  IconExternalLink,
   IconEye,
   IconRefresh,
 } from "@tabler/icons-react";
@@ -380,7 +380,14 @@ export default function WalletPage() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <IconExternalLink className="mr-2 size-4" />
+                <Image
+                  src="/logos/solscan-logo-dark.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width={16}
+                  height={16}
+                  className="mr-2 size-4"
+                />
                 View on Solscan
               </Link>
             </Button>

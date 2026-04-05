@@ -36,7 +36,16 @@ interface PnlData {
   totalBuyVolume: number;
   totalSellVolume: number;
   platformFees: number;
-  proFees: number;
+  launchFees: number;
+  launchFeeBreakdown: {
+    generatedWalletFeeSol: number;
+    generatedWalletCount: number;
+    vanityMintFeeSol: number;
+    attributionRemovalFeeSol: number;
+    bundleBuyFeeSol: number;
+  } | null;
+  exitFees: number;
+  volumeBotFees: number;
   jitoTipsSol: number;
   totalFees: number;
   creationCostSol: number;

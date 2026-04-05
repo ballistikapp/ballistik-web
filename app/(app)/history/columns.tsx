@@ -1,6 +1,7 @@
 "use client";
 
 import { format, formatDistanceToNowStrict } from "date-fns";
+import Image from "next/image";
 import Link from "next/link";
 import { type ColumnDef } from "@tanstack/react-table";
 import type { AppTransaction } from "@/lib/generated/prisma/client";
@@ -251,7 +252,13 @@ export function getColumns(): ColumnDef<AppTransaction>[] {
                   rel="noreferrer"
                   className="inline-flex size-6 items-center justify-center text-muted-foreground hover:text-foreground"
                 >
-                  <IconExternalLink className="size-3.5" />
+                  <Image
+                    src="/logos/solscan-logo-dark.svg"
+                    alt="Solscan"
+                    width={14}
+                    height={14}
+                    className="size-3.5"
+                  />
                 </a>
               </TooltipTrigger>
               <TooltipContent>View on Solscan</TooltipContent>

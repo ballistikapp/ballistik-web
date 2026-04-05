@@ -2579,6 +2579,7 @@ export const TokenTransactionScalarFieldEnum = {
   pricePerToken: 'pricePerToken',
   slippageBps: 'slippageBps',
   feeAmount: 'feeAmount',
+  slot: 'slot',
   blockTime: 'blockTime',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
@@ -2977,6 +2978,20 @@ export type EnumTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInputType
  * Reference to a field of type 'TransactionStatus[]'
  */
 export type ListEnumTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TransactionStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
     
 
 

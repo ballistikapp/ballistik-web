@@ -3,12 +3,7 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import {
-  GalleryVerticalEnd,
-  RefreshCw,
-  Copy,
-  Check,
-} from "lucide-react";
+import { GalleryVerticalEnd, RefreshCw, Copy, Check } from "lucide-react";
 import { IconBrandX, IconBrandTelegram, IconWorld } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -123,11 +118,88 @@ export function DashboardHeader({
         <div className="h-6 w-px bg-border hidden @xl/main:block" />
 
         <div className="flex min-w-0 flex-1 flex-wrap items-center gap-3">
+          {hasMetadataLinks && (
+            <div className="flex items-center gap-1">
+              {token.twitterUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      asChild
+                    >
+                      <Link
+                        href={token.twitterUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IconBrandX className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Twitter / X</TooltipContent>
+                </Tooltip>
+              )}
+
+              {token.telegramUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      asChild
+                    >
+                      <Link
+                        href={token.telegramUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IconBrandTelegram className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Telegram</TooltipContent>
+                </Tooltip>
+              )}
+
+              {token.websiteUrl && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="size-8"
+                      asChild
+                    >
+                      <Link
+                        href={token.websiteUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <IconWorld className="size-3.5" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Website</TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          )}
+
+          {hasMetadataLinks && <div className="w-px h-4 bg-border mx-0.5" />}
+
           <div className="flex items-center gap-1 shrink-0">
             <div className="flex items-center gap-1">
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8" asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    asChild
+                  >
                     <Link
                       href={pumpUrl}
                       target="_blank"
@@ -147,109 +219,34 @@ export function DashboardHeader({
 
               <Tooltip>
                 <TooltipTrigger asChild>
-                  <Button variant="ghost" size="icon" className="size-8" asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="size-8"
+                    asChild
+                  >
                     <Link
                       href={solscanUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                     >
-                      <svg
-                        viewBox="0 0 24 24"
-                        fill="none"
+                      <Image
+                        src="/logos/solscan-logo-dark.svg"
+                        alt="Solscan"
+                        width={14}
+                        height={14}
                         className="size-3.5"
-                        stroke="currentColor"
-                        strokeWidth="2"
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                      >
-                        <circle cx="11" cy="11" r="8" />
-                        <path d="m21 21-4.3-4.3" />
-                      </svg>
+                      />
                     </Link>
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>Solscan</TooltipContent>
               </Tooltip>
             </div>
-
-            {hasMetadataLinks && <div className="w-px h-4 bg-border mx-0.5" />}
-
-            {hasMetadataLinks && (
-              <div className="flex items-center gap-1">
-                {token.twitterUrl && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        asChild
-                      >
-                        <Link
-                          href={token.twitterUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <IconBrandX className="size-3.5" />
-                        </Link>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Twitter / X</TooltipContent>
-                  </Tooltip>
-                )}
-
-                {token.telegramUrl && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        asChild
-                      >
-                        <Link
-                          href={token.telegramUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <IconBrandTelegram className="size-3.5" />
-                        </Link>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Telegram</TooltipContent>
-                  </Tooltip>
-                )}
-
-                {token.websiteUrl && (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="size-8"
-                        asChild
-                      >
-                        <Link
-                          href={token.websiteUrl}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                        >
-                          <IconWorld className="size-3.5" />
-                        </Link>
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>Website</TooltipContent>
-                  </Tooltip>
-                )}
-              </div>
-            )}
           </div>
 
           <div className="ml-auto flex shrink-0 items-center gap-3">
-            <p
-              className="text-sm text-muted-foreground"
-              aria-live="polite"
-            >
+            <p className="text-sm text-muted-foreground" aria-live="polite">
               {refreshStatusLabel}
             </p>
 

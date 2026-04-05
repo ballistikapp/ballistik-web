@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -7,7 +8,6 @@ import {
   IconArrowDownRight,
   IconArrowUpRight,
   IconCopy,
-  IconExternalLink,
   IconEye,
   IconRefresh,
 } from "@tabler/icons-react";
@@ -520,7 +520,14 @@ export default function Page() {
                           target="_blank"
                           rel="noreferrer"
                         >
-                          <IconExternalLink className="size-4" />
+                          <Image
+                            src="/logos/solscan-logo-dark.svg"
+                            alt=""
+                            aria-hidden="true"
+                            width={16}
+                            height={16}
+                            className="size-4"
+                          />
                           <span className="sr-only">
                             Open shared wallet in Solscan
                           </span>
@@ -609,7 +616,14 @@ export default function Page() {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            <IconExternalLink className="size-4" />
+                            <Image
+                              src="/logos/solscan-logo-dark.svg"
+                              alt=""
+                              aria-hidden="true"
+                              width={16}
+                              height={16}
+                              className="size-4"
+                            />
                             <span className="sr-only">
                               Open main wallet in Solscan
                             </span>
@@ -711,7 +725,14 @@ export default function Page() {
                             target="_blank"
                             rel="noreferrer"
                           >
-                            <IconExternalLink className="size-4" />
+                            <Image
+                              src="/logos/solscan-logo-dark.svg"
+                              alt=""
+                              aria-hidden="true"
+                              width={16}
+                              height={16}
+                              className="size-4"
+                            />
                             <span className="sr-only">
                               Open dev wallet in Solscan
                             </span>

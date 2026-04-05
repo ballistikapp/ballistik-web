@@ -32,6 +32,7 @@ export type TokenTransactionAvgAggregateOutputType = {
   pricePerToken: runtime.Decimal | null
   slippageBps: number | null
   feeAmount: runtime.Decimal | null
+  slot: number | null
 }
 
 export type TokenTransactionSumAggregateOutputType = {
@@ -40,6 +41,7 @@ export type TokenTransactionSumAggregateOutputType = {
   pricePerToken: runtime.Decimal | null
   slippageBps: number | null
   feeAmount: runtime.Decimal | null
+  slot: bigint | null
 }
 
 export type TokenTransactionMinAggregateOutputType = {
@@ -57,6 +59,7 @@ export type TokenTransactionMinAggregateOutputType = {
   pricePerToken: runtime.Decimal | null
   slippageBps: number | null
   feeAmount: runtime.Decimal | null
+  slot: bigint | null
   blockTime: Date | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -77,6 +80,7 @@ export type TokenTransactionMaxAggregateOutputType = {
   pricePerToken: runtime.Decimal | null
   slippageBps: number | null
   feeAmount: runtime.Decimal | null
+  slot: bigint | null
   blockTime: Date | null
   createdAt: Date | null
   updatedAt: Date | null
@@ -97,6 +101,7 @@ export type TokenTransactionCountAggregateOutputType = {
   pricePerToken: number
   slippageBps: number
   feeAmount: number
+  slot: number
   blockTime: number
   createdAt: number
   updatedAt: number
@@ -110,6 +115,7 @@ export type TokenTransactionAvgAggregateInputType = {
   pricePerToken?: true
   slippageBps?: true
   feeAmount?: true
+  slot?: true
 }
 
 export type TokenTransactionSumAggregateInputType = {
@@ -118,6 +124,7 @@ export type TokenTransactionSumAggregateInputType = {
   pricePerToken?: true
   slippageBps?: true
   feeAmount?: true
+  slot?: true
 }
 
 export type TokenTransactionMinAggregateInputType = {
@@ -135,6 +142,7 @@ export type TokenTransactionMinAggregateInputType = {
   pricePerToken?: true
   slippageBps?: true
   feeAmount?: true
+  slot?: true
   blockTime?: true
   createdAt?: true
   updatedAt?: true
@@ -155,6 +163,7 @@ export type TokenTransactionMaxAggregateInputType = {
   pricePerToken?: true
   slippageBps?: true
   feeAmount?: true
+  slot?: true
   blockTime?: true
   createdAt?: true
   updatedAt?: true
@@ -175,6 +184,7 @@ export type TokenTransactionCountAggregateInputType = {
   pricePerToken?: true
   slippageBps?: true
   feeAmount?: true
+  slot?: true
   blockTime?: true
   createdAt?: true
   updatedAt?: true
@@ -282,6 +292,7 @@ export type TokenTransactionGroupByOutputType = {
   pricePerToken: runtime.Decimal
   slippageBps: number
   feeAmount: runtime.Decimal
+  slot: bigint | null
   blockTime: Date | null
   createdAt: Date
   updatedAt: Date
@@ -325,6 +336,7 @@ export type TokenTransactionWhereInput = {
   pricePerToken?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFilter<"TokenTransaction"> | number
   feeAmount?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.BigIntNullableFilter<"TokenTransaction"> | bigint | number | null
   blockTime?: Prisma.DateTimeNullableFilter<"TokenTransaction"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
@@ -347,6 +359,7 @@ export type TokenTransactionOrderByWithRelationInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrderInput | Prisma.SortOrder
   blockTime?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -373,6 +386,7 @@ export type TokenTransactionWhereUniqueInput = Prisma.AtLeast<{
   pricePerToken?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFilter<"TokenTransaction"> | number
   feeAmount?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.BigIntNullableFilter<"TokenTransaction"> | bigint | number | null
   blockTime?: Prisma.DateTimeNullableFilter<"TokenTransaction"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
@@ -395,6 +409,7 @@ export type TokenTransactionOrderByWithAggregationInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrderInput | Prisma.SortOrder
   blockTime?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -423,6 +438,7 @@ export type TokenTransactionScalarWhereWithAggregatesInput = {
   pricePerToken?: Prisma.DecimalWithAggregatesFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntWithAggregatesFilter<"TokenTransaction"> | number
   feeAmount?: Prisma.DecimalWithAggregatesFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.BigIntNullableWithAggregatesFilter<"TokenTransaction"> | bigint | number | null
   blockTime?: Prisma.DateTimeNullableWithAggregatesFilter<"TokenTransaction"> | Date | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"TokenTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"TokenTransaction"> | Date | string
@@ -441,6 +457,7 @@ export type TokenTransactionCreateInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -463,6 +480,7 @@ export type TokenTransactionUncheckedCreateInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -481,6 +499,7 @@ export type TokenTransactionUpdateInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -503,6 +522,7 @@ export type TokenTransactionUncheckedUpdateInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -523,6 +543,7 @@ export type TokenTransactionCreateManyInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -541,6 +562,7 @@ export type TokenTransactionUpdateManyMutationInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -561,6 +583,7 @@ export type TokenTransactionUncheckedUpdateManyInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -598,6 +621,7 @@ export type TokenTransactionCountOrderByAggregateInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   blockTime?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -609,6 +633,7 @@ export type TokenTransactionAvgOrderByAggregateInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
 }
 
 export type TokenTransactionMaxOrderByAggregateInput = {
@@ -626,6 +651,7 @@ export type TokenTransactionMaxOrderByAggregateInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   blockTime?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -646,6 +672,7 @@ export type TokenTransactionMinOrderByAggregateInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
   blockTime?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
@@ -657,6 +684,7 @@ export type TokenTransactionSumOrderByAggregateInput = {
   pricePerToken?: Prisma.SortOrder
   slippageBps?: Prisma.SortOrder
   feeAmount?: Prisma.SortOrder
+  slot?: Prisma.SortOrder
 }
 
 export type TokenTransactionCreateNestedManyWithoutWalletRefInput = {
@@ -747,6 +775,14 @@ export type NullableEnumWalletTypeFieldUpdateOperationsInput = {
   set?: $Enums.WalletType | null
 }
 
+export type NullableBigIntFieldUpdateOperationsInput = {
+  set?: bigint | number | null
+  increment?: bigint | number
+  decrement?: bigint | number
+  multiply?: bigint | number
+  divide?: bigint | number
+}
+
 export type TokenTransactionCreateWithoutWalletRefInput = {
   id?: string
   walletPublicKey: string
@@ -760,6 +796,7 @@ export type TokenTransactionCreateWithoutWalletRefInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -780,6 +817,7 @@ export type TokenTransactionUncheckedCreateWithoutWalletRefInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -829,6 +867,7 @@ export type TokenTransactionScalarWhereInput = {
   pricePerToken?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFilter<"TokenTransaction"> | number
   feeAmount?: Prisma.DecimalFilter<"TokenTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.BigIntNullableFilter<"TokenTransaction"> | bigint | number | null
   blockTime?: Prisma.DateTimeNullableFilter<"TokenTransaction"> | Date | string | null
   createdAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"TokenTransaction"> | Date | string
@@ -847,6 +886,7 @@ export type TokenTransactionCreateWithoutTokenInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -867,6 +907,7 @@ export type TokenTransactionUncheckedCreateWithoutTokenInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -912,6 +953,7 @@ export type TokenTransactionCreateManyWalletRefInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -930,6 +972,7 @@ export type TokenTransactionUpdateWithoutWalletRefInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -950,6 +993,7 @@ export type TokenTransactionUncheckedUpdateWithoutWalletRefInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -969,6 +1013,7 @@ export type TokenTransactionUncheckedUpdateManyWithoutWalletRefInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -988,6 +1033,7 @@ export type TokenTransactionCreateManyTokenInput = {
   pricePerToken: runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps: number
   feeAmount: runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: bigint | number | null
   blockTime?: Date | string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1006,6 +1052,7 @@ export type TokenTransactionUpdateWithoutTokenInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1026,6 +1073,7 @@ export type TokenTransactionUncheckedUpdateWithoutTokenInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1045,6 +1093,7 @@ export type TokenTransactionUncheckedUpdateManyWithoutTokenInput = {
   pricePerToken?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   slippageBps?: Prisma.IntFieldUpdateOperationsInput | number
   feeAmount?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
+  slot?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
   blockTime?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1067,6 +1116,7 @@ export type TokenTransactionSelect<ExtArgs extends runtime.Types.Extensions.Inte
   pricePerToken?: boolean
   slippageBps?: boolean
   feeAmount?: boolean
+  slot?: boolean
   blockTime?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1089,6 +1139,7 @@ export type TokenTransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Ty
   pricePerToken?: boolean
   slippageBps?: boolean
   feeAmount?: boolean
+  slot?: boolean
   blockTime?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1111,6 +1162,7 @@ export type TokenTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Ty
   pricePerToken?: boolean
   slippageBps?: boolean
   feeAmount?: boolean
+  slot?: boolean
   blockTime?: boolean
   createdAt?: boolean
   updatedAt?: boolean
@@ -1133,12 +1185,13 @@ export type TokenTransactionSelectScalar = {
   pricePerToken?: boolean
   slippageBps?: boolean
   feeAmount?: boolean
+  slot?: boolean
   blockTime?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type TokenTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "walletPublicKey" | "walletRefPublicKey" | "tokenPublicKey" | "walletType" | "isOwned" | "transactionType" | "status" | "transactionSignature" | "solAmount" | "tokenAmount" | "pricePerToken" | "slippageBps" | "feeAmount" | "blockTime" | "createdAt" | "updatedAt", ExtArgs["result"]["tokenTransaction"]>
+export type TokenTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "walletPublicKey" | "walletRefPublicKey" | "tokenPublicKey" | "walletType" | "isOwned" | "transactionType" | "status" | "transactionSignature" | "solAmount" | "tokenAmount" | "pricePerToken" | "slippageBps" | "feeAmount" | "slot" | "blockTime" | "createdAt" | "updatedAt", ExtArgs["result"]["tokenTransaction"]>
 export type TokenTransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   walletRef?: boolean | Prisma.TokenTransaction$walletRefArgs<ExtArgs>
   token?: boolean | Prisma.TokenDefaultArgs<ExtArgs>
@@ -1173,6 +1226,7 @@ export type $TokenTransactionPayload<ExtArgs extends runtime.Types.Extensions.In
     pricePerToken: runtime.Decimal
     slippageBps: number
     feeAmount: runtime.Decimal
+    slot: bigint | null
     blockTime: Date | null
     createdAt: Date
     updatedAt: Date
@@ -1615,6 +1669,7 @@ export interface TokenTransactionFieldRefs {
   readonly pricePerToken: Prisma.FieldRef<"TokenTransaction", 'Decimal'>
   readonly slippageBps: Prisma.FieldRef<"TokenTransaction", 'Int'>
   readonly feeAmount: Prisma.FieldRef<"TokenTransaction", 'Decimal'>
+  readonly slot: Prisma.FieldRef<"TokenTransaction", 'BigInt'>
   readonly blockTime: Prisma.FieldRef<"TokenTransaction", 'DateTime'>
   readonly createdAt: Prisma.FieldRef<"TokenTransaction", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"TokenTransaction", 'DateTime'>

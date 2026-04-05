@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { IconExternalLink, IconArrowUpRight, IconArrowDownRight, IconSparkles } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
@@ -195,7 +196,13 @@ export function DashboardTransactions({
                       rel="noopener noreferrer"
                       className="text-muted-foreground hover:text-foreground transition-colors shrink-0"
                     >
-                      <IconExternalLink className="size-3.5" />
+                      <Image
+                        src="/logos/solscan-logo-dark.svg"
+                        alt="Solscan"
+                        width={14}
+                        height={14}
+                        className="size-3.5"
+                      />
                     </a>
                   </TooltipTrigger>
                   <TooltipContent>View Transaction on Solscan</TooltipContent>

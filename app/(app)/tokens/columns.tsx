@@ -344,7 +344,13 @@ export const createColumns = (
                     target="_blank"
                     rel="noreferrer"
                   >
-                    <IconExternalLink className="size-4" />
+                    <Image
+                      src="/logos/solscan-logo-dark.svg"
+                      alt="Solscan"
+                      width={16}
+                      height={16}
+                      className="size-4"
+                    />
                     View on Solscan
                   </a>
                 </DropdownMenuItem>

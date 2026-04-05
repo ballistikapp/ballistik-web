@@ -32,6 +32,7 @@ type ParsedTransactionResult = {
   pricePerToken: number;
   slippageBps: number;
   feeAmount: number;
+  slot: bigint | null;
   blockTime: Date | null;
 };
 
@@ -58,6 +59,7 @@ type TokenTransactionListRow = {
   pricePerToken: number;
   slippageBps: number;
   feeAmount: number;
+  slot: bigint | null;
   blockTime: Date | null;
   createdAt: Date;
   updatedAt: Date;
@@ -303,6 +305,10 @@ function parseTransactionForTokenOwners(
   );
 
   const results: ParsedTransactionResult[] = [];
+  const txSlot = tx.slot ? BigInt(tx.slot) : null;
+  const txBlockTime = tx.blockTime ? new Date(tx.blockTime * 1000) : null;
+  const txFee = (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL;
+  const txFailed = Boolean(tx.meta?.err);
 
   owners.forEach((owner) => {
     const preAmount = preByOwner.get(owner) ?? 0;
@@ -323,14 +329,15 @@ function parseTransactionForTokenOwners(
       results.push({
         walletPublicKey: owner,
         transactionType: isCreate ? "CREATE" : "BUY",
-        status: tx.meta?.err ? "FAILED" : "CONFIRMED",
+        status: txFailed ? "FAILED" : "CONFIRMED",
         transactionSignature: signature,
         solAmount,
         tokenAmount,
         pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
         slippageBps: 0,
-        feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
-        blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
+        feeAmount: txFee,
+        slot: txSlot,
+        blockTime: txBlockTime,
       });
       return;
     }
@@ -340,14 +347,15 @@ function parseTransactionForTokenOwners(
     results.push({
       walletPublicKey: owner,
       transactionType: "SELL",
-      status: tx.meta?.err ? "FAILED" : "CONFIRMED",
+      status: txFailed ? "FAILED" : "CONFIRMED",
       transactionSignature: signature,
       solAmount,
       tokenAmount,
       pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
       slippageBps: 0,
-      feeAmount: (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL,
-      blockTime: tx.blockTime ? new Date(tx.blockTime * 1000) : null,
+      feeAmount: txFee,
+      slot: txSlot,
+      blockTime: txBlockTime,
     });
   });
 
@@ -396,6 +404,7 @@ export const transactionService = {
                     tt."pricePerToken"::double precision AS "pricePerToken",
                     tt."slippageBps",
                     tt."feeAmount"::double precision AS "feeAmount",
+                    tt."slot",
                     tt."blockTime",
                     tt."createdAt",
                     tt."updatedAt"
@@ -406,10 +415,10 @@ export const transactionService = {
                     tt."transactionSignature",
                     CASE WHEN tt."walletPublicKey" = ${bondingCurvePublicKey} THEN 1 ELSE 0 END ASC,
                     CASE WHEN tt."walletType" IS NULL THEN 1 ELSE 0 END ASC,
-                    COALESCE(tt."blockTime", tt."createdAt") DESC,
-                    tt."createdAt" DESC
+                    tt."slot" DESC NULLS LAST,
+                    COALESCE(tt."blockTime", tt."createdAt") DESC
                 ) grouped
-                ORDER BY COALESCE(grouped."blockTime", grouped."createdAt") DESC
+                ORDER BY grouped."slot" DESC NULLS LAST, COALESCE(grouped."blockTime", grouped."createdAt") DESC
                 LIMIT ${take}
                 OFFSET ${skip}
               `
@@ -451,11 +460,12 @@ export const transactionService = {
                 pricePerToken: true,
                 slippageBps: true,
                 feeAmount: true,
+                slot: true,
                 blockTime: true,
                 createdAt: true,
                 updatedAt: true,
               },
-              orderBy: [{ blockTime: "desc" }, { createdAt: "desc" }],
+              orderBy: [{ slot: { sort: "desc", nulls: "last" } }, { blockTime: "desc" }, { createdAt: "desc" }],
               skip,
               take,
             }),
@@ -658,6 +668,7 @@ export const transactionService = {
             tokenAmount: transaction.tokenAmount,
             pricePerToken: transaction.pricePerToken,
             feeAmount: transaction.feeAmount,
+            slot: transaction.slot,
             blockTime: transaction.blockTime,
             status: transaction.status,
           },
@@ -673,6 +684,7 @@ export const transactionService = {
             tokenAmount: number;
             pricePerToken: number;
             feeAmount: number;
+            slot: bigint | null;
             blockTime: Date | null;
             status: "CONFIRMED" | "FAILED";
           };
@@ -699,6 +711,7 @@ export const transactionService = {
           pricePerToken: transaction.pricePerToken,
           slippageBps: transaction.slippageBps,
           feeAmount: transaction.feeAmount,
+          slot: transaction.slot,
           blockTime: transaction.blockTime,
         })),
       });

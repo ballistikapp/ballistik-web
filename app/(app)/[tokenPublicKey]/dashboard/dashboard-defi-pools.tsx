@@ -1,6 +1,7 @@
 "use client";
 
-import { IconPool, IconExternalLink } from "@tabler/icons-react";
+import Image from "next/image";
+import { IconPool } from "@tabler/icons-react";
 import { Badge } from "@/components/ui/badge";
 import {
   Tooltip,
@@ -87,7 +88,13 @@ export function DashboardDefiPools({ pools }: DashboardDefiPoolsProps) {
                     rel="noopener noreferrer"
                     className="text-muted-foreground hover:text-foreground transition-colors"
                   >
-                    <IconExternalLink className="h-4 w-4" />
+                    <Image
+                      src="/logos/solscan-logo-dark.svg"
+                      alt="Solscan"
+                      width={16}
+                      height={16}
+                      className="h-4 w-4"
+                    />
                   </a>
                 </TooltipTrigger>
                 <TooltipContent>

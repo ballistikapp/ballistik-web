@@ -515,10 +515,12 @@ model TokenTransaction {
   pricePerToken Decimal
   slippageBps Int
   feeAmount Decimal
+  slot BigInt?
   blockTime DateTime?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@unique([tokenPublicKey, transactionSignature, walletPublicKey, transactionType])
+  @@index([tokenPublicKey, slot(sort: Desc)])
   @@index([tokenPublicKey, createdAt])
   @@index([walletPublicKey, tokenPublicKey, createdAt])
   @@index([tokenPublicKey, transactionSignature])

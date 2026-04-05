@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import {
@@ -8,7 +9,6 @@ import {
   IconArrowDownLeft,
   IconCheck,
   IconCopy,
-  IconExternalLink,
   IconKey,
   IconPencil,
   IconRefresh,
@@ -301,7 +301,14 @@ export default function AccountPage() {
                 target="_blank"
                 rel="noreferrer"
               >
-                <IconExternalLink className="size-4" />
+                <Image
+                  src="/logos/solscan-logo-dark.svg"
+                  alt=""
+                  aria-hidden="true"
+                  width={16}
+                  height={16}
+                  className="size-4"
+                />
                 View on Solscan
               </Link>
             </Button>
