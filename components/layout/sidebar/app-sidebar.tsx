@@ -26,6 +26,12 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
   const { selectedTokenPublicKey } = useSelectedToken();
   const effectiveTokenPublicKey =
     selectedTokenPublicKey ?? props.tokens[0]?.publicKey;
+  const sidebarCountsQuery = trpc.token.getSidebarCounts.useQuery(
+    { publicKey: effectiveTokenPublicKey ?? "" },
+    {
+      enabled: Boolean(effectiveTokenPublicKey),
+    }
+  );
   const { data: currentUser } = trpc.auth.me.useQuery();
   const subscriptionOverviewQuery = trpc.billing.getSubscriptionOverview.useQuery(
     {},
@@ -51,6 +57,52 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
     ],
     [subscriptionPlanBadge]
   );
+  const tokenWorkspaceItems = React.useMemo(
+    () =>
+      tokenWorkspaceRoutes.map((item) => {
+        if (item.title === "Holdings") {
+          const walletsWithHoldings =
+            sidebarCountsQuery.data?.walletsWithHoldings ?? 0;
+          return {
+            ...item,
+            badge:
+              walletsWithHoldings > 0 ? String(walletsWithHoldings) : undefined,
+            badgeTooltip: `${walletsWithHoldings} wallets with holdings.`,
+          };
+        }
+
+        if (item.title === "Wallets") {
+          const walletsWithBalance =
+            sidebarCountsQuery.data?.walletsWithBalance ?? 0;
+          return {
+            ...item,
+            badge:
+              walletsWithBalance > 0 ? String(walletsWithBalance) : undefined,
+            badgeTooltip: `${walletsWithBalance} non-main wallets with active balance.`,
+          };
+        }
+
+        if (item.title === "Volume Bot") {
+          const activeVolumeBotSessions =
+            sidebarCountsQuery.data?.activeVolumeBotSessions ?? 0;
+          return {
+            ...item,
+            badge:
+              activeVolumeBotSessions > 0
+                ? String(activeVolumeBotSessions)
+                : undefined,
+            badgeTooltip: `${activeVolumeBotSessions} volume bot sessions running.`,
+          };
+        }
+
+        return item;
+      }),
+    [
+      sidebarCountsQuery.data?.activeVolumeBotSessions,
+      sidebarCountsQuery.data?.walletsWithBalance,
+      sidebarCountsQuery.data?.walletsWithHoldings,
+    ]
+  );
 
   return (
     <Sidebar collapsible="icon" {...props}>
@@ -60,7 +112,7 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
       <SidebarContent>
         <NavMain
           title="Token Workspace"
-          items={tokenWorkspaceRoutes}
+          items={tokenWorkspaceItems}
           currentToken={effectiveTokenPublicKey}
         />
         <NavMain

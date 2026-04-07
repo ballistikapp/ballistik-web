@@ -11,6 +11,10 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 - Tracks an exit run per user/token
 - Persists `status`, `progress`, `currentStep`, and `result`
 - Stores `input` for parameters such as `jitoTipSol`
+- Terminal statuses are:
+  - `SUCCEEDED` when bundle submission and required cleanup both succeed
+  - `PARTIAL_SUCCESS` when bundle submission succeeds but cleanup / SOL recovery has wallet failures
+  - `FAILED` when bundle submission fails or the run aborts before a sell completes
 
 ### HoldingExitLog
 
@@ -37,10 +41,11 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
    - submit as a Jito bundle
 5. **Cleanup**:
    - close empty ATAs for wallets involved in the exit
-  - optionally return the remaining available SOL to the main wallet when `returnSolToMainWallet` is enabled, using the main wallet as fee payer when possible and falling back otherwise
+   - if a system dev wallet sold in the exit, immediately sweep realized SOL from that system wallet back to the user main wallet
+   - return the remaining available SOL to the main wallet when enabled, using the main wallet as fee payer when possible and falling back otherwise
 6. **Finalize**:
    - persist `result` summary
-   - mark status `SUCCEEDED` or `FAILED`
+   - mark status `SUCCEEDED`, `PARTIAL_SUCCESS`, or `FAILED`
    - include total Jito tip paid in summary (`totalJitoTipSol`)
 
 ### Processing Model
@@ -50,6 +55,7 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 - Chunk outcomes are tracked individually (`successfulChunks`, `failedChunks`).
 - Cleanup (ATA close + SOL recovery) runs only after all chunk jobs settle.
 - Cleanup wallet work runs with bounded concurrency (wallet-level parallelism) and aggregates results after all wallet tasks settle.
+- The exit uses the same shared post-sell SOL recovery helpers as manual holding sells so system dev wallet behavior stays consistent across both flows.
 
 ### Sell Instruction
 
@@ -157,8 +163,9 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 - Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
 - Exit preflight totals should reflect deduped holdings data so shared main/dev launches do not inflate wallet counts or token totals.
 - Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior, and it is checked by default when the dialog opens
+- System dev wallet exits always force SOL return to the main wallet even if the toggle was off in the request
 - Activity logs are shown in real time with newest entries first and the latest update visually emphasized in the progress feed
-- Summary shows totals including chunk outcomes (total/successful/failed chunks), wallets, bundles, tokens, ATAs closed, SOL recovered, and total Jito tip
+- Summary shows totals including chunk outcomes (total/successful/failed chunks), wallets, bundles, tokens, ATAs closed, SOL recovered, cleanup failures, system dev immediate sweeps, and total Jito tip
 - Users can cancel an active exit via `holding.cancelExit`
 - When an exit reaches a terminal state from the holdings page, the client refreshes holdings plus related wallet balances so follow-up views reflect the completed cleanup
-- This pass keeps exit execution logic unchanged and instead aligns preflight inputs with deduped holdings data.
+- The dialog displays both the requested SOL-return preference and the effective server behavior when the system dev safety override changed the outcome.

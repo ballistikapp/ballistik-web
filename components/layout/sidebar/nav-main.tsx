@@ -24,6 +24,11 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { BALLISTIK_TELEGRAM_URL } from "@/lib/config/external-links";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -36,6 +41,7 @@ export type NavMainItem = {
   scope?: "token" | "global";
   external?: boolean;
   badge?: string;
+  badgeTooltip?: string;
 };
 
 export const tokenWorkspaceRoutes: NavMainItem[] = [
@@ -52,15 +58,15 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
     scope: "token",
   },
   {
-    title: "Transactions",
-    url: "/transactions",
-    icon: IconArrowsRightLeft,
-    scope: "token",
-  },
-  {
     title: "Wallets",
     url: "/wallets",
     icon: IconWallet,
+    scope: "token",
+  },
+  {
+    title: "Transactions",
+    url: "/transactions",
+    icon: IconArrowsRightLeft,
     scope: "token",
   },
   {
@@ -162,9 +168,23 @@ export const NavMain = React.memo(function NavMain({
                       {item.title}
                     </span>
                     {item.badge ? (
-                      <SidebarMenuBadge className="right-2 rounded-full border border-sidebar-border/70 bg-sidebar-accent/60 px-2 text-[10px] font-semibold uppercase tracking-[0.08em]">
-                        {item.badge}
-                      </SidebarMenuBadge>
+                      item.badgeTooltip ? (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <SidebarMenuBadge className="pointer-events-auto right-2 gap-1 rounded-md bg-sidebar-accent/60 px-2 text-[10px] font-semibold tracking-[0.08em] text-primary">
+                              <span className="size-1 rounded-full bg-primary" />
+                              <span>{item.badge}</span>
+                            </SidebarMenuBadge>
+                          </TooltipTrigger>
+                          <TooltipContent side="right">
+                            {item.badgeTooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                      ) : (
+                        <SidebarMenuBadge className="right-2 rounded-full border border-sidebar-border/70 bg-sidebar-accent/60 px-2 text-[10px] font-semibold tracking-[0.08em]">
+                          {item.badge}
+                        </SidebarMenuBadge>
+                      )
                     ) : null}
                     {item.external ? (
                       <IconExternalLink className="ml-auto size-3.5 shrink-0 opacity-60 group-data-[collapsible=icon]:hidden" />

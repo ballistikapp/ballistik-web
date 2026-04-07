@@ -130,6 +130,7 @@ export default function Page() {
   const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
   const walletsWithBalance = holdingsData?.walletsWithBalance ?? 0;
   const totalSupply = holdingsData?.totalSupply ?? null;
+  const hasHoldings = totalBalance > 0;
   const totalSupplyShare =
     totalSupply && totalSupply > 0 ? (totalBalance / totalSupply) * 100 : null;
   const metricCards = useMemo(
@@ -294,7 +295,7 @@ export default function Page() {
           summaryParts.push(`${result.ataClose.failed} close failed`);
         }
       }
-      if (returnSolToMainWallet && result.solRecovery) {
+      if (result.effectiveReturnSolToMainWallet && result.solRecovery) {
         summaryParts.push(
           `${result.solRecovery.recovered} wallet SOL returned`
         );
@@ -307,7 +308,7 @@ export default function Page() {
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
       await refreshRelatedWalletData(
-        returnSolToMainWallet ? undefined : walletPublicKeys
+        result.effectiveReturnSolToMainWallet ? undefined : walletPublicKeys
       );
       logHoldingsEvent({
         eventType: "trade_result",
@@ -398,6 +399,7 @@ export default function Page() {
   }, [exitStatus, handleRefresh, refreshRelatedWalletData]);
 
   const handleOpenExitDialog = () => {
+    if (!hasHoldings) return;
     setManualExitDialogOpen(true);
     setDismissedExitId(null);
   };
@@ -563,7 +565,9 @@ export default function Page() {
                 size="sm"
                 onClick={handleOpenExitDialog}
                 disabled={
-                  startExitMutation.isPending || exitStatus === "RUNNING"
+                  !hasHoldings ||
+                  startExitMutation.isPending ||
+                  exitStatus === "RUNNING"
                 }
               >
                 Exit

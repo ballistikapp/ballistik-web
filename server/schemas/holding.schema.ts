@@ -44,7 +44,7 @@ export type SellHoldingsByTokenInput = z.infer<
 export const startExitSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   jitoTipSol: z.number().min(0).max(1).default(0.005),
-  returnSolToMainWallet: z.boolean().optional().default(false),
+  returnSolToMainWallet: z.boolean().optional().default(true),
 });
 
 export type StartExitInput = z.infer<typeof startExitSchema>;

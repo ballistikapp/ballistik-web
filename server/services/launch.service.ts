@@ -162,6 +162,11 @@ type DistributionWallet = {
   wallet: Keypair;
 };
 
+type LaunchWalletFundingSnapshot = {
+  publicKey: string;
+  fundedLamports: bigint;
+};
+
 type BundlerBuyTarget = {
   wallet: Keypair;
   amountLamports: bigint;
@@ -405,6 +410,34 @@ async function persistLaunchRecoveryWallets(
   if (rows.length > 0) {
     await prisma.launchRecoveryWallet.createMany({ data: rows });
   }
+}
+
+async function persistLaunchRecoveryFundingSnapshot(
+  launchId: string,
+  fundedWallets: LaunchWalletFundingSnapshot[]
+) {
+  const fundedRows = fundedWallets.filter(
+    (wallet) => wallet.fundedLamports > BigInt(0)
+  );
+  if (fundedRows.length === 0) {
+    return;
+  }
+
+  await retryLaunchDbWrite(() =>
+    prisma.$transaction(
+      fundedRows.map((wallet) =>
+        prisma.launchRecoveryWallet.updateMany({
+          where: {
+            launchId,
+            walletPublicKey: wallet.publicKey,
+          },
+          data: {
+            fundedLamports: wallet.fundedLamports.toString(),
+          },
+        })
+      )
+    )
+  );
 }
 
 async function setLaunchRecovery(
@@ -1036,6 +1069,7 @@ async function fundWalletsFromMain(
       fundedCount: 0,
       totalLamports: BigInt(0),
       signatures: [] as string[],
+      fundedWallets: [] as LaunchWalletFundingSnapshot[],
     };
   }
 
@@ -1074,6 +1108,7 @@ async function fundWalletsFromMain(
       fundedCount: 0,
       totalLamports: BigInt(0),
       signatures: [] as string[],
+      fundedWallets: [] as LaunchWalletFundingSnapshot[],
     };
   }
 
@@ -1081,6 +1116,10 @@ async function fundWalletsFromMain(
     (total, target) => total + target.topUpLamports,
     BigInt(0)
   );
+  const fundedWallets = fundingPlan.map((target) => ({
+    publicKey: target.publicKey.toBase58(),
+    fundedLamports: target.topUpLamports,
+  }));
 
   if (BigInt(mainBalance) < totalLamports + mainReserveLamports) {
     throw new AppError(
@@ -1212,7 +1251,12 @@ async function fundWalletsFromMain(
     },
   });
 
-  return { fundedCount: fundingPlan.length, totalLamports, signatures };
+  return {
+    fundedCount: fundingPlan.length,
+    totalLamports,
+    signatures,
+    fundedWallets,
+  };
 }
 
 function validateLaunchInput(input: LaunchCostInput) {
@@ -2562,6 +2606,7 @@ async function finalizeLaunchFailure(params: {
   recoveryData: LaunchRecoveryData | null;
   mainWalletKeypair: Keypair | null;
   managedLaunchWallets: Keypair[];
+  fundedLaunchWallets: LaunchWalletFundingSnapshot[];
   userId?: string;
 }) {
   const {
@@ -2574,6 +2619,8 @@ async function finalizeLaunchFailure(params: {
     recoveryData,
     mainWalletKeypair,
     managedLaunchWallets,
+    fundedLaunchWallets,
+    userId,
   } = params;
   if (persistedTokenPublicKey) {
     try {
@@ -2634,7 +2681,8 @@ async function finalizeLaunchFailure(params: {
         launchId,
         mainWalletKeypair,
         managedLaunchWallets,
-        params.userId
+        userId,
+        fundedLaunchWallets
       );
       const reclaimSummary = summarizeFailureRecoveryAttempt(
         reclaimResult.results
@@ -2796,7 +2844,8 @@ async function reclaimManagedLaunchWallets(
   launchId: string,
   mainWalletKeypair: Keypair,
   sourceWallets: Keypair[],
-  userId?: string
+  userId?: string,
+  inMemoryFundedWallets: LaunchWalletFundingSnapshot[] = []
 ) {
   const startedAt = Date.now();
   const connection = getSolanaConnection();
@@ -2819,31 +2868,65 @@ async function reclaimManagedLaunchWallets(
     };
   }
 
+  const recoveryWalletRows = await prisma.launchRecoveryWallet.findMany({
+    where: {
+      launchId,
+      walletPublicKey: {
+        in: uniqueSourceWallets.map((wallet) => wallet.publicKey.toBase58()),
+      },
+    },
+    select: {
+      walletPublicKey: true,
+      fundedLamports: true,
+    },
+  });
+  const fundedLamportsByPublicKey = new Map(
+    inMemoryFundedWallets.map((wallet) => [wallet.publicKey, wallet.fundedLamports])
+  );
+  for (const recoveryWallet of recoveryWalletRows) {
+    fundedLamportsByPublicKey.set(
+      recoveryWallet.walletPublicKey,
+      BigInt(recoveryWallet.fundedLamports.toString())
+    );
+  }
+
   const results: SolReturnResult[] = [];
   let totalReturnedLamports = BigInt(0);
 
   for (const sourceWallet of uniqueSourceWallets) {
     const attemptedAt = new Date();
+    const walletPublicKey = sourceWallet.publicKey.toBase58();
     const balanceLamports = await connection.getBalance(sourceWallet.publicKey);
-    const lamportsToSend = computeFailedLaunchDrainLamports(balanceLamports);
+    const fundedLamports =
+      fundedLamportsByPublicKey.get(walletPublicKey) ?? BigInt(0);
+    const lamportsToSend = computeFailedLaunchDrainLamports(
+      balanceLamports,
+      fundedLamports
+    );
     if (lamportsToSend <= 0) {
+      const reclaimError =
+        balanceLamports <= 0
+          ? "Zero balance"
+          : fundedLamports <= BigInt(0)
+            ? "No launch-funded balance recorded"
+            : "No launch-funded balance remaining";
       await prisma.launchRecoveryWallet.updateMany({
         where: {
           launchId,
-          walletPublicKey: sourceWallet.publicKey.toBase58(),
+          walletPublicKey,
         },
         data: {
           reclaimStatus: "SKIPPED",
-          reclaimError: "Zero balance",
+          reclaimError,
           reclaimTxSignature: null,
           lastAttemptAt: attemptedAt,
         },
       });
       results.push({
-        publicKey: sourceWallet.publicKey.toBase58(),
+        publicKey: walletPublicKey,
         status: "skipped",
-        remainingBalanceSol: 0,
-        error: "Zero balance",
+        remainingBalanceSol: balanceLamports / LAMPORTS_PER_SOL,
+        error: reclaimError,
       });
       continue;
     }
@@ -2863,8 +2946,8 @@ async function reclaimManagedLaunchWallets(
             userId,
             type: "TRANSFER_RECLAIM",
             source: "LAUNCH",
-            walletPublicKey: sourceWallet.publicKey.toBase58(),
-            fromAddress: sourceWallet.publicKey.toBase58(),
+            walletPublicKey,
+            fromAddress: walletPublicKey,
             toAddress: mainPublicKey.toBase58(),
             solAmount: lamportsToSend / 1_000_000_000,
             referenceId: launchId,
@@ -2880,7 +2963,7 @@ async function reclaimManagedLaunchWallets(
       await prisma.launchRecoveryWallet.updateMany({
         where: {
           launchId,
-          walletPublicKey: sourceWallet.publicKey.toBase58(),
+          walletPublicKey,
         },
         data: {
           reclaimStatus: "RETURNED",
@@ -2895,21 +2978,22 @@ async function reclaimManagedLaunchWallets(
         source: "launch.service",
         action: "launch.failureReclaim",
         launchId,
-        wallets: [sourceWallet.publicKey.toBase58(), mainPublicKey.toBase58()],
+        wallets: [walletPublicKey, mainPublicKey.toBase58()],
         signature,
         status: "submitted",
         actualValue: {
           amountSol: lamportsToSol(BigInt(lamportsToSend)),
-          walletPublicKey: sourceWallet.publicKey.toBase58(),
+          walletPublicKey,
         },
       });
       totalReturnedLamports += BigInt(lamportsToSend);
       results.push({
-        publicKey: sourceWallet.publicKey.toBase58(),
+        publicKey: walletPublicKey,
         status: "returned",
         signature,
         amountSol: lamportsToSol(BigInt(lamportsToSend)),
-        remainingBalanceSol: 0,
+        remainingBalanceSol:
+          (balanceLamports - lamportsToSend) / LAMPORTS_PER_SOL,
       });
     } catch (reclaimError) {
       const errorMessage =
@@ -2920,7 +3004,7 @@ async function reclaimManagedLaunchWallets(
       await prisma.launchRecoveryWallet.updateMany({
         where: {
           launchId,
-          walletPublicKey: sourceWallet.publicKey.toBase58(),
+          walletPublicKey,
         },
         data: {
           reclaimStatus: "FAILED",
@@ -2930,7 +3014,7 @@ async function reclaimManagedLaunchWallets(
         },
       });
       results.push({
-        publicKey: sourceWallet.publicKey.toBase58(),
+        publicKey: walletPublicKey,
         status: "failed",
         remainingBalanceSol: remainingBalanceLamports / LAMPORTS_PER_SOL,
         error: errorMessage,
@@ -3756,6 +3840,7 @@ export const launchService = {
     let persistedTokenPublicKey: string | null = null;
     let mainWalletKeypair: Keypair | null = null;
     let managedLaunchWallets: Keypair[] = [];
+    let fundedLaunchWallets: LaunchWalletFundingSnapshot[] = [];
     let launchReadyForSuccessRepair = false;
 
     try {
@@ -3976,13 +4061,15 @@ export const launchService = {
         tipLamports: tipLamports.toString(),
         bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
       });
-      await fundWalletsFromMain(
+      const fundingResult = await fundWalletsFromMain(
         launchId,
         mainWalletKeypair,
         fundingTargets,
         mainReserveLamports,
         user.id
       );
+      fundedLaunchWallets = fundingResult.fundedWallets;
+      await persistLaunchRecoveryFundingSnapshot(launchId, fundedLaunchWallets);
 
       await setStep(launchId, 18, "metadata", "Preparing metadata");
       const metadataStartedAt = Date.now();
@@ -4475,6 +4562,7 @@ export const launchService = {
         recoveryData,
         mainWalletKeypair,
         managedLaunchWallets,
+        fundedLaunchWallets,
         userId: launch.userId,
       });
     }

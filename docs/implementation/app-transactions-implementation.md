@@ -90,6 +90,8 @@ Each retry attempt (e.g., on `TransactionExpiredBlockheightExceededError`) creat
 
 One row per logical operation. Batch funding of N wallets produces N rows sharing the same `transactionSignature`.
 
+For launch funding, those `TRANSFER_FUND` rows remain the operational ledger of main-wallet top-ups. Failed-launch auto reclaim does not derive its cap from these best-effort rows; it uses the persisted `LaunchRecoveryWallet.fundedLamports` snapshot written during launch funding so shared wallets can only return launch-specific SOL.
+
 ### Jito bundles
 
 One row per transaction in the bundle. All rows share the same `bundleId`. The last transaction row gets `jitoTipLamports` populated.
@@ -149,8 +151,10 @@ Protected procedure. Aggregates confirmed `AppTransaction` data for a token, gro
 The token dashboard P&L combines data from two sources:
 
 - **Sell volume**: `TokenTransaction.groupBy` where `isOwned: true`, `transactionType: 'SELL'`
-- **Buy volume**: `TokenTransaction` owned buy volume + `AppTransaction.TRADE_BUY` (source: `LAUNCH`) sum. The dev buy during token creation is recorded as a `TRADE_BUY` in `AppTransaction` with the exact configured dev buy amount. This is more accurate than the `TokenTransaction.CREATE` row, which includes creation overhead.
+- **Buy volume**: `TokenTransaction` owned buy volume + the confirmed `AppTransaction.TRADE_BUY` for the token's recorded dev wallet on the successful launch. The dev buy during token creation is recorded with the exact configured dev buy amount, which is more accurate than the `TokenTransaction.CREATE` row because that row includes creation overhead.
 - **Fees**: `AppTransaction` aggregation of `FEE_USAGE` and `FEE_PRO` types for the token, plus Jito tips from `jitoTipLamports`.
+
+This dashboard metric is portfolio P&L for the token's managed wallets. It is not intended to reconcile one-to-one with main-wallet balance movement.
 
 P&L formula:
 
@@ -160,13 +164,23 @@ creatorRewardsClaimedSol = sum of confirmed REWARD_PAYOUT solAmount (AppTransact
 pnl = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
 ```
 
+`creationCostSol` is the residual launch funding that was not returned to the main wallet and was not spent on launch buys:
+
+```
+creationCostSol = launchFunding - launchReturns - launchBuySol
+launchBuySol = sum of confirmed AppTransaction.TRADE_BUY rows for the successful launch
+```
+
 This is computed in `dashboard.service.ts` via `getOperationalCosts()` and `getClaimedCreatorRewards()`, which run parallel queries against `AppTransaction`:
 1. Fee aggregation (grouped by type for `FEE_USAGE` / `FEE_PRO`)
 2. Jito tip aggregation (sum of `jitoTipLamports`)
-3. Dev buy aggregation (`TRADE_BUY` where source is `LAUNCH`)
-4. Claimed creator rewards (`REWARD_PAYOUT` where source is `CREATOR_REWARD`, status `CONFIRMED`)
+3. Dev buy aggregation (the confirmed `TRADE_BUY` where source is `LAUNCH`, `referenceId` matches the successful launch, and `walletPublicKey` matches `TokenDevWallet.walletPublicKey`)
+4. Launch buy aggregation (all confirmed `TRADE_BUY` rows where source is `LAUNCH` and `referenceId` matches the successful launch)
+5. Claimed creator rewards (`REWARD_PAYOUT` where source is `CREATOR_REWARD`, status `CONFIRMED`)
 
 The P&L card shows a clickable details dialog (`pnl-details-dialog.tsx`) breaking down: bought, sold, trading P&L, platform fees, pro fees, Jito tips, and net P&L.
+
+If realized SOL from a sale is still held on a managed wallet such as the system dev wallet, that value still belongs in portfolio P&L. Sweeping it back to the main wallet is a separate wallet-recovery concern.
 
 ### `tokenPublicKey` on fee records
 

@@ -741,14 +741,16 @@ export function DashboardClient() {
 
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;
+  const hasHoldings = (statsData?.holdingsBreakdown.userTotalTokens ?? 0) > 0;
   const shouldAutoOpen =
     Boolean(activeExitId) && dismissedExitId !== activeExitId;
   const isExitDialogOpen = manualExitDialogOpen || shouldAutoOpen;
 
   const handleOpenExitDialog = useCallback(() => {
+    if (!hasHoldings) return;
     setManualExitDialogOpen(true);
     setDismissedExitId(null);
-  }, []);
+  }, [hasHoldings]);
 
   const handleExitDialogOpenChange = useCallback(
     (open: boolean) => {
@@ -920,7 +922,9 @@ export function DashboardClient() {
             metrics={statsData.metrics}
             onOpenExitDialog={handleOpenExitDialog}
             exitDisabled={
-              startExitMutation.isPending || exitStatus === "RUNNING"
+              !hasHoldings ||
+              startExitMutation.isPending ||
+              exitStatus === "RUNNING"
             }
             exitPending={startExitMutation.isPending}
           />

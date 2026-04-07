@@ -5,6 +5,7 @@ import { formatSol } from "@/lib/utils/format";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
@@ -159,7 +160,8 @@ export function PnlDetailsDialog({
     {
       label: "Token Buys",
       value: pnl.totalBuyVolume,
-      tooltip: "SOL spent on buying tokens, including the initial dev buy at launch",
+      tooltip:
+        "SOL spent buying tokens across this token's managed wallets, including the initial dev buy at launch",
     },
     {
       label: "Creation Costs",
@@ -194,6 +196,9 @@ export function PnlDetailsDialog({
       <DialogContent className="sm:max-w-sm">
         <DialogHeader>
           <DialogTitle>P&L Details</DialogTitle>
+          <DialogDescription>
+            Realized portfolio P&amp;L across this token&apos;s managed wallets.
+          </DialogDescription>
         </DialogHeader>
 
         <TooltipProvider>
@@ -235,7 +240,7 @@ export function PnlDetailsDialog({
                 label="Token Sales"
                 value={`+${formatSol(pnl.totalSellVolume)} SOL`}
                 valueClass={pnl.totalSellVolume > 0 ? "text-green-400" : "text-muted-foreground"}
-                tooltip="SOL received from selling tokens on pump.fun"
+                tooltip="SOL received by this token's managed wallets from selling tokens on pump.fun, whether or not it has already been returned to the main wallet"
               />
               {pnl.creatorRewardsClaimedSol > 0 && (
                 <Row
@@ -260,7 +265,7 @@ export function PnlDetailsDialog({
                 value={`${isNetProfit ? "+" : ""}${formatSol(pnl.net)} SOL`}
                 valueClass={pnl.net !== 0 ? (isNetProfit ? "text-green-500" : "text-red-500") : "text-muted-foreground"}
                 bold
-                tooltip="Total realized profit or loss including claimed creator rewards — matches the change in your main wallet balance"
+                tooltip="Total realized profit or loss across this token's managed wallets, including claimed creator rewards. This does not require the proceeds to have already been returned to the main wallet."
               />
             </div>
           </div>

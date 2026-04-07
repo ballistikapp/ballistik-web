@@ -247,6 +247,7 @@ export const LaunchRecoveryWalletScalarFieldEnum = {
   walletType: 'walletType',
   role: 'role',
   isManaged: 'isManaged',
+  fundedLamports: 'fundedLamports',
   reclaimStatus: 'reclaimStatus',
   reclaimTxSignature: 'reclaimTxSignature',
   reclaimError: 'reclaimError',

@@ -58,6 +58,15 @@ Structured log entries per launch.
 - `step`: optional step id
 - `data`: optional JSON context
 
+### LaunchRecoveryWallet
+
+Per-launch recovery tracking for managed wallets.
+
+- One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION`)
+- `isManaged`: whether launch cleanup is allowed to operate on the wallet automatically
+- `fundedLamports`: the actual SOL top-up this launch funded into that wallet
+- `reclaimStatus`, `reclaimTxSignature`, `reclaimError`, `lastAttemptAt`, `reclaimedAt`: reclaim bookkeeping for auto and manual recovery flows
+
 ### VanityMint
 
 Pool of pre-generated vanity mints (reserve first, consume after on-chain confirmation).
@@ -106,7 +115,7 @@ Server-side enforcement: for free-tier users, `devWalletOption` is normalized to
 
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
 
-When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
+When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup, but failed-launch reclaim is capped to the launch-funded top-up recorded for that attempt so pre-existing system-wallet SOL is not swept to the user. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
 
 ### Bundler Wallets
 
@@ -163,6 +172,8 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 11. **Activate**: set Token status to `ACTIVE` after launch succeeds on-chain.
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet. Cleanup tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
 13. **Failure Reclaim**: if launch execution fails after recovery wallets were persisted, attempt to return remaining SOL to the main wallet before final UI guidance is shown.
+   - Failed-launch reclaim is capped per wallet to `min(current wallet balance, launch-funded lamports for that wallet)`.
+   - The per-wallet funded amount is persisted on `LaunchRecoveryWallet.fundedLamports` after funding succeeds, so shared wallets such as the system dev wallet only return launch-specific top-ups.
 14. **Complete**: mark SUCCEEDED or CANCELED, or mark FAILED after reclaim outcome is recorded, store result metadata, log completion.
 
 ## UI Integration
@@ -214,7 +225,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 ## Key Files
 
-- `prisma/schema.prisma` (Launch, LaunchLog, VanityMint)
+- `prisma/schema.prisma` (Launch, LaunchLog, LaunchRecoveryWallet, VanityMint)
 - `server/services/launch.service.ts`
 - `server/services/storage.service.ts`
 - `server/trpc/routers/launch.router.ts`
@@ -415,7 +426,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - Launch state remains `FAILED` even when automatic reclaim succeeds.
 - Automatic reclaim outcome is stored in `Launch.result.failureRecovery` for user-facing messaging.
 - `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Manage Tokens for reclaim.
-- Failed-launch reclaim uses an aggressive drain path for temporary generated wallets so the main-wallet balance returns as close to unchanged as possible when the launch never lands.
+- Failed-launch reclaim is launch-scoped: each managed wallet can only return the funded top-up recorded for that launch, never more than its current balance.
 - Failed launches without `failureRecovery` metadata fall back to showing My Tokens guidance so older/stale failure records still have a recovery path.
 - Manual reclaim remains available from Manage Tokens row actions and the reclaim dialog.
 

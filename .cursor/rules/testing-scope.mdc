@@ -1,0 +1,11 @@
+---
+description: "Do not write, run, or plan tests unless explicitly requested"
+alwaysApply: true
+---
+
+# Test Scope
+
+- Do not write new tests or update existing tests unless the user explicitly asks for tests.
+- Do not run automated tests, test scripts, or test-related CLI commands unless the user explicitly asks.
+- Do not include test work in plans, suggested implementation steps, or default follow-up actions unless the user explicitly requests it.
+- If tests would normally be the next step, mention that they were intentionally skipped because the user did not ask for them.

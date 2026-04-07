@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { Info } from "lucide-react";
 import { toast } from "sonner";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
@@ -20,6 +21,11 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type RouterOutputs = inferRouterOutputs<AppRouter>;
 type ExitStatusOutput = RouterOutputs["holding"]["exitStatus"];
@@ -52,6 +58,7 @@ const statusVariantMap: Record<
 > = {
   PENDING: "secondary",
   RUNNING: "default",
+  PARTIAL_SUCCESS: "secondary",
   SUCCEEDED: "outline",
   FAILED: "destructive",
 };
@@ -59,6 +66,7 @@ const statusVariantMap: Record<
 const statusLabelMap: Record<string, string> = {
   PENDING: "Pending",
   RUNNING: "Running",
+  PARTIAL_SUCCESS: "Partial Success",
   SUCCEEDED: "Succeeded",
   FAILED: "Failed",
 };
@@ -104,7 +112,10 @@ export function HoldingExitDialog({
   const progress = exit?.progress ?? 0;
   const currentStep = exit?.currentStep ?? "Ready";
   const canClose =
-    status === "SUCCEEDED" || status === "FAILED" || status === "RUNNING";
+    status === "SUCCEEDED" ||
+    status === "PARTIAL_SUCCESS" ||
+    status === "FAILED" ||
+    status === "RUNNING";
   const summary = exit?.result as
     | {
         totalWallets?: number;
@@ -118,6 +129,12 @@ export function HoldingExitDialog({
         fundingLamports?: number;
         atasClosed?: number;
         solRecoveredSol?: number;
+        cleanupFailedWallets?: number;
+        requestedReturnSolToMainWallet?: boolean;
+        effectiveReturnSolToMainWallet?: boolean;
+        systemDevImmediateSweeps?: number;
+        systemDevImmediateSweepFailures?: number;
+        systemDevImmediateSweepLamports?: number;
         totalJitoTipSol?: number;
       }
     | undefined;
@@ -132,7 +149,9 @@ export function HoldingExitDialog({
       ? exitInput.jitoTipSol
       : localTipSol;
   const activeReturnSolToMainWallet =
-    typeof exitInput?.returnSolToMainWallet === "boolean"
+    typeof summary?.effectiveReturnSolToMainWallet === "boolean"
+      ? summary.effectiveReturnSolToMainWallet
+      : typeof exitInput?.returnSolToMainWallet === "boolean"
       ? exitInput.returnSolToMainWallet
       : returnSolToMainWallet;
   const estimatedBundles =
@@ -142,8 +161,12 @@ export function HoldingExitDialog({
   const estimatedTotalTipSol = activeTipSol * estimatedBundles;
 
   const showProgress = Boolean(exit);
-  const showSummary = status === "SUCCEEDED" && summary;
+  const showSummary =
+    (status === "SUCCEEDED" || status === "PARTIAL_SUCCESS") && summary;
   const showError = status === "FAILED" && exit?.errorMessage;
+  const showCleanupWarning =
+    status === "PARTIAL_SUCCESS" &&
+    (exit?.errorMessage || (summary?.cleanupFailedWallets ?? 0) > 0);
   const activityItems = React.useMemo(
     () =>
       [...(exit?.logs ?? [])]
@@ -216,31 +239,36 @@ export function HoldingExitDialog({
                 }
               />
               <div className="grid gap-1">
-                <Label htmlFor="exitReturnSolToMainWallet">
-                  Return SOL to main wallet
-                </Label>
-                <p className="text-xs text-muted-foreground">
-                  After exit processing, transfer spendable SOL from processed
-                  wallets to your main wallet.
-                </p>
+                <div className="flex items-center gap-1.5">
+                  <Label htmlFor="exitReturnSolToMainWallet">
+                    Return SOL to main wallet
+                  </Label>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground transition-colors hover:text-foreground"
+                        aria-label="About returning SOL to main wallet"
+                      >
+                        <Info className="size-3.5" />
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-sm">
+                      After exit processing, spendable SOL from processed
+                      wallets is sent back to your main wallet. System dev
+                      wallet proceeds are always swept back to main.
+                    </TooltipContent>
+                  </Tooltip>
+                </div>
               </div>
             </div>
-            <div className="rounded-md border p-3 space-y-2 text-xs text-muted-foreground">
-              <div className="font-medium text-foreground">What exit does</div>
+            <div className="rounded-md border p-3 text-xs text-muted-foreground">
               <p>
-                1) Collects token balances from all managed wallets with tokens.
-              </p>
-              <p>
-                2) Bundles transfers + sell instructions and submits through
-                Jito.
-              </p>
-              <p>3) Closes empty token accounts.</p>
-              <p>
-                4) {returnSolToMainWallet ? "Returns" : "Optionally returns"}{" "}
-                SOL from processed wallets to main wallet.
-              </p>
-              <p>
-                Jito tip is paid per bundle. Estimated bundles:{" "}
+                Exit sells tokens across managed wallets, closes empty token
+                accounts, and{" "}
+                {returnSolToMainWallet ? "returns" : "can return"} leftover SOL
+                to your main wallet. Jito tip is paid per bundle. Estimated
+                bundles:{" "}
                 <span className="font-mono">{estimatedBundles}</span>, estimated
                 total tip:{" "}
                 <span className="font-mono">
@@ -257,9 +285,23 @@ export function HoldingExitDialog({
             <Progress value={progress} className="w-full" />
             <Separator />
             {showSummary && (
-              <div className="rounded-md border border-emerald-500/30 bg-emerald-500/5 p-3 space-y-2">
-                <div className="text-sm font-medium text-emerald-700 dark:text-emerald-300">
-                  Exit succeeded
+              <div
+                className={`rounded-md border p-3 space-y-2 ${
+                  status === "PARTIAL_SUCCESS"
+                    ? "border-amber-500/30 bg-amber-500/5"
+                    : "border-emerald-500/30 bg-emerald-500/5"
+                }`}
+              >
+                <div
+                  className={`text-sm font-medium ${
+                    status === "PARTIAL_SUCCESS"
+                      ? "text-amber-700 dark:text-amber-300"
+                      : "text-emerald-700 dark:text-emerald-300"
+                  }`}
+                >
+                  {status === "PARTIAL_SUCCESS"
+                    ? "Exit completed with cleanup issues"
+                    : "Exit succeeded"}
                 </div>
                 <div className="grid gap-2 text-xs text-muted-foreground">
                   <div className="flex items-center justify-between">
@@ -312,6 +354,35 @@ export function HoldingExitDialog({
                       {summary?.solRecoveredSol?.toFixed?.(4) ?? "-"} SOL
                     </span>
                   </div>
+                  {(summary?.cleanupFailedWallets ?? 0) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>Cleanup failures</span>
+                      <span className="font-mono">
+                        {summary?.cleanupFailedWallets}
+                      </span>
+                    </div>
+                  )}
+                  {(summary?.systemDevImmediateSweeps ?? 0) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>System dev sweeps</span>
+                      <span className="font-mono">
+                        {summary?.systemDevImmediateSweeps} (
+                        {(
+                          (summary?.systemDevImmediateSweepLamports ?? 0) /
+                          1_000_000_000
+                        ).toFixed(4)}{" "}
+                        SOL)
+                      </span>
+                    </div>
+                  )}
+                  {(summary?.systemDevImmediateSweepFailures ?? 0) > 0 && (
+                    <div className="flex items-center justify-between">
+                      <span>System dev sweep failures</span>
+                      <span className="font-mono">
+                        {summary?.systemDevImmediateSweepFailures}
+                      </span>
+                    </div>
+                  )}
                   <div className="flex items-center justify-between">
                     <span>Total Jito tip</span>
                     <span className="font-mono">
@@ -326,6 +397,12 @@ export function HoldingExitDialog({
                 {exit?.errorMessage}
               </div>
             )}
+            {showCleanupWarning && (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-sm text-amber-700 dark:text-amber-300">
+                {exit?.errorMessage ??
+                  "Some cleanup steps failed after the exit bundle succeeded."}
+              </div>
+            )}
             <div className="rounded-md border p-3 text-xs text-muted-foreground">
               Tip per bundle:{" "}
               <span className="font-mono">{activeTipSol.toFixed(4)} SOL</span>
@@ -334,6 +411,17 @@ export function HoldingExitDialog({
               <span className="font-mono">
                 {activeReturnSolToMainWallet ? "Enabled" : "Disabled"}
               </span>
+              {typeof summary?.requestedReturnSolToMainWallet === "boolean" &&
+              typeof summary?.effectiveReturnSolToMainWallet === "boolean" &&
+              summary.requestedReturnSolToMainWallet !==
+                summary.effectiveReturnSolToMainWallet ? (
+                <>
+                  <br />
+                  <span className="font-mono">
+                    Forced on for system dev wallet handling
+                  </span>
+                </>
+              ) : null}
             </div>
             <div className="space-y-2">
               <div className="text-sm font-medium">Activity</div>
@@ -394,9 +482,37 @@ export function HoldingExitDialog({
           </div>
         )}
 
-        <DialogFooter>
+        <DialogFooter className="sm:items-center">
+          <div className="flex items-center gap-1.5 text-sm text-muted-foreground sm:mr-auto">
+            <span>
+              Powered by{" "}
+              <a
+                href="https://www.jito.wtf/"
+                target="_blank"
+                rel="noreferrer"
+                className="underline underline-offset-4 transition-colors hover:text-foreground"
+              >
+                Jito
+              </a>
+            </span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  type="button"
+                  className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                  aria-label="About Jito bundles"
+                >
+                  <Info className="size-3.5" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-sm">
+                Exit submits the sell flow as Jito bundles so grouped
+                instructions can land together with priority.
+              </TooltipContent>
+            </Tooltip>
+          </div>
           {showProgress ? (
-            <div className="flex gap-2 w-full justify-end">
+            <div className="flex w-full gap-2 justify-end sm:w-auto">
               {(status === "PENDING" || status === "RUNNING") && onCancel && (
                 <Button
                   variant="destructive"

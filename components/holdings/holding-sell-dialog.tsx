@@ -164,7 +164,8 @@ export function HoldingSellDialog({
               </Label>
               <p className="text-xs text-muted-foreground">
                 After processing selected wallets, send each processed wallet&apos;s
-                spendable SOL balance back to the main wallet.
+                spendable SOL balance back to the main wallet. System dev wallet
+                proceeds are always swept back to main.
               </p>
             </div>
           </div>

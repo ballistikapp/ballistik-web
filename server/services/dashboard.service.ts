@@ -145,7 +145,7 @@ async function getWalletKeys(tokenPublicKey: string, userId: string) {
 async function getOperationalCosts(tokenPublicKey: string, userId: string) {
   const confirmedWhere = { userId, tokenPublicKey, status: "CONFIRMED" as const };
 
-  const [feeAgg, jitoTipAgg, devBuyAgg, launchReturnAgg, launch] = await Promise.all([
+  const [feeAgg, jitoTipAgg, launchReturnAgg, launch, tokenDevWallet] = await Promise.all([
     prisma.appTransaction.groupBy({
       by: ["source"],
       where: { ...confirmedWhere, type: "FEE_USAGE" },
@@ -156,10 +156,6 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
       _sum: { jitoTipLamports: true },
     }),
     prisma.appTransaction.aggregate({
-      where: { ...confirmedWhere, type: "TRADE_BUY", source: "LAUNCH" },
-      _sum: { solAmount: true },
-    }),
-    prisma.appTransaction.aggregate({
       where: { ...confirmedWhere, type: "TRANSFER_RETURN", source: "LAUNCH" },
       _sum: { solAmount: true },
     }),
@@ -168,7 +164,36 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
       select: { id: true, input: true },
       orderBy: { createdAt: "desc" },
     }),
+    prisma.tokenDevWallet.findFirst({
+      where: { tokenPublicKey },
+      select: { walletPublicKey: true },
+    }),
   ]);
+
+  const devBuyAgg =
+    launch && tokenDevWallet
+      ? await prisma.appTransaction.aggregate({
+          where: {
+            ...confirmedWhere,
+            type: "TRADE_BUY",
+            source: "LAUNCH",
+            referenceId: launch.id,
+            walletPublicKey: tokenDevWallet.walletPublicKey,
+          },
+          _sum: { solAmount: true },
+        })
+      : { _sum: { solAmount: null } };
+  const launchBuyAgg = launch
+    ? await prisma.appTransaction.aggregate({
+        where: {
+          ...confirmedWhere,
+          type: "TRADE_BUY",
+          source: "LAUNCH",
+          referenceId: launch.id,
+        },
+        _sum: { solAmount: true },
+      })
+    : { _sum: { solAmount: null } };
 
   // TRANSFER_FUND records don't have tokenPublicKey because wallets are
   // funded before the mint is generated — query by launch referenceId instead
@@ -189,9 +214,12 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
     Number(jitoTipAgg._sum.jitoTipLamports ?? 0) / 1e9
   );
   const devBuySol = round4(Number(devBuyAgg._sum.solAmount ?? 0));
+  const launchBuySol = round4(Number(launchBuyAgg._sum.solAmount ?? 0));
   const launchFunding = round4(Number(launchFundAgg._sum.solAmount ?? 0));
   const launchReturns = round4(Number(launchReturnAgg._sum.solAmount ?? 0));
-  const creationCostSol = round4(Math.max(0, launchFunding - launchReturns - devBuySol));
+  const creationCostSol = round4(
+    Math.max(0, launchFunding - launchReturns - launchBuySol)
+  );
 
   const launchInput = launch?.input as Record<string, unknown> | null;
   const launchFeeBreakdown = launchInput

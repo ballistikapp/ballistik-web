@@ -23,6 +23,11 @@ export const tokenRouter = router({
         ctx.user.id
       );
     }),
+  getSidebarCounts: protectedProcedure
+    .input(tokenPublicKeySchema)
+    .query(async ({ input, ctx }) => {
+      return await tokenService.getSidebarCounts(input.publicKey, ctx.user.id);
+    }),
   getUserTokens: protectedProcedure
     .input(tokenListPaginationSchema.optional())
     .query(async ({ ctx, input }) => {

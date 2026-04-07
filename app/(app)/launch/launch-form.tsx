@@ -1446,29 +1446,59 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
           <PageSection>
             <PageSectionHeader
               title="Bundler Settings"
-              className="flex-row items-center justify-start gap-3"
+              className="flex-row items-center justify-between gap-3"
               meta={
-                <div className="mb-1 flex items-center gap-2">
-                  <Tooltip>
-                    <TooltipTrigger>
-                      <Info className="h-4 w-4 text-muted-foreground" />
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      Enable bundler to buy tokens within the same transaction
-                      with the token creation. Enabling this feature costs 0.1
-                      SOL.
-                    </TooltipContent>
-                  </Tooltip>
-                  <form.Field name="bundleBuyEnabled">
-                    {(field) => (
-                      <Switch
-                        id="bundle-buy"
-                        size="lg"
-                        checked={field.state.value}
-                        onCheckedChange={field.handleChange}
-                      />
-                    )}
-                  </form.Field>
+                <div className="mb-1 flex flex-1 flex-wrap items-center justify-between gap-x-4 gap-y-2">
+                  <div className="flex items-center gap-2">
+                    <Tooltip>
+                      <TooltipTrigger>
+                        <Info className="h-4 w-4 text-muted-foreground" />
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        Enable bundler to buy tokens within the same transaction
+                        with the token creation. Enabling this feature costs 0.1
+                        SOL.
+                      </TooltipContent>
+                    </Tooltip>
+                    <form.Field name="bundleBuyEnabled">
+                      {(field) => (
+                        <Switch
+                          id="bundle-buy"
+                          size="lg"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      )}
+                    </form.Field>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-sm text-muted-foreground">
+                    <span>
+                      Powered by{" "}
+                      <a
+                        href="https://www.jito.wtf/"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="underline underline-offset-4 transition-colors hover:text-foreground"
+                      >
+                        Jito
+                      </a>
+                    </span>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          className="inline-flex text-muted-foreground transition-colors hover:text-foreground"
+                          aria-label="About Jito bundles"
+                        >
+                          <Info className="size-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="max-w-sm">
+                        Bundler buy submits grouped instructions through Jito so
+                        they can land together with priority.
+                      </TooltipContent>
+                    </Tooltip>
+                  </div>
                 </div>
               }
             />

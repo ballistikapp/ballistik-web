@@ -103,11 +103,14 @@ P&L = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - 
 ```
 
 - `ownedBuyVolume` / `ownedSellVolume`: from `TokenTransaction.groupBy` where `isOwned: true`, `status: 'CONFIRMED'`
-- `devBuySol`: from `AppTransaction.aggregate` where `type: 'TRADE_BUY'`, `source: 'LAUNCH'` — the exact dev buy amount configured at launch time. This is used instead of the `TokenTransaction.CREATE` row, which includes creation overhead in its `solAmount`.
+- `devBuySol`: from the confirmed `AppTransaction.TRADE_BUY` for the token's recorded dev wallet (`TokenDevWallet.walletPublicKey`) on the successful launch. This is used instead of the `TokenTransaction.CREATE` row, which includes creation overhead in its `solAmount`.
+- `creationCostSol`: residual launch funding that was not returned to the main wallet and was not spent on launch buys. It is derived as `launchFunding - launchReturns - launchBuySol`, where `launchBuySol` sums all confirmed launch `TRADE_BUY` rows for the successful launch.
 - `totalFees`: platform fees (`FEE_USAGE`) + pro fees (`FEE_PRO`) from `AppTransaction.groupBy`
 - Jito tips are displayed in the P&L details dialog but not subtracted from net P&L (they are included in the on-chain transaction costs, not a separate fee)
 
-The P&L is purely realized — unrealized holdings value is not included. Holdings value is displayed separately on its own card.
+The P&L is purely realized portfolio P&L for the token's managed wallets — unrealized holdings value is not included. Holdings value is displayed separately on its own card.
+
+Realized sell proceeds count toward portfolio P&L even if they are still sitting on a managed wallet such as the system dev wallet. Returning SOL to the user's main wallet is handled by separate wallet recovery flows and does not change the P&L formula.
 
 ### P&L Details Dialog
 

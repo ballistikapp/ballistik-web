@@ -206,6 +206,7 @@ enum HoldingExitStatus {
   PENDING
   RUNNING
   FAILED
+  PARTIAL_SUCCESS
   SUCCEEDED
 }
 
@@ -292,6 +293,7 @@ model LaunchRecoveryWallet {
   walletType WalletType
   role LaunchRecoveryWalletRole
   isManaged Boolean @default(true)
+  fundedLamports Decimal @default(0) @db.Decimal(20, 0)
   reclaimStatus LaunchRecoveryWalletStatus @default(ELIGIBLE)
   reclaimTxSignature String?
   reclaimError String?

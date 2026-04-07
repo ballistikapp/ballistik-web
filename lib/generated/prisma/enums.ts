@@ -82,6 +82,7 @@ export const HoldingExitStatus = {
   PENDING: 'PENDING',
   RUNNING: 'RUNNING',
   FAILED: 'FAILED',
+  PARTIAL_SUCCESS: 'PARTIAL_SUCCESS',
   SUCCEEDED: 'SUCCEEDED'
 } as const
 

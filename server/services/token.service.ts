@@ -1,6 +1,10 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import type { Prisma } from "@/lib/generated/prisma/client";
+import {
+  VolumeBotSessionStatus,
+  WalletType,
+  type Prisma,
+} from "@/lib/generated/prisma/client";
 import { AppError } from "@/server/errors";
 import { getServerUser } from "@/lib/utils/auth";
 import type { CreateTokenInput } from "@/server/schemas/token.schema";
@@ -214,6 +218,91 @@ export const tokenService = {
     }
 
     return token;
+  },
+
+  async getSidebarCounts(publicKey: string, userId: string) {
+    const token = await prisma.token.findFirst({
+      where: { publicKey, userId },
+      select: { publicKey: true },
+    });
+
+    if (!token) {
+      throw new AppError("Token not found", 404);
+    }
+
+    const [
+      user,
+      devWallet,
+      operationalWalletsWithBalance,
+      holdingWalletsWithBalance,
+      activeVolumeBotSessions,
+    ] = await Promise.all([
+      prisma.user.findUnique({
+        where: { id: userId },
+        select: { mainWalletPublicKey: true },
+      }),
+      prisma.tokenDevWallet.findFirst({
+        where: { tokenPublicKey: publicKey },
+        select: {
+          walletPublicKey: true,
+          wallet: {
+            select: {
+              balanceSol: true,
+              isSystemWallet: true,
+            },
+          },
+        },
+      }),
+      prisma.wallet.count({
+        where: {
+          tokenPublicKey: publicKey,
+          type: {
+            in: [
+              WalletType.BUNDLER,
+              WalletType.VOLUME,
+              WalletType.DISTRIBUTION,
+            ],
+          },
+          balanceSol: { gt: 0 },
+        },
+      }),
+      prisma.holding.findMany({
+        where: {
+          tokenPublicKey: publicKey,
+          tokenBalance: { gt: 0 },
+        },
+        select: { walletPublicKey: true },
+        distinct: ["walletPublicKey"],
+      }),
+      prisma.volumeBotSession.count({
+        where: {
+          userId,
+          tokenPublicKey: publicKey,
+          status: {
+            in: [
+              VolumeBotSessionStatus.RUNNING,
+              VolumeBotSessionStatus.STOP_REQUESTED,
+              VolumeBotSessionStatus.STOPPING,
+            ],
+          },
+        },
+      }),
+    ]);
+
+    const mainWalletPublicKey = user?.mainWalletPublicKey ?? null;
+    const devWalletCanReturnSol = Boolean(
+      devWallet &&
+        !devWallet.wallet.isSystemWallet &&
+        devWallet.walletPublicKey !== mainWalletPublicKey &&
+        Number(devWallet.wallet.balanceSol ?? 0) > 0
+    );
+
+    return {
+      walletsWithBalance:
+        operationalWalletsWithBalance + (devWalletCanReturnSol ? 1 : 0),
+      walletsWithHoldings: holdingWalletsWithBalance.length,
+      activeVolumeBotSessions,
+    };
   },
 
   async getTokenPrivateKeyByPublicKey(publicKey: string, userId: string) {

@@ -16,8 +16,31 @@ export type FailureRecoverySummary = {
   failureMessage: string | null;
 };
 
-export function computeFailedLaunchDrainLamports(balanceLamports: number) {
-  return balanceLamports > 0 ? balanceLamports : 0;
+export function computeFailedLaunchDrainLamports(
+  balanceLamports: number,
+  fundedLamports?: bigint | number
+) {
+  if (balanceLamports <= 0) {
+    return 0;
+  }
+  if (fundedLamports === undefined) {
+    return balanceLamports;
+  }
+
+  const maxRecoverableLamports =
+    typeof fundedLamports === "bigint"
+      ? fundedLamports
+      : BigInt(Math.max(0, fundedLamports));
+  if (maxRecoverableLamports <= BigInt(0)) {
+    return 0;
+  }
+
+  const currentBalanceLamports = BigInt(balanceLamports);
+  return Number(
+    currentBalanceLamports < maxRecoverableLamports
+      ? currentBalanceLamports
+      : maxRecoverableLamports
+  );
 }
 
 export function summarizeFailureRecoveryAttempt(

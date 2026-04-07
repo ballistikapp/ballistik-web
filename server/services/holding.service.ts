@@ -8,14 +8,8 @@ import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import {
-  computeRecoverableLamports,
-  computeSponsoredRecoverableLamports,
-  resolveBatchReclaimMode,
-} from "@/lib/utils/sol-recovery";
-import {
   Keypair,
   PublicKey,
-  SystemProgram,
   Transaction,
   sendAndConfirmTransaction,
   type Connection,
@@ -31,6 +25,11 @@ import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { testRunLogService } from "@/server/services/test-run-log.service";
+import {
+  recoverWalletSolBalances,
+  resolveReturnSolToMainWallet,
+  sweepSystemDevRealizedSol,
+} from "@/server/services/holding-sol-recovery";
 import type {
   ListHoldingsByTokenInput,
   RefreshHoldingsByTokenInput,
@@ -315,250 +314,6 @@ async function getCachedTokenSupply(
   } catch {
     return cached?.value ?? null;
   }
-}
-
-async function returnSolToMainWallet(
-  connection: Connection,
-  wallets: WalletWithKey[],
-  mainWalletKeypair: Keypair,
-  userId?: string,
-  tokenPublicKey?: string
-) {
-  const rentExemptMinimumLamports =
-    await connection.getMinimumBalanceForRentExemption(0, "confirmed");
-  const walletBalances = new Map<string, number>();
-  await mapWithConcurrency(wallets, 2, async (wallet) => {
-    if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
-      walletBalances.set(wallet.publicKey, 0);
-      return;
-    }
-
-    const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-    const balanceLamports = await connection.getBalance(owner.publicKey);
-    walletBalances.set(wallet.publicKey, balanceLamports);
-  });
-  const firstRecoverableWallet = wallets.find(
-    (wallet) => (walletBalances.get(wallet.publicKey) ?? 0) > 0
-  );
-  let sponsoredFeeLamports = 0;
-  if (firstRecoverableWallet) {
-    const owner = Keypair.fromSecretKey(
-      bs58.decode(firstRecoverableWallet.privateKey)
-    );
-    const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-    const sponsoredFeeTransaction = new Transaction().add(
-      SystemProgram.transfer({
-        fromPubkey: owner.publicKey,
-        toPubkey: mainWalletKeypair.publicKey,
-        lamports: 1,
-      })
-    );
-    sponsoredFeeTransaction.feePayer = mainWalletKeypair.publicKey;
-    sponsoredFeeTransaction.recentBlockhash = latestBlockhash.blockhash;
-    const sponsoredFee = await connection.getFeeForMessage(
-      sponsoredFeeTransaction.compileMessage(),
-      "confirmed"
-    );
-    sponsoredFeeLamports = sponsoredFee.value ?? 5000;
-  }
-  const mainWalletBalanceLamports = await connection.getBalance(
-    mainWalletKeypair.publicKey
-  );
-  const reclaimMode = resolveBatchReclaimMode({
-    mainWalletBalanceLamports,
-    walletBalancesLamports: wallets.map(
-      (wallet) => walletBalances.get(wallet.publicKey) ?? 0
-    ),
-    sponsoredFeeLamports,
-  });
-  const results = await mapWithConcurrency(wallets, 2, async (wallet) => {
-    if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
-      return {
-        walletPublicKey: wallet.publicKey,
-        status: "SKIPPED",
-        recoveredLamports: 0,
-      };
-    }
-
-    try {
-      const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-      const balanceLamports = walletBalances.get(wallet.publicKey) ?? 0;
-      if (balanceLamports <= 0) {
-        return {
-          walletPublicKey: wallet.publicKey,
-          status: "SKIPPED",
-          recoveredLamports: 0,
-        };
-      }
-
-      const feeTransaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: owner.publicKey,
-          toPubkey: mainWalletKeypair.publicKey,
-          lamports: 1,
-        })
-      );
-      const feePayer = owner.publicKey;
-      feeTransaction.feePayer = feePayer;
-      const latestBlockhash = await connection.getLatestBlockhash("confirmed");
-      feeTransaction.recentBlockhash = latestBlockhash.blockhash;
-      const fee = await connection.getFeeForMessage(
-        feeTransaction.compileMessage(),
-        "confirmed"
-      );
-      const feeLamports = fee.value ?? 5000;
-      const lamports =
-        reclaimMode === "main-sponsored"
-          ? computeSponsoredRecoverableLamports({
-              balanceLamports,
-              feeLamports: sponsoredFeeLamports,
-            })
-          : computeRecoverableLamports({
-              balanceLamports,
-              feeLamports,
-              rentExemptMinimumLamports,
-            });
-      if (lamports <= 0) {
-        return {
-          walletPublicKey: wallet.publicKey,
-          status: "SKIPPED",
-          recoveredLamports: 0,
-        };
-      }
-
-      const transferTx = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: owner.publicKey,
-          toPubkey: mainWalletKeypair.publicKey,
-          lamports,
-        })
-      );
-      transferTx.recentBlockhash = latestBlockhash.blockhash;
-      transferTx.feePayer =
-        reclaimMode === "main-sponsored"
-          ? mainWalletKeypair.publicKey
-          : owner.publicKey;
-      const returnTrackId = userId
-        ? await appTransactionService
-            .create({
-              userId,
-              type: "TRANSFER_RETURN",
-              source: "HOLDING",
-              tokenPublicKey,
-              walletPublicKey: wallet.publicKey,
-              fromAddress: wallet.publicKey,
-              toAddress: mainWalletKeypair.publicKey.toBase58(),
-              solAmount: lamports / 1_000_000_000,
-            })
-            .then((r) => r.id)
-            .catch(() => null)
-        : null;
-      const signature = await sendAndConfirmTransaction(
-        connection,
-        transferTx,
-        reclaimMode === "main-sponsored"
-          ? [mainWalletKeypair, owner]
-          : [owner],
-        {
-          commitment: "confirmed",
-        }
-      );
-      if (returnTrackId) await appTransactionService.confirm(returnTrackId, { signature }).catch(() => {});
-      await testRunLogService.appendServerEvent({
-        eventType: "wallet_transaction",
-        source: "holding.service",
-        action: "holding.returnSolToMainWallet",
-        wallets: [wallet.publicKey, mainWalletKeypair.publicKey.toBase58()],
-        signature,
-        status: "submitted",
-        expectedValue: {
-          recoverableLamports: lamports,
-          reclaimMode,
-        },
-        actualValue: {
-          walletPublicKey: wallet.publicKey,
-          recoveredLamports: lamports,
-        },
-      });
-
-      return {
-        walletPublicKey: wallet.publicKey,
-        status: "RECOVERED",
-        recoveredLamports: lamports,
-      };
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error);
-      return {
-        walletPublicKey: wallet.publicKey,
-        status: "FAILED",
-        recoveredLamports: 0,
-        error: message,
-      };
-    }
-  });
-
-  const recovered = results.filter((result) => result.status === "RECOVERED");
-  const failed = results.filter((result) => result.status === "FAILED");
-  const totalLamports = recovered.reduce(
-    (sum, result) => sum + result.recoveredLamports,
-    0
-  );
-  return {
-    recovered: recovered.length,
-    failed: failed.length,
-    totalLamports,
-    totalSol: totalLamports / 1_000_000_000,
-    results,
-  };
-}
-
-async function sweepSystemDevRealizedSol(
-  connection: Connection,
-  sellSignature: string,
-  systemDevKeypair: Keypair,
-  mainWalletKeypair: Keypair
-) {
-  let tx: Awaited<ReturnType<Connection["getTransaction"]>> = null;
-  for (let attempt = 0; attempt < 5; attempt++) {
-    tx = await connection.getTransaction(sellSignature, {
-      commitment: "confirmed",
-      maxSupportedTransactionVersion: 0,
-    });
-    if (tx) break;
-    await new Promise((r) => setTimeout(r, 1000));
-  }
-  if (!tx?.meta) return;
-
-  const accountKeys = tx.transaction.message.getAccountKeys();
-  const sellerIndex = accountKeys.staticAccountKeys.findIndex(
-    (key) => key.toBase58() === systemDevKeypair.publicKey.toBase58()
-  );
-  if (sellerIndex < 0) return;
-
-  const preLamports = tx.meta.preBalances[sellerIndex] ?? 0;
-  const postLamports = tx.meta.postBalances[sellerIndex] ?? 0;
-  const realizedLamports = postLamports - preLamports;
-  if (realizedLamports <= 0) return;
-
-  const transferFeeLamports = 5000;
-  const sweepLamports = realizedLamports - transferFeeLamports;
-  if (sweepLamports <= 0) return;
-
-  const sweepTx = new Transaction().add(
-    SystemProgram.transfer({
-      fromPubkey: systemDevKeypair.publicKey,
-      toPubkey: mainWalletKeypair.publicKey,
-      lamports: sweepLamports,
-    })
-  );
-  const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash("confirmed");
-  sweepTx.recentBlockhash = blockhash;
-  sweepTx.lastValidBlockHeight = lastValidBlockHeight;
-  sweepTx.feePayer = systemDevKeypair.publicKey;
-  await sendAndConfirmTransaction(connection, sweepTx, [systemDevKeypair], {
-    commitment: "confirmed",
-  });
 }
 
 type BalanceResult = {
@@ -967,12 +722,14 @@ export const holdingService = {
       throw new AppError("No valid wallets selected", 400);
     }
 
-    const hasSystemDevWallet = wallets.some((w) => w.isSystemWallet);
     const connection = getSolanaConnection();
     const mintPublicKey = new PublicKey(token.publicKey);
     const sellPercentage = Math.floor(input.sellPercentage);
     const shouldCloseAta = Boolean(input.closeAta);
-    const shouldReturnSolToMainWallet = hasSystemDevWallet || Boolean(input.returnSolToMainWallet);
+    const shouldReturnSolToMainWallet = resolveReturnSolToMainWallet(
+      wallets,
+      Boolean(input.returnSolToMainWallet)
+    );
     const mainWalletRecord = await prisma.user.findUnique({
       where: { id: userId },
       select: {
@@ -1105,10 +862,17 @@ export const holdingService = {
           if (wallet.isSystemWallet && mainWalletKeypair) {
             try {
               await sweepSystemDevRealizedSol(
-                connection,
-                signature,
-                seller,
-                mainWalletKeypair
+                {
+                  connection,
+                  sellSignature: signature,
+                  systemDevKeypair: seller,
+                  mainWalletKeypair,
+                  source: "HOLDING",
+                  logSource: "holding.service",
+                  logAction: "holding.sweepSystemDevRealizedSol",
+                  userId,
+                  tokenPublicKey: token.publicKey,
+                }
               );
             } catch (sweepError) {
               console.error(
@@ -1245,7 +1009,17 @@ export const holdingService = {
 
     const solRecovery =
       shouldReturnSolToMainWallet && mainWalletKeypair
-        ? await returnSolToMainWallet(connection, wallets, mainWalletKeypair, userId, input.tokenPublicKey)
+        ? await recoverWalletSolBalances({
+            connection,
+            wallets,
+            mainWalletKeypair,
+            source: "HOLDING",
+            logSource: "holding.service",
+            logAction: "holding.returnSolToMainWallet",
+            preserveRentExemptMinimum: true,
+            userId,
+            tokenPublicKey: input.tokenPublicKey,
+          })
         : null;
 
     const refreshWalletPublicKeys = Array.from(
@@ -1315,6 +1089,7 @@ export const holdingService = {
 
     return {
       tokenPublicKey: token.publicKey,
+      effectiveReturnSolToMainWallet: shouldReturnSolToMainWallet,
       submitted: submitted.length,
       failed: failed.length,
       results,
