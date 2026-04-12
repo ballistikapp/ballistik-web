@@ -12,8 +12,8 @@ import { buildAuthRedirectPath } from "@/lib/utils/auth-redirect";
 export const dynamic = "force-dynamic";
 export const metadata: Metadata = {
   title: {
-    default: "BALLISTIK",
-    template: "%s | BALLISTIK",
+    default: "Ballistik",
+    template: "%s | Ballistik",
   },
 };
 

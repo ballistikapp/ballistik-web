@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import Image from "next/image";
-import { IconBrandTelegram } from "@tabler/icons-react";
+import { IconBrandTelegram, IconBrandX } from "@tabler/icons-react";
 import { motion } from "motion/react";
 import {
   ArrowRightIcon,
@@ -13,7 +13,21 @@ import { Spotlight } from "@/components/ui/spotlight";
 import { ContainerScroll } from "@/components/ui/container-scroll-animation";
 import { HoverBorderGradient } from "@/components/ui/hover-border-gradient";
 import FeaturesGrid from "@/components/landing-page/features-grid";
-import { BALLISTIK_TELEGRAM_URL } from "@/lib/config/external-links";
+import {
+  BALLISTIK_TELEGRAM_URL,
+  BALLISTIK_X_URL,
+} from "@/lib/config/external-links";
+import {
+  BRAND_WORDMARK_CLASSNAME,
+  SITE_BRAND_NAME,
+} from "@/lib/config/site.config";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { LANDING_FAQ_ITEMS } from "@/lib/config/landing-faq";
 
 export function LandingPage() {
   return (
@@ -23,12 +37,12 @@ export function LandingPage() {
       </div>
       <header className="mx-auto flex w-full items-center justify-between p-6 md:px-12 py-8">
         <motion.p
-          className="text-2xl md:text-3xl font-bold text-foreground"
+          className={`text-2xl md:text-3xl font-bold text-foreground ${BRAND_WORDMARK_CLASSNAME}`}
           initial={{ opacity: 0, y: -16 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.8, ease: "easeInOut" }}
         >
-          BALLISTIK
+          {SITE_BRAND_NAME}
         </motion.p>
         <motion.div
           initial={{ opacity: 0, y: -16 }}
@@ -70,8 +84,8 @@ export function LandingPage() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 1.2, ease: "easeInOut", delay: 0.9 }}
                 >
-                  Jito-powered token launch, automated volume bots, and full
-                  wallet control.
+                  Solana pump.fun launches with Jito bundles, volume bots, and
+                  full wallet control. Free to start; Pro adds premium limits.
                 </motion.p>
                 <motion.div
                   initial={{ opacity: 0, y: 16 }}
@@ -95,7 +109,7 @@ export function LandingPage() {
           >
             <Image
               src="/ballistik-dashboard.png"
-              alt="hero"
+              alt="Ballistik dashboard preview"
               height={720}
               width={1400}
               className="block w-full h-auto"
@@ -412,12 +426,71 @@ export function LandingPage() {
             platform fees on supported flows.
           </motion.p>
         </section>
+
+        <section
+          id="faq"
+          className="flex flex-col gap-10 w-full py-20 md:py-32 px-4 md:px-6"
+        >
+          <motion.h2
+            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            Common questions.
+          </motion.h2>
+          <motion.p
+            className="text-center text-neutral-500 text-lg -mt-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+          >
+            Straight answers about plans, fees, and how {SITE_BRAND_NAME}{" "}
+            works.
+          </motion.p>
+          <div className="h-10" />
+          <motion.div
+            className="mx-auto w-full max-w-3xl overflow-hidden rounded-2xl border border-neutral-800 bg-neutral-950/60"
+            initial={{ opacity: 0, y: 40 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.35 }}
+          >
+            <Accordion
+              type="single"
+              collapsible
+              defaultValue="faq-0"
+              className="w-full"
+            >
+              {LANDING_FAQ_ITEMS.map((item, index) => (
+                <AccordionItem
+                  key={item.question}
+                  value={`faq-${index}`}
+                  className="border-neutral-800/80 px-0"
+                >
+                  <AccordionTrigger className="gap-3 px-6 py-5 text-left text-lg font-semibold text-neutral-100 hover:no-underline md:px-8 md:py-6 **:data-[slot=accordion-trigger-icon]:text-neutral-500">
+                    {item.question}
+                  </AccordionTrigger>
+                  <AccordionContent className="px-6 text-neutral-400 md:px-8">
+                    <p className="pb-5 text-sm leading-relaxed md:pb-6">
+                      {item.answer}
+                    </p>
+                  </AccordionContent>
+                </AccordionItem>
+              ))}
+            </Accordion>
+          </motion.div>
+        </section>
       </main>
 
       <footer className="mt-20 border-t border-neutral-800 px-6 md:px-12 py-20 ">
         <div className="flex flex-col items-center gap-4 md:grid md:grid-cols-[1fr_auto_1fr] md:items-center">
-          <p className="text-2xl font-bold text-foreground tracking-wide md:justify-self-start">
-            BALLISTIK
+          <p
+            className={`text-2xl font-bold text-foreground md:justify-self-start ${BRAND_WORDMARK_CLASSNAME}`}
+          >
+            {SITE_BRAND_NAME}
           </p>
           <div className="flex items-center justify-center gap-6 text-xs text-neutral-500 md:justify-self-center">
             <Link
@@ -433,6 +506,12 @@ export function LandingPage() {
               Pricing
             </Link>
             <Link
+              href="#faq"
+              className="hover:text-neutral-300 transition-colors"
+            >
+              FAQ
+            </Link>
+            <Link
               href="/auth"
               className="inline-flex items-center gap-1 hover:text-neutral-300 transition-colors"
             >
@@ -440,16 +519,28 @@ export function LandingPage() {
               <ArrowRightIcon className="size-3.5" />
             </Link>
           </div>
-          <Link
-            href={BALLISTIK_TELEGRAM_URL}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center justify-center gap-1 text-xs text-neutral-500 hover:text-neutral-300 transition-colors md:justify-self-end"
-          >
-            <IconBrandTelegram className="size-3.5" />
-            <span>Telegram</span>
-            <ArrowUpRightIcon className="size-3.5" />
-          </Link>
+          <div className="flex flex-wrap items-center justify-center gap-4 text-xs text-neutral-500 md:justify-self-end md:gap-6">
+            <Link
+              href={BALLISTIK_TELEGRAM_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1 hover:text-neutral-300 transition-colors"
+            >
+              <IconBrandTelegram className="size-3.5" />
+              <span>Telegram</span>
+              <ArrowUpRightIcon className="size-3.5" />
+            </Link>
+            <Link
+              href={BALLISTIK_X_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center justify-center gap-1 hover:text-neutral-300 transition-colors"
+            >
+              <IconBrandX className="size-3.5" />
+              <span>X</span>
+              <ArrowUpRightIcon className="size-3.5" />
+            </Link>
+          </div>
         </div>
       </footer>
     </div>

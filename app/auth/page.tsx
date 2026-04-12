@@ -33,6 +33,10 @@ import {
   FieldLabel,
   FieldDescription,
 } from "@/components/ui/field";
+import {
+  BRAND_WORDMARK_CLASSNAME,
+  SITE_BRAND_NAME,
+} from "@/lib/config/site.config";
 import { Spinner } from "@/components/ui/spinner";
 import { useSearchParams } from "next/navigation";
 import { getSafeRedirectPath } from "@/lib/utils/auth-redirect";
@@ -416,7 +420,11 @@ export default function AuthPage() {
   return (
     <div className="min-h-screen flex items-center justify-center p-4 lg:p-8">
       <div className="w-full max-w-[460px]">
-        <h1 className="text-center text-5xl font-bold mb-12">BALLISTIK</h1>
+        <h1
+          className={`text-center text-5xl font-bold mb-12 ${BRAND_WORDMARK_CLASSNAME}`}
+        >
+          {SITE_BRAND_NAME}
+        </h1>
 
         <div className="rounded-lg border bg-card shadow-sm">
           <div className="border-b">

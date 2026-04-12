@@ -5,6 +5,7 @@ import {
   type Icon,
   IconArrowsRightLeft,
   IconBrandTelegram,
+  IconBrandX,
   IconCoins,
   IconExternalLink,
   IconHistory,
@@ -29,7 +30,10 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { BALLISTIK_TELEGRAM_URL } from "@/lib/config/external-links";
+import {
+  BALLISTIK_TELEGRAM_URL,
+  BALLISTIK_X_URL,
+} from "@/lib/config/external-links";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
@@ -110,6 +114,13 @@ export const helpRoutes: NavMainItem[] = [
     title: "Telegram",
     url: BALLISTIK_TELEGRAM_URL,
     icon: IconBrandTelegram,
+    scope: "global",
+    external: true,
+  },
+  {
+    title: "X",
+    url: BALLISTIK_X_URL,
+    icon: IconBrandX,
     scope: "global",
     external: true,
   },

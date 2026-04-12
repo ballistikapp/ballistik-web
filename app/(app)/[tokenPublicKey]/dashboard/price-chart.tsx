@@ -32,6 +32,8 @@ interface PriceChartProps {
   isComplete: boolean;
   priceHistory: PricePoint[];
   currentPriceSol: number;
+  /** When set, replaces the default DexScreener / bonding-curve subtitle */
+  chartDescription?: string;
 }
 
 function useIsDarkMode(): boolean {
@@ -256,6 +258,7 @@ export function PriceChart({
   isComplete,
   priceHistory,
   currentPriceSol,
+  chartDescription,
 }: PriceChartProps) {
   const isDark = useIsDarkMode();
 
@@ -273,9 +276,10 @@ export function PriceChart({
               )}
             </CardTitle>
             <CardDescription>
-              {isComplete
-                ? "Live chart powered by DexScreener"
-                : "Price in SOL from bonding curve transactions"}
+              {chartDescription ??
+                (isComplete
+                  ? "Live chart powered by DexScreener"
+                  : "Price in SOL from bonding curve transactions")}
             </CardDescription>
           </div>
         </div>

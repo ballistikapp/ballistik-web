@@ -45,6 +45,7 @@ This directory contains detailed implementation documentation for all features i
 
 ### System Configuration
 
+- [SEO / public metadata](./seo-public-metadata.md) — canonical URL, `NEXT_PUBLIC_SITE_URL`, landing metadata, FAQ copy and `FAQPage` JSON-LD
 - [Config Implementation](./config-implementation.md) — configuration and env parsing
 - [Logging Implementation](./logging-implementation.md) — structured logging setup
 - [API Abuse Protection](./api-abuse-protection.md) — request identity, rate-limit tiers, and endpoint hardening
