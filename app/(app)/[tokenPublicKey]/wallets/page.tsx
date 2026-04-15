@@ -13,6 +13,7 @@ import {
 } from "@tabler/icons-react";
 import Link from "next/link";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { copyToClipboard } from "@/lib/utils";
@@ -266,6 +267,7 @@ export default function Page() {
             }),
           ]);
         }
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
         if (toastId) {
           if (refreshed.length > 0) {
             const parts: string[] = [];

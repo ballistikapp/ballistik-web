@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "./dashboard-loading";
 import { DashboardHeader } from "./dashboard-header";
@@ -100,6 +101,8 @@ export function DashboardClient() {
     { publicKey: tokenPublicKey || "" },
     { enabled: !!tokenPublicKey }
   );
+
+  const utils = trpc.useUtils();
 
   const grpcStatusQuery = trpc.dashboard.getGrpcStatus.useQuery(undefined, {
     enabled: !!tokenPublicKey,
@@ -308,6 +311,7 @@ export function DashboardClient() {
           },
           { trigger: `monitoring-holdings:${source}` }
         );
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
       } catch (error) {
         logDashboardEvent({
           eventType: "run_issue",
@@ -333,6 +337,7 @@ export function DashboardClient() {
       monitoringRefreshHoldings,
       refetchStats,
       tokenPublicKey,
+      utils,
     ]
   );
 
@@ -546,6 +551,7 @@ export function DashboardClient() {
         hasFailure = results.some((result) => result.status === "rejected");
       } finally {
         rereadDashboardData();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
         logDashboardEvent({
           eventType: "dashboard_refresh",
           action,
@@ -565,6 +571,7 @@ export function DashboardClient() {
       refreshHoldings,
       refreshTransactions,
       rereadDashboardData,
+      utils,
     ]
   );
 

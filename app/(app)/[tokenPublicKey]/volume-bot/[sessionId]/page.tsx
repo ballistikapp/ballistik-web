@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -98,6 +99,7 @@ export default function VolumeBotRunPage() {
   const stopMutation = trpc.volumeBot.stop.useMutation({
     onSuccess: () => {
       toast.success("Stop requested");
+      invalidateTokenSidebarCounts(utils, tokenPublicKey);
       refetch();
     },
     onError: (error) => {
@@ -185,10 +187,11 @@ export default function VolumeBotRunPage() {
     if (prevIsActiveRef.current && !isActive) {
       refreshMainBalance.mutateAsync({}).then(() => {
         utils.wallet.getMain.invalidate();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
       });
     }
     prevIsActiveRef.current = isActive;
-  }, [isActive, refreshMainBalance, utils.wallet.getMain]);
+  }, [isActive, refreshMainBalance, tokenPublicKey, utils]);
 
   const baseRuntime = session?.runtimeSeconds ?? 0;
   const runtimeSeconds = baseRuntime + (isActive ? elapsedSeconds : 0);

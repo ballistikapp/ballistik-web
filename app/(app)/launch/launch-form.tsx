@@ -66,6 +66,7 @@ import { LaunchOverviewDialog } from "@/app/(app)/launch/launch-overview-dialog"
 import { LaunchProgressDialog } from "@/app/(app)/launch/launch-progress-dialog";
 import { useRouter } from "next/navigation";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import {
   bundleBuyFeeSol,
   calculateLaunchUsageFees,
@@ -339,10 +340,14 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       });
       setLaunchNotified(true);
       if (launch.tokenPublicKey) {
-        void refreshWalletBalancesMutation.mutateAsync({
-          tokenPublicKey: launch.tokenPublicKey,
-          force: true,
-        });
+        void refreshWalletBalancesMutation
+          .mutateAsync({
+            tokenPublicKey: launch.tokenPublicKey,
+            force: true,
+          })
+          .finally(() => {
+            invalidateTokenSidebarCounts(utils, launch.tokenPublicKey);
+          });
       }
       utils.wallet.getMain.invalidate();
       router.refresh();
@@ -372,7 +377,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     launchStatusQuery.data,
     refreshWalletBalancesMutation,
     router,
-    utils.wallet.getMain,
+    utils,
   ]);
 
   const clearActiveLaunch = React.useCallback(() => {

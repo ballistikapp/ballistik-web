@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -175,6 +176,7 @@ export function WalletTransferDialog({
       });
       utils.wallet.getOperationalByToken.invalidate();
       utils.wallet.getDevByToken.invalidate();
+      invalidateTokenSidebarCounts(utils, tokenPublicKey);
       onSuccess?.();
     } catch (error) {
       const message =

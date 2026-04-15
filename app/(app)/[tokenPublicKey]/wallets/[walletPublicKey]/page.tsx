@@ -12,6 +12,7 @@ import {
   IconRefresh,
 } from "@tabler/icons-react";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { copyToClipboard } from "@/lib/utils";
@@ -207,6 +208,7 @@ export default function WalletPage() {
           };
         });
         await refetchWallet();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
         toast.success("Wallet balance refreshed", { id: toastId, icon: null });
       } else if (result.skippedCooldown.length > 0) {
         toast.info(getCooldownMessage(), { id: toastId, icon: null });
@@ -237,6 +239,7 @@ export default function WalletPage() {
         walletPublicKeys: [walletPublicKey],
       });
       await utils.holding.listByToken.invalidate();
+      invalidateTokenSidebarCounts(utils, tokenPublicKey);
       toast.success("Holdings refreshed", { id: toastId, icon: null });
     } catch {
       toast.error("Failed to refresh holdings", { id: toastId, icon: null });

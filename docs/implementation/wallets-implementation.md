@@ -58,6 +58,8 @@ tRPC procedures:
 - `wallet.getPrivateKey` fetches a wallet private key on-demand after access checks.
 - `wallet.refreshBalances` refreshes balances via server-side RPC with a 5s debounce.
 - `wallet.refreshBalances` accepts optional `force` to bypass debounce for immediate post-transaction refreshes.
+
+After balance refresh or token-scoped SOL send/return flows that can change sidebar badge inputs, the client calls `invalidateTokenSidebarCounts` (see `@/lib/trpc/invalidate-token-sidebar-counts` and `docs/implementation/holdings-implementation.md` — Sidebar badge cache).
 - `wallet.refreshBalances` returns structured outcomes for manual UX:
   - `refreshed`
   - `skippedCooldown`

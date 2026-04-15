@@ -37,6 +37,10 @@ The `refreshByToken` service is optimized for speed:
    - If duplicate `Holding` rows already exist for the same `(walletPublicKey, tokenPublicKey)`, refresh keeps one canonical row and deletes the extras.
 6. The mutation touches refresh cache state; client invalidates `holding.listByToken` and refetches.
 
+## Sidebar badge cache (`token.getSidebarCounts`)
+
+The app shell sidebar shows badges (holdings / wallets with balance / active volume-bot sessions) from `token.getSidebarCounts`. After any flow that mutates **holdings**, **token-scoped wallet SOL** used in those counts, or **volume-bot session** status for a mint, the client must call `invalidateTokenSidebarCounts` from `@/lib/trpc/invalidate-token-sidebar-counts` with that mint and `trpc.useUtils()` so React Query refetches the procedure. Holdings refresh, sell, exit completion, dashboard refresh/monitoring holdings refresh, and related wallet balance updates are wired accordingly; new features touching the same DB surfaces should follow the same pattern.
+
 ## Sell Flow
 
 1. User selects holdings rows and opens the Sell dialog.

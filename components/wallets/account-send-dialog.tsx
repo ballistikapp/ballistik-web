@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -216,6 +217,7 @@ export function AccountSendDialog({
       utils.wallet.getDevByToken.invalidate({
         tokenPublicKey: selectedTokenPk,
       });
+      invalidateTokenSidebarCounts(utils, selectedTokenPk);
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to submit transfer";

@@ -8,6 +8,7 @@ import { toast } from "sonner";
 import { IconRefresh } from "@tabler/icons-react";
 import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
@@ -185,14 +186,13 @@ export default function Page() {
         utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
         utils.wallet.getDevByToken.invalidate({ tokenPublicKey }),
       ]);
+      invalidateTokenSidebarCounts(utils, tokenPublicKey);
     },
     [
       refreshMainBalance,
       refreshWalletBalances,
       tokenPublicKey,
-      utils.wallet.getDevByToken,
-      utils.wallet.getMain,
-      utils.wallet.getOperationalByToken,
+      utils,
     ]
   );
 
@@ -226,6 +226,7 @@ export default function Page() {
       try {
         await refreshHoldings({ tokenPublicKey });
         void utils.holding.listByToken.invalidate();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
         const latestHoldings = await utils.holding.listByToken.fetch({
           tokenPublicKey,
           page: pagination.pageIndex + 1,
@@ -263,7 +264,7 @@ export default function Page() {
       refetchRefreshCache,
       refreshHoldings,
       tokenPublicKey,
-      utils.holding.listByToken,
+      utils,
     ]
   );
 

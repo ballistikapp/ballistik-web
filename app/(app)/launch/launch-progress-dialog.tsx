@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { copyToClipboard } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -106,6 +107,7 @@ export function LaunchProgressDialog({
           utils.dashboard.getDefiPools.invalidate({ tokenPublicKey }),
           utils.token.getByPublicKey.invalidate({ publicKey: tokenPublicKey }),
         ]);
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
         router.push(`/${tokenPublicKey}/dashboard`);
       } finally {
         setPreparingDashboard(false);

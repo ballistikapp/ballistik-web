@@ -34,6 +34,10 @@ Previously, each range had a `probability` field (0-1) that acted as an executio
 
 The `probability` field was redundant with interval control. A range with interval 10-20s and probability 0.5 behaves nearly identically to interval 20-40s with probability 1.0. Removing probability simplifies configuration, estimation formulas, and the user's mental model.
 
+## Sidebar badge cache
+
+Starting or stopping a session changes `activeVolumeBotSessions` in `token.getSidebarCounts`. After successful start/stop (and when a session transitions to inactive on the run page), the client calls `invalidateTokenSidebarCounts` from `@/lib/trpc/invalidate-token-sidebar-counts` so sidebar badges refetch.
+
 ## Architecture Summary
 
 - UI and tRPC run in the web service.

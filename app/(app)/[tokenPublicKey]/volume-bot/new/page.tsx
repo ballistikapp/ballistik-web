@@ -5,6 +5,7 @@ import { useRouter, useParams } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -902,6 +903,7 @@ export default function VolumeBotStartPage() {
       force: true,
     });
     utils.wallet.getMain.invalidate();
+    invalidateTokenSidebarCounts(utils, tokenPublicKey);
     router.push(`/${tokenPublicKey}/volume-bot/${result.sessionId}`);
   };
 

@@ -5,6 +5,7 @@ import { toast } from "sonner";
 import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { trpc } from "@/lib/trpc/client";
+import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -108,6 +109,7 @@ export function TokenReclaimDialog({
           ? utils.wallet.getDevByToken.invalidate({ tokenPublicKey })
           : Promise.resolve(),
       ]);
+      invalidateTokenSidebarCounts(utils, tokenPublicKey);
       const returnedCount = result.results.filter(
         (item) => item.status === "returned"
       ).length;
