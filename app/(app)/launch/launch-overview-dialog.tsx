@@ -44,6 +44,7 @@ interface LaunchOverviewDialogProps {
     bundleBuyEnabled: boolean;
     vanityMint: boolean;
     removeAttribution: boolean;
+    mayhemMode: boolean;
     bundlerWalletCount: number;
     bundlerBuyAmountSol: number;
     bundlerBuyVariancePercent: number;
@@ -76,6 +77,7 @@ export function LaunchOverviewDialog({
       bundleBuyEnabled: launchInput.bundleBuyEnabled,
       vanityMint: launchInput.vanityMint,
       removeAttribution: launchInput.removeAttribution,
+      mayhemMode: launchInput.mayhemMode,
       bundlerWalletCount: launchInput.bundlerWalletCount,
       bundlerBuyAmountSol: launchInput.bundlerBuyAmountSol,
       bundlerBuyVariancePercent: launchInput.bundlerBuyVariancePercent,
@@ -314,6 +316,14 @@ export function LaunchOverviewDialog({
                     {launchInput.removeAttribution
                       ? "Removed (+0.1 SOL)"
                       : "Included by default"}
+                  </span>
+                </div>
+                <div className="grid grid-cols-[140px_1fr] gap-2">
+                  <span className="text-muted-foreground">Mayhem</span>
+                  <span>
+                    {launchInput.mayhemMode
+                      ? "Enabled (create v2)"
+                      : "Off (create v2, standard)"}
                   </span>
                 </div>
               </div>

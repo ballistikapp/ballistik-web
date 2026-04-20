@@ -52,7 +52,7 @@ The app shell sidebar shows badges (holdings / wallets with balance / active vol
    - `getLatestBlockhash` uses `rpcConfig.tuning.rpcTimeoutMs` (30s default)
    - `sendAndConfirmTransaction` uses `rpcConfig.tuning.confirmTimeoutMs` (120s default)
 7. If close ATA is enabled, the service closes empty associated token accounts after selling.
-8. If return SOL is enabled, the service returns the maximum available SOL from processed wallets to the main wallet. It tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
+8. If return SOL is enabled, the service runs batch SOL recovery (`recoverWalletSolBalances`) for **non-system** processed wallets only: maximum available SOL to the main wallet, main as fee payer when possible, otherwise source-funded. Wallets with `isSystemWallet` (shared system dev) are excluded from that batch so operational SOL is not swept; when the seller is the system dev, sell proceeds are moved separately via `sweepSystemDevRealizedSol` (net change from the sell transaction, correct balance indices for legacy and v0 txs, capped so a configured operational reserve remains on the system dev).
 9. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
 
 ## UI Behavior

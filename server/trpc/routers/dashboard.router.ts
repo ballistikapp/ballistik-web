@@ -37,6 +37,8 @@ export const dashboardRouter = router({
       accessMode: access.accessMode,
       connected: status.connected,
       lastError: status.lastError,
+      lastErrorDiagnostics: status.lastErrorDiagnostics,
+      tokenEnv: status.tokenEnv,
       monitoringPipelineV2: MONITORING_PIPELINE_V2,
       endpointType: status.endpointType,
       subscriptionCount: status.subscriptionCount,

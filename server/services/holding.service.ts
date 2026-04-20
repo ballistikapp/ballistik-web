@@ -23,7 +23,10 @@ import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
-import { buildSellTransaction } from "@/server/solana/pump-new-idl";
+import {
+  buildSellTransaction,
+  getTokenProgramIdForPumpMint,
+} from "@/server/solana/pump-new-idl";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import {
   recoverWalletSolBalances,
@@ -272,8 +275,19 @@ async function getTokenBalanceForWallet(
 ) {
   try {
     const owner = new PublicKey(walletPublicKey);
-    const ata = await getAssociatedTokenAddress(mintPublicKey, owner);
-    const account = await getAccount(connection, ata);
+    const tokenProgramId = await getTokenProgramIdForPumpMint(mintPublicKey);
+    const ata = await getAssociatedTokenAddress(
+      mintPublicKey,
+      owner,
+      false,
+      tokenProgramId
+    );
+    const account = await getAccount(
+      connection,
+      ata,
+      "confirmed",
+      tokenProgramId
+    );
     return account.amount;
   } catch (error) {
     if (
@@ -337,10 +351,20 @@ async function fetchBalancesViaRpc(
       }
     )?.parsed?.info?.decimals ?? 9;
 
+  const tokenProgramId = mintInfo.value?.owner;
+  if (!tokenProgramId) {
+    throw new AppError("Mint account not found", 404);
+  }
+
   const atas = await Promise.all(
     wallets.map(async (wallet) => ({
       wallet,
-      ata: await getAssociatedTokenAddress(mintPubkey, new PublicKey(wallet.publicKey)),
+      ata: await getAssociatedTokenAddress(
+        mintPubkey,
+        new PublicKey(wallet.publicKey),
+        false,
+        tokenProgramId
+      ),
     }))
   );
 
@@ -744,6 +768,9 @@ export const holdingService = {
         )
       : null;
 
+    const tokenProgramIdForAta =
+      await getTokenProgramIdForPumpMint(mintPublicKey);
+
     const results = await mapWithConcurrency(
       wallets,
       rpcConfig.tuning.sellConcurrency,
@@ -913,7 +940,9 @@ export const holdingService = {
             const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
             const ata = await getAssociatedTokenAddress(
               mintPublicKey,
-              owner.publicKey
+              owner.publicKey,
+              false,
+              tokenProgramIdForAta
             );
             const feePayer =
               mainWalletKeypair &&
@@ -924,7 +953,12 @@ export const holdingService = {
             const destination = mainWalletKeypair?.publicKey ?? owner.publicKey;
             let account;
             try {
-              account = await getAccount(connection, ata);
+              account = await getAccount(
+                connection,
+                ata,
+                "confirmed",
+                tokenProgramIdForAta
+              );
             } catch (error) {
               if (
                 error instanceof Error &&
@@ -950,7 +984,13 @@ export const holdingService = {
             }
 
             const closeTx = new Transaction().add(
-              createCloseAccountInstruction(ata, destination, owner.publicKey)
+              createCloseAccountInstruction(
+                ata,
+                destination,
+                owner.publicKey,
+                [],
+                tokenProgramIdForAta
+              )
             );
             const { blockhash, lastValidBlockHeight } =
               await connection.getLatestBlockhash("confirmed");

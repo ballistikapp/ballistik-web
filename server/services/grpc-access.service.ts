@@ -23,7 +23,7 @@ const FREE_VOLUME_BOT_MIN_INTERVAL_SECONDS = 5;
 
 function resolveInfraState() {
   const { SHYFT_GRPC_TOKEN, GRPC_ACCESS_MODE } = getEnv();
-  const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN);
+  const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN?.trim());
   const globallyEnabled = GRPC_ACCESS_MODE !== "off";
 
   return {

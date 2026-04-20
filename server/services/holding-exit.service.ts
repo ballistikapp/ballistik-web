@@ -7,7 +7,10 @@ import { mapWithConcurrency } from "@/lib/utils/async";
 import { walletService } from "@/server/services/wallet.service";
 import { persistHoldingExitLog } from "@/server/services/log-persistence.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
-import { buildSellTransaction } from "@/server/solana/pump-new-idl";
+import {
+  buildSellTransaction,
+  getTokenProgramIdForPumpMint,
+} from "@/server/solana/pump-new-idl";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
 import {
   Keypair,
@@ -229,11 +232,17 @@ async function getTokenBalancesForWallets(
   mint: PublicKey
 ) {
   const connection = getSolanaConnection();
+  const tokenProgramId = await getTokenProgramIdForPumpMint(mint);
 
   const atas = await Promise.all(
     wallets.map(async (wallet) => ({
       wallet,
-      ata: await getAssociatedTokenAddress(mint, new PublicKey(wallet.publicKey)),
+      ata: await getAssociatedTokenAddress(
+        mint,
+        new PublicKey(wallet.publicKey),
+        false,
+        tokenProgramId
+      ),
     }))
   );
 
@@ -420,12 +429,18 @@ async function buildExitBundleTransactions({
 }) {
   const sellerKeypair = Keypair.fromSecretKey(bs58.decode(seller.privateKey));
   const sellerPublicKey = sellerKeypair.publicKey;
-  const sellerAta = await getAssociatedTokenAddress(mint, sellerPublicKey);
   const connection = getSolanaConnection();
+  const tokenProgramId = await getTokenProgramIdForPumpMint(mint);
+  const sellerAta = await getAssociatedTokenAddress(
+    mint,
+    sellerPublicKey,
+    false,
+    tokenProgramId
+  );
 
   let sellerAtaExists = true;
   try {
-    await getAccount(connection, sellerAta);
+    await getAccount(connection, sellerAta, "confirmed", tokenProgramId);
   } catch (error) {
     if (
       error instanceof Error &&
@@ -457,7 +472,8 @@ async function buildExitBundleTransactions({
           mainWallet.publicKey,
           sellerAta,
           sellerPublicKey,
-          mint
+          mint,
+          tokenProgramId
         )
       );
     }
@@ -469,7 +485,9 @@ async function buildExitBundleTransactions({
       );
       const senderAta = await getAssociatedTokenAddress(
         mint,
-        senderKeypair.publicKey
+        senderKeypair.publicKey,
+        false,
+        tokenProgramId
       );
       tx.add(
         createTransferCheckedInstruction(
@@ -478,7 +496,9 @@ async function buildExitBundleTransactions({
           sellerAta,
           senderKeypair.publicKey,
           entry.balance,
-          decimals
+          decimals,
+          [],
+          tokenProgramId
         )
       );
       transferSigners.push(senderKeypair);
@@ -502,7 +522,8 @@ async function buildExitBundleTransactions({
         mainWallet.publicKey,
         sellerAta,
         sellerPublicKey,
-        mint
+        mint,
+        tokenProgramId
       )
     );
   }
@@ -540,6 +561,7 @@ async function closeAtasAndRecoverSol({
   tokenPublicKey?: string;
 }) {
   const connection = getSolanaConnection();
+  const tokenProgramId = await getTokenProgramIdForPumpMint(mint);
   const cleanupWallets = wallets.filter(
     (wallet) => wallet.publicKey !== mainWallet.publicKey.toBase58()
   );
@@ -559,7 +581,12 @@ async function closeAtasAndRecoverSol({
       }
 
       const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-      const ata = await getAssociatedTokenAddress(mint, owner.publicKey);
+      const ata = await getAssociatedTokenAddress(
+        mint,
+        owner.publicKey,
+        false,
+        tokenProgramId
+      );
       let ataClosed = false;
       const solRecoveredLamports = 0;
       const errors: string[] = [];
@@ -568,7 +595,12 @@ async function closeAtasAndRecoverSol({
         let accountBalance = BigInt(0);
         let ataExists = true;
         try {
-          const account = await getAccount(connection, ata);
+          const account = await getAccount(
+            connection,
+            ata,
+            "confirmed",
+            tokenProgramId
+          );
           accountBalance = account.amount;
         } catch (error) {
           if (
@@ -593,7 +625,9 @@ async function closeAtasAndRecoverSol({
               createCloseAccountInstruction(
                 ata,
                 mainWallet.publicKey,
-                owner.publicKey
+                owner.publicKey,
+                [],
+                tokenProgramId
               )
             );
             const latestBlockhash = await connection.getLatestBlockhash(

@@ -34,7 +34,7 @@ The system dev wallet is excluded from:
 
 The system dev wallet is included in:
 - Holdings, dashboard holdings, and transactions (token-position views)
-- Sell and exit flows (with forced SOL recovery to user's main wallet)
+- Sell and exit flows: sell **proceeds** are swept to the user main via `sweepSystemDevRealizedSol` (metadata-based delta, v0-safe account indexing, and a **minimum balance floor** — see `SYSTEM_DEV_OPERATIONAL_RESERVE_LAMPORTS` in `lib/config/system-dev-wallet.config.ts`). Generic batch SOL recovery still skips `isSystemWallet`.
 - Launch funding and cleanup
 
 Creator rewards are **not available** for tokens using the system dev wallet — the service returns `eligible: false` and the dashboard card is hidden.

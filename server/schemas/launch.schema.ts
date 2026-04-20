@@ -1,4 +1,27 @@
 import { z } from "zod";
+import { getLaunchConfig } from "@/lib/config/launch.config";
+
+function mayhemBundlerWalletRefine(
+  data: {
+    bundleBuyEnabled: boolean;
+    mayhemMode?: boolean;
+    bundlerWalletCount: number;
+  },
+  ctx: z.RefinementCtx
+) {
+  const { maxMayhemBundlerWallets } = getLaunchConfig();
+  if (
+    data.bundleBuyEnabled &&
+    data.mayhemMode &&
+    data.bundlerWalletCount > maxMayhemBundlerWallets
+  ) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: `Mayhem bundle allows at most ${maxMayhemBundlerWallets} bundler wallets (Solana limits how much fits in one Jito bundle). Turn off Mayhem mode or lower the count.`,
+      path: ["bundlerWalletCount"],
+    });
+  }
+}
 
 export const launchTokenSchema = z.object({
   tokenName: z
@@ -20,11 +43,15 @@ export const launchTokenSchema = z.object({
   website: z.string().optional(),
   devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
-  devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
+  devBuyAmountSol: z
+    .number()
+    .min(0.05, "Dev buy must be at least 0.05 SOL.")
+    .max(100, "Dev buy cannot exceed 100 SOL."),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
+  mayhemMode: z.boolean().optional().default(false),
   bundlerWalletCount: z
     .number()
     .int()
@@ -32,7 +59,7 @@ export const launchTokenSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -42,7 +69,7 @@ export const launchTokenSchema = z.object({
     .int()
     .min(1, "Distribution multiplier must be at least 1")
     .max(5, "Distribution multiplier must be 5 or less"),
-});
+}).superRefine(mayhemBundlerWalletRefine);
 
 export type DevWalletOption = LaunchTokenInput["devWalletOption"];
 
@@ -57,11 +84,15 @@ export const launchRetrySchema = z.object({
 export const launchPreviewCostsSchema = z.object({
   devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
   importedDevWalletKey: z.string().optional(),
-  devBuyAmountSol: z.number().positive("Dev buy amount must be greater than 0"),
+  devBuyAmountSol: z
+    .number()
+    .min(0.05, "Dev buy must be at least 0.05 SOL.")
+    .max(100, "Dev buy cannot exceed 100 SOL."),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
+  mayhemMode: z.boolean().optional().default(false),
   bundlerWalletCount: z
     .number()
     .int()
@@ -69,7 +100,7 @@ export const launchPreviewCostsSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -79,7 +110,7 @@ export const launchPreviewCostsSchema = z.object({
     .int()
     .min(1, "Distribution multiplier must be at least 1")
     .max(5, "Distribution multiplier must be 5 or less"),
-});
+}).superRefine(mayhemBundlerWalletRefine);
 
 export const launchRecoverySchema = z.object({
   launchId: z.string().min(1),

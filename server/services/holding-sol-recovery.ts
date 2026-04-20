@@ -2,12 +2,14 @@ import "server-only";
 
 import {
   Keypair,
+  PublicKey,
   SystemProgram,
   Transaction,
   sendAndConfirmTransaction,
   type Connection,
 } from "@solana/web3.js";
 import bs58 from "bs58";
+import { SYSTEM_DEV_OPERATIONAL_RESERVE_LAMPORTS } from "@/lib/config/system-dev-wallet.config";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import {
@@ -15,6 +17,59 @@ import {
   computeSponsoredRecoverableLamports,
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
+
+type LoadedTransaction = NonNullable<
+  Awaited<ReturnType<Connection["getTransaction"]>>
+>;
+
+/**
+ * Account keys in the same order as `meta.preBalances` / `meta.postBalances`
+ * (static keys first, then writable loaded addresses, then readonly loaded).
+ */
+function resolveAccountKeysForMetaBalances(
+  tx: LoadedTransaction
+): PublicKey[] | null {
+  const meta = tx.meta;
+  if (!meta?.preBalances?.length) return null;
+  const message = tx.transaction.message;
+
+  try {
+    if (message.version === "legacy") {
+      const accountKeys = message.getAccountKeys();
+      if (accountKeys.length !== meta.preBalances.length) return null;
+      const keys: PublicKey[] = [];
+      for (let i = 0; i < accountKeys.length; i++) {
+        const k = accountKeys.get(i);
+        if (!k) return null;
+        keys.push(k);
+      }
+      return keys;
+    }
+
+    if (message.version === 0) {
+      const loaded = meta.loadedAddresses;
+      if (!loaded) return null;
+      const accountKeys = message.getAccountKeys({
+        accountKeysFromLookups: {
+          writable: loaded.writable,
+          readonly: loaded.readonly,
+        },
+      });
+      if (accountKeys.length !== meta.preBalances.length) return null;
+      const keys: PublicKey[] = [];
+      for (let i = 0; i < accountKeys.length; i++) {
+        const k = accountKeys.get(i);
+        if (!k) return null;
+        keys.push(k);
+      }
+      return keys;
+    }
+  } catch {
+    return null;
+  }
+
+  return null;
+}
 
 export type SolRecoveryWallet = {
   publicKey: string;
@@ -106,6 +161,11 @@ export async function recoverWalletSolBalances({
         return;
       }
 
+      if (wallet.isSystemWallet) {
+        walletBalances.set(wallet.publicKey, 0);
+        return;
+      }
+
       const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
       const balanceLamports = await connection.getBalance(owner.publicKey);
       walletBalances.set(wallet.publicKey, balanceLamports);
@@ -154,6 +214,15 @@ export async function recoverWalletSolBalances({
 
   async function processWallet(wallet: SolRecoveryWallet) {
     if (wallet.publicKey === mainWalletKeypair.publicKey.toBase58()) {
+      results.push({
+        walletPublicKey: wallet.publicKey,
+        status: "SKIPPED",
+        recoveredLamports: 0,
+      });
+      return;
+    }
+
+    if (wallet.isSystemWallet) {
       results.push({
         walletPublicKey: wallet.publicKey,
         status: "SKIPPED",
@@ -364,12 +433,16 @@ export async function sweepSystemDevRealizedSol({
     return { status: "SKIPPED", sweptLamports: 0, signature: null };
   }
 
-  const accountKeys = tx.transaction.message.getAccountKeys();
-  const sellerIndex = accountKeys.staticAccountKeys.findIndex(
-    (key) => key.toBase58() === systemDevKeypair.publicKey.toBase58()
+  const accountKeyList = resolveAccountKeysForMetaBalances(tx);
+  if (!accountKeyList) {
+    return { status: "SKIPPED", sweptLamports: 0, signature: null };
+  }
+
+  const sellerIndex = accountKeyList.findIndex((key) =>
+    key.equals(systemDevKeypair.publicKey)
   );
 
-  if (sellerIndex < 0) {
+  if (sellerIndex < 0 || sellerIndex >= tx.meta.preBalances.length) {
     return { status: "SKIPPED", sweptLamports: 0, signature: null };
   }
 
@@ -382,7 +455,26 @@ export async function sweepSystemDevRealizedSol({
   }
 
   const transferFeeLamports = 5000;
-  const sweepLamports = realizedLamports - transferFeeLamports;
+  let sweepLamports = realizedLamports - transferFeeLamports;
+
+  if (sweepLamports <= 0) {
+    return { status: "SKIPPED", sweptLamports: 0, signature: null };
+  }
+
+  const [liveBalance, rentMinLamports] = await Promise.all([
+    connection.getBalance(systemDevKeypair.publicKey, "confirmed"),
+    connection.getMinimumBalanceForRentExemption(0, "confirmed"),
+  ]);
+  const minRemainingLamports = Math.max(
+    rentMinLamports,
+    SYSTEM_DEV_OPERATIONAL_RESERVE_LAMPORTS
+  );
+  const sweepFeeHeadroomLamports = 10_000;
+  const maxSweepFromWallet = Math.max(
+    0,
+    liveBalance - minRemainingLamports - sweepFeeHeadroomLamports
+  );
+  sweepLamports = Math.min(sweepLamports, maxSweepFromWallet);
 
   if (sweepLamports <= 0) {
     return { status: "SKIPPED", sweptLamports: 0, signature: null };

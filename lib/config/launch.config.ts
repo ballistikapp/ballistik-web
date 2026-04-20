@@ -2,6 +2,10 @@ import { z } from "zod";
 import { getEnv } from "@/lib/config/env";
 import { getDefaultJitoBlockEngineUrl } from "@/lib/config/jito.config";
 
+/** Client-safe caps; must match `baseLaunchConfig`. */
+export const MAX_BUNDLE_WALLETS = 10;
+export const MAX_MAYHEM_BUNDLER_WALLETS = 8;
+
 const launchConfigSchema = z.object({
   // Minimum buy amount per wallet (SOL).
   minBuyAmountSol: z.number().min(0),
@@ -9,6 +13,8 @@ const launchConfigSchema = z.object({
   slippageBasisPoints: z.bigint().min(BigInt(0)),
   // Maximum bundler wallets allowed in a single bundle launch.
   maxBundleWallets: z.number().int().min(1),
+  // Mayhem `buy_exact_sol_in` is larger; follow-up txs fit at most 2 buys under the 1232-byte limit.
+  maxMayhemBundlerWallets: z.number().int().min(1),
   // Extra lamports added to each buy wallet for transaction fees.
   fundingBufferLamports: z.number().int().min(0),
   // Extra lamports reserved for token creation fees.
@@ -39,7 +45,9 @@ const baseLaunchConfig = {
   // Slippage basis points applied to pump.fun swaps.
   slippageBasisPoints: BigInt(10000),
   // Maximum bundler wallets allowed in a single bundle launch.
-  maxBundleWallets: 10,
+  maxBundleWallets: MAX_BUNDLE_WALLETS,
+  // First bundle tx has 1 buy + create; four follow-up txs × 2 buys = 8 bundlers + dev (9 buyers) max in 5 Jito txs.
+  maxMayhemBundlerWallets: MAX_MAYHEM_BUNDLER_WALLETS,
   // Extra lamports added to each buy wallet for transaction fees.
   fundingBufferLamports: 4_000_000,
   // Extra lamports reserved for token creation fees.

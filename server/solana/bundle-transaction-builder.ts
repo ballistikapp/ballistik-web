@@ -8,8 +8,12 @@ import {
   type TransactionInstruction,
 } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
+import { getLaunchConfig } from "@/lib/config/launch.config";
 import { logger } from "@/lib/logger";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
+
+/** Must match Jito bundle cap in `jito-bundle.ts`. */
+const JITO_MAX_BUNDLE_TRANSACTIONS = 5;
 
 const filterComputeBudget = (ixs: TransactionInstruction[]) =>
   ixs.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
@@ -88,6 +92,8 @@ export async function buildBundleTransactionsForCreateAndBuys(
   creator?: PublicKey,
   options?: {
     buildBuyTransaction?: BuildBuyTransaction;
+    /** Required for mayhem `createV2` bundles: bonding curve is not on RPC when buys are built. */
+    isMayhemMode?: boolean;
   }
 ): Promise<[Transaction[], Keypair[][]]> {
   const logContext = {
@@ -95,7 +101,12 @@ export async function buildBundleTransactionsForCreateAndBuys(
     ...(creator ? { creator: creator.toBase58() } : {}),
   };
   const buildBuyTransaction =
-    options?.buildBuyTransaction ?? buildBuyTokenTransaction;
+    options?.buildBuyTransaction != null
+      ? options.buildBuyTransaction
+      : (buyer: Keypair, m: PublicKey, lamports: bigint, cr?: PublicKey, minOut?: bigint) =>
+          buildBuyTokenTransaction(buyer, m, lamports, cr, minOut, {
+            isMayhemMode: options?.isMayhemMode ?? false,
+          });
   if (wallets.length !== buyAmountsLamport.length) {
     throw new Error(
       `Bundle buy mismatch: wallets=${wallets.length}, amounts=${buyAmountsLamport.length}`
@@ -119,7 +130,18 @@ export async function buildBundleTransactionsForCreateAndBuys(
   const bundleTransactions: Transaction[] = [];
   const bundleSigners: Keypair[][] = [];
   const firstTransactionBuyCount = Math.min(1, wallets.length);
-  const buysPerTransaction = 3;
+  const buysPerTransaction = options?.isMayhemMode ? 2 : 3;
+  const deferredBuyCount = Math.max(0, wallets.length - firstTransactionBuyCount);
+  const deferredTxCount = Math.ceil(deferredBuyCount / buysPerTransaction);
+  const totalBundleTxCount = 1 + deferredTxCount;
+  if (totalBundleTxCount > JITO_MAX_BUNDLE_TRANSACTIONS) {
+    const { maxMayhemBundlerWallets } = getLaunchConfig();
+    throw new Error(
+      options?.isMayhemMode
+        ? `Mayhem bundle needs ${totalBundleTxCount} transactions (max ${JITO_MAX_BUNDLE_TRANSACTIONS}). Use at most ${maxMayhemBundlerWallets} bundler wallets or disable Mayhem mode.`
+        : `Bundle needs ${totalBundleTxCount} transactions (max ${JITO_MAX_BUNDLE_TRANSACTIONS}). Reduce bundler wallets.`
+    );
+  }
 
   const firstWallets = wallets.slice(0, firstTransactionBuyCount);
   const firstAmounts = buyAmountsLamport.slice(0, firstTransactionBuyCount);
@@ -206,6 +228,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
       creator,
       {
         buildBuyTransaction,
+        isMayhemMode: options?.isMayhemMode,
         hoistedAtaInstructions,
         hoistedAtaSigners,
         shouldHoistAtaInstructions: canHoistAtaInstructions,
@@ -259,6 +282,7 @@ async function buildBuyBundleTransaction(
   creator?: PublicKey,
   options?: {
     buildBuyTransaction?: BuildBuyTransaction;
+    isMayhemMode?: boolean;
     hoistedAtaInstructions?: TransactionInstruction[];
     hoistedAtaSigners?: Keypair[];
     shouldHoistAtaInstructions?: (
@@ -272,7 +296,12 @@ async function buildBuyBundleTransaction(
     ...(creator ? { creator: creator.toBase58() } : {}),
   };
   const buildBuyTransaction =
-    options?.buildBuyTransaction ?? buildBuyTokenTransaction;
+    options?.buildBuyTransaction != null
+      ? options.buildBuyTransaction
+      : (buyer: Keypair, m: PublicKey, lamports: bigint, cr?: PublicKey, minOut?: bigint) =>
+          buildBuyTokenTransaction(buyer, m, lamports, cr, minOut, {
+            isMayhemMode: options?.isMayhemMode ?? false,
+          });
   const hoistedAtaInstructions = options?.hoistedAtaInstructions;
   const hoistedAtaSigners = options?.hoistedAtaSigners;
   const shouldHoistAtaInstructions = options?.shouldHoistAtaInstructions;

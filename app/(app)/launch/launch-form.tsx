@@ -2,6 +2,7 @@
 
 import * as React from "react";
 import { useForm } from "@tanstack/react-form";
+import { useStore } from "@tanstack/react-store";
 import { toast } from "sonner";
 import * as z from "zod";
 import {
@@ -76,6 +77,88 @@ import {
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
 import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
+import {
+  MAX_BUNDLE_WALLETS,
+  MAX_MAYHEM_BUNDLER_WALLETS,
+} from "@/lib/config/launch.config";
+
+const DEV_BUY_SOL_MIN = 0.05;
+const DEV_BUY_SOL_MAX = 100;
+
+const devBuyAmountSolSchema = z
+  .number()
+  .min(
+    DEV_BUY_SOL_MIN,
+    `Dev buy must be at least ${DEV_BUY_SOL_MIN} SOL.`,
+  )
+  .max(
+    DEV_BUY_SOL_MAX,
+    `Dev buy cannot exceed ${DEV_BUY_SOL_MAX} SOL.`,
+  );
+
+function devBuyAmountSolValidatorMessage(value: unknown): string | undefined {
+  const parsed = devBuyAmountSolSchema.safeParse(value);
+  if (!parsed.success) {
+    return (
+      parsed.error.issues[0]?.message ?? "Enter a valid dev buy amount (SOL)."
+    );
+  }
+}
+
+const BUNDLER_BUY_PER_WALLET_MIN = 0.05;
+
+const bundlerBuyAmountSolSchema = z
+  .number()
+  .min(
+    BUNDLER_BUY_PER_WALLET_MIN,
+    `Buy amount per wallet must be at least ${BUNDLER_BUY_PER_WALLET_MIN} SOL.`,
+  );
+
+function bundlerBuyAmountSolValidatorMessage(
+  value: unknown
+): string | undefined {
+  const parsed = bundlerBuyAmountSolSchema.safeParse(value);
+  if (!parsed.success) {
+    return (
+      parsed.error.issues[0]?.message ??
+      "Enter a valid buy amount per wallet (SOL)."
+    );
+  }
+}
+
+type BundlerWalletFormSlice = {
+  getFieldValue: (
+    name: "bundleBuyEnabled" | "mayhemMode"
+  ) => unknown;
+};
+
+function bundlerWalletCountValidatorMessage(
+  value: unknown,
+  form: BundlerWalletFormSlice
+): string | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    return "Enter a valid number of wallets.";
+  }
+  if (!Number.isInteger(value)) {
+    return "Use a whole number of wallets.";
+  }
+  if (value < 0) {
+    return "Bundler wallet count cannot be negative.";
+  }
+  if (value > MAX_BUNDLE_WALLETS) {
+    return `Bundler wallet count cannot exceed ${MAX_BUNDLE_WALLETS}.`;
+  }
+  const bundleBuyEnabled = Boolean(form.getFieldValue("bundleBuyEnabled"));
+  const mayhemMode = Boolean(form.getFieldValue("mayhemMode"));
+  if (
+    bundleBuyEnabled &&
+    mayhemMode &&
+    value > MAX_MAYHEM_BUNDLER_WALLETS
+  ) {
+    return `Mayhem bundle allows at most ${MAX_MAYHEM_BUNDLER_WALLETS} bundler wallets (Solana limits how much fits in one Jito bundle). Turn off Mayhem mode or lower the count.`;
+  }
+  return undefined;
+}
 
 const formSchema = z
   .object({
@@ -97,21 +180,21 @@ const formSchema = z
     website: z.string(),
     devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
     importedDevWalletKey: z.string(),
-    devBuyAmountSol: z
-      .number()
-      .positive("Dev buy amount must be greater than 0"),
+    devBuyAmountSol: devBuyAmountSolSchema,
     jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
     bundleBuyEnabled: z.boolean(),
     vanityMint: z.boolean(),
     removeAttribution: z.boolean(),
+    mayhemMode: z.boolean(),
     bundlerWalletCount: z
       .number()
       .int()
       .min(0, "Bundler wallet count must be 0 or more")
-      .max(10, "Bundler wallet count must be 10 or less"),
-    bundlerBuyAmountSol: z
-      .number()
-      .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+      .max(
+        MAX_BUNDLE_WALLETS,
+        `Bundler wallet count must be ${MAX_BUNDLE_WALLETS} or less`
+      ),
+    bundlerBuyAmountSol: bundlerBuyAmountSolSchema,
     bundlerBuyVariancePercent: z
       .number()
       .min(0, "Bundler buy variance must be 0 or more")
@@ -131,6 +214,19 @@ const formSchema = z
         code: z.ZodIssueCode.custom,
         path: ["importedDevWalletKey"],
         message: "Dev wallet private key is required",
+      });
+    }
+  })
+  .superRefine((values, ctx) => {
+    if (
+      values.bundleBuyEnabled &&
+      values.mayhemMode &&
+      values.bundlerWalletCount > MAX_MAYHEM_BUNDLER_WALLETS
+    ) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["bundlerWalletCount"],
+        message: `Mayhem bundle allows at most ${MAX_MAYHEM_BUNDLER_WALLETS} bundler wallets (Solana limits how much fits in one Jito bundle). Turn off Mayhem mode or lower the count.`,
       });
     }
   });
@@ -570,6 +666,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     bundleBuyEnabled: true,
     vanityMint: true,
     removeAttribution: false,
+    mayhemMode: false,
     bundlerWalletCount: 10,
     bundlerBuyAmountSol: 0.1,
     bundlerBuyVariancePercent: 20,
@@ -589,11 +686,27 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialValues]);
 
+  const scrollFirstInvalidLaunchFieldIntoView = React.useCallback(() => {
+    const run = () => {
+      const formEl = document.getElementById("launch-form");
+      if (!formEl) return;
+      const target = formEl.querySelector<HTMLElement>(
+        '[data-slot="field"][data-invalid="true"]'
+      );
+      target?.scrollIntoView({ behavior: "smooth", block: "center" });
+    };
+    requestAnimationFrame(() => {
+      requestAnimationFrame(run);
+    });
+  }, []);
+
   const form = useForm({
     defaultValues: mergedDefaults,
+    canSubmitWhenInvalid: true,
     validators: {
       onSubmit: formSchema,
     },
+    onSubmitInvalid: scrollFirstInvalidLaunchFieldIntoView,
     onSubmit: async ({ value }) => {
       const validation = await formSchema.safeParseAsync(value);
       if (!validation.success) {
@@ -607,18 +720,23 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     },
   });
 
+  const submissionAttempts = useStore(form.store, (s) => s.submissionAttempts);
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
-  const showSubmitErrors = form.state.submissionAttempts > 0;
+  const showSubmitErrors = submissionAttempts > 0;
   const getIsInvalid = (field: {
     state: {
       meta: {
         isTouched: boolean;
-        errors: Array<{ message?: string } | undefined>;
+        errors: ReadonlyArray<unknown>;
+        errorMap?: Record<string, unknown>;
       };
     };
-  }) =>
-    (field.state.meta.isTouched || showSubmitErrors) &&
-    field.state.meta.errors.length > 0;
+  }) => {
+    const hasErrors =
+      field.state.meta.errors.length > 0 ||
+      Object.values(field.state.meta.errorMap ?? {}).some((v) => v != null);
+    return (field.state.meta.isTouched || showSubmitErrors) && hasErrors;
+  };
   const revalidateAfterSubmitAttempt = () => {
     if (showSubmitErrors) {
       form.validateAllFields("submit");
@@ -650,6 +768,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       bundleBuyEnabled: values.bundleBuyEnabled,
       vanityMint: values.vanityMint,
       removeAttribution: values.removeAttribution,
+      mayhemMode: values.mayhemMode,
       bundlerWalletCount: values.bundlerWalletCount,
       bundlerBuyAmountSol: values.bundlerBuyAmountSol,
       bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
@@ -668,6 +787,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       bundleBuyEnabled: form.state.values.bundleBuyEnabled,
       vanityMint: form.state.values.vanityMint,
       removeAttribution: form.state.values.removeAttribution,
+      mayhemMode: form.state.values.mayhemMode,
       bundlerWalletCount: form.state.values.bundlerWalletCount,
       bundlerBuyAmountSol: form.state.values.bundlerBuyAmountSol,
       bundlerBuyVariancePercent: form.state.values.bundlerBuyVariancePercent,
@@ -687,7 +807,6 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
         id="launch-form"
         onSubmit={(e) => {
           e.preventDefault();
-          form.validateAllFields("submit");
           void form.handleSubmit();
         }}
         className="space-y-0"
@@ -908,6 +1027,30 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           By default, token descriptions include &quot;Launched
                           with ballistik.app&quot; at the end. Enable this to
                           remove that attribution for +0.1 SOL.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3 pt-1">
+                    <form.Field name="mayhemMode">
+                      {(field) => (
+                        <Switch
+                          id="mayhem-mode"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      )}
+                    </form.Field>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="mayhem-mode">Mayhem mode</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-sm">
+                          Mayhem Mode helps early pump.fun coins get traction:
+                          an autonomous AI trading agent adds volume and price
+                          variance.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -1402,7 +1545,14 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 </form.Subscribe>
               </Field>
 
-              <form.Field name="devBuyAmountSol">
+              <form.Field
+                name="devBuyAmountSol"
+                validators={{
+                  onBlur: ({ value }) => devBuyAmountSolValidatorMessage(value),
+                  onSubmit: ({ value }) =>
+                    devBuyAmountSolValidatorMessage(value),
+                }}
+              >
                 {(field) => {
                   const isInvalid = getIsInvalid(field);
                   return (
@@ -1509,15 +1659,41 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
             />
             <div>
               <form.Subscribe
-                selector={(state) => state.values.bundleBuyEnabled}
+                selector={(state) => ({
+                  bundleBuyEnabled: state.values.bundleBuyEnabled,
+                  mayhemMode: state.values.mayhemMode,
+                })}
               >
-                {(bundleBuyEnabled) =>
+                {({ bundleBuyEnabled, mayhemMode }) =>
                   bundleBuyEnabled && (
                     <div className="space-y-6">
                       <div className="grid grid-cols-1 gap-4 md:grid-cols-2 md:gap-6">
-                        <form.Field name="bundlerWalletCount">
+                        <form.Field
+                          name="bundlerWalletCount"
+                          validators={{
+                            onChange: ({ value, fieldApi }) =>
+                              bundlerWalletCountValidatorMessage(
+                                value,
+                                fieldApi.form as BundlerWalletFormSlice
+                              ),
+                            onBlur: ({ value, fieldApi }) =>
+                              bundlerWalletCountValidatorMessage(
+                                value,
+                                fieldApi.form as BundlerWalletFormSlice
+                              ),
+                            onSubmit: ({ value, fieldApi }) =>
+                              bundlerWalletCountValidatorMessage(
+                                value,
+                                fieldApi.form as BundlerWalletFormSlice
+                              ),
+                            onChangeListenTo: ["mayhemMode", "bundleBuyEnabled"],
+                          }}
+                        >
                           {(field) => {
                             const isInvalid = getIsInvalid(field);
+                            const bundlerMax = mayhemMode
+                              ? MAX_MAYHEM_BUNDLER_WALLETS
+                              : MAX_BUNDLE_WALLETS;
                             return (
                               <Field data-invalid={isInvalid}>
                                 <FieldLabel htmlFor={field.name}>
@@ -1527,7 +1703,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   id={field.name}
                                   type="number"
                                   min="1"
-                                  max="10"
+                                  max={bundlerMax}
                                   value={field.state.value}
                                   onBlur={field.handleBlur}
                                   onChange={(e) =>
@@ -1539,8 +1715,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   aria-invalid={isInvalid}
                                 />
                                 <FieldDescription>
-                                  How many wallets to use for bundle buy (max
-                                  10)
+                                  How many wallets to use for bundle buy (max{" "}
+                                  {bundlerMax})
                                 </FieldDescription>
                                 {isInvalid && (
                                   <FieldError
@@ -1551,7 +1727,15 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             );
                           }}
                         </form.Field>
-                        <form.Field name="bundlerBuyAmountSol">
+                        <form.Field
+                          name="bundlerBuyAmountSol"
+                          validators={{
+                            onBlur: ({ value }) =>
+                              bundlerBuyAmountSolValidatorMessage(value),
+                            onSubmit: ({ value }) =>
+                              bundlerBuyAmountSolValidatorMessage(value),
+                          }}
+                        >
                           {(field) => {
                             const isInvalid = getIsInvalid(field);
                             return (
@@ -1563,7 +1747,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   id={field.name}
                                   type="number"
                                   step="0.001"
-                                  min="0.1"
+                                  min="0.05"
                                   value={field.state.value}
                                   onBlur={field.handleBlur}
                                   onChange={(e) =>
@@ -1571,7 +1755,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                       e.target.valueAsNumber || 0
                                     )
                                   }
-                                  placeholder="0.1"
+                                  placeholder="0.05"
                                   aria-invalid={isInvalid}
                                 />
                                 <FieldDescription>
@@ -1996,8 +2180,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             ) : usageFees.platformFeeDiscountRate > 0 ? (
                               <div className="text-xs text-emerald-400">
                                 Developer active. Platform fees are reduced by{" "}
-                                {Math.round(usageFees.platformFeeDiscountRate * 100)}%
-                                for this launch.
+                                {Math.round(
+                                  usageFees.platformFeeDiscountRate * 100
+                                )}
+                                % for this launch.
                               </div>
                             ) : null}
                             <div

@@ -45,7 +45,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/field flex w-full", {
+const fieldVariants = cva("gap-2 group/field flex w-full", {
   variants: {
     orientation: {
       vertical:
@@ -64,6 +64,7 @@ const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/fiel
 function Field({
   className,
   orientation = "vertical",
+  "data-invalid": dataInvalid,
   ...props
 }: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
   return (
@@ -72,6 +73,7 @@ function Field({
       data-slot="field"
       data-orientation={orientation}
       className={cn(fieldVariants({ orientation }), className)}
+      data-invalid={dataInvalid ? true : undefined}
       {...props}
     />
   )
@@ -162,13 +164,35 @@ function FieldSeparator({
   )
 }
 
+type FieldErrorEntry =
+  | string
+  | { message?: string }
+  | undefined
+  | null
+
+function normalizeFieldErrorEntry(
+  error: FieldErrorEntry
+): { message: string } | null {
+  if (error == null) return null
+  if (typeof error === "string" && error.trim() !== "") {
+    return { message: error }
+  }
+  if (typeof error === "object" && error !== null) {
+    const msg = error.message
+    if (typeof msg === "string" && msg.trim() !== "") {
+      return { message: msg }
+    }
+  }
+  return null
+}
+
 function FieldError({
   className,
   children,
   errors,
   ...props
 }: React.ComponentProps<"div"> & {
-  errors?: Array<{ message?: string } | undefined>
+  errors?: FieldErrorEntry[]
 }) {
   const content = useMemo(() => {
     if (children) {
@@ -179,8 +203,16 @@ function FieldError({
       return null
     }
 
+    const normalized = errors
+      .map(normalizeFieldErrorEntry)
+      .filter((e): e is { message: string } => e != null)
+
+    if (normalized.length === 0) {
+      return null
+    }
+
     const uniqueErrors = [
-      ...new Map(errors.map((error) => [error?.message, error])).values(),
+      ...new Map(normalized.map((e) => [e.message, e])).values(),
     ]
 
     if (uniqueErrors?.length == 1) {

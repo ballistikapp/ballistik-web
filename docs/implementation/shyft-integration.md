@@ -13,7 +13,7 @@ Free users fall back to RPC polling or slower non-streaming behavior. Pro users 
 ## Environment Variables
 
 - `SHYFT_API_KEY` — enables Shyft REST APIs, Callbacks, and DeFi APIs
-- `SHYFT_GRPC_TOKEN` — x-token for gRPC authentication
+- `SHYFT_GRPC_TOKEN` — x-token for gRPC authentication (optional; if omitted or whitespace-only, no Shyft gRPC connections are opened—see [Transport prerequisites](#transport-prerequisites-no-token-no-network))
 - `GRPC_ACCESS_MODE` — global app override for gRPC-powered features (`off`, `pro`, `all`)
 - `SHYFT_CALLBACK_SECRET` — validates incoming webhook requests at `/api/webhooks/shyft`
 - `APP_URL` — base URL for Shyft callback webhook registration (e.g. `https://app.example.com`)
@@ -35,6 +35,19 @@ The manager provides an event-driven API:
 - `grpcManager.onTransactionUpdate(callback)` — listen for new transactions (signature + account keys)
 
 Auto-reconnect with 5-second backoff is built in. The manager is a global singleton preserved across hot reloads in development.
+
+### Transport prerequisites (no token, no network)
+
+If gRPC should not run, the process must not import `@triton-one/yellowstone-grpc` or open a Shyft stream. Behavior:
+
+- **`SHYFT_GRPC_TOKEN`** must be **non-empty after `.trim()`**. Unset, empty, or whitespace-only values are treated as “not configured.”
+- **`GRPC_ACCESS_MODE=off`** disables transport the same way as a missing token for subscription/connect decisions.
+- **`grpcManager.connect()`** — Returns `false` before any dynamic import or TCP/TLS work when the token is missing (after trim) or access mode is `off`.
+- **`grpcManager.subscribe()`** — Checks token and access mode **before** mutating `subscriptions` / `allSubscribedAccounts`. If transport is disabled, it returns `false` when new accounts would be registered, or `true` only for the idempotent case (subscription id already present and no new accounts). It never calls `loadGrpcClient()` or `connect()` in that situation.
+- **`waitForSignaturesViaGrpc`** (`server/solana/shyft-grpc.ts`) — Same trim + `GRPC_ACCESS_MODE` checks; skips loading the client when gRPC is not configured.
+- **`grpc-access.service`** — `tokenConfigured` uses `Boolean(SHYFT_GRPC_TOKEN?.trim())`, so product-level “infra available” matches the transport layer.
+
+On failures, the manager logs structured diagnostics from `server/solana/grpc-error-diagnostics.ts`: gRPC `grpcCode` / `grpcCodeName`, server `details`, safe `metadata` entries, `shyftAuthHint`, and `hints`. It also logs `tokenEnv` (token length, whether `SHYFT_GRPC_TOKEN` equals `SHYFT_API_KEY`, rough shape) without ever logging the secret. **Shyft often returns one message for both bad tokens and disallowed IPs** (`invalid token or IP`); when you see that text, the server does not indicate which check failed—validate the gRPC token and IP allowlist independently in the Shyft dashboard. The same payload is available on `dashboard.getGrpcStatus` as `lastErrorDiagnostics` and `tokenEnv`.
 
 Infrastructure availability alone does not grant product access. Callers must check the centralized gRPC access service before using gRPC-backed features for a user-facing workflow.
 

@@ -41,8 +41,8 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
    - submit as a Jito bundle
 5. **Cleanup**:
    - close empty ATAs for wallets involved in the exit
-   - if a system dev wallet sold in the exit, immediately sweep realized SOL from that system wallet back to the user main wallet
-   - return the remaining available SOL to the main wallet when enabled, using the main wallet as fee payer when possible and falling back otherwise
+   - if a system dev wallet sold in the exit, immediately sweep realized SOL from that system wallet back to the user main wallet (`sweepSystemDevRealizedSol`: net lamport delta from the sell tx with account keys aligned to `meta.preBalances`, and the sweep amount capped so at least `max(rent-exempt minimum, SYSTEM_DEV_OPERATIONAL_RESERVE_LAMPORTS)` stays on the shared wallet)
+   - when SOL return is enabled, batch recovery (`recoverWalletSolBalances`) sends available SOL from **user-owned** wallets to the main wallet (main as fee payer when possible, otherwise source-funded). Wallets with `isSystemWallet` are **skipped** in that batch so the shared system dev keypair is never drained; only the immediate realized sweep above moves SOL off it for this flow.
 6. **Finalize**:
    - persist `result` summary
    - mark status `SUCCEEDED`, `PARTIAL_SUCCESS`, or `FAILED`
@@ -55,16 +55,16 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 - Chunk outcomes are tracked individually (`successfulChunks`, `failedChunks`).
 - Cleanup (ATA close + SOL recovery) runs only after all chunk jobs settle.
 - Cleanup wallet work runs with bounded concurrency (wallet-level parallelism) and aggregates results after all wallet tasks settle.
-- The exit uses the same shared post-sell SOL recovery helpers as manual holding sells so system dev wallet behavior stays consistent across both flows.
+- The exit uses the same shared post-sell helpers as manual holding sells: realized SOL from the system dev uses `sweepSystemDevRealizedSol`; generic batch recovery skips `isSystemWallet` in both flows.
 
 ### Sell Instruction
 
-The sell instruction is built by `buildSellTransaction` in `pump-new-idl.ts`. It uses the same shared constants as the buy instruction (fee recipient, fee config, fee program) for consistency. The function:
+The sell instruction is built by `buildSellTransaction` in `pump-new-idl.ts`. It uses the same fee config / fee program accounts as the buy instruction; the **`fee_recipient`** is chosen via `selectPumpTradeFeeRecipient` using **`isMayhemMode` read from the bonding curve** (standard vs reserved recipient pool on `Global`). The function:
 
 - Fetches the creator from the bonding curve on-chain
 - Derives all PDAs consistently with the buy instruction
 - Does not require an Anchor `Program` object (pure instruction building)
-- **Includes `bondingCurveV2`** as a trailing remaining account (V2 account layout). Without this account, the on-chain program falls back to a legacy code path with u64 arithmetic that overflows on the constant-product `k = virtualTokenReserves * virtualSolReserves` calculation, causing error 6024 (Overflow) for any sell amount
+- Uses the **14** accounts named in the pump IDL (`global` through `fee_program`) **plus** a trailing **`bonding_curve_v2`** PDA, matching on-chain expectations (same overflow/compat rationale as buy)
 - Returns a single `Transaction`
 
 All three sell paths (holding sell, volume bot sell, exit bundle sell) use this function. The holding service and exit bundle use `buildSellTransaction` directly. The volume bot uses the `sellTokensWithNewIdl` wrapper which delegates to it.
@@ -126,7 +126,7 @@ Solana enforces strict transaction size limits:
 
 ### Why These Chunk Sizes?
 
-The pump.fun sell instruction is large (15 accounts including bondingCurveV2, ~750-950 bytes). Combining it with multiple transfers exceeded the 1232 byte limit.
+The pump.fun sell instruction is still account-heavy (15 accounts including `bonding_curve_v2`, hundreds of bytes of account keys plus data and signatures). Combining it with multiple transfers exceeded the 1232 byte limit.
 
 **Key constants:**
 ```typescript
@@ -142,7 +142,7 @@ const WALLETS_PER_CHUNK = 20;    // Max wallets per exit bundle iteration
 - Practical chunk cap is 20 wallets (1 seller + up to 19 senders)
 
 **Why sell is separate?**
-- The sell instruction has 15 accounts (~480 bytes just for account keys)
+- The sell instruction has 15 accounts including `bonding_curve_v2` (still a large share of the 1232-byte raw transaction cap in account keys alone)
 - Plus instruction data, signatures, and transaction metadata
 - Combining with transfers caused the "transaction too large" error
 
