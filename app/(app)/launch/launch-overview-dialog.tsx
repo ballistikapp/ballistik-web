@@ -20,6 +20,7 @@ import {
 import {
   bundleBuyFeeSol,
   descriptionAttributionRemovalFeeSol,
+  nonSystemDevWalletFeeSol,
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
 import { trpc } from "@/lib/trpc/client";
@@ -112,6 +113,11 @@ export function LaunchOverviewDialog({
   const bundleFeeDisplaySol = launchInput.bundleBuyEnabled
     ? (preview?.lineItems.bundleBuyFeeSol ?? bundleBuyFeeSol)
     : bundleBuyFeeSol;
+  const customDevWalletFeeDisplaySol =
+    launchInput.devWalletOption !== "system"
+      ? (preview?.lineItems.nonSystemDevWalletFeeSol ??
+        nonSystemDevWalletFeeSol)
+      : nonSystemDevWalletFeeSol;
   const temporaryReserveItems = preview
     ? [
         {
@@ -135,26 +141,28 @@ export function LaunchOverviewDialog({
             "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
         },
       ]
-    : [
-    {
-      label: "Creator reserve",
-      amount: "Calculating...",
-      tooltip:
-        "Temporary SOL reserved for token creation and creator-side launch steps. Any unused amount is expected to be returned after launch cleanup.",
-    },
-    {
-      label: "Buy wallet reserve",
-      amount: launchInput.bundleBuyEnabled ? "Calculating..." : "Not needed",
-      tooltip:
-        "Temporary SOL reserved across buy wallets so bundle execution can complete smoothly. Any unused amount is expected to be returned after launch cleanup.",
-    },
-    {
-      label: "Transfer reserve",
-      amount: "Calculating...",
-      tooltip:
-        "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
-    },
-  ] as const;
+    : ([
+        {
+          label: "Creator reserve",
+          amount: "Calculating...",
+          tooltip:
+            "Temporary SOL reserved for token creation and creator-side launch steps. Any unused amount is expected to be returned after launch cleanup.",
+        },
+        {
+          label: "Buy wallet reserve",
+          amount: launchInput.bundleBuyEnabled
+            ? "Calculating..."
+            : "Not needed",
+          tooltip:
+            "Temporary SOL reserved across buy wallets so bundle execution can complete smoothly. Any unused amount is expected to be returned after launch cleanup.",
+        },
+        {
+          label: "Transfer reserve",
+          amount: "Calculating...",
+          tooltip:
+            "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
+        },
+      ] as const);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -252,7 +260,7 @@ export function LaunchOverviewDialog({
                   <span className="text-muted-foreground">Dev Wallet</span>
                   <span>
                     {launchInput.devWalletOption === "system"
-                      ? "System Wallet"
+                      ? "Ballistik Wallet"
                       : launchInput.devWalletOption === "import"
                         ? "Imported wallet"
                         : launchInput.devWalletOption === "generate"
@@ -388,7 +396,8 @@ export function LaunchOverviewDialog({
                     <div className="mt-2 text-xs text-emerald-400">
                       Pro active. Platform fees are waived for this launch.
                     </div>
-                  ) : preview.platformFeeDiscountRate != null && preview.platformFeeDiscountRate > 0 ? (
+                  ) : preview.platformFeeDiscountRate != null &&
+                    preview.platformFeeDiscountRate > 0 ? (
                     <div className="mt-2 text-xs text-emerald-400">
                       Developer active. Platform fees are reduced by{" "}
                       {Math.round(preview.platformFeeDiscountRate * 100)}%.
@@ -410,6 +419,20 @@ export function LaunchOverviewDialog({
                       </div>
                       <span className="tabular-nums">
                         {preview.lineItems.generatedWalletFeeSol.toFixed(4)} SOL
+                      </span>
+                    </div>
+                    <div
+                      className={`flex items-center justify-between ${
+                        launchInput.devWalletOption === "system"
+                          ? "opacity-50 line-through"
+                          : ""
+                      }`}
+                    >
+                      <div className="text-muted-foreground">
+                        Custom dev wallet fee
+                      </div>
+                      <span className="tabular-nums">
+                        {customDevWalletFeeDisplaySol.toFixed(4)} SOL
                       </span>
                     </div>
                     <div
@@ -468,8 +491,9 @@ export function LaunchOverviewDialog({
                           </button>
                         </TooltipTrigger>
                         <TooltipContent side="top">
-                          These are temporary reserves added to help the launch complete.
-                          Any unused amount is returned to your main wallet after cleanup.
+                          These are temporary reserves added to help the launch
+                          complete. Any unused amount is returned to your main
+                          wallet after cleanup.
                         </TooltipContent>
                       </Tooltip>
                     </div>

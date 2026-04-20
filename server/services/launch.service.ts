@@ -61,7 +61,6 @@ import {
   computeSponsoredRecoverableLamports,
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
-import type { DevWalletOption } from "@/server/schemas/launch.schema";
 
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
@@ -981,14 +980,6 @@ function getSystemDevWalletKeypair(): Keypair {
   return keypairFromPrivateKey(SYSTEM_DEV_WALLET_PRIVATE_KEY);
 }
 
-function normalizeDevWalletOptionForPlan(
-  option: DevWalletOption,
-  plan: ContextUser["plan"]
-): DevWalletOption {
-  if (plan === UserPlan.PRO || plan === UserPlan.DEVELOPER) return option;
-  return "system";
-}
-
 async function mintAccountExistsOnChain(mint: PublicKey) {
   try {
     const connection = getSolanaConnection();
@@ -1360,6 +1351,7 @@ type LaunchCostPreview = {
     bundleBuyFeeSol: number;
     vanityMintFeeSol: number;
     generatedWalletFeeSol: number;
+    nonSystemDevWalletFeeSol: number;
     devBuySol: number;
     bundleBuyBaseSol: number;
     bundleBuyMaxSol: number;
@@ -1673,6 +1665,7 @@ async function calculateLaunchCostPreview(
       bundleBuyFeeSol: usageFees.bundleBuyFeeSol,
       vanityMintFeeSol: usageFees.vanityMintFeeSol,
       generatedWalletFeeSol: usageFees.generatedWalletFeeSol,
+      nonSystemDevWalletFeeSol: usageFees.nonSystemDevWalletFeeSol,
       devBuySol: devBuyAmountSol,
       bundleBuyBaseSol,
       bundleBuyMaxSol,
@@ -3156,11 +3149,7 @@ export type UserLaunchRow = {
 
 export const launchService = {
   async previewCosts(input: LaunchPreviewCostsInput, user: RequestUser) {
-    const normalizedInput = {
-      ...input,
-      devWalletOption: normalizeDevWalletOptionForPlan(input.devWalletOption, user.plan),
-    };
-    return await calculateLaunchCostPreview(normalizedInput, user);
+    return await calculateLaunchCostPreview(input, user);
   },
 
   async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
@@ -3269,15 +3258,11 @@ export const launchService = {
   },
 
   async startLaunch(input: LaunchTokenInput, user: RequestUser) {
-    const enforcedInput: LaunchTokenInput = {
-      ...input,
-      devWalletOption: normalizeDevWalletOptionForPlan(input.devWalletOption, user.plan),
-    };
     const idempotencyKey = [
       "launch-start",
       user.id,
-      enforcedInput.tokenName.trim().toLowerCase(),
-      normalizeSymbol(enforcedInput.tokenSymbol),
+      input.tokenName.trim().toLowerCase(),
+      normalizeSymbol(input.tokenSymbol),
     ].join(":");
     const actionKey = `launch:start:${user.id}`;
 
@@ -3299,7 +3284,7 @@ export const launchService = {
           }
 
           const normalizedInput =
-            await normalizeLaunchInputMediaForStorage(enforcedInput);
+            await normalizeLaunchInputMediaForStorage(input);
           await ensureLaunchFundingAvailable(normalizedInput, user);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
@@ -3382,10 +3367,7 @@ export const launchService = {
           400
         );
       }
-      const retryInput: LaunchTokenInput = {
-        ...parsedInput.data,
-        devWalletOption: normalizeDevWalletOptionForPlan(parsedInput.data.devWalletOption, user.plan),
-      };
+      const retryInput: LaunchTokenInput = parsedInput.data;
       await ensureLaunchFundingAvailable(retryInput, user);
       const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
         user,
@@ -3898,6 +3880,7 @@ export const launchService = {
         usageFeeBundleBuyFeeSol: usageFees.bundleBuyFeeSol,
         usageFeeDescriptionAttributionRemovalFeeSol:
           usageFees.descriptionAttributionRemovalFeeSol,
+        usageFeeNonSystemDevWalletFeeSol: usageFees.nonSystemDevWalletFeeSol,
         tokenMediaSource,
         tokenMediaType,
         tokenBannerSource,

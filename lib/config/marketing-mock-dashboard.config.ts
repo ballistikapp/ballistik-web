@@ -113,6 +113,7 @@ export const marketingMockDashboard = {
       launchFeeBreakdown: {
         generatedWalletFeeSol: 4,
         generatedWalletCount: 6,
+        nonSystemDevWalletFeeSol: 0,
         vanityMintFeeSol: 2,
         attributionRemovalFeeSol: 0,
         bundleBuyFeeSol: 12,

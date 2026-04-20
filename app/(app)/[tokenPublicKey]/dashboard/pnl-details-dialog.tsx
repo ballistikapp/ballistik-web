@@ -19,6 +19,7 @@ import {
 interface LaunchFeeBreakdown {
   generatedWalletFeeSol: number;
   generatedWalletCount: number;
+  nonSystemDevWalletFeeSol: number;
   vanityMintFeeSol: number;
   attributionRemovalFeeSol: number;
   bundleBuyFeeSol: number;
@@ -112,6 +113,14 @@ function buildLaunchFeeChildren(bd: LaunchFeeBreakdown): CostItem[] {
       label: `Generated Wallets (${bd.generatedWalletCount})`,
       value: bd.generatedWalletFeeSol,
       tooltip: `Fee for generating ${bd.generatedWalletCount} operational wallets`,
+    });
+  }
+  if ((bd.nonSystemDevWalletFeeSol ?? 0) > 0) {
+    items.push({
+      label: "Custom dev wallet",
+      value: bd.nonSystemDevWalletFeeSol,
+      tooltip:
+        "Usage fee when the launch uses an imported, generated, or main-wallet dev wallet instead of the platform system dev wallet",
     });
   }
   if (bd.vanityMintFeeSol > 0) {

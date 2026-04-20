@@ -66,7 +66,10 @@ function Field({
   orientation = "vertical",
   "data-invalid": dataInvalid,
   ...props
-}: React.ComponentProps<"div"> & VariantProps<typeof fieldVariants>) {
+}: React.ComponentProps<"div"> &
+  VariantProps<typeof fieldVariants> & {
+    "data-invalid"?: boolean
+  }) {
   return (
     <div
       role="group"

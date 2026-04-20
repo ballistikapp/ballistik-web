@@ -24,7 +24,7 @@ const statsData = {
       totalSellVolume: 9,
       platformFees: 0.12,
       launchFees: 0.12,
-      launchFeeBreakdown: { generatedWalletFeeSol: 0.12, generatedWalletCount: 11, vanityMintFeeSol: 0, attributionRemovalFeeSol: 0, bundleBuyFeeSol: 0 },
+      launchFeeBreakdown: { generatedWalletFeeSol: 0.12, generatedWalletCount: 11, nonSystemDevWalletFeeSol: 0, vanityMintFeeSol: 0, attributionRemovalFeeSol: 0, bundleBuyFeeSol: 0 },
       exitFees: 0,
       volumeBotFees: 0,
       jitoTipsSol: 0.001,

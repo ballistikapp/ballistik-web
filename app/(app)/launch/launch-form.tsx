@@ -15,7 +15,6 @@ import {
   ChevronRight,
   ChevronsUpDown,
   Shield,
-  Lock,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -75,6 +74,7 @@ import {
   discountLaunchUsageFees,
   waiveLaunchUsageFees,
   vanityMintFeeSol,
+  nonSystemDevWalletFeeSol,
 } from "@/lib/config/usage-fees.config";
 import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 import {
@@ -87,14 +87,8 @@ const DEV_BUY_SOL_MAX = 100;
 
 const devBuyAmountSolSchema = z
   .number()
-  .min(
-    DEV_BUY_SOL_MIN,
-    `Dev buy must be at least ${DEV_BUY_SOL_MIN} SOL.`,
-  )
-  .max(
-    DEV_BUY_SOL_MAX,
-    `Dev buy cannot exceed ${DEV_BUY_SOL_MAX} SOL.`,
-  );
+  .min(DEV_BUY_SOL_MIN, `Dev buy must be at least ${DEV_BUY_SOL_MIN} SOL.`)
+  .max(DEV_BUY_SOL_MAX, `Dev buy cannot exceed ${DEV_BUY_SOL_MAX} SOL.`);
 
 function devBuyAmountSolValidatorMessage(value: unknown): string | undefined {
   const parsed = devBuyAmountSolSchema.safeParse(value);
@@ -111,7 +105,7 @@ const bundlerBuyAmountSolSchema = z
   .number()
   .min(
     BUNDLER_BUY_PER_WALLET_MIN,
-    `Buy amount per wallet must be at least ${BUNDLER_BUY_PER_WALLET_MIN} SOL.`,
+    `Buy amount per wallet must be at least ${BUNDLER_BUY_PER_WALLET_MIN} SOL.`
   );
 
 function bundlerBuyAmountSolValidatorMessage(
@@ -127,9 +121,7 @@ function bundlerBuyAmountSolValidatorMessage(
 }
 
 type BundlerWalletFormSlice = {
-  getFieldValue: (
-    name: "bundleBuyEnabled" | "mayhemMode"
-  ) => unknown;
+  getFieldValue: (name: "bundleBuyEnabled" | "mayhemMode") => unknown;
 };
 
 function bundlerWalletCountValidatorMessage(
@@ -150,11 +142,7 @@ function bundlerWalletCountValidatorMessage(
   }
   const bundleBuyEnabled = Boolean(form.getFieldValue("bundleBuyEnabled"));
   const mayhemMode = Boolean(form.getFieldValue("mayhemMode"));
-  if (
-    bundleBuyEnabled &&
-    mayhemMode &&
-    value > MAX_MAYHEM_BUNDLER_WALLETS
-  ) {
+  if (bundleBuyEnabled && mayhemMode && value > MAX_MAYHEM_BUNDLER_WALLETS) {
     return `Mayhem bundle allows at most ${MAX_MAYHEM_BUNDLER_WALLETS} bundler wallets (Solana limits how much fits in one Jito bundle). Turn off Mayhem mode or lower the count.`;
   }
   return undefined;
@@ -659,7 +647,11 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     twitter: "",
     telegram: "",
     website: "",
-    devWalletOption: "system" as "system" | "import" | "generate" | "use_main",
+    devWalletOption: "generate" as
+      | "system"
+      | "import"
+      | "generate"
+      | "use_main",
     importedDevWalletKey: "",
     devBuyAmountSol: 0.5,
     jitoTipAmountSol: 0.001,
@@ -1327,167 +1319,101 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 </div>
                 <form.Field name="devWalletOption">
                   {(field) => {
-                    const canSelectDevWallet =
-                      currentUser?.plan === "PRO" ||
-                      currentUser?.plan === "DEVELOPER";
-                    const lockedClass = !canSelectDevWallet
-                      ? "opacity-50 cursor-not-allowed"
-                      : "";
-                    const upgradeTooltip =
-                      "Upgrade to Developer or Pro plan to use Import, Generate, or Main Wallet options.";
+                    const nonSystemDevWalletTooltip =
+                      "Adds a usage fee on launch. Pro waives platform fees; Developer gets the same discount as on other launch fees.";
+                    const freeBadgeClass =
+                      "pointer-events-none absolute -top-3 h-5 -right-2 border border-border/60 bg-secondary px-1.5 text-[10px] uppercase tracking-wide shadow-sm";
                     return (
                       <div className="flex flex-wrap gap-2">
-                        <button
-                          type="button"
-                          onClick={() => field.handleChange("system")}
-                          className={cn(
-                            "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                            field.state.value === "system"
-                              ? "border-primary bg-primary/5 font-medium"
-                              : "border-muted hover:border-muted-foreground/50"
-                          )}
-                        >
-                          <Shield className="h-4 w-4" />
-                          System Wallet
-                        </button>
-                        {canSelectDevWallet ? (
-                          <button
-                            type="button"
-                            onClick={() => field.handleChange("import")}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                              field.state.value === "import"
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-muted hover:border-muted-foreground/50"
-                            )}
-                          >
-                            <Import className="h-4 w-4" />
-                            Import
-                          </button>
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="relative inline-flex">
-                                <button
-                                  type="button"
-                                  disabled
-                                  className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                                    field.state.value === "import"
-                                      ? "border-primary bg-primary/5 font-medium"
-                                      : "border-muted",
-                                    lockedClass
-                                  )}
-                                >
-                                  <Import className="h-4 w-4" />
-                                  Import
-                                </button>
-                                <Badge
-                                  variant="secondary"
-                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
-                                >
-                                  <Lock className="h-2 w-2" />
-                                  PAID
-                                </Badge>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {upgradeTooltip}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                        {canSelectDevWallet ? (
-                          <button
-                            type="button"
-                            onClick={() => field.handleChange("generate")}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                              field.state.value === "generate"
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-muted hover:border-muted-foreground/50"
-                            )}
-                          >
-                            <Sparkles className="h-4 w-4" />
-                            Generate
-                          </button>
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="relative inline-flex">
-                                <button
-                                  type="button"
-                                  disabled
-                                  className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                                    field.state.value === "generate"
-                                      ? "border-primary bg-primary/5 font-medium"
-                                      : "border-muted",
-                                    lockedClass
-                                  )}
-                                >
-                                  <Sparkles className="h-4 w-4" />
-                                  Generate
-                                </button>
-                                <Badge
-                                  variant="secondary"
-                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
-                                >
-                                  <Lock className="h-2 w-2" />
-                                  PAID
-                                </Badge>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {upgradeTooltip}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
-                        {canSelectDevWallet ? (
-                          <button
-                            type="button"
-                            onClick={() => field.handleChange("use_main")}
-                            className={cn(
-                              "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                              field.state.value === "use_main"
-                                ? "border-primary bg-primary/5 font-medium"
-                                : "border-muted hover:border-muted-foreground/50"
-                            )}
-                          >
-                            <Wallet className="h-4 w-4" />
-                            Main Wallet
-                          </button>
-                        ) : (
-                          <Tooltip>
-                            <TooltipTrigger asChild>
-                              <span className="relative inline-flex">
-                                <button
-                                  type="button"
-                                  disabled
-                                  className={cn(
-                                    "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                                    field.state.value === "use_main"
-                                      ? "border-primary bg-primary/5 font-medium"
-                                      : "border-muted",
-                                    lockedClass
-                                  )}
-                                >
-                                  <Wallet className="h-4 w-4" />
-                                  Main Wallet
-                                </button>
-                                <Badge
-                                  variant="secondary"
-                                  className="opacity-70 pointer-events-none absolute left-1/2 -top-4 h-5 -translate-x-1/2 border border-border/60 bg-secondary/70 px-1.5 text-[10px] uppercase tracking-wide shadow-sm"
-                                >
-                                  <Lock className="h-2 w-2" />
-                                  PAID
-                                </Badge>
-                              </span>
-                            </TooltipTrigger>
-                            <TooltipContent side="top">
-                              {upgradeTooltip}
-                            </TooltipContent>
-                          </Tooltip>
-                        )}
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => field.handleChange("generate")}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                field.state.value === "generate"
+                                  ? "border-primary bg-primary/5 font-medium"
+                                  : "border-muted hover:border-muted-foreground/50"
+                              )}
+                            >
+                              <Sparkles className="h-4 w-4" />
+                              Generate
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            {nonSystemDevWalletTooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => field.handleChange("import")}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                field.state.value === "import"
+                                  ? "border-primary bg-primary/5 font-medium"
+                                  : "border-muted hover:border-muted-foreground/50"
+                              )}
+                            >
+                              <Import className="h-4 w-4" />
+                              Import
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            {nonSystemDevWalletTooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => field.handleChange("use_main")}
+                              className={cn(
+                                "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                field.state.value === "use_main"
+                                  ? "border-primary bg-primary/5 font-medium"
+                                  : "border-muted hover:border-muted-foreground/50"
+                              )}
+                            >
+                              <Wallet className="h-4 w-4" />
+                              Main Wallet
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            {nonSystemDevWalletTooltip}
+                          </TooltipContent>
+                        </Tooltip>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <span className="relative inline-flex">
+                              <button
+                                type="button"
+                                onClick={() => field.handleChange("system")}
+                                className={cn(
+                                  "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
+                                  field.state.value === "system"
+                                    ? "border-primary bg-primary/5 font-medium"
+                                    : "border-muted hover:border-muted-foreground/50"
+                                )}
+                              >
+                                <Shield className="h-4 w-4" />
+                                Ballistik Wallet
+                              </button>
+                              <Badge
+                                variant="secondary"
+                                className={cn(freeBadgeClass)}
+                              >
+                                FREE
+                              </Badge>
+                            </span>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            Platform-provided dev wallet. No extra dev-wallet
+                            usage fee for this option.
+                          </TooltipContent>
+                        </Tooltip>
                       </div>
                     );
                   }}
@@ -1499,7 +1425,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                     <div className="mt-2 h-9">
                       {devWalletOption === "system" && (
                         <p className="text-sm text-muted-foreground flex items-center h-full">
-                          Platform-provided dev wallet will be used for this
+                          Ballistik platform dev wallet will be used for this
                           launch
                         </p>
                       )}
@@ -1686,7 +1612,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 value,
                                 fieldApi.form as BundlerWalletFormSlice
                               ),
-                            onChangeListenTo: ["mayhemMode", "bundleBuyEnabled"],
+                            onChangeListenTo: [
+                              "mayhemMode",
+                              "bundleBuyEnabled",
+                            ],
                           }}
                         >
                           {(field) => {
@@ -1984,6 +1913,10 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   const bundleFeeDisplaySol = values.bundleBuyEnabled
                     ? usageFees.bundleBuyFeeSol
                     : bundleBuyFeeSol;
+                  const customDevWalletFeeDisplaySol =
+                    values.devWalletOption !== "system"
+                      ? usageFees.nonSystemDevWalletFeeSol
+                      : nonSystemDevWalletFeeSol;
                   const reviewDescription = getReviewDescription(
                     values.description,
                     values.removeAttribution
@@ -2083,7 +2016,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               </span>
                               <span>
                                 {values.devWalletOption === "system"
-                                  ? "System Wallet"
+                                  ? "Ballistik Wallet"
                                   : values.devWalletOption === "import"
                                     ? "Imported wallet"
                                     : values.devWalletOption === "generate"
@@ -2201,6 +2134,20 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                               </div>
                               <span className="tabular-nums">
                                 {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
+                              </span>
+                            </div>
+                            <div
+                              className={cn(
+                                "flex items-center justify-between",
+                                values.devWalletOption === "system" &&
+                                  "opacity-50 line-through"
+                              )}
+                            >
+                              <div className="text-muted-foreground">
+                                Custom dev wallet fee
+                              </div>
+                              <span className="tabular-nums">
+                                {customDevWalletFeeDisplaySol.toFixed(4)} SOL
                               </span>
                             </div>
                             <div

@@ -235,6 +235,7 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
         return {
           generatedWalletFeeSol: fees.generatedWalletFeeSol,
           generatedWalletCount: fees.generatedWalletCount,
+          nonSystemDevWalletFeeSol: fees.nonSystemDevWalletFeeSol,
           vanityMintFeeSol: fees.vanityMintFeeSol,
           attributionRemovalFeeSol: fees.descriptionAttributionRemovalFeeSol,
           bundleBuyFeeSol: fees.bundleBuyFeeSol,
@@ -592,7 +593,7 @@ async function buildStatsResponse(
 
   const isComplete = currentPrice?.isComplete ?? false;
 
-  const defaultCosts = { platformFees: 0, launchFees: 0, launchFeeBreakdown: null as { generatedWalletFeeSol: number; generatedWalletCount: number; vanityMintFeeSol: number; attributionRemovalFeeSol: number; bundleBuyFeeSol: number } | null, exitFees: 0, volumeBotFees: 0, jitoTipsSol: 0, totalFees: 0, devBuySol: 0, creationCostSol: 0 };
+  const defaultCosts = { platformFees: 0, launchFees: 0, launchFeeBreakdown: null as { generatedWalletFeeSol: number; generatedWalletCount: number; nonSystemDevWalletFeeSol: number; vanityMintFeeSol: number; attributionRemovalFeeSol: number; bundleBuyFeeSol: number } | null, exitFees: 0, volumeBotFees: 0, jitoTipsSol: 0, totalFees: 0, devBuySol: 0, creationCostSol: 0 };
 
   const results = await Promise.allSettled([
     getOperationalCosts(tokenPublicKey, userId),

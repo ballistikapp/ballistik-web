@@ -2,6 +2,7 @@ export const generatedWalletFeeSol = 0.02;
 export const vanityMintFeeSol = 0.1;
 export const descriptionAttributionRemovalFeeSol = 0.1;
 export const bundleBuyFeeSol = 0.1;
+export const nonSystemDevWalletFeeSol = 0.1;
 
 export type LaunchUsageFeeInput = {
   devWalletOption: "system" | "import" | "generate" | "use_main";
@@ -17,6 +18,7 @@ export type LaunchUsageFeeBreakdown = {
   platformFeeDiscountRate: number;
   generatedWalletCount: number;
   generatedWalletFeeSol: number;
+  nonSystemDevWalletFeeSol: number;
   vanityMintFeeSol: number;
   descriptionAttributionRemovalFeeSol: number;
   bundleBuyFeeSol: number;
@@ -65,8 +67,11 @@ export function calculateLaunchUsageFees(
     ? descriptionAttributionRemovalFeeSol
     : 0;
   const bundleBuyFeeValue = input.bundleBuyEnabled ? bundleBuyFeeSol : 0;
+  const nonSystemDevWalletValue =
+    input.devWalletOption !== "system" ? nonSystemDevWalletFeeSol : 0;
   const totalFeeSol =
     generatedWalletFeeValue +
+    nonSystemDevWalletValue +
     vanityFeeValue +
     attributionRemovalFeeValue +
     bundleBuyFeeValue;
@@ -75,6 +80,7 @@ export function calculateLaunchUsageFees(
     platformFeeDiscountRate: 0,
     generatedWalletCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
+    nonSystemDevWalletFeeSol: nonSystemDevWalletValue,
     vanityMintFeeSol: vanityFeeValue,
     descriptionAttributionRemovalFeeSol: attributionRemovalFeeValue,
     bundleBuyFeeSol: bundleBuyFeeValue,
@@ -104,6 +110,7 @@ export function waiveLaunchUsageFees(
     platformFeeWaived: true,
     platformFeeDiscountRate: 1,
     generatedWalletFeeSol: 0,
+    nonSystemDevWalletFeeSol: 0,
     vanityMintFeeSol: 0,
     descriptionAttributionRemovalFeeSol: 0,
     bundleBuyFeeSol: 0,
