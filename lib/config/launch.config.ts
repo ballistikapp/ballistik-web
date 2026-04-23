@@ -60,6 +60,9 @@ const baseLaunchConfig = {
   minCreatorBalanceLamports: BigInt(20_000_000),
 };
 
+/** Safe to import from client components — does not read env. */
+export const MAX_BUNDLE_WALLETS = baseLaunchConfig.maxBundleWallets;
+
 let cachedLaunchConfig: LaunchConfig | null = null;
 
 export const getLaunchConfig = (): LaunchConfig => {

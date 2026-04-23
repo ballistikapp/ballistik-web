@@ -5,10 +5,12 @@ import { AppError, isAppError } from "@/server/errors";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { logger } from "@/lib/logger";
 import {
-  launchTokenSchema,
+  launchInputFromStorageSchema,
+  type LaunchInputFromStorage,
   type LaunchPreviewCostsInput,
   type LaunchTokenInput,
 } from "@/server/schemas/launch.schema";
+import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
 import {
@@ -66,7 +68,7 @@ import {
 type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 type LaunchRecord = Prisma.LaunchGetPayload<Prisma.LaunchDefaultArgs>;
 type RequestUser = Pick<ContextUser, "id" | "plan">;
-type StoredLaunchInput = LaunchTokenInput & {
+type StoredLaunchInput = LaunchInputFromStorage & {
   entitlementSnapshot?: {
     plan: ContextUser["plan"];
     launchRealtimeEnabled: boolean;
@@ -83,7 +85,7 @@ function lamportsToSol(lamports: bigint) {
   return Number(lamports) / LAMPORTS_PER_SOL;
 }
 
-const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
+const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.05;
 const MIN_BUNDLER_BUY_AMOUNT_LAMPORTS = toLamports(MIN_BUNDLER_BUY_AMOUNT_SOL);
 
 function normalizeSymbol(symbol: string) {
@@ -93,24 +95,25 @@ function normalizeSymbol(symbol: string) {
 const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
 
 function applyLaunchFeePolicy(
-  input: LaunchTokenInput | LaunchPreviewCostsInput,
+  input: LaunchTokenInput | LaunchPreviewCostsInput | LaunchCostInput,
   user: Pick<ContextUser, "plan">
 ) {
-  const usageFees = calculateLaunchUsageFees({
+  const feeInput: LaunchUsageFeeInput = {
     devWalletOption: input.devWalletOption,
     bundleBuyEnabled: input.bundleBuyEnabled,
     bundlerWalletCount: input.bundlerWalletCount,
     distributionWalletMultiplier: input.distributionWalletMultiplier,
     vanityMint: input.vanityMint,
     removeAttribution: input.removeAttribution,
-  });
+  };
+  const usageFees = calculateLaunchUsageFees(feeInput);
   const discountRate = grpcAccessService.getPlatformFeeDiscountRate(user);
   if (discountRate >= 1) return waiveLaunchUsageFees(usageFees);
   if (discountRate > 0) return discountLaunchUsageFees(usageFees, discountRate);
   return usageFees;
 }
 
-function composeTokenDescription(input: LaunchTokenInput) {
+function composeTokenDescription(input: LaunchInputFromStorage) {
   const baseDescription = input.description?.trim() || "";
   if (input.removeAttribution) {
     return baseDescription;
@@ -172,7 +175,7 @@ type BundlerBuyTarget = {
 };
 
 type LaunchCostInput = Pick<
-  LaunchTokenInput,
+  LaunchInputFromStorage,
   | "devWalletOption"
   | "importedDevWalletKey"
   | "devBuyAmountSol"
@@ -329,7 +332,7 @@ function resolveLaunchClientMessage(error: unknown, message: string) {
 }
 
 function buildLaunchRecoveryData(
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   mainWalletPublicKey: string,
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
@@ -352,7 +355,7 @@ function buildLaunchRecoveryData(
 
 function buildLaunchRecoveryWalletRows(
   launchId: string,
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   mainWalletPublicKey: string,
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
@@ -391,7 +394,7 @@ function buildLaunchRecoveryWalletRows(
 
 async function persistLaunchRecoveryWallets(
   launchId: string,
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   mainWalletPublicKey: string,
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
@@ -449,7 +452,7 @@ async function setLaunchRecovery(
 }
 
 function buildTokenMetadata(
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   file: File,
   bannerFile?: File | null
 ): PumpMetadataUpload {
@@ -1347,6 +1350,8 @@ type LaunchCostPreview = {
     descriptionAttributionRemovalFeeSol: number;
     bundleBuyFeeSol: number;
     vanityMintFeeSol: number;
+    generatedWalletCount: number;
+    generatedWalletsBilledForFeeCount: number;
     generatedWalletFeeSol: number;
     nonSystemDevWalletFeeSol: number;
     devBuySol: number;
@@ -1661,6 +1666,9 @@ async function calculateLaunchCostPreview(
         usageFees.descriptionAttributionRemovalFeeSol,
       bundleBuyFeeSol: usageFees.bundleBuyFeeSol,
       vanityMintFeeSol: usageFees.vanityMintFeeSol,
+      generatedWalletCount: usageFees.generatedWalletCount,
+      generatedWalletsBilledForFeeCount:
+        usageFees.generatedWalletsBilledForFeeCount,
       generatedWalletFeeSol: usageFees.generatedWalletFeeSol,
       nonSystemDevWalletFeeSol: usageFees.nonSystemDevWalletFeeSol,
       devBuySol: devBuyAmountSol,
@@ -1699,7 +1707,7 @@ async function calculateLaunchCostPreview(
 }
 
 async function resolveDevWallet(
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   userId: string,
   mainWalletKeypair: Keypair,
   mainWalletPublicKey: string
@@ -2174,7 +2182,7 @@ async function distributeTokensToWallets(
 }
 
 async function persistTokenPending(
-  input: LaunchTokenInput,
+  input: LaunchInputFromStorage,
   tokenImageUrl: string | null,
   userId: string,
   mintPublicKey: string,
@@ -3343,14 +3351,23 @@ export const launchService = {
         );
       }
 
-      const parsedInput = launchTokenSchema.safeParse(sourceLaunch.input);
+      const parsedInput = launchInputFromStorageSchema.safeParse(
+        sourceLaunch.input
+      );
       if (!parsedInput.success) {
         throw new AppError(
           "Launch retry is unavailable because original input is no longer valid",
           400
         );
       }
-      const retryInput: LaunchTokenInput = parsedInput.data;
+      const parsed = parsedInput.data;
+      if (parsed.devWalletOption === "system") {
+        throw new AppError(
+          "The platform dev wallet is no longer available. Create a new launch and choose Generate, Import, or Main wallet for the dev wallet.",
+          400
+        );
+      }
+      const retryInput = parsed as LaunchTokenInput;
       await ensureLaunchFundingAvailable(retryInput, user);
       const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
         user,

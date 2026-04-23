@@ -19,6 +19,8 @@ import {
 interface LaunchFeeBreakdown {
   generatedWalletFeeSol: number;
   generatedWalletCount: number;
+  /** Present for launches after generated-wallet fee change; else use generatedWalletCount. */
+  generatedWalletsBilledForFeeCount?: number;
   nonSystemDevWalletFeeSol: number;
   vanityMintFeeSol: number;
   attributionRemovalFeeSol: number;
@@ -109,18 +111,19 @@ interface CostItem {
 function buildLaunchFeeChildren(bd: LaunchFeeBreakdown): CostItem[] {
   const items: CostItem[] = [];
   if (bd.generatedWalletFeeSol > 0) {
+    const billed =
+      bd.generatedWalletsBilledForFeeCount ?? bd.generatedWalletCount;
     items.push({
-      label: `Generated Wallets (${bd.generatedWalletCount})`,
+      label: `Generated Wallets (${billed})`,
       value: bd.generatedWalletFeeSol,
-      tooltip: `Fee for generating ${bd.generatedWalletCount} operational wallets`,
+      tooltip: `Fee for ${billed} generated operational wallets (bundler/distribution; dev keypair is not charged)`,
     });
   }
   if ((bd.nonSystemDevWalletFeeSol ?? 0) > 0) {
     items.push({
       label: "Custom dev wallet",
       value: bd.nonSystemDevWalletFeeSol,
-      tooltip:
-        "Usage fee when the launch uses an imported, generated, or main-wallet dev wallet instead of the platform system dev wallet",
+      tooltip: "Legacy launch usage line item (no longer charged for new launches)",
     });
   }
   if (bd.vanityMintFeeSol > 0) {

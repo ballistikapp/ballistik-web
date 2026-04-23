@@ -13,7 +13,6 @@ import {
   Wallet,
   ChevronRight,
   ChevronsUpDown,
-  Shield,
 } from "lucide-react";
 import Image from "next/image";
 import {
@@ -28,7 +27,6 @@ import {
   CommandList,
 } from "@/components/ui/command";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   PageSection,
   PageSectionDivider,
@@ -73,12 +71,9 @@ import {
   discountLaunchUsageFees,
   waiveLaunchUsageFees,
   vanityMintFeeSol,
-  nonSystemDevWalletFeeSol,
 } from "@/lib/config/usage-fees.config";
 import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
-import { getLaunchConfig } from "@/lib/config/launch.config";
-
-const MAX_BUNDLE_WALLETS = getLaunchConfig().maxBundleWallets;
+import { MAX_BUNDLE_WALLETS } from "@/lib/config/launch.config";
 
 const DEV_BUY_SOL_MIN = 0.05;
 const DEV_BUY_SOL_MAX = 100;
@@ -158,7 +153,7 @@ const formSchema = z
     twitter: z.string(),
     telegram: z.string(),
     website: z.string(),
-    devWalletOption: z.enum(["system", "import", "generate", "use_main"]),
+    devWalletOption: z.enum(["import", "generate", "use_main"]),
     importedDevWalletKey: z.string(),
     devBuyAmountSol: devBuyAmountSolSchema,
     jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
@@ -244,7 +239,7 @@ const readVideoDimensions = (file: File) =>
   });
 
 function calculateLaunchTotals(values: {
-  devWalletOption: "system" | "import" | "generate" | "use_main";
+  devWalletOption: "import" | "generate" | "use_main";
   devBuyAmountSol: number;
   jitoTipAmountSol: number;
   bundleBuyEnabled: boolean;
@@ -625,11 +620,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     twitter: "",
     telegram: "",
     website: "",
-    devWalletOption: "generate" as
-      | "system"
-      | "import"
-      | "generate"
-      | "use_main",
+    devWalletOption: "generate" as "import" | "generate" | "use_main",
     importedDevWalletKey: "",
     devBuyAmountSol: 0.5,
     jitoTipAmountSol: 0.001,
@@ -1250,10 +1241,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 </div>
                 <form.Field name="devWalletOption">
                   {(field) => {
-                    const nonSystemDevWalletTooltip =
-                      "Adds a usage fee on launch. Pro waives platform fees; Developer gets the same discount as on other launch fees.";
-                    const freeBadgeClass =
-                      "pointer-events-none absolute -top-3 h-5 -right-2 border border-border/60 bg-secondary px-1.5 text-[10px] uppercase tracking-wide shadow-sm";
+                    const customDevWalletTooltip =
+                      "Pro waives platform fees; Developer plan gets the same discount as on other launch usage fees where applicable.";
                     return (
                       <div className="flex flex-wrap gap-2">
                         <Tooltip>
@@ -1273,7 +1262,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            {nonSystemDevWalletTooltip}
+                            {customDevWalletTooltip}
                           </TooltipContent>
                         </Tooltip>
                         <Tooltip>
@@ -1293,7 +1282,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            {nonSystemDevWalletTooltip}
+                            {customDevWalletTooltip}
                           </TooltipContent>
                         </Tooltip>
                         <Tooltip>
@@ -1313,36 +1302,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             </button>
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            {nonSystemDevWalletTooltip}
-                          </TooltipContent>
-                        </Tooltip>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <span className="relative inline-flex">
-                              <button
-                                type="button"
-                                onClick={() => field.handleChange("system")}
-                                className={cn(
-                                  "flex items-center gap-2 px-3 py-2 rounded-md border transition-all text-sm",
-                                  field.state.value === "system"
-                                    ? "border-primary bg-primary/5 font-medium"
-                                    : "border-muted hover:border-muted-foreground/50"
-                                )}
-                              >
-                                <Shield className="h-4 w-4" />
-                                Ballistik Wallet
-                              </button>
-                              <Badge
-                                variant="secondary"
-                                className={cn(freeBadgeClass)}
-                              >
-                                FREE
-                              </Badge>
-                            </span>
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            Platform-provided dev wallet. No extra dev-wallet
-                            usage fee for this option.
+                            {customDevWalletTooltip}
                           </TooltipContent>
                         </Tooltip>
                       </div>
@@ -1354,12 +1314,6 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                 >
                   {(devWalletOption) => (
                     <div className="mt-2 h-9">
-                      {devWalletOption === "system" && (
-                        <p className="text-sm text-muted-foreground flex items-center h-full">
-                          Ballistik platform dev wallet will be used for this
-                          launch
-                        </p>
-                      )}
                       {devWalletOption === "import" && (
                         <form.Field name="importedDevWalletKey">
                           {(field) => {
@@ -1811,10 +1765,6 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                   const bundleFeeDisplaySol = values.bundleBuyEnabled
                     ? usageFees.bundleBuyFeeSol
                     : bundleBuyFeeSol;
-                  const customDevWalletFeeDisplaySol =
-                    values.devWalletOption !== "system"
-                      ? usageFees.nonSystemDevWalletFeeSol
-                      : nonSystemDevWalletFeeSol;
                   const reviewDescription = getReviewDescription(
                     values.description,
                     values.removeAttribution
@@ -1913,13 +1863,11 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 Dev Wallet
                               </span>
                               <span>
-                                {values.devWalletOption === "system"
-                                  ? "Ballistik Wallet"
-                                  : values.devWalletOption === "import"
-                                    ? "Imported wallet"
-                                    : values.devWalletOption === "generate"
-                                      ? "Will be generated"
-                                      : "Main Wallet (used as dev)"}
+                                {values.devWalletOption === "import"
+                                  ? "Imported wallet"
+                                  : values.devWalletOption === "generate"
+                                    ? "Will be generated"
+                                    : "Main Wallet (used as dev)"}
                               </span>
                             </div>
                             <div className="grid grid-cols-[140px_1fr] gap-2">
@@ -2018,34 +1966,33 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                             <div
                               className={cn(
                                 "flex items-center justify-between",
-                                usageFees.generatedWalletCount === 0 &&
-                                  "opacity-50 line-through"
+                                usageFees.generatedWalletsBilledForFeeCount ===
+                                  0 && "opacity-50 line-through"
                               )}
                             >
                               <div className="text-muted-foreground">
                                 Generated wallets fee
                                 <span className="ml-2 text-xs">
-                                  ({usageFees.generatedWalletCount} wallets)
+                                  (
+                                  {usageFees.generatedWalletsBilledForFeeCount}{" "}
+                                  wallets)
                                 </span>
                               </div>
                               <span className="tabular-nums">
                                 {usageFees.generatedWalletFeeSol.toFixed(4)} SOL
                               </span>
                             </div>
-                            <div
-                              className={cn(
-                                "flex items-center justify-between",
-                                values.devWalletOption === "system" &&
-                                  "opacity-50 line-through"
-                              )}
-                            >
-                              <div className="text-muted-foreground">
-                                Custom dev wallet fee
+                            {usageFees.nonSystemDevWalletFeeSol > 0 && (
+                              <div className="flex items-center justify-between">
+                                <div className="text-muted-foreground">
+                                  Custom dev wallet fee
+                                </div>
+                                <span className="tabular-nums">
+                                  {usageFees.nonSystemDevWalletFeeSol.toFixed(4)}{" "}
+                                  SOL
+                                </span>
                               </div>
-                              <span className="tabular-nums">
-                                {customDevWalletFeeDisplaySol.toFixed(4)} SOL
-                              </span>
-                            </div>
+                            )}
                             <div
                               className={cn(
                                 "flex items-center justify-between",

@@ -41,6 +41,7 @@ interface PnlData {
   launchFeeBreakdown: {
     generatedWalletFeeSol: number;
     generatedWalletCount: number;
+    generatedWalletsBilledForFeeCount?: number;
     nonSystemDevWalletFeeSol: number;
     vanityMintFeeSol: number;
     attributionRemovalFeeSol: number;

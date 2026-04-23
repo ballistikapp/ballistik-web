@@ -2,7 +2,8 @@ export const generatedWalletFeeSol = 0.02;
 export const vanityMintFeeSol = 0.1;
 export const descriptionAttributionRemovalFeeSol = 0.1;
 export const bundleBuyFeeSol = 0.1;
-export const nonSystemDevWalletFeeSol = 0.1;
+/** Legacy: was 0.1 SOL; launch no longer charges a non-system dev wallet fee. */
+export const nonSystemDevWalletFeeSol = 0;
 
 export type LaunchUsageFeeInput = {
   devWalletOption: "system" | "import" | "generate" | "use_main";
@@ -16,7 +17,10 @@ export type LaunchUsageFeeInput = {
 export type LaunchUsageFeeBreakdown = {
   platformFeeWaived: boolean;
   platformFeeDiscountRate: number;
+  /** All generated keypairs (dev + bundler + distribution) for display and limits. */
   generatedWalletCount: number;
+  /** Wallets that count toward the 0.02/SOL line (excludes the dev keypair when generating a new dev wallet). */
+  generatedWalletsBilledForFeeCount: number;
   generatedWalletFeeSol: number;
   nonSystemDevWalletFeeSol: number;
   vanityMintFeeSol: number;
@@ -61,14 +65,20 @@ export function calculateLaunchUsageFees(
   input: LaunchUsageFeeInput
 ): LaunchUsageFeeBreakdown {
   const generatedWalletCount = calculateLaunchGeneratedWalletCount(input);
-  const generatedWalletFeeValue = generatedWalletCount * generatedWalletFeeSol;
+  const devKeypairExemptFromGeneratedFee =
+    input.devWalletOption === "generate" ? 1 : 0;
+  const generatedWalletsBilledForFeeCount = Math.max(
+    0,
+    generatedWalletCount - devKeypairExemptFromGeneratedFee
+  );
+  const generatedWalletFeeValue =
+    generatedWalletsBilledForFeeCount * generatedWalletFeeSol;
   const vanityFeeValue = input.vanityMint ? vanityMintFeeSol : 0;
   const attributionRemovalFeeValue = input.removeAttribution
     ? descriptionAttributionRemovalFeeSol
     : 0;
   const bundleBuyFeeValue = input.bundleBuyEnabled ? bundleBuyFeeSol : 0;
-  const nonSystemDevWalletValue =
-    input.devWalletOption !== "system" ? nonSystemDevWalletFeeSol : 0;
+  const nonSystemDevWalletValue = 0;
   const totalFeeSol =
     generatedWalletFeeValue +
     nonSystemDevWalletValue +
@@ -79,6 +89,7 @@ export function calculateLaunchUsageFees(
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,
     generatedWalletCount,
+    generatedWalletsBilledForFeeCount,
     generatedWalletFeeSol: generatedWalletFeeValue,
     nonSystemDevWalletFeeSol: nonSystemDevWalletValue,
     vanityMintFeeSol: vanityFeeValue,
@@ -109,6 +120,7 @@ export function waiveLaunchUsageFees(
     ...breakdown,
     platformFeeWaived: true,
     platformFeeDiscountRate: 1,
+    generatedWalletsBilledForFeeCount: 0,
     generatedWalletFeeSol: 0,
     nonSystemDevWalletFeeSol: 0,
     vanityMintFeeSol: 0,

@@ -20,7 +20,6 @@ import {
 import {
   bundleBuyFeeSol,
   descriptionAttributionRemovalFeeSol,
-  nonSystemDevWalletFeeSol,
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
 import { trpc } from "@/lib/trpc/client";
@@ -38,7 +37,7 @@ interface LaunchOverviewDialogProps {
     twitter: string;
     telegram: string;
     website: string;
-    devWalletOption: "system" | "import" | "generate" | "use_main";
+    devWalletOption: "import" | "generate" | "use_main" | "system";
     importedDevWalletKey: string;
     devBuyAmountSol: number;
     jitoTipAmountSol: number;
@@ -67,7 +66,10 @@ export function LaunchOverviewDialog({
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
   const previewInput = React.useMemo(
     () => ({
-      devWalletOption: launchInput.devWalletOption,
+      devWalletOption:
+        launchInput.devWalletOption === "system"
+          ? "generate"
+          : launchInput.devWalletOption,
       importedDevWalletKey:
         launchInput.devWalletOption === "import"
           ? launchInput.importedDevWalletKey
@@ -112,10 +114,7 @@ export function LaunchOverviewDialog({
     ? (preview?.lineItems.bundleBuyFeeSol ?? bundleBuyFeeSol)
     : bundleBuyFeeSol;
   const customDevWalletFeeDisplaySol =
-    launchInput.devWalletOption !== "system"
-      ? (preview?.lineItems.nonSystemDevWalletFeeSol ??
-        nonSystemDevWalletFeeSol)
-      : nonSystemDevWalletFeeSol;
+    preview?.lineItems.nonSystemDevWalletFeeSol ?? 0;
   const temporaryReserveItems = preview
     ? [
         {
@@ -396,7 +395,8 @@ export function LaunchOverviewDialog({
                   <div className="mt-2 space-y-2">
                     <div
                       className={`flex items-center justify-between ${
-                        generatedWalletCount === 0
+                        preview.lineItems.generatedWalletsBilledForFeeCount ===
+                        0
                           ? "opacity-50 line-through"
                           : ""
                       }`}
@@ -404,27 +404,25 @@ export function LaunchOverviewDialog({
                       <div className="text-muted-foreground">
                         Generated wallets fee
                         <span className="ml-2 text-xs">
-                          ({generatedWalletCount} wallets)
+                          (
+                          {preview.lineItems.generatedWalletsBilledForFeeCount}{" "}
+                          wallets)
                         </span>
                       </div>
                       <span className="tabular-nums">
                         {preview.lineItems.generatedWalletFeeSol.toFixed(4)} SOL
                       </span>
                     </div>
-                    <div
-                      className={`flex items-center justify-between ${
-                        launchInput.devWalletOption === "system"
-                          ? "opacity-50 line-through"
-                          : ""
-                      }`}
-                    >
-                      <div className="text-muted-foreground">
-                        Custom dev wallet fee
+                    {customDevWalletFeeDisplaySol > 0 && (
+                      <div className="flex items-center justify-between">
+                        <div className="text-muted-foreground">
+                          Custom dev wallet fee
+                        </div>
+                        <span className="tabular-nums">
+                          {customDevWalletFeeDisplaySol.toFixed(4)} SOL
+                        </span>
                       </div>
-                      <span className="tabular-nums">
-                        {customDevWalletFeeDisplaySol.toFixed(4)} SOL
-                      </span>
-                    </div>
+                    )}
                     <div
                       className={`flex items-center justify-between ${
                         launchInput.vanityMint ? "" : "opacity-50 line-through"
