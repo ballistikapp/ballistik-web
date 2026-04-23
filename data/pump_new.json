@@ -1,0 +1,3256 @@
+{
+  "accounts": [
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "virtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "virtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "realTokenReserves", "type": "u64" },
+          { "docs": [], "name": "realSolReserves", "type": "u64" },
+          { "docs": [], "name": "tokenTotalSupply", "type": "u64" },
+          { "docs": [], "name": "complete", "type": "bool" },
+          { "docs": [], "name": "creator", "type": "pubkey" },
+          { "docs": [], "name": "isMayhemMode", "type": "bool" },
+          { "docs": [], "name": "isCashbackCoin", "type": "bool" }
+        ],
+        "kind": "struct"
+      },
+      "name": "BondingCurve"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "bump", "type": "u8" },
+          { "docs": [], "name": "admin", "type": "pubkey" },
+          { "docs": [], "name": "flatFees", "type": "Fees" },
+          { "docs": [], "name": "feeTiers", "type": "vec(FeeTier)" }
+        ],
+        "kind": "struct"
+      },
+      "name": "FeeConfig"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": ["Unused"], "name": "initialized", "type": "bool" },
+          { "docs": [], "name": "authority", "type": "pubkey" },
+          { "docs": [], "name": "feeRecipient", "type": "pubkey" },
+          { "docs": [], "name": "initialVirtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "initialVirtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "initialRealTokenReserves", "type": "u64" },
+          { "docs": [], "name": "tokenTotalSupply", "type": "u64" },
+          { "docs": [], "name": "feeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "withdrawAuthority", "type": "pubkey" },
+          { "docs": ["Unused"], "name": "enableMigrate", "type": "bool" },
+          { "docs": [], "name": "poolMigrationFee", "type": "u64" },
+          { "docs": [], "name": "creatorFeeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "feeRecipients", "type": "array(pubkey, 7)" },
+          { "docs": [], "name": "setCreatorAuthority", "type": "pubkey" },
+          { "docs": [], "name": "adminSetCreatorAuthority", "type": "pubkey" },
+          { "docs": [], "name": "createV2Enabled", "type": "bool" },
+          { "docs": [], "name": "whitelistPda", "type": "pubkey" },
+          { "docs": [], "name": "reservedFeeRecipient", "type": "pubkey" },
+          { "docs": [], "name": "mayhemModeEnabled", "type": "bool" },
+          {
+            "docs": [],
+            "name": "reservedFeeRecipients",
+            "type": "array(pubkey, 7)"
+          },
+          { "docs": [], "name": "isCashbackEnabled", "type": "bool" }
+        ],
+        "kind": "struct"
+      },
+      "name": "Global"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "startTime", "type": "i64" },
+          { "docs": [], "name": "endTime", "type": "i64" },
+          { "docs": [], "name": "secondsInADay", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "totalTokenSupply", "type": "array(u64, 30)" },
+          { "docs": [], "name": "solVolumes", "type": "array(u64, 30)" }
+        ],
+        "kind": "struct"
+      },
+      "name": "GlobalVolumeAccumulator"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "bump", "type": "u8" },
+          { "docs": [], "name": "version", "type": "u8" },
+          { "docs": [], "name": "status", "type": "ConfigStatus" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "admin", "type": "pubkey" },
+          { "docs": [], "name": "adminRevoked", "type": "bool" },
+          { "docs": [], "name": "shareholders", "type": "vec(Shareholder)" }
+        ],
+        "kind": "struct"
+      },
+      "name": "SharingConfig"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "needsClaim", "type": "bool" },
+          { "docs": [], "name": "totalUnclaimedTokens", "type": "u64" },
+          { "docs": [], "name": "totalClaimedTokens", "type": "u64" },
+          { "docs": [], "name": "currentSolVolume", "type": "u64" },
+          { "docs": [], "name": "lastUpdateTimestamp", "type": "i64" },
+          { "docs": [], "name": "hasTotalClaimedTokens", "type": "bool" },
+          { "docs": [], "name": "cashbackEarned", "type": "u64" },
+          { "docs": [], "name": "totalCashbackClaimed", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "UserVolumeAccumulator"
+    }
+  ],
+  "errors": [
+    {
+      "code": "6000",
+      "message": "The given account is not authorized to execute this instruction.",
+      "name": "NotAuthorized"
+    },
+    {
+      "code": "6001",
+      "message": "The program is already initialized.",
+      "name": "AlreadyInitialized"
+    },
+    {
+      "code": "6002",
+      "message": "slippage: Too much SOL required to buy the given amount of tokens.",
+      "name": "TooMuchSolRequired"
+    },
+    {
+      "code": "6003",
+      "message": "slippage: Too little SOL received to sell the given amount of tokens.",
+      "name": "TooLittleSolReceived"
+    },
+    {
+      "code": "6004",
+      "message": "The mint does not match the bonding curve.",
+      "name": "MintDoesNotMatchBondingCurve"
+    },
+    {
+      "code": "6005",
+      "message": "The bonding curve has completed and liquidity migrated to raydium.",
+      "name": "BondingCurveComplete"
+    },
+    {
+      "code": "6006",
+      "message": "The bonding curve has not completed.",
+      "name": "BondingCurveNotComplete"
+    },
+    {
+      "code": "6007",
+      "message": "The program is not initialized.",
+      "name": "NotInitialized"
+    },
+    {
+      "code": "6008",
+      "message": "Withdraw too frequent",
+      "name": "WithdrawTooFrequent"
+    },
+    {
+      "code": "6009",
+      "message": "new_size should be > current_size",
+      "name": "NewSizeShouldBeGreaterThanCurrentSize"
+    },
+    {
+      "code": "6010",
+      "message": "Account type not supported",
+      "name": "AccountTypeNotSupported"
+    },
+    {
+      "code": "6011",
+      "message": "initial_real_token_reserves should be less than token_total_supply",
+      "name": "InitialRealTokenReservesShouldBeLessThanTokenTotalSupply"
+    },
+    {
+      "code": "6012",
+      "message": "initial_virtual_token_reserves should be greater than initial_real_token_reserves",
+      "name": "InitialVirtualTokenReservesShouldBeGreaterThanInitialRealTokenReserves"
+    },
+    {
+      "code": "6013",
+      "message": "fee_basis_points greater than maximum",
+      "name": "FeeBasisPointsGreaterThanMaximum"
+    },
+    {
+      "code": "6014",
+      "message": "Withdraw authority cannot be set to System Program ID",
+      "name": "AllZerosWithdrawAuthority"
+    },
+    {
+      "code": "6015",
+      "message": "pool_migration_fee should be less than final_real_sol_reserves",
+      "name": "PoolMigrationFeeShouldBeLessThanFinalRealSolReserves"
+    },
+    {
+      "code": "6016",
+      "message": "pool_migration_fee should be greater than creator_fee + MAX_MIGRATE_FEES",
+      "name": "PoolMigrationFeeShouldBeGreaterThanCreatorFeePlusMaxMigrateFees"
+    },
+    {
+      "code": "6017",
+      "message": "Migrate instruction is disabled",
+      "name": "DisabledWithdraw"
+    },
+    {
+      "code": "6018",
+      "message": "Migrate instruction is disabled",
+      "name": "DisabledMigrate"
+    },
+    {
+      "code": "6019",
+      "message": "Invalid creator pubkey",
+      "name": "InvalidCreator"
+    },
+    { "code": "6020", "message": "Buy zero amount", "name": "BuyZeroAmount" },
+    {
+      "code": "6021",
+      "message": "Not enough tokens to buy",
+      "name": "NotEnoughTokensToBuy"
+    },
+    { "code": "6022", "message": "Sell zero amount", "name": "SellZeroAmount" },
+    {
+      "code": "6023",
+      "message": "Not enough tokens to sell",
+      "name": "NotEnoughTokensToSell"
+    },
+    { "code": "6024", "message": "Overflow", "name": "Overflow" },
+    { "code": "6025", "message": "Truncation", "name": "Truncation" },
+    { "code": "6026", "message": "Division by zero", "name": "DivisionByZero" },
+    {
+      "code": "6027",
+      "message": "Not enough remaining accounts",
+      "name": "NotEnoughRemainingAccounts"
+    },
+    {
+      "code": "6028",
+      "message": "All fee recipients should be non-zero",
+      "name": "AllFeeRecipientsShouldBeNonZero"
+    },
+    {
+      "code": "6029",
+      "message": "Unsorted or not unique fee recipients",
+      "name": "UnsortedNotUniqueFeeRecipients"
+    },
+    {
+      "code": "6030",
+      "message": "Creator should not be zero",
+      "name": "CreatorShouldNotBeZero"
+    },
+    { "code": "6031", "message": "", "name": "StartTimeInThePast" },
+    { "code": "6032", "message": "", "name": "EndTimeInThePast" },
+    { "code": "6033", "message": "", "name": "EndTimeBeforeStartTime" },
+    { "code": "6034", "message": "", "name": "TimeRangeTooLarge" },
+    { "code": "6035", "message": "", "name": "EndTimeBeforeCurrentDay" },
+    { "code": "6036", "message": "", "name": "SupplyUpdateForFinishedRange" },
+    { "code": "6037", "message": "", "name": "DayIndexAfterEndIndex" },
+    { "code": "6038", "message": "", "name": "DayInActiveRange" },
+    { "code": "6039", "message": "", "name": "InvalidIncentiveMint" },
+    {
+      "code": "6040",
+      "message": "Buy: Not enough SOL to cover for rent exemption.",
+      "name": "BuyNotEnoughSolToCoverRent"
+    },
+    {
+      "code": "6041",
+      "message": "Buy: Not enough SOL to cover for fees.",
+      "name": "BuyNotEnoughSolToCoverFees"
+    },
+    {
+      "code": "6042",
+      "message": "Slippage: Would buy less tokens than expected min_tokens_out",
+      "name": "BuySlippageBelowMinTokensOut"
+    },
+    { "code": "6043", "message": "", "name": "NameTooLong" },
+    { "code": "6044", "message": "", "name": "SymbolTooLong" },
+    { "code": "6045", "message": "", "name": "UriTooLong" },
+    { "code": "6046", "message": "", "name": "CreateV2Disabled" },
+    { "code": "6047", "message": "", "name": "CpitializeMayhemFailed" },
+    { "code": "6048", "message": "", "name": "MayhemModeDisabled" },
+    {
+      "code": "6049",
+      "message": "creator has been migrated to sharing config, use pump_fees::reset_fee_sharing_config instead",
+      "name": "CreatorMigratedToSharingConfig"
+    },
+    {
+      "code": "6050",
+      "message": "creator_vault has been migrated to sharing config, use pump:distribute_creator_fees instead",
+      "name": "UnableToDistributeCreatorVaultMigratedToSharingConfig"
+    },
+    {
+      "code": "6051",
+      "message": "Sharing config is not active",
+      "name": "SharingConfigNotActive"
+    },
+    {
+      "code": "6052",
+      "message": "The recipient account is executable, so it cannot receive lamports, remove it from the team first",
+      "name": "UnableToDistributeCreatorFeesToExecutableRecipient"
+    },
+    {
+      "code": "6053",
+      "message": "Bonding curve creator does not match sharing config",
+      "name": "BondingCurveAndSharingConfigCreatorMismatch"
+    },
+    {
+      "code": "6054",
+      "message": "Remaining accounts do not match shareholders, make sure to pass exactly the same pubkeys in the same order",
+      "name": "ShareholdersAndRemainingAccountsMismatch"
+    },
+    {
+      "code": "6055",
+      "message": "Share bps must be greater than 0",
+      "name": "InvalidShareBps"
+    },
+    {
+      "code": "6056",
+      "message": "Cashback is not enabled",
+      "name": "CashbackNotEnabled"
+    }
+  ],
+  "events": [
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "adminSetCreatorAuthority", "type": "pubkey" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "oldCreator", "type": "pubkey" },
+          { "docs": [], "name": "newCreator", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "AdminSetCreatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [{ "docs": [], "name": "idlAuthority", "type": "pubkey" }],
+        "kind": "struct"
+      },
+      "name": "AdminSetIdlAuthorityEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "startTime", "type": "i64" },
+          { "docs": [], "name": "endTime", "type": "i64" },
+          { "docs": [], "name": "dayNumber", "type": "u64" },
+          { "docs": [], "name": "tokenSupplyPerDay", "type": "u64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "secondsInADay", "type": "i64" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "AdminUpdateTokenIncentivesEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "amount", "type": "u64" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "totalClaimed", "type": "u64" },
+          { "docs": [], "name": "totalCashbackEarned", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "ClaimCashbackEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "amount", "type": "u64" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "totalClaimedTokens", "type": "u64" },
+          { "docs": [], "name": "currentSolVolume", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "ClaimTokenIncentivesEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "totalUnclaimedTokens", "type": "u64" },
+          { "docs": [], "name": "totalClaimedTokens", "type": "u64" },
+          { "docs": [], "name": "currentSolVolume", "type": "u64" },
+          { "docs": [], "name": "lastUpdateTimestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "CloseUserVolumeAccumulatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "creator", "type": "pubkey" },
+          { "docs": [], "name": "creatorFee", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "CollectCreatorFeeEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "CompleteEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "mintAmount", "type": "u64" },
+          { "docs": [], "name": "solAmount", "type": "u64" },
+          { "docs": [], "name": "poolMigrationFee", "type": "u64" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "pool", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "CompletePumpAmmMigrationEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "name", "type": "string" },
+          { "docs": [], "name": "symbol", "type": "string" },
+          { "docs": [], "name": "uri", "type": "string" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "creator", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "virtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "virtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "realTokenReserves", "type": "u64" },
+          { "docs": [], "name": "tokenTotalSupply", "type": "u64" },
+          { "docs": [], "name": "tokenProgram", "type": "pubkey" },
+          { "docs": [], "name": "isMayhemMode", "type": "bool" },
+          { "docs": [], "name": "isCashbackEnabled", "type": "bool" }
+        ],
+        "kind": "struct"
+      },
+      "name": "CreateEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "sharingConfig", "type": "pubkey" },
+          { "docs": [], "name": "admin", "type": "pubkey" },
+          { "docs": [], "name": "shareholders", "type": "vec(Shareholder)" },
+          { "docs": [], "name": "distributed", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "DistributeCreatorFeesEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "account", "type": "pubkey" },
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "currentSize", "type": "u64" },
+          { "docs": [], "name": "newSize", "type": "u64" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "ExtendAccountEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "payer", "type": "pubkey" },
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "InitUserVolumeAccumulatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "sharingConfig", "type": "pubkey" },
+          { "docs": [], "name": "oldCreator", "type": "pubkey" },
+          { "docs": [], "name": "newCreator", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "MigrateBondingCurveCreatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "minimumRequired", "type": "u64" },
+          { "docs": [], "name": "distributableFees", "type": "u64" },
+          { "docs": [], "name": "canDistribute", "type": "bool" }
+        ],
+        "kind": "struct"
+      },
+      "name": "MinimumDistributableFeeEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "reservedFeeRecipient", "type": "pubkey" },
+          {
+            "docs": [],
+            "name": "reservedFeeRecipients",
+            "type": "array(pubkey, 7)"
+          }
+        ],
+        "kind": "struct"
+      },
+      "name": "ReservedFeeRecipientsEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "creator", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "SetCreatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "bondingCurve", "type": "pubkey" },
+          { "docs": [], "name": "metadata", "type": "pubkey" },
+          { "docs": [], "name": "creator", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "SetMetaplexCreatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "initialVirtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "initialVirtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "initialRealTokenReserves", "type": "u64" },
+          { "docs": [], "name": "finalRealSolReserves", "type": "u64" },
+          { "docs": [], "name": "tokenTotalSupply", "type": "u64" },
+          { "docs": [], "name": "feeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "withdrawAuthority", "type": "pubkey" },
+          { "docs": [], "name": "enableMigrate", "type": "bool" },
+          { "docs": [], "name": "poolMigrationFee", "type": "u64" },
+          { "docs": [], "name": "creatorFeeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "feeRecipients", "type": "array(pubkey, 8)" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "setCreatorAuthority", "type": "pubkey" },
+          { "docs": [], "name": "adminSetCreatorAuthority", "type": "pubkey" }
+        ],
+        "kind": "struct"
+      },
+      "name": "SetParamsEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "totalClaimedTokensBefore", "type": "u64" },
+          { "docs": [], "name": "totalClaimedTokensAfter", "type": "u64" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "SyncUserVolumeAccumulatorEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "solAmount", "type": "u64" },
+          { "docs": [], "name": "tokenAmount", "type": "u64" },
+          { "docs": [], "name": "isBuy", "type": "bool" },
+          { "docs": [], "name": "user", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "virtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "virtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "realSolReserves", "type": "u64" },
+          { "docs": [], "name": "realTokenReserves", "type": "u64" },
+          { "docs": [], "name": "feeRecipient", "type": "pubkey" },
+          { "docs": [], "name": "feeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "fee", "type": "u64" },
+          { "docs": [], "name": "creator", "type": "pubkey" },
+          { "docs": [], "name": "creatorFeeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "creatorFee", "type": "u64" },
+          { "docs": [], "name": "trackVolume", "type": "bool" },
+          { "docs": [], "name": "totalUnclaimedTokens", "type": "u64" },
+          { "docs": [], "name": "totalClaimedTokens", "type": "u64" },
+          { "docs": [], "name": "currentSolVolume", "type": "u64" },
+          { "docs": [], "name": "lastUpdateTimestamp", "type": "i64" },
+          { "docs": [], "name": "ixName", "type": "string" },
+          { "docs": [], "name": "mayhemMode", "type": "bool" },
+          { "docs": [], "name": "cashbackFeeBasisPoints", "type": "u64" },
+          { "docs": [], "name": "cashback", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "TradeEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "global", "type": "pubkey" },
+          { "docs": [], "name": "authority", "type": "pubkey" },
+          { "docs": [], "name": "newAuthority", "type": "pubkey" },
+          { "docs": [], "name": "timestamp", "type": "i64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "UpdateGlobalAuthorityEvent"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "timestamp", "type": "i64" },
+          { "docs": [], "name": "mint", "type": "pubkey" },
+          { "docs": [], "name": "virtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "virtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "newVirtualTokenReserves", "type": "u64" },
+          { "docs": [], "name": "newVirtualSolReserves", "type": "u64" },
+          { "docs": [], "name": "realTokenReserves", "type": "u64" },
+          { "docs": [], "name": "realSolReserves", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "UpdateMayhemVirtualParamsEvent"
+    }
+  ],
+  "instructions": [
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "adminSetCreatorAuthority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "creator", "rawType": "pubkey", "type": "pubkey" }
+      ],
+      "docs": [
+        "Allows Global::admin_set_creator_authority to override the bonding curve creator"
+      ],
+      "name": "adminSetCreator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "idlAccount",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "programSigner",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        {
+          "docs": [],
+          "name": "idlAuthority",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        }
+      ],
+      "docs": [],
+      "name": "adminSetIdlAuthority"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalIncentiveTokenAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedTokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "startTime", "rawType": "i64", "type": "i64" },
+        { "docs": [], "name": "endTime", "rawType": "i64", "type": "i64" },
+        {
+          "docs": [],
+          "name": "secondsInADay",
+          "rawType": "i64",
+          "type": "i64"
+        },
+        { "docs": [], "name": "dayNumber", "rawType": "u64", "type": "u64" },
+        {
+          "docs": [],
+          "name": "pumpTokenSupplyPerDay",
+          "rawType": "u64",
+          "type": "u64"
+        }
+      ],
+      "docs": [],
+      "name": "adminUpdateTokenIncentives"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeRecipient",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedUser",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "feeConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "amount", "rawType": "u64", "type": "u64" },
+        { "docs": [], "name": "maxSolCost", "rawType": "u64", "type": "u64" },
+        {
+          "docs": [],
+          "name": "trackVolume",
+          "rawType": { "defined": { "name": "OptionBool" } },
+          "type": "OptionBool"
+        }
+      ],
+      "docs": ["Buys tokens from a bonding curve."],
+      "name": "buy"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeRecipient",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedUser",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "feeConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        {
+          "docs": [],
+          "name": "spendableSolIn",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        { "docs": [], "name": "minTokensOut", "rawType": "u64", "type": "u64" },
+        {
+          "docs": [],
+          "name": "trackVolume",
+          "rawType": { "defined": { "name": "OptionBool" } },
+          "type": "OptionBool"
+        }
+      ],
+      "docs": [
+        "Given a budget of spendable SOL, buy at least min_tokens_out tokens.",
+        "Fees are deducted from spendable_sol_in.",
+        "",
+        "# Quote formulas",
+        "Where:",
+        "- total_fee_bps = protocol_fee_bps + creator_fee_bps (creator_fee_bps is 0 if no creator)",
+        "- floor(a/b) = a / b (integer division)",
+        "- ceil(a/b) = (a + b - 1) / b",
+        "",
+        "SOL → tokens quote",
+        "To calculate tokens_out for a given spendable_sol_in:",
+        "1. net_sol = floor(spendable_sol_in * 10_000 / (10_000 + total_fee_bps))",
+        "2. fees = ceil(net_sol * protocol_fee_bps / 10_000) + ceil(net_sol * creator_fee_bps / 10_000) (creator_fee_bps is 0 if no creator)",
+        "3. if net_sol + fees > spendable_sol_in: net_sol = net_sol - (net_sol + fees - spendable_sol_in)",
+        "4. tokens_out = floor((net_sol - 1) * virtual_token_reserves / (virtual_sol_reserves + net_sol - 1))",
+        "",
+        "Reverse quote (tokens → SOL)",
+        "To calculate spendable_sol_in for a desired number of tokens:",
+        "1. net_sol = ceil(tokens * virtual_sol_reserves / (virtual_token_reserves - tokens)) + 1",
+        "2. spendable_sol_in = ceil(net_sol * (10_000 + total_fee_bps) / 10_000)",
+        "",
+        "Rent",
+        "Separately make sure the instruction's payer has enough SOL to cover rent for:",
+        "- creator_vault: rent.minimum_balance(0)",
+        "- user_volume_accumulator: rent.minimum_balance(UserVolumeAccumulator::LEN)"
+      ],
+      "name": "buyExactSolIn"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "claimCashback"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "userAta",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "globalVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalIncentiveTokenAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "associatedTokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "payer",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "claimTokenIncentives"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "closeUserVolumeAccumulator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "creator",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "Collects creator_fee from creator_vault to the coin creator account"
+      ],
+      "name": "collectCreatorFee"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mintAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "mplTokenMetadata",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "metadata",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "associatedTokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "rent",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "name", "rawType": "string", "type": "string" },
+        { "docs": [], "name": "symbol", "rawType": "string", "type": "string" },
+        { "docs": [], "name": "uri", "rawType": "string", "type": "string" },
+        { "docs": [], "name": "creator", "rawType": "pubkey", "type": "pubkey" }
+      ],
+      "docs": ["Creates a new coin and bonding curve."],
+      "name": "create"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mintAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "associatedTokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "mayhemProgramId",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "globalParams",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "solVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mayhemState",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mayhemTokenVault",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "name", "rawType": "string", "type": "string" },
+        { "docs": [], "name": "symbol", "rawType": "string", "type": "string" },
+        { "docs": [], "name": "uri", "rawType": "string", "type": "string" },
+        {
+          "docs": [],
+          "name": "creator",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        },
+        {
+          "docs": [],
+          "name": "isMayhemMode",
+          "rawType": "bool",
+          "type": "bool"
+        },
+        {
+          "docs": [],
+          "name": "isCashbackEnabled",
+          "rawType": { "defined": { "name": "OptionBool" } },
+          "type": "OptionBool"
+        }
+      ],
+      "docs": ["Creates a new spl-22 coin and bonding curve."],
+      "name": "createV2"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "sharingConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "Distributes creator fees to shareholders based on their share percentages",
+        "The creator vault needs to have at least the minimum distributable amount to distribute fees",
+        "This can be checked with the get_minimum_distributable_fee instruction"
+      ],
+      "name": "distributeCreatorFees"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "account",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": ["Extends the size of program-owned accounts"],
+      "name": "extendAccount"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "sharingConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "Permissionless instruction to check the minimum required fees for distribution",
+        "Returns the minimum required balance from the creator_vault and whether distribution can proceed"
+      ],
+      "name": "getMinimumDistributableFee"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "payer",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "initUserVolumeAccumulator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": ["Creates the global state."],
+      "name": "initialize"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "withdrawAuthority",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "pumpAmm",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "pool",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "poolAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "poolAuthorityMintAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "poolAuthorityWsolAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "ammGlobalConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "wsolMint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "lpMint",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "userPoolTokenAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "poolBaseTokenAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "poolQuoteTokenAccount",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "token2022Program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "associatedTokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "pumpAmmEventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "Migrates liquidity to pump_amm if the bonding curve is complete"
+      ],
+      "name": "migrate"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "sharingConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "migrateBondingCurveCreator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeRecipient",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedBondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "associatedUser",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "systemProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "creatorVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeConfig",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "feeProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "amount", "rawType": "u64", "type": "u64" },
+        { "docs": [], "name": "minSolOutput", "rawType": "u64", "type": "u64" }
+      ],
+      "docs": [
+        "Sells tokens into a bonding curve.",
+        "For cashback coins, optionally pass user_volume_accumulator as remaining_accounts[0].",
+        "If provided and valid, creator_fee goes to user_volume_accumulator.",
+        "Otherwise, falls back to transferring creator_fee to creator_vault."
+      ],
+      "name": "sell"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "setCreatorAuthority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "metadata",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "creator", "rawType": "pubkey", "type": "pubkey" }
+      ],
+      "docs": [
+        "Allows Global::set_creator_authority to set the bonding curve creator from Metaplex metadata or input argument"
+      ],
+      "name": "setCreator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "solVaultAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mayhemTokenVault",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "tokenProgram",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "setMayhemVirtualParams"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "mint",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "metadata",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "bondingCurve",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [
+        "Syncs the bonding curve creator with the Metaplex metadata creator if it exists"
+      ],
+      "name": "setMetaplexCreator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        {
+          "docs": [],
+          "name": "initialVirtualTokenReserves",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "initialVirtualSolReserves",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "initialRealTokenReserves",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "tokenTotalSupply",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "feeBasisPoints",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "withdrawAuthority",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        },
+        {
+          "docs": [],
+          "name": "enableMigrate",
+          "rawType": "bool",
+          "type": "bool"
+        },
+        {
+          "docs": [],
+          "name": "poolMigrationFee",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "creatorFeeBasisPoints",
+          "rawType": "u64",
+          "type": "u64"
+        },
+        {
+          "docs": [],
+          "name": "setCreatorAuthority",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        },
+        {
+          "docs": [],
+          "name": "adminSetCreatorAuthority",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        }
+      ],
+      "docs": ["Sets the global state parameters."],
+      "name": "setParams"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        {
+          "docs": [],
+          "name": "whitelistPda",
+          "rawType": "pubkey",
+          "type": "pubkey"
+        }
+      ],
+      "docs": [],
+      "name": "setReservedFeeRecipients"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "user",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "globalVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "userVolumeAccumulator",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "syncUserVolumeAccumulator"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "enabled", "rawType": "bool", "type": "bool" }
+      ],
+      "docs": [],
+      "name": "toggleCashbackEnabled"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "enabled", "rawType": "bool", "type": "bool" }
+      ],
+      "docs": [],
+      "name": "toggleCreateV2"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [
+        { "docs": [], "name": "enabled", "rawType": "bool", "type": "bool" }
+      ],
+      "docs": [],
+      "name": "toggleMayhemMode"
+    },
+    {
+      "accounts": [
+        {
+          "docs": [],
+          "name": "global",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": true
+        },
+        {
+          "docs": [],
+          "name": "authority",
+          "optional": false,
+          "pda": false,
+          "signer": true,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "newAuthority",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "eventAuthority",
+          "optional": false,
+          "pda": true,
+          "signer": false,
+          "writable": false
+        },
+        {
+          "docs": [],
+          "name": "program",
+          "optional": false,
+          "pda": false,
+          "signer": false,
+          "writable": false
+        }
+      ],
+      "args": [],
+      "docs": [],
+      "name": "updateGlobalAuthority"
+    }
+  ],
+  "pdas": [
+    {
+      "docs": [],
+      "name": "global",
+      "seeds": [{ "kind": "type", "name": "676c6f62616c", "type": "seed" }]
+    },
+    {
+      "docs": [],
+      "name": "bondingCurve",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "626f6e64696e672d6375727665",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "eventAuthority",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "5f5f6576656e745f617574686f72697479",
+          "type": "seed"
+        }
+      ]
+    },
+    { "docs": [], "name": "programSigner", "seeds": [] },
+    {
+      "docs": [],
+      "name": "globalVolumeAccumulator",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "676c6f62616c5f766f6c756d655f616363756d756c61746f72",
+          "type": "seed"
+        }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "globalIncentiveTokenAccount",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "global_volume_accumulator",
+          "type": "pubkey"
+        },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "associatedBondingCurve",
+      "seeds": [
+        { "kind": "type", "name": "bonding_curve", "type": "pubkey" },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "creatorVault",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "63726561746f722d7661756c74",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "bonding_curve.creator", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "userVolumeAccumulator",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "757365725f766f6c756d655f616363756d756c61746f72",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "user", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "feeConfig",
+      "seeds": [
+        { "kind": "type", "name": "6665655f636f6e666967", "type": "seed" },
+        {
+          "kind": "type",
+          "name": "0156e0f693665acf44db1568bf175baa5189cb97f5d2ff3b655d2bb6fd6d18b0",
+          "type": "seed"
+        }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "userAta",
+      "seeds": [
+        { "kind": "type", "name": "user", "type": "pubkey" },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "mintAuthority",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "6d696e742d617574686f72697479",
+          "type": "seed"
+        }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "metadata",
+      "seeds": [
+        { "kind": "type", "name": "6d65746164617461", "type": "seed" },
+        {
+          "kind": "type",
+          "name": "0b7065b1e3d17c45389d527f6b04c3cd58b86c731aa0fdb549b6d1bc03f82946",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "globalParams",
+      "seeds": [
+        { "kind": "type", "name": "676c6f62616c2d706172616d73", "type": "seed" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "solVault",
+      "seeds": [
+        { "kind": "type", "name": "736f6c2d7661756c74", "type": "seed" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "mayhemState",
+      "seeds": [
+        { "kind": "type", "name": "6d617968656d2d7374617465", "type": "seed" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "sharingConfig",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "73686172696e672d636f6e666967",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "pool",
+      "seeds": [
+        { "kind": "type", "name": "706f6f6c", "type": "seed" },
+        { "kind": "type", "name": "0000", "type": "seed" },
+        { "kind": "type", "name": "pool_authority", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" },
+        { "kind": "type", "name": "wsol_mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "poolAuthority",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "706f6f6c2d617574686f72697479",
+          "type": "seed"
+        },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "poolAuthorityMintAccount",
+      "seeds": [
+        { "kind": "type", "name": "pool_authority", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "poolAuthorityWsolAccount",
+      "seeds": [
+        { "kind": "type", "name": "pool_authority", "type": "pubkey" },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "wsol_mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "ammGlobalConfig",
+      "seeds": [
+        { "kind": "type", "name": "676c6f62616c5f636f6e666967", "type": "seed" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "lpMint",
+      "seeds": [
+        { "kind": "type", "name": "706f6f6c5f6c705f6d696e74", "type": "seed" },
+        { "kind": "type", "name": "pool", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "userPoolTokenAccount",
+      "seeds": [
+        { "kind": "type", "name": "pool_authority", "type": "pubkey" },
+        { "kind": "type", "name": "token_2022_program", "type": "pubkey" },
+        { "kind": "type", "name": "lp_mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "poolBaseTokenAccount",
+      "seeds": [
+        { "kind": "type", "name": "pool", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "poolQuoteTokenAccount",
+      "seeds": [
+        { "kind": "type", "name": "pool", "type": "pubkey" },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "wsol_mint", "type": "pubkey" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "pumpAmmEventAuthority",
+      "seeds": [
+        {
+          "kind": "type",
+          "name": "5f5f6576656e745f617574686f72697479",
+          "type": "seed"
+        }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "solVaultAuthority",
+      "seeds": [
+        { "kind": "type", "name": "736f6c2d7661756c74", "type": "seed" }
+      ]
+    },
+    {
+      "docs": [],
+      "name": "mayhemTokenVault",
+      "seeds": [
+        { "kind": "type", "name": "sol_vault_authority", "type": "pubkey" },
+        { "kind": "type", "name": "token_program", "type": "pubkey" },
+        { "kind": "type", "name": "mint", "type": "pubkey" }
+      ]
+    }
+  ],
+  "types": [
+    {
+      "docs": [],
+      "fieldType": { "kind": "enum", "variants": ["Paused", "Active"] },
+      "name": "ConfigStatus"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "marketCapLamportsThreshold", "type": "u128" },
+          { "docs": [], "name": "fees", "type": "Fees" }
+        ],
+        "kind": "struct"
+      },
+      "name": "FeeTier"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "lpFeeBps", "type": "u64" },
+          { "docs": [], "name": "protocolFeeBps", "type": "u64" },
+          { "docs": [], "name": "creatorFeeBps", "type": "u64" }
+        ],
+        "kind": "struct"
+      },
+      "name": "Fees"
+    },
+    {
+      "docs": [],
+      "fieldType": { "fields": [{ "type": "bool" }], "kind": "struct" },
+      "name": "OptionBool"
+    },
+    {
+      "docs": [],
+      "fieldType": {
+        "fields": [
+          { "docs": [], "name": "address", "type": "pubkey" },
+          { "docs": [], "name": "shareBps", "type": "u16" }
+        ],
+        "kind": "struct"
+      },
+      "name": "Shareholder"
+    }
+  ]
+}

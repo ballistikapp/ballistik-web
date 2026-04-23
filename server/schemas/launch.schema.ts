@@ -32,7 +32,7 @@ export const launchTokenSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL"),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -69,7 +69,7 @@ export const launchPreviewCostsSchema = z.object({
     .max(10, "Bundler wallet count must be 10 or less"),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.1, "Buy amount per wallet must be at least 0.1 SOL"),
+    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL"),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")

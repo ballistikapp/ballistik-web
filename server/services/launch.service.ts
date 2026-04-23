@@ -84,7 +84,7 @@ function lamportsToSol(lamports: bigint) {
   return Number(lamports) / LAMPORTS_PER_SOL;
 }
 
-const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
+const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.05;
 const MIN_BUNDLER_BUY_AMOUNT_LAMPORTS = toLamports(MIN_BUNDLER_BUY_AMOUNT_SOL);
 
 function normalizeSymbol(symbol: string) {
