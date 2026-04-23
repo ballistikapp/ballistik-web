@@ -1677,6 +1677,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   type="number"
                                   step="0.001"
                                   min="0.05"
+                                  min="0.05"
                                   value={field.state.value}
                                   onBlur={field.handleBlur}
                                   onChange={(e) =>
@@ -1684,6 +1685,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                       e.target.valueAsNumber || 0
                                     )
                                   }
+                                  placeholder="0.05"
                                   placeholder="0.05"
                                   aria-invalid={isInvalid}
                                 />
