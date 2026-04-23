@@ -141,7 +141,6 @@ model Token {
   status TokenStatus @default(PENDING)
   name String
   symbol String
-  isMayhemMode Boolean @default(false)
   description String?
   imageUrl String?
   websiteUrl String?

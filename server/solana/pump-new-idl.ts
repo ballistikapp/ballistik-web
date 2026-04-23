@@ -1,4 +1,3 @@
-import { randomInt } from "node:crypto";
 import type { Program } from "@coral-xyz/anchor";
 import { BN } from "@coral-xyz/anchor";
 import {
@@ -7,19 +6,17 @@ import {
   Transaction,
   TransactionInstruction,
   SystemProgram,
+  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
-  getAssociatedTokenAddressSync,
   createAssociatedTokenAccountInstruction,
   TOKEN_PROGRAM_ID,
-  TOKEN_2022_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAccount,
 } from "@solana/spl-token";
 import { CreateTokenMetadata } from "pumpdotfun-sdk";
 
-import { MAYHEM_PROGRAM_ID_STR } from "@/lib/config/pump-mayhem.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { logger } from "@/lib/logger";
 import { AppError } from "@/server/errors";
@@ -28,20 +25,12 @@ import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
 const GLOBAL_SEED = Buffer.from("global");
 const BONDING_CURVE_SEED = Buffer.from("bonding-curve");
 const MINT_AUTHORITY_SEED = Buffer.from("mint-authority");
-const GLOBAL_PARAMS_SEED = Buffer.from("global-params");
-const SOL_VAULT_SEED = Buffer.from("sol-vault");
-const MAYHEM_STATE_SEED = Buffer.from("mayhem-state");
-
-/** Mayhem program: PDAs for `createV2` (global params, sol vault, mayhem state). */
-export const MAYHEM_PROGRAM_ID = new PublicKey(MAYHEM_PROGRAM_ID_STR);
-
+const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+);
 const FEE_PROGRAM_ID = new PublicKey(
   "pfeeUxB6jkeY1Hxd7CsFCAjcbHA9rWtchMGdZ6VojVZ"
 );
-
-/** Borsh layout offsets in pump `Global` account data (`data/pump.json`), after 8-byte disc. */
-const GLOBAL_OFFSET_CREATE_V2_ENABLED = 450;
-const GLOBAL_OFFSET_MAYHEM_MODE_ENABLED = 515;
 
 export const DISCRIMINATORS = {
   CREATE: Buffer.from([24, 30, 200, 40, 5, 28, 7, 119]),
@@ -82,121 +71,6 @@ export function applyBuyToState(
   };
 }
 
-/** After8-byte disc: bool + authority pubkey; `feeRecipient` is next32 bytes (`data/pump.json` Global). */
-const GLOBAL_OFFSET_FEE_RECIPIENT = 8 + 1 + 32;
-/** Standard protocol fee recipient pool: `feeRecipients` array (`data/pump.json` Global). */
-const GLOBAL_OFFSET_FEE_RECIPIENTS_START = 162;
-const GLOBAL_FEE_RECIPIENT_POOL_LEN = 7;
-/** Mayhem fee recipients (`reservedFeeRecipient` + `reservedFeeRecipients`). */
-const GLOBAL_OFFSET_RESERVED_FEE_RECIPIENT = 483;
-const GLOBAL_OFFSET_RESERVED_FEE_RECIPIENTS_START = 516;
-
-/** BondingCurve: 8 disc + 5×u64 + `complete` + `creator` + `isMayhemMode` (`data/pump.json`). */
-const BONDING_CURVE_OFFSET_IS_MAYHEM = 8 + 40 + 1 + 32;
-
-function pubkeySliceNonZero(buf: Buffer, offset: number): boolean {
-  const end = offset + 32;
-  if (buf.length < end) return false;
-  return buf.subarray(offset, end).some((b) => b !== 0);
-}
-
-export function readPumpGlobalFeeRecipient(globalData: Buffer): PublicKey {
-  const end = GLOBAL_OFFSET_FEE_RECIPIENT + 32;
-  if (globalData.length < end) {
-    throw new Error("Pump Global account data too short for feeRecipient");
-  }
-  return new PublicKey(globalData.subarray(GLOBAL_OFFSET_FEE_RECIPIENT, end));
-}
-
-/** Whether the bonding curve account marks this mint as pump mayhem mode (affects fee recipient). */
-export function readBondingCurveIsMayhemMode(bondingCurveData: Buffer): boolean {
-  const end = BONDING_CURVE_OFFSET_IS_MAYHEM + 1;
-  if (bondingCurveData.length < end) {
-    return false;
-  }
-  return bondingCurveData.readUInt8(BONDING_CURVE_OFFSET_IS_MAYHEM) !== 0;
-}
-
-function collectPumpStandardFeeRecipients(globalData: Buffer): PublicKey[] {
-  const out: PublicKey[] = [];
-  if (pubkeySliceNonZero(globalData, GLOBAL_OFFSET_FEE_RECIPIENT)) {
-    out.push(
-      new PublicKey(
-        globalData.subarray(
-          GLOBAL_OFFSET_FEE_RECIPIENT,
-          GLOBAL_OFFSET_FEE_RECIPIENT + 32
-        )
-      )
-    );
-  }
-  for (let i = 0; i < GLOBAL_FEE_RECIPIENT_POOL_LEN; i++) {
-    const start = GLOBAL_OFFSET_FEE_RECIPIENTS_START + i * 32;
-    if (pubkeySliceNonZero(globalData, start)) {
-      out.push(new PublicKey(globalData.subarray(start, start + 32)));
-    }
-  }
-  return out;
-}
-
-function collectPumpReservedFeeRecipients(globalData: Buffer): PublicKey[] {
-  const out: PublicKey[] = [];
-  if (globalData.length < GLOBAL_OFFSET_RESERVED_FEE_RECIPIENTS_START + GLOBAL_FEE_RECIPIENT_POOL_LEN * 32) {
-    return out;
-  }
-  if (pubkeySliceNonZero(globalData, GLOBAL_OFFSET_RESERVED_FEE_RECIPIENT)) {
-    out.push(
-      new PublicKey(
-        globalData.subarray(
-          GLOBAL_OFFSET_RESERVED_FEE_RECIPIENT,
-          GLOBAL_OFFSET_RESERVED_FEE_RECIPIENT + 32
-        )
-      )
-    );
-  }
-  for (let i = 0; i < GLOBAL_FEE_RECIPIENT_POOL_LEN; i++) {
-    const start = GLOBAL_OFFSET_RESERVED_FEE_RECIPIENTS_START + i * 32;
-    if (pubkeySliceNonZero(globalData, start)) {
-      out.push(new PublicKey(globalData.subarray(start, start + 32)));
-    }
-  }
-  return out;
-}
-
-/**
- * Pump buy/sell `fee_recipient` account: standard vs mayhem pool from on-chain Global.
- * Matches `@pump-fun/pump-sdk` `getFeeRecipient` behavior (random eligible recipient).
- */
-export function selectPumpTradeFeeRecipient(
-  globalData: Buffer,
-  isMayhemMode: boolean
-): PublicKey {
-  const candidates = isMayhemMode
-    ? collectPumpReservedFeeRecipients(globalData)
-    : collectPumpStandardFeeRecipients(globalData);
-  if (candidates.length === 0) {
-    throw new Error(
-      isMayhemMode
-        ? "Pump Global has no reserved fee recipients for mayhem trades"
-        : "Pump Global has no standard fee recipients"
-    );
-  }
-  return candidates[randomInt(candidates.length)]!;
-}
-
-/** Current pump.fun protocol fee recipient (from on-chain Global). Do not hardcode; it changes. */
-export async function fetchPumpGlobalFeeRecipient(): Promise<PublicKey> {
-  const connection = getSolanaConnection();
-  const [globalPDA] = PublicKey.findProgramAddressSync(
-    [GLOBAL_SEED],
-    PUMP_PROGRAM_ID
-  );
-  const globalAccountInfo = await connection.getAccountInfo(globalPDA, "confirmed");
-  if (!globalAccountInfo?.data) {
-    throw new Error("Failed to fetch Pump.fun global account for fee recipient");
-  }
-  return readPumpGlobalFeeRecipient(globalAccountInfo.data);
-}
-
 export async function fetchInitialBondingCurveState(): Promise<BondingCurveState> {
   const connection = getSolanaConnection();
   const [globalPDA] = PublicKey.findProgramAddressSync(
@@ -208,8 +82,6 @@ export async function fetchInitialBondingCurveState(): Promise<BondingCurveState
     throw new Error("Failed to fetch Pump.fun global account");
   }
   const data = globalAccountInfo.data;
-  // `Global` Borsh layout (see `data/pump.json`): 8-byte disc + bool + 2 pubkeys, then
-  // initialVirtualTokenReserves / initialVirtualSolReserves / initialRealTokenReserves.
   const virtualTokenReserves = data.readBigUInt64LE(73);
   const virtualSolReserves = data.readBigUInt64LE(81);
   const realTokenReserves = data.readBigUInt64LE(89);
@@ -244,112 +116,36 @@ export function derivePumpAddresses(mint: PublicKey) {
   };
 }
 
-export function deriveMayhemCreateV2Accounts(mint: PublicKey) {
-  const [globalParams] = PublicKey.findProgramAddressSync(
-    [GLOBAL_PARAMS_SEED],
-    MAYHEM_PROGRAM_ID
-  );
-  const [solVault] = PublicKey.findProgramAddressSync(
-    [SOL_VAULT_SEED],
-    MAYHEM_PROGRAM_ID
-  );
-  const [mayhemState] = PublicKey.findProgramAddressSync(
-    [MAYHEM_STATE_SEED, mint.toBuffer()],
-    MAYHEM_PROGRAM_ID
-  );
-  const mayhemTokenVault = getAssociatedTokenAddressSync(
-    mint,
-    solVault,
-    true,
-    TOKEN_2022_PROGRAM_ID,
-    ASSOCIATED_TOKEN_PROGRAM_ID
-  );
-
-  return {
-    globalParams,
-    solVault,
-    mayhemState,
-    mayhemTokenVault,
-  };
-}
-
-export async function getTokenProgramIdForPumpMint(
-  mint: PublicKey
-): Promise<PublicKey> {
-  const connection = getSolanaConnection();
-  const info = await connection.getAccountInfo(mint, "confirmed");
-  if (!info) {
-    throw new Error(`Mint account not found: ${mint.toBase58()}`);
-  }
-  if (
-    !info.owner.equals(TOKEN_PROGRAM_ID) &&
-    !info.owner.equals(TOKEN_2022_PROGRAM_ID)
-  ) {
-    logger.warn("Unexpected mint owner for pump token", {
-      mint: mint.toBase58(),
-      owner: info.owner.toBase58(),
-    });
-  }
-  return info.owner;
-}
-
-async function assertPumpCreateV2GlobalAllows(
-  connection: ReturnType<typeof getSolanaConnection>,
-  globalPk: PublicKey,
-  isMayhemMode: boolean
-) {
-  const globalAccountInfo = await connection.getAccountInfo(globalPk, "confirmed");
-  if (!globalAccountInfo?.data || globalAccountInfo.data.length < GLOBAL_OFFSET_MAYHEM_MODE_ENABLED + 1) {
-    throw new AppError(
-      "Could not read pump global account for create v2 preflight.",
-      503
-    );
-  }
-  const data = globalAccountInfo.data;
-  const createV2Enabled = data.readUInt8(GLOBAL_OFFSET_CREATE_V2_ENABLED) !== 0;
-  const mayhemModeEnabled = data.readUInt8(GLOBAL_OFFSET_MAYHEM_MODE_ENABLED) !== 0;
-  if (!createV2Enabled) {
-    throw new AppError(
-      "Token creation is temporarily unavailable: create v2 is disabled on pump.fun.",
-      503
-    );
-  }
-  if (isMayhemMode && !mayhemModeEnabled) {
-    throw new AppError(
-      "Mayhem mode is disabled on pump.fun for new coins right now.",
-      400
-    );
-  }
-}
-
-export type CreateTokenWithNewIdlOptions = {
-  isMayhemMode?: boolean;
-  /** Pump `OptionBool` (IDL struct); default false (cashback off). */
-  isCashbackEnabled?: boolean;
-};
-
 export async function createTokenWithNewIdl(
   program: Program,
   creator: Keypair,
   mint: Keypair,
   metadata: CreateTokenMetadata,
-  metadataUri: string,
-  options?: CreateTokenWithNewIdlOptions
+  metadataUri: string
 ): Promise<Transaction> {
-  const isMayhemMode = options?.isMayhemMode ?? false;
-  const isCashbackEnabled = options?.isCashbackEnabled ?? false;
-
   const addresses = derivePumpAddresses(mint.publicKey);
 
-  const associatedBondingCurve = getAssociatedTokenAddressSync(
-    mint.publicKey,
-    addresses.bondingCurve,
-    true,
-    TOKEN_2022_PROGRAM_ID,
+  const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
+    [
+      addresses.bondingCurve.toBuffer(),
+      Buffer.from([
+        6, 221, 246, 225, 215, 101, 161, 147, 217, 203, 225, 70, 206, 235, 121,
+        172, 28, 180, 133, 237, 95, 91, 55, 145, 58, 140, 245, 133, 126, 255, 0,
+        169,
+      ]),
+      mint.publicKey.toBuffer(),
+    ],
     ASSOCIATED_TOKEN_PROGRAM_ID
   );
 
-  const mayhemAccounts = deriveMayhemCreateV2Accounts(mint.publicKey);
+  const [metadataPDA] = PublicKey.findProgramAddressSync(
+    [
+      Buffer.from("metadata"),
+      TOKEN_METADATA_PROGRAM_ID.toBuffer(),
+      mint.publicKey.toBuffer(),
+    ],
+    TOKEN_METADATA_PROGRAM_ID
+  );
 
   const [eventAuthority] = PublicKey.findProgramAddressSync(
     [Buffer.from("__event_authority")],
@@ -422,9 +218,9 @@ export async function createTokenWithNewIdl(
     );
   }
 
-  if (!associatedBondingCurve || !eventAuthority) {
+  if (!associatedBondingCurve || !metadataPDA || !eventAuthority) {
     throw new Error(
-      `Failed to derive PDAs: associatedBondingCurve=${!!associatedBondingCurve}, eventAuthority=${!!eventAuthority}`
+      `Failed to derive PDAs: associatedBondingCurve=${!!associatedBondingCurve}, metadataPDA=${!!metadataPDA}, eventAuthority=${!!eventAuthority}`
     );
   }
 
@@ -434,17 +230,14 @@ export async function createTokenWithNewIdl(
     bondingCurve: addresses.bondingCurve,
     associatedBondingCurve,
     global: addresses.global,
+    mplTokenMetadata: TOKEN_METADATA_PROGRAM_ID,
+    metadata: metadataPDA,
     user: creator.publicKey,
     systemProgram: SystemProgram.programId,
-    tokenProgram: TOKEN_2022_PROGRAM_ID,
+    tokenProgram: TOKEN_PROGRAM_ID,
     associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
-    mayhemProgramId: MAYHEM_PROGRAM_ID,
-    globalParams: mayhemAccounts.globalParams,
-    solVault: mayhemAccounts.solVault,
-    mayhemState: mayhemAccounts.mayhemState,
-    mayhemTokenVault: mayhemAccounts.mayhemTokenVault,
+    rent: SYSVAR_RENT_PUBKEY,
     eventAuthority,
-    program: PUMP_PROGRAM_ID,
   };
 
   for (const [key, value] of Object.entries(allAccounts)) {
@@ -544,21 +337,15 @@ export async function createTokenWithNewIdl(
       symbol,
       uri: uri.substring(0, 50) + "...",
       creator: creatorPubkey.toBase58(),
-      isMayhemMode,
-      isCashbackEnabled,
     });
-
-    const connection = getSolanaConnection();
-    await assertPumpCreateV2GlobalAllows(
-      connection,
-      addresses.global,
-      isMayhemMode
-    );
-
-    const optionCashback = { _0: isCashbackEnabled };
     const tx = await program.methods
-      .createV2(name, symbol, uri, creatorPubkey, isMayhemMode, optionCashback)
-      .accounts(allAccounts)
+      .create(name, symbol, uri, creatorPubkey)
+      .accounts({
+        mint: mint.publicKey,
+        associatedBondingCurve,
+        metadata: metadataPDA,
+        user: creatorPubkey,
+      })
       .signers([mint])
       .transaction();
 
@@ -603,56 +390,15 @@ export async function buyTokensWithNewIdl(
   mint: PublicKey,
   solAmountLamports: bigint,
   creator?: PublicKey,
-  minTokensOut?: bigint,
-  /** Encoded as pump `OptionBool` on `buyExactSolIn` (Borsh: one byte). Default true for volume tracking. */
-  trackVolume: boolean = true,
-  buyOptions?: { isMayhemMode?: boolean }
+  minTokensOut?: bigint
 ): Promise<Transaction> {
   const addresses = derivePumpAddresses(mint);
-  const connection = getSolanaConnection();
-  const [globalAccount, bondingCurveAccountEarly] = await Promise.all([
-    connection.getAccountInfo(addresses.global, "confirmed"),
-    connection.getAccountInfo(addresses.bondingCurve, "confirmed"),
-  ]);
-  if (!globalAccount?.data) {
-    throw new Error("Failed to fetch Pump.fun global account for fee recipient");
-  }
-  let isMayhemMode = buyOptions?.isMayhemMode;
-  if (isMayhemMode === undefined) {
-    isMayhemMode =
-      bondingCurveAccountEarly?.data != null &&
-      readBondingCurveIsMayhemMode(bondingCurveAccountEarly.data);
-  }
-  const feeRecipient = selectPumpTradeFeeRecipient(
-    globalAccount.data,
-    isMayhemMode
-  );
-
-  let tokenProgramId: PublicKey;
-  try {
-    tokenProgramId = await getTokenProgramIdForPumpMint(mint);
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : String(err);
-    if (creator && msg.includes("Mint account not found")) {
-      tokenProgramId = TOKEN_2022_PROGRAM_ID;
-      logger.info("Mint not on-chain yet; using Token-2022 for pump buy (create+buy bundle)", {
-        mint: mint.toBase58(),
-      });
-    } else {
-      throw err;
-    }
-  }
-  const associatedUser = await getAssociatedTokenAddress(
-    mint,
-    buyer.publicKey,
-    false,
-    tokenProgramId,
-    ASSOCIATED_TOKEN_PROGRAM_ID
-  );
+  const associatedUser = await getAssociatedTokenAddress(mint, buyer.publicKey);
 
   let ataExists = false;
   try {
-    await getAccount(connection, associatedUser, "confirmed", tokenProgramId);
+    const connection = getSolanaConnection();
+    await getAccount(connection, associatedUser, "confirmed");
     ataExists = true;
     logger.info("ATA exists and initialized", associatedUser.toBase58());
   } catch (error: unknown) {
@@ -674,9 +420,16 @@ export async function buyTokensWithNewIdl(
     ataInitialized: ataExists,
   });
 
+  const feeRecipient = new PublicKey(
+    "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
+  );
+
   let creatorPubkey: PublicKey;
   try {
-    const bondingCurveAccountInfo = bondingCurveAccountEarly;
+    const connection = getSolanaConnection();
+    const bondingCurveAccountInfo = await connection.getAccountInfo(
+      addresses.bondingCurve
+    );
     if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
       if (creator) {
         creatorPubkey = creator;
@@ -685,7 +438,6 @@ export async function buyTokensWithNewIdl(
         throw new Error("Bonding curve not found and no creator provided.");
       }
     } else {
-      // BondingCurve: 8 disc + 5×u64 + bool + creator pubkey (see `data/pump.json`).
       const creatorBytes = bondingCurveAccountInfo.data.slice(49, 81);
       creatorPubkey = new PublicKey(creatorBytes);
       logger.info("Creator fetched from bonding curve", creatorPubkey.toBase58());
@@ -708,7 +460,7 @@ export async function buyTokensWithNewIdl(
   const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
     [
       addresses.bondingCurve.toBuffer(),
-      tokenProgramId.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
       mint.toBuffer(),
     ],
     ASSOCIATED_TOKEN_PROGRAM_ID
@@ -745,17 +497,12 @@ export async function buyTokensWithNewIdl(
     solAmountLamports: solAmountLamports.toString(),
     solAmountSol: Number(solAmountLamports) / 1e9,
     bondingCurve: addresses.bondingCurve.toBase58(),
-    tokenProgram: tokenProgramId.toBase58(),
-    feeRecipient: feeRecipient.toBase58(),
-    isMayhemMode,
   });
 
-  const optionBoolTrackVolume = Buffer.from([trackVolume ? 1 : 0]);
   const data = Buffer.concat([
     DISCRIMINATORS.BUY_EXACT_SOL_IN,
     encodeU64LE(solAmountLamports),
     encodeU64LE(minTokensOut ?? BigInt(1)),
-    optionBoolTrackVolume,
   ]);
 
   const buyIx = new TransactionInstruction({
@@ -769,7 +516,7 @@ export async function buyTokensWithNewIdl(
       { pubkey: associatedUser, isSigner: false, isWritable: true },
       { pubkey: buyer.publicKey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: creatorVault, isSigner: false, isWritable: true },
       { pubkey: eventAuthority, isSigner: false, isWritable: false },
       { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
@@ -777,7 +524,6 @@ export async function buyTokensWithNewIdl(
       { pubkey: userVolumeAccumulator, isSigner: false, isWritable: true },
       { pubkey: feeConfig, isSigner: false, isWritable: false },
       { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
-      // Not listed on some IDL exports; required on deployed program to avoid u64 overflow (6024) at buy.rs.
       { pubkey: bondingCurveV2, isSigner: false, isWritable: false },
     ],
     data,
@@ -786,7 +532,6 @@ export async function buyTokensWithNewIdl(
   logger.info("Raw buy_exact_sol_in instruction built", {
     accountCount: buyIx.keys.length,
     dataLength: data.length,
-    trackVolume,
     bondingCurveV2: bondingCurveV2.toBase58(),
   });
 
@@ -803,7 +548,7 @@ export async function buyTokensWithNewIdl(
         associatedUser,
         buyer.publicKey,
         mint,
-        tokenProgramId,
+        TOKEN_PROGRAM_ID,
         ASSOCIATED_TOKEN_PROGRAM_ID
       )
     );
@@ -829,35 +574,20 @@ export async function buildSellTransaction(
 ): Promise<Transaction> {
   const connection = getSolanaConnection();
   const addresses = derivePumpAddresses(mint);
-  const tokenProgramId = await getTokenProgramIdForPumpMint(mint);
-  const associatedUser = await getAssociatedTokenAddress(
-    mint,
-    seller.publicKey,
-    false,
-    tokenProgramId,
-    ASSOCIATED_TOKEN_PROGRAM_ID
-  );
+  const associatedUser = await getAssociatedTokenAddress(mint, seller.publicKey);
 
-  const [bondingCurveAccountInfo, globalAccountInfo] = await Promise.all([
-    connection.getAccountInfo(addresses.bondingCurve, "confirmed"),
-    connection.getAccountInfo(addresses.global, "confirmed"),
-  ]);
+  const bondingCurveAccountInfo = await connection.getAccountInfo(
+    addresses.bondingCurve
+  );
   if (!bondingCurveAccountInfo || !bondingCurveAccountInfo.data) {
     throw new Error("Cannot build sell: Bonding curve not found");
   }
-  if (!globalAccountInfo?.data) {
-    throw new Error("Cannot build sell: Pump global account not found");
-  }
 
   const bcData = bondingCurveAccountInfo.data;
-  const creatorPubkey = new PublicKey(
-    bcData.slice(49, 81) // BondingCurve creator field offset (see `data/pump.json`).
-  );
+  const creatorPubkey = new PublicKey(bcData.slice(49, 81));
 
-  const isMayhemMode = readBondingCurveIsMayhemMode(bcData);
-  const feeRecipient = selectPumpTradeFeeRecipient(
-    globalAccountInfo.data,
-    isMayhemMode
+  const feeRecipient = new PublicKey(
+    "CebN5WGQ4jvEPvsVU4EoHEpgzq1VV7AbicfhtW4xC9iM"
   );
 
   const [creatorVault] = PublicKey.findProgramAddressSync(
@@ -868,7 +598,7 @@ export async function buildSellTransaction(
   const [associatedBondingCurve] = PublicKey.findProgramAddressSync(
     [
       addresses.bondingCurve.toBuffer(),
-      tokenProgramId.toBuffer(),
+      TOKEN_PROGRAM_ID.toBuffer(),
       mint.toBuffer(),
     ],
     ASSOCIATED_TOKEN_PROGRAM_ID
@@ -907,7 +637,7 @@ export async function buildSellTransaction(
       { pubkey: seller.publicKey, isSigner: true, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       { pubkey: creatorVault, isSigner: false, isWritable: true },
-      { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: eventAuthority, isSigner: false, isWritable: false },
       { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
       { pubkey: feeConfig, isSigner: false, isWritable: false },

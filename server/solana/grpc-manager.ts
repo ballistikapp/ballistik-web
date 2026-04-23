@@ -10,11 +10,6 @@ import {
   type GrpcStream,
 } from "./grpc-utils";
 import { logger } from "@/lib/logger";
-import {
-  diagnoseGrpcError,
-  summarizeGrpcTokenEnv,
-  type GrpcErrorDiagnostics,
-} from "./grpc-error-diagnostics";
 
 const log = logger.child({ service: "grpc" });
 
@@ -42,10 +37,6 @@ type Subscription = {
 
 const TOKEN_PROGRAM_ID = "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA";
 
-function shyftGrpcTokenOrEmpty(): string {
-  return getEnv().SHYFT_GRPC_TOKEN?.trim() ?? "";
-}
-
 class GrpcManager {
   private stream: GrpcStream | null = null;
   private connected = false;
@@ -61,7 +52,6 @@ class GrpcManager {
   private transactionListeners = new Set<Listener<TransactionUpdate>>();
   private lastEventAt: string | null = null;
   private lastWriteFailureAt: string | null = null;
-  private lastErrorDiagnostics: GrpcErrorDiagnostics | null = null;
   private metrics = {
     streamEventsReceived: 0,
     accountEventsReceived: 0,
@@ -76,42 +66,21 @@ class GrpcManager {
     dbWriteFailure: 0,
   };
 
-  private captureGrpcFailure(
-    error: unknown,
-    context: string,
-    extras?: Record<string, unknown>
-  ) {
-    const env = getEnv();
-    const tokenEnv = summarizeGrpcTokenEnv({
-      shyftGrpcToken: env.SHYFT_GRPC_TOKEN,
-      shyftApiKey: env.SHYFT_API_KEY,
-    });
-    const diagnostics = diagnoseGrpcError(error, { tokenEnv });
-    this.lastErrorDiagnostics = diagnostics;
-    log.error(context, {
-      endpoint: this.endpointType,
-      ...extras,
-      ...diagnostics,
-      tokenEnv,
-    });
-  }
-
   async connect(
     endpoint?: "rabbitstream" | "yellowstone"
   ): Promise<boolean> {
-    const { GRPC_ACCESS_MODE } = getEnv();
-    const grpcToken = shyftGrpcTokenOrEmpty();
+    const { SHYFT_GRPC_TOKEN, GRPC_ACCESS_MODE } = getEnv();
     if (GRPC_ACCESS_MODE === "off") {
       log.warn("GRPC_ACCESS_MODE=off, gRPC disabled");
       this.lastError = "GRPC_ACCESS_MODE=off";
       return false;
     }
-    if (!grpcToken) {
+    if (!SHYFT_GRPC_TOKEN) {
       log.warn("SHYFT_GRPC_TOKEN not set, gRPC disabled");
       this.lastError = "SHYFT_GRPC_TOKEN not set";
       return false;
     }
-    this.apiKey = grpcToken;
+    this.apiKey = SHYFT_GRPC_TOKEN;
     this.endpointType = endpoint ?? "rabbitstream";
 
     try {
@@ -128,7 +97,7 @@ class GrpcManager {
         return false;
       }
 
-      const client = new Client(url, grpcToken, undefined);
+      const client = new Client(url, SHYFT_GRPC_TOKEN, undefined);
       this.stream = await client.subscribe();
       this.setupStreamHandlers();
       this.connected = true;
@@ -137,10 +106,8 @@ class GrpcManager {
       return true;
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
+      log.error("Connection failed", { error: message, endpoint: this.endpointType });
       this.lastError = message;
-      this.captureGrpcFailure(error, "Connection failed", {
-        phase: "connect",
-      });
       this.scheduleReconnect();
       return false;
     }
@@ -156,9 +123,9 @@ class GrpcManager {
     this.stream.on("data", (data: unknown) => this.handleUpdate(data));
     this.stream.on("error", (error: unknown) => {
       const message = error instanceof Error ? error.message : String(error);
+      log.error("Stream error", { error: message });
       this.connected = false;
       this.lastError = message;
-      this.captureGrpcFailure(error, "Stream error", { phase: "stream" });
       this.scheduleReconnect();
     });
     this.stream.on("end", () => {
@@ -310,20 +277,9 @@ class GrpcManager {
     subscriptionId: string,
     accounts: string[]
   ): Promise<boolean> {
-    const { GRPC_ACCESS_MODE } = getEnv();
-    const grpcDisabled =
-      GRPC_ACCESS_MODE === "off" || shyftGrpcTokenOrEmpty() === "";
-
     const existing = this.subscriptions.get(subscriptionId);
     const existingAccounts = new Set(existing?.accounts ?? []);
     const newAccounts = accounts.filter((a) => !existingAccounts.has(a));
-
-    if (grpcDisabled) {
-      if (newAccounts.length === 0 && existing) {
-        return true;
-      }
-      return false;
-    }
 
     this.subscriptions.set(subscriptionId, {
       id: subscriptionId,
@@ -404,9 +360,8 @@ class GrpcManager {
       this.metrics.subscriptionWriteSuccess += 1;
       return true;
     } catch (error) {
-      this.captureGrpcFailure(error, "Subscribe write failed", {
-        phase: "subscribe_write",
-        accountCount: this.allSubscribedAccounts.size,
+      log.error("Subscribe write failed", {
+        error: error instanceof Error ? error.message : String(error),
       });
       this.metrics.subscriptionWriteFailure += 1;
       return false;
@@ -441,17 +396,12 @@ class GrpcManager {
   }
 
   getStatus() {
-    const env = getEnv();
-    const tokenConfigured = shyftGrpcTokenOrEmpty() !== "";
+    const { SHYFT_GRPC_TOKEN, GRPC_ACCESS_MODE } = getEnv();
+    const tokenConfigured = Boolean(SHYFT_GRPC_TOKEN);
     return {
       connected: this.connected,
-      enabled: tokenConfigured && env.GRPC_ACCESS_MODE !== "off",
+      enabled: tokenConfigured && GRPC_ACCESS_MODE !== "off",
       lastError: this.lastError,
-      lastErrorDiagnostics: this.lastErrorDiagnostics,
-      tokenEnv: summarizeGrpcTokenEnv({
-        shyftGrpcToken: env.SHYFT_GRPC_TOKEN,
-        shyftApiKey: env.SHYFT_API_KEY,
-      }),
       endpointType: this.endpointType,
       subscriptionCount: this.subscriptions.size,
       accountCount: this.allSubscribedAccounts.size,

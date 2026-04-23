@@ -26,7 +26,6 @@ const tokenPublicSelect = {
   status: true,
   name: true,
   symbol: true,
-  isMayhemMode: true,
   description: true,
   imageUrl: true,
   websiteUrl: true,

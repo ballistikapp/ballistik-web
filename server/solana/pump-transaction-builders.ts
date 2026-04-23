@@ -64,8 +64,7 @@ async function uploadPumpMetadata(metadata: PumpMetadataUpload) {
 export async function buildCreateTokenTransaction(
   creator: Keypair,
   mint: Keypair,
-  metadata: PumpMetadataUpload,
-  options?: { isMayhemMode?: boolean }
+  metadata: PumpMetadataUpload
 ) {
   const metadataResult = await uploadPumpMetadata(metadata);
   const metadataUri = metadataResult.metadataUri as string;
@@ -80,8 +79,7 @@ export async function buildCreateTokenTransaction(
     creator,
     mint,
     metadata,
-    metadataUri,
-    { isMayhemMode: options?.isMayhemMode ?? false }
+    metadataUri
   );
   if (!createTx.feePayer) {
     createTx.feePayer = creator.publicKey;
@@ -94,17 +92,14 @@ export async function buildBuyTokenTransaction(
   mint: PublicKey,
   buyAmountLamport: bigint,
   creator?: PublicKey,
-  minTokensOut?: bigint,
-  options?: { isMayhemMode?: boolean }
+  minTokensOut?: bigint
 ): Promise<Transaction> {
   const tx = await buyTokensWithNewIdl(
     buyer,
     mint,
     buyAmountLamport,
     creator,
-    minTokensOut,
-    true,
-    options
+    minTokensOut
   );
   tx.feePayer = buyer.publicKey;
   return tx;

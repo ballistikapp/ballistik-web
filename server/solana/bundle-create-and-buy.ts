@@ -22,8 +22,6 @@ type BundleLaunchInput = {
   creator: Keypair;
   mint: Keypair;
   metadata: PumpMetadataUpload;
-  /** Pump `createV2` mayhem flag. */
-  isMayhemMode?: boolean;
   creatorBuyAmountLamport: bigint;
   buyerWallets: Keypair[];
   buyAmountsLamport: bigint[];
@@ -70,8 +68,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
   const { createTx, metadataUri } = await buildCreateTokenTransaction(
     input.creator,
     input.mint,
-    input.metadata,
-    { isMayhemMode: input.isMayhemMode ?? false }
+    input.metadata
   );
   logger.info("Create transaction prepared", {
     ...logContext,
@@ -137,8 +134,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     buyerWallets,
     input.mint.publicKey,
     buyAmountsLamport,
-    input.creator.publicKey,
-    { isMayhemMode: input.isMayhemMode ?? false }
+    input.creator.publicKey
   );
   logger.info("Bundle transactions built", {
     ...logContext,

@@ -10,8 +10,6 @@ type AppendLaunchDevBuyInstructionsParams = {
   solAmountLamports: bigint;
   creator: PublicKey;
   minTokensOut?: bigint;
-  /** Must match `createV2` mayhem flag when the curve is not on-chain yet. */
-  isMayhemMode?: boolean;
   buildBuyTransaction?: BuildBuyTransaction;
 };
 
@@ -22,7 +20,6 @@ export async function appendLaunchDevBuyInstructions({
   solAmountLamports,
   creator,
   minTokensOut = BigInt(1),
-  isMayhemMode,
   buildBuyTransaction = buildBuyTokenTransaction,
 }: AppendLaunchDevBuyInstructionsParams) {
   if (solAmountLamports <= BigInt(0)) {
@@ -34,8 +31,7 @@ export async function appendLaunchDevBuyInstructions({
     mint,
     solAmountLamports,
     creator,
-    minTokensOut,
-    { isMayhemMode }
+    minTokensOut
   );
 
   createTx.add(...buyTx.instructions);

@@ -31,10 +31,6 @@ const BUNDLE_CONFIRM_RPC_SLOW_POLL_MS = 3000;
 const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
 const MAX_BLOCKHASH_REBUILDS = 2;
-/** Solana wire limit for serialized `VersionedTransaction` (raw bytes). */
-const SOLANA_VERSIONED_TX_MAX_RAW_BYTES = 1232;
-/** RPC/base64 encoding limit (matches validator error messaging). */
-const SOLANA_VERSIONED_TX_MAX_BASE64_BYTES = 1644;
 
 export type BundleTelemetryEvent = {
   type:
@@ -535,46 +531,13 @@ export async function profileVersionedTransactions({
 }): Promise<BundleTransactionProfile[]> {
   return await Promise.all(
     versionedTxs.map(async (transaction, txIndex) => {
-      const serialized = transaction.serialize();
-      const serializedSizeBytes = serialized.length;
-      const base64EncodedSizeBytes = Buffer.from(serialized).toString("base64")
-        .length;
-      const instructionCount = transaction.message.compiledInstructions.length;
-      const signerCount = transaction.signatures.length;
-      const signature = signatures[txIndex] ?? null;
-      const exceedsRaw = serializedSizeBytes > SOLANA_VERSIONED_TX_MAX_RAW_BYTES;
-      const exceedsBase64 =
-        base64EncodedSizeBytes > SOLANA_VERSIONED_TX_MAX_BASE64_BYTES;
-
-      logger.info("Bundle transaction pre-simulation size", {
-        txIndex,
-        signature,
-        instructionCount,
-        signerCount,
-        serializedSizeBytes,
-        base64EncodedSizeBytes,
-        maxRawBytes: SOLANA_VERSIONED_TX_MAX_RAW_BYTES,
-        maxBase64Bytes: SOLANA_VERSIONED_TX_MAX_BASE64_BYTES,
-      });
-      if (exceedsRaw || exceedsBase64) {
-        logger.warn("Bundle transaction exceeds Solana serialized size limit", {
-          txIndex,
-          signature,
-          instructionCount,
-          serializedSizeBytes,
-          base64EncodedSizeBytes,
-          maxRawBytes: SOLANA_VERSIONED_TX_MAX_RAW_BYTES,
-          maxBase64Bytes: SOLANA_VERSIONED_TX_MAX_BASE64_BYTES,
-        });
-      }
-
       const simulation = await simulateTransaction(transaction);
       return {
         txIndex,
-        signature,
-        instructionCount,
-        signerCount,
-        serializedSizeBytes,
+        signature: signatures[txIndex] ?? null,
+        instructionCount: transaction.message.compiledInstructions.length,
+        signerCount: transaction.signatures.length,
+        serializedSizeBytes: transaction.serialize().length,
         unitsConsumed: simulation.value.unitsConsumed ?? null,
         simulationError: stringifySimulationError(simulation.value.err),
         simulationLogs: sanitizeSimulationLogs(simulation.value.logs),

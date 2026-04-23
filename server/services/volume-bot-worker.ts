@@ -997,36 +997,25 @@ export const closeVolumeBotAccounts = async (sessionId: string) => {
     include: { wallet: true },
   });
   const connection = getSolanaConnection();
-  const {
-    createCloseAccountInstruction,
-    TOKEN_PROGRAM_ID,
-    TOKEN_2022_PROGRAM_ID,
-  } = await import("@solana/spl-token");
+  const { createCloseAccountInstruction, TOKEN_PROGRAM_ID } =
+    await import("@solana/spl-token");
   await mapWithConcurrency(wallets, 2, async (volumeWallet) => {
     const walletKeypair = Keypair.fromSecretKey(
       bs58.decode(volumeWallet.wallet.privateKey)
     );
-    const [legacyAccounts, token2022Accounts] = await Promise.all([
-      connection.getParsedTokenAccountsByOwner(walletKeypair.publicKey, {
-        programId: TOKEN_PROGRAM_ID,
-      }),
-      connection.getParsedTokenAccountsByOwner(walletKeypair.publicKey, {
-        programId: TOKEN_2022_PROGRAM_ID,
-      }),
-    ]);
-    const tokenAccounts = [...legacyAccounts.value, ...token2022Accounts.value];
-    await mapWithConcurrency(tokenAccounts, 2, async (account) => {
+    const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+      walletKeypair.publicKey,
+      { programId: TOKEN_PROGRAM_ID }
+    );
+    await mapWithConcurrency(tokenAccounts.value, 2, async (account) => {
       const tokenAmount = account.account.data.parsed.info.tokenAmount.amount;
       if (tokenAmount !== "0") {
         return;
       }
-      const tokenProgramId = new PublicKey(account.account.owner);
       const closeIx = createCloseAccountInstruction(
         account.pubkey,
         walletKeypair.publicKey,
-        walletKeypair.publicKey,
-        [],
-        tokenProgramId
+        walletKeypair.publicKey
       );
       let tx = new Transaction().add(closeIx);
       tx = addComputeBudget(tx, 50_000, 10_000);

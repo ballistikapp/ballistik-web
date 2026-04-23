@@ -286,79 +286,27 @@ export default function Page() {
         closeAta,
         returnSolToMainWallet,
       });
-      const submitted = result.submitted;
-      const failed = result.failed;
-
-      const extraParts: string[] = [];
+      const summaryParts = [
+        `${result.submitted} submitted`,
+        `${result.failed} failed`,
+      ];
       if (closeAta && result.ataClose) {
-        const closed = result.ataClose.closed;
-        const closeFailed = result.ataClose.failed;
-        if (closed > 0) {
-          extraParts.push(
-            closed === 1
-              ? "Closed 1 empty token account"
-              : `Closed ${closed} empty token accounts`
-          );
-        }
-        if (closeFailed > 0) {
-          extraParts.push(
-            closeFailed === 1
-              ? "1 account close failed"
-              : `${closeFailed} account closes failed`
-          );
+        summaryParts.push(`${result.ataClose.closed} ATA closed`);
+        if (result.ataClose.failed > 0) {
+          summaryParts.push(`${result.ataClose.failed} close failed`);
         }
       }
       if (result.effectiveReturnSolToMainWallet && result.solRecovery) {
-        const recovered = result.solRecovery.recovered;
-        const recoverFailed = result.solRecovery.failed;
-        if (recovered > 0) {
-          extraParts.push(
-            recovered === 1
-              ? "Reclaimed SOL from 1 wallet"
-              : `Reclaimed SOL from ${recovered} wallets`
-          );
-        }
-        if (recoverFailed > 0) {
-          extraParts.push(
-            recoverFailed === 1
-              ? "1 SOL reclaim failed"
-              : `${recoverFailed} SOL reclaims failed`
-          );
+        summaryParts.push(
+          `${result.solRecovery.recovered} wallet SOL returned`
+        );
+        if (result.solRecovery.failed > 0) {
+          summaryParts.push(`${result.solRecovery.failed} SOL return failed`);
         }
       }
-
-      const summaryLine =
-        failed > 0
-          ? submitted > 0
-            ? `${submitted} sent · ${failed} failed`
-            : `${failed} failed`
-          : null;
-
-      const descriptionBits = [
-        ...(summaryLine ? [summaryLine] : []),
-        ...extraParts,
-      ];
-      const description =
-        descriptionBits.length > 0
-          ? `${descriptionBits.join(". ")}.`
-          : undefined;
-
-      if (failed === 0) {
-        toast.success(submitted === 1 ? "Sell submitted" : "Sells submitted", {
-          id: toastId,
-          ...(description ? { description } : {}),
-        });
-      } else if (submitted > 0) {
-        toast.message("Some sells failed", {
-          id: toastId,
-          ...(description ? { description } : {}),
-        });
-      } else {
-        toast.error("Sell failed", {
-          id: toastId,
-          ...(description ? { description } : {}),
-        });
-      }
+      toast.success(`Sell submitted: ${summaryParts.join(", ")}`, {
+        id: toastId,
+      });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
       await refreshRelatedWalletData(
         result.effectiveReturnSolToMainWallet ? undefined : walletPublicKeys

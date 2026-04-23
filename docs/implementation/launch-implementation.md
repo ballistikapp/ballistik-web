@@ -115,7 +115,7 @@ Any plan may choose `use_main`, `generate`, or `import`. Choosing a non-system d
 
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
 
-When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup, but failed-launch reclaim is capped to the launch-funded top-up recorded for that attempt so pre-existing system-wallet SOL is not swept to the user. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept to the user's main wallet subject to the same operational reserve and indexing rules as holdings/exit (`sweepSystemDevRealizedSol`).
+When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup, but failed-launch reclaim is capped to the launch-funded top-up recorded for that attempt so pre-existing system-wallet SOL is not swept to the user. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
 
 ### Bundler Wallets
 
@@ -143,7 +143,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
-2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy and for bundle buy amount per wallet) and bundle wallet limit (max `10` bundler wallets).
+2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `10` bundler wallets).
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
@@ -233,7 +233,6 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `server/solana/bundle-create-and-buy.ts`
 - `server/solana/bundle-transaction-builder.ts`
 - `server/solana/pump-transaction-builders.ts`
-- `server/solana/pump-idl.ts` (normalizes `data/pump.json` into the shape `@coral-xyz/anchor` expects for `create` only)
 - `app/(app)/launch/launch-progress-dialog.tsx`
 - `app/(app)/launch/launch-overview-dialog.tsx`
 - `app/(app)/launch/launch-form.tsx`
@@ -307,22 +306,16 @@ The server quote groups values into:
 
 ## Bundle Launch
 
-### Create v2 and mayhem mode
-
-- All new launches use Anchor **`createV2`** against the normalized [`data/pump.json`](../../data/pump.json) IDL (Token-2022 mint; no Metaplex metadata accounts in the create instruction).
-- Optional **`mayhemMode`** on the launch form sets `isMayhemMode` on-chain. The server **preflights** the pump `Global` account: if `createV2Enabled` or `mayhemModeEnabled` is false when required, the user gets a clear `AppError`.
-- Mayhem PDAs (`global-params`, `sol-vault`, `mayhem-state`, mayhem token vault) use the Mayhem program id from [`lib/config/pump-mayhem.config.ts`](../../lib/config/pump-mayhem.config.ts). `Token.isMayhemMode` stores the launch flag in the database.
-
 ### Overview
 
 When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito bundle. The path is:
 
-1. Build the token create transaction (via Anchor `program.methods.createV2`).
+1. Build the token create transaction (via Anchor `program.methods.create`).
 2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
 3. Pack transactions into a bundle and submit through Jito.
 4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
 
-Note: Buy instructions are built as raw `TransactionInstruction` (not via Anchor) using the `buy_exact_sol_in` discriminator with **25-byte** payload: 8-byte discriminator + `spendable_sol_in` (u64 LE) + `min_tokens_out` (u64 LE) + `track_volume` as pump’s `OptionBool` (**1 byte**, Borsh: `0x00` / `0x01`). The app defaults `track_volume` to **true** so volume-incentive accounting matches typical pump.fun behavior. Each buy includes the **16** accounts from the IDL (`global` through `fee_program`) **plus** a trailing **`bonding_curve_v2`** PDA (`["bonding-curve-v2", mint]`). Some IDL exports omit that account, but the **deployed program** still expects it—without it, buys hit error **6024 (Overflow)** in `buy.rs` (legacy u128 math path). The **`fee_recipient`** (2nd account) must be an **authorized** protocol recipient from on-chain **`Global`**: for normal tokens, `feeRecipient` / `feeRecipients`; for **mayhem** tokens (`isMayhemMode` on the bonding curve), `reservedFeeRecipient` / `reservedFeeRecipients` (see `selectPumpTradeFeeRecipient` in `server/solana/pump-new-idl.ts`). Bundle builds pass **`isMayhemMode`** through `buildBundleTransactionsForCreateAndBuys` because the curve does not exist on RPC yet when buys are assembled. Using the wrong pool causes **6000 (`NotAuthorized`)** in `fee_recipient.rs`.
+Note: Buy instructions are built as raw `TransactionInstruction` (not via Anchor) using the `buy_exact_sol_in` discriminator with 24-byte data (discriminator + sol_amount + min_tokens_out). The `track_volume` OptionBool parameter is omitted. Each buy instruction includes 17 accounts: the standard 16 accounts plus a trailing `bonding_curve_v2` PDA (derived from `["bonding-curve-v2", mint]`). The V2 trailing account is required by the current program version — without it, the program falls into a legacy code path that overflows at `buy.rs:181`.
 
 Note: No off-chain token amount calculation is needed. The program determines tokens from the SOL input, deducts fees (currently 1.25% via the `pfee` program), and transfers the appropriate token amount. `min_tokens_out = 1` is safe inside an atomic Jito bundle where MEV is not a concern.
 
@@ -333,9 +326,8 @@ Note: No off-chain token amount calculation is needed. The program determines to
   - A compute budget instruction (800k units),
   - The token create instructions,
   - Up to 1 buy.
-- Subsequent transactions include up to **3 buys each** for normal tokens, and up to **2 buys each** for **Mayhem** launches — Mayhem `buy_exact_sol_in` carries more accounts, and three buys in one v0 transaction exceeds Solana’s **1232**-byte raw serialized limit (~**1644** bytes base64).
-- With Mayhem + bundle buy, bundler wallet count is capped at **8** (dev buy + 8 bundlers = 9 buyers → 1 + 4×2 buys across follow-up txs, 5 transactions total). `maxMayhemBundlerWallets` lives in [`lib/config/launch.config.ts`](../../lib/config/launch.config.ts).
-- With the max **10** bundler wallets + dev buy (11 total buys) **without** Mayhem, the packing is:
+- Subsequent transactions include up to 3 buys each.
+- With the max 10 bundler wallets + dev buy (11 total buys), the packing is:
   - TX1: create + dev buy
   - TX2: 3 buys
   - TX3: 3 buys

@@ -88,7 +88,6 @@ function readBool(buffer: Buffer, offset: number): boolean {
   return buffer[offset] !== 0;
 }
 
-/** BondingCurve leading fields per `data/pump.json` (8-byte account disc + reserves + complete). */
 function decodeBondingCurveAccount(data: Buffer) {
   const offset = DISCRIMINATOR_SIZE;
   return {

@@ -17,6 +17,8 @@ import {
   discountLaunchUsageFees,
 } from "@/lib/config/usage-fees.config";
 import { getEnv } from "@/lib/config/env";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -32,15 +34,14 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import bs58 from "bs58";
+import { PumpFunSDK } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
 import { appendLaunchDevBuyInstructions } from "@/server/solana/launch-dev-buy";
 import type { BundleTelemetryEvent } from "@/server/solana/jito-bundle";
 import {
-  buildBuyTokenTransaction,
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
 } from "@/server/solana/pump-transaction-builders";
-import { getTokenProgramIdForPumpMint } from "@/server/solana/pump-new-idl";
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
@@ -82,7 +83,7 @@ function lamportsToSol(lamports: bigint) {
   return Number(lamports) / LAMPORTS_PER_SOL;
 }
 
-const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.05;
+const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.1;
 const MIN_BUNDLER_BUY_AMOUNT_LAMPORTS = toLamports(MIN_BUNDLER_BUY_AMOUNT_SOL);
 
 function normalizeSymbol(symbol: string) {
@@ -183,7 +184,6 @@ type LaunchCostInput = Pick<
   | "bundlerBuyVariancePercent"
   | "distributionWalletMultiplier"
   | "removeAttribution"
-  | "mayhemMode"
 >;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -567,6 +567,14 @@ async function normalizeLaunchInputMediaForStorage(
   }
 
   return normalizedInput;
+}
+
+async function createPumpSdk(creator: Keypair) {
+  const wallet = new NodeWallet(creator);
+  const provider = new AnchorProvider(getSolanaConnection(), wallet, {
+    commitment: "finalized",
+  });
+  return new PumpFunSDK(provider);
 }
 
 async function appendLog(
@@ -1246,7 +1254,6 @@ function validateLaunchInput(input: LaunchCostInput) {
   const {
     minBuyAmountSol: MIN_BUY_AMOUNT_SOL,
     maxBundleWallets: MAX_BUNDLE_WALLETS,
-    maxMayhemBundlerWallets: MAX_MAYHEM_BUNDLER_WALLETS,
   } = getLaunchConfig();
   const devBuyAmountSol = input.devBuyAmountSol;
   const jitoTipAmountSol = input.jitoTipAmountSol;
@@ -1279,16 +1286,6 @@ function validateLaunchInput(input: LaunchCostInput) {
   if (input.bundleBuyEnabled && bundlerWalletCount > MAX_BUNDLE_WALLETS) {
     throw new AppError(
       `Bundle buy supports up to ${MAX_BUNDLE_WALLETS} wallets per launch`,
-      400
-    );
-  }
-  if (
-    input.bundleBuyEnabled &&
-    input.mayhemMode &&
-    bundlerWalletCount > MAX_MAYHEM_BUNDLER_WALLETS
-  ) {
-    throw new AppError(
-      `Mayhem bundle allows at most ${MAX_MAYHEM_BUNDLER_WALLETS} bundler wallets (Solana limits how much fits in one Jito bundle). Turn off Mayhem mode or lower the count.`,
       400
     );
   }
@@ -2015,7 +2012,6 @@ async function distributeTokensToWallets(
   }
 
   const connection = getSolanaConnection();
-  const tokenProgramId = await getTokenProgramIdForPumpMint(mint);
   const grouped = new Map<number, Keypair[]>();
   distributionWallets.forEach((wallet) => {
     const list = grouped.get(wallet.parentIndex) ?? [];
@@ -2043,18 +2039,11 @@ async function distributeTokensToWallets(
     }
     const sourceAta = await getAssociatedTokenAddress(
       mint,
-      sourceWallet.publicKey,
-      false,
-      tokenProgramId
+      sourceWallet.publicKey
     );
     let tokenBalance = BigInt(0);
     try {
-      const account = await getAccount(
-        connection,
-        sourceAta,
-        "confirmed",
-        tokenProgramId
-      );
+      const account = await getAccount(connection, sourceAta);
       tokenBalance = account.amount;
     } catch (error) {
       failedTransfers += 1;
@@ -2088,9 +2077,7 @@ async function distributeTokensToWallets(
       const destination = childWallets[j];
       const destinationAta = await getAssociatedTokenAddress(
         mint,
-        destination.publicKey,
-        false,
-        tokenProgramId
+        destination.publicKey
       );
       try {
         const transaction = new Transaction();
@@ -2101,8 +2088,7 @@ async function distributeTokensToWallets(
               sourceWallet.publicKey,
               destinationAta,
               destination.publicKey,
-              mint,
-              tokenProgramId
+              mint
             )
           );
         }
@@ -2111,9 +2097,7 @@ async function distributeTokensToWallets(
             sourceAta,
             destinationAta,
             sourceWallet.publicKey,
-            amountPerWallet,
-            [],
-            tokenProgramId
+            amountPerWallet
           )
         );
         const { blockhash } = await connection.getLatestBlockhash("confirmed");
@@ -2210,7 +2194,6 @@ async function persistTokenPending(
           status: "PENDING",
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
-          isMayhemMode: input.mayhemMode,
           description: composeTokenDescription(input) || null,
           imageUrl: tokenImageUrl,
           twitterUrl: input.twitter?.trim() || null,
@@ -4153,6 +4136,7 @@ export const launchService = {
 
       await setStep(launchId, 45, "create", "Creating token");
       const createStartedAt = Date.now();
+      const pumpSdk = await createPumpSdk(devWalletKeypair);
       let createSignature: string | null = null;
       let bundleId: string | null = null;
       if (input.bundleBuyEnabled) {
@@ -4182,7 +4166,6 @@ export const launchService = {
           creator: devWalletKeypair,
           mint: mintKeypair,
           metadata,
-          isMayhemMode: input.mayhemMode,
           creatorBuyAmountLamport: toLamports(devBuyAmountSol),
           buyerWallets,
           buyAmountsLamport,
@@ -4228,8 +4211,7 @@ export const launchService = {
         const { createTx } = await buildCreateTokenTransaction(
           devWalletKeypair,
           mintKeypair,
-          metadata,
-          { isMayhemMode: input.mayhemMode }
+          metadata
         );
         const connection = getSolanaConnection();
         if (devBuyAmountSol > 0) {
@@ -4240,7 +4222,6 @@ export const launchService = {
             solAmountLamports: toLamports(devBuyAmountSol),
             creator: devWalletKeypair.publicKey,
             minTokensOut: BigInt(1),
-            isMayhemMode: input.mayhemMode,
           });
         }
         if (!createTx.feePayer) {
@@ -4346,13 +4327,12 @@ export const launchService = {
             if (amountLamports <= BigInt(0)) {
               continue;
             }
-            const tx = await buildBuyTokenTransaction(
-              buyer,
+            const tx = await pumpSdk.getBuyInstructionsBySolAmount(
+              buyer.publicKey,
               mintKeypair.publicKey,
               amountLamports,
-              devWalletKeypair.publicKey,
-              BigInt(1),
-              { isMayhemMode: input.mayhemMode }
+              SLIPPAGE_BASIS_POINTS,
+              "confirmed"
             );
             tx.feePayer = buyer.publicKey;
             const latestBlockhash =

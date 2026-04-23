@@ -2556,7 +2556,6 @@ export const TokenScalarFieldEnum = {
   status: 'status',
   name: 'name',
   symbol: 'symbol',
-  isMayhemMode: 'isMayhemMode',
   description: 'description',
   imageUrl: 'imageUrl',
   websiteUrl: 'websiteUrl',

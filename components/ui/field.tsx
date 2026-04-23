@@ -45,7 +45,7 @@ function FieldGroup({ className, ...props }: React.ComponentProps<"div">) {
   )
 }
 
-const fieldVariants = cva("gap-2 group/field flex w-full", {
+const fieldVariants = cva("data-[invalid=true]:text-destructive gap-2 group/field flex w-full", {
   variants: {
     orientation: {
       vertical:
@@ -64,7 +64,6 @@ const fieldVariants = cva("gap-2 group/field flex w-full", {
 function Field({
   className,
   orientation = "vertical",
-  "data-invalid": dataInvalid,
   ...props
 }: React.ComponentProps<"div"> &
   VariantProps<typeof fieldVariants> & {
@@ -76,7 +75,6 @@ function Field({
       data-slot="field"
       data-orientation={orientation}
       className={cn(fieldVariants({ orientation }), className)}
-      data-invalid={dataInvalid ? true : undefined}
       {...props}
     />
   )
@@ -167,35 +165,13 @@ function FieldSeparator({
   )
 }
 
-type FieldErrorEntry =
-  | string
-  | { message?: string }
-  | undefined
-  | null
-
-function normalizeFieldErrorEntry(
-  error: FieldErrorEntry
-): { message: string } | null {
-  if (error == null) return null
-  if (typeof error === "string" && error.trim() !== "") {
-    return { message: error }
-  }
-  if (typeof error === "object" && error !== null) {
-    const msg = error.message
-    if (typeof msg === "string" && msg.trim() !== "") {
-      return { message: msg }
-    }
-  }
-  return null
-}
-
 function FieldError({
   className,
   children,
   errors,
   ...props
 }: React.ComponentProps<"div"> & {
-  errors?: FieldErrorEntry[]
+  errors?: ReadonlyArray<unknown>
 }) {
   const content = useMemo(() => {
     if (children) {
@@ -206,20 +182,30 @@ function FieldError({
       return null
     }
 
-    const normalized = errors
-      .map(normalizeFieldErrorEntry)
-      .filter((e): e is { message: string } => e != null)
+    const toMessage = (e: unknown): string | undefined => {
+      if (typeof e === "string") return e;
+      if (e && typeof e === "object" && "message" in e) {
+        const m = (e as { message?: unknown }).message;
+        return typeof m === "string" ? m : undefined;
+      }
+      return undefined;
+    };
 
-    if (normalized.length === 0) {
-      return null
-    }
+    const normalized = errors
+      .map((e) => {
+        const message = toMessage(e);
+        return message != null && message !== "" ? { message } : undefined;
+      })
+      .filter(
+        (e): e is { message: string } => e != null && e.message.length > 0
+      );
 
     const uniqueErrors = [
-      ...new Map(normalized.map((e) => [e.message, e])).values(),
-    ]
+      ...new Map(normalized.map((error) => [error.message, error])).values(),
+    ];
 
     if (uniqueErrors?.length == 1) {
-      return uniqueErrors[0]?.message
+      return uniqueErrors[0]?.message;
     }
 
     return (
@@ -229,7 +215,7 @@ function FieldError({
             error?.message && <li key={index}>{error.message}</li>
         )}
       </ul>
-    )
+    );
   }, [children, errors])
 
   if (!content) {

@@ -2,7 +2,6 @@ import "server-only";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { getAssociatedTokenAddress } from "@solana/spl-token";
-import { getTokenProgramIdForPumpMint } from "@/server/solana/pump-new-idl";
 import { prisma } from "@/lib/prisma";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { rpcConfig } from "@/lib/config/rpc.config";
@@ -289,15 +288,9 @@ const fetchTokenBalances = async (
   }
   const connection = getSolanaConnection();
   const tokenDecimals = await getMintDecimals(mintPublicKey);
-  const tokenProgramId = await getTokenProgramIdForPumpMint(mintPublicKey);
   const atas = await Promise.all(
     walletPublicKeys.map((walletPublicKey) =>
-      getAssociatedTokenAddress(
-        mintPublicKey,
-        new PublicKey(walletPublicKey),
-        false,
-        tokenProgramId
-      )
+      getAssociatedTokenAddress(mintPublicKey, new PublicKey(walletPublicKey))
     )
   );
 
