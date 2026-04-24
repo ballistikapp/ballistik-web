@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Tokens",
+  title: "Launches",
 };
 
-export default function TokensLayout({
+export default function LaunchesLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

@@ -40,7 +40,7 @@ const LAUNCH_STATUS_MAP: Record<string, TokenRowStatus> = {
   CANCELED: "FAILED",
 };
 
-export default function ManageTokensPage() {
+export default function ManageLaunchesPage() {
   const router = useRouter();
   const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery(
     undefined,
@@ -138,7 +138,7 @@ export default function ManageTokensPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="My Tokens"
+        title="Launches"
         rightContent={
           <Button asChild>
             <Link href="/launch">
@@ -154,12 +154,12 @@ export default function ManageTokensPage() {
         data={tableRows}
         isLoading={isLoading}
         getRowId={(row) => row.id}
-        searchableColumns={["token", "publicKey"]}
+        searchableColumns={["name", "symbol", "publicKey"]}
         toolbar={(table) => (
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
-              placeholder="Search tokens..."
+              placeholder="Search launches..."
               className="w-full sm:max-w-sm"
             />
             <DataTableViewOptions table={table} />
@@ -211,14 +211,17 @@ export default function ManageTokensPage() {
               Close
             </Button>
             {privateKey ? (
-              <Button onClick={() => copyToClipboard(privateKey, "Private key")}>
+              <Button
+                onClick={() => copyToClipboard(privateKey, "Private key")}
+              >
                 Copy private key
               </Button>
             ) : (
               <Button
                 onClick={handleGetPrivateKey}
                 disabled={
-                  getPrivateKeyMutation.isPending || !privateKeyTarget?.publicKey
+                  getPrivateKeyMutation.isPending ||
+                  !privateKeyTarget?.publicKey
                 }
               >
                 {getPrivateKeyMutation.isPending && (

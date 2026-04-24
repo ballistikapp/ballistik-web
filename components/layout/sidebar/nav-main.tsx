@@ -80,7 +80,7 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
     scope: "token",
   },
   {
-    title: "Launch New Coin",
+    title: "Launch New Token",
     url: "/launch",
     icon: IconPlus,
     iconClassName: "text-primary",
@@ -96,8 +96,8 @@ export const accountRoutes: NavMainItem[] = [
     scope: "global",
   },
   {
-    title: "My Tokens",
-    url: "/tokens",
+    title: "Launches",
+    url: "/launches",
     icon: IconList,
     scope: "global",
   },
