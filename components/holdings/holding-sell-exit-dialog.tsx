@@ -8,6 +8,17 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
+import { bundledExitFeeSol } from "@/lib/config/usage-fees.config";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -145,6 +156,7 @@ export function HoldingSellExitDialog({
   const [exitReturnSolToMainWallet, setExitReturnSolToMainWallet] =
     React.useState(true);
   const [isPreparingSell, setIsPreparingSell] = React.useState(false);
+  const [exitConfirmOpen, setExitConfirmOpen] = React.useState(false);
   const [dialogHoldings, setDialogHoldings] = React.useState<HoldingSummary[]>(
     []
   );
@@ -237,6 +249,7 @@ export function HoldingSellExitDialog({
     setSellReturnSolToMainWallet(true);
     setTip("0.005");
     setExitReturnSolToMainWallet(true);
+    setExitConfirmOpen(false);
     setSelectedWallets({});
     setDialogHoldings([]);
     autoRefreshRunRef.current = false;
@@ -319,6 +332,20 @@ export function HoldingSellExitDialog({
       return;
     }
     await onExit(parsed, exitReturnSolToMainWallet);
+    setExitConfirmOpen(false);
+  };
+
+  const handleExitClick = () => {
+    const parsed = Number.parseFloat(tip);
+    if (!Number.isFinite(parsed) || parsed < 0 || parsed > 1) {
+      toast.error("Enter a tip between 0 and 1 SOL");
+      return;
+    }
+    if (walletsWithBalance === 0) {
+      toast.error("No wallets with balances available");
+      return;
+    }
+    setExitConfirmOpen(true);
   };
 
   const status = exit?.status ?? "PENDING";
@@ -391,6 +418,7 @@ export function HoldingSellExitDialog({
   );
 
   return (
+    <>
     <Dialog open={open} onOpenChange={handleOpenChange}>
       <DialogContent className="grid max-h-[min(90vh,760px)] min-w-0 max-w-lg grid-rows-[auto_minmax(0,1fr)_auto] gap-0 overflow-hidden p-0 sm:max-w-lg">
         <DialogHeader className="min-w-0 border-b px-4 py-3 pr-12">
@@ -723,6 +751,16 @@ export function HoldingSellExitDialog({
                     .
                   </p>
                 </div>
+                <div className="min-w-0 overflow-hidden rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+                  <p className="min-w-0 wrap-break-word">
+                    A{" "}
+                    <span className="font-mono tabular-nums">
+                      {bundledExitFeeSol.toFixed(1)} SOL
+                    </span>{" "}
+                    bundled exit fee will be deducted from your main wallet after
+                    the sell bundles land successfully.
+                  </p>
+                </div>
               </>
             )}
 
@@ -990,7 +1028,7 @@ export function HoldingSellExitDialog({
                   </Button>
                   <Button
                     variant="destructive"
-                    onClick={handleExitConfirm}
+                    onClick={handleExitClick}
                     disabled={isStartingExit}
                   >
                     {isStartingExit ? (
@@ -1028,5 +1066,41 @@ export function HoldingSellExitDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+    <AlertDialog open={exitConfirmOpen} onOpenChange={setExitConfirmOpen}>
+      <AlertDialogContent size="default">
+        <AlertDialogHeader>
+          <AlertDialogTitle>Confirm bundled exit</AlertDialogTitle>
+          <AlertDialogDescription>
+            This will sell token balances across all managed wallets for{" "}
+            <span className="font-mono">${tokenSymbol}</span>. Estimated bundles:{" "}
+            <span className="font-mono tabular-nums">{estimatedBundles}</span>,
+            estimated total Jito tip:{" "}
+            <span className="font-mono tabular-nums">
+              {estimatedTotalTipSol.toFixed(4)} SOL
+            </span>
+            . A{" "}
+            <span className="font-mono tabular-nums">
+              {bundledExitFeeSol.toFixed(1)} SOL
+            </span>{" "}
+            bundled exit fee will be deducted from your main wallet after the sell
+            bundles land successfully.
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel disabled={isStartingExit}>Cancel</AlertDialogCancel>
+          <AlertDialogAction
+            variant="destructive"
+            disabled={isStartingExit}
+            onClick={(event) => {
+              event.preventDefault();
+              void handleExitConfirm();
+            }}
+          >
+            {isStartingExit ? "Starting..." : "Confirm Exit"}
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   );
 }

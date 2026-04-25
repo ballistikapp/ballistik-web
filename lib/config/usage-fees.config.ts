@@ -2,6 +2,7 @@ export const generatedWalletFeeSol = 0.02;
 export const vanityMintFeeSol = 0.1;
 export const descriptionAttributionRemovalFeeSol = 0.1;
 export const bundleBuyFeeSol = 0.1;
+export const bundledExitFeeSol = 0.1;
 /** Legacy: was 0.1 SOL; launch no longer charges a non-system dev wallet fee. */
 export const nonSystemDevWalletFeeSol = 0;
 

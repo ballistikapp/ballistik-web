@@ -180,6 +180,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 - Launch form starts via `launch.start` and polls `launch.status`.
 - Progress dialog renders launch status and logs.
+- The app header shows active launch progress beside the sidebar trigger via `activeProcess.list`; clicking the header pill opens the same launch progress dialog.
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
 - User can request cancellation.
 - Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).

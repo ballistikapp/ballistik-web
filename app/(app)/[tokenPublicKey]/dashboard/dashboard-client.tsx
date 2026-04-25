@@ -23,6 +23,7 @@ import {
   buildDashboardFullSnapshotPayload,
   buildDashboardSummaryPayload,
 } from "./dashboard-log-payload";
+import { formatBuyHoldingsToast } from "@/lib/utils/buy-holdings-toast-message";
 import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
 
 const POLL_INTERVAL = 30_000;
@@ -772,8 +773,9 @@ export function DashboardClient() {
       setLocalExitId(result.exitId);
       setManualExitDialogOpen(true);
       setDismissedExitId(null);
+      void utils.activeProcess.list.invalidate();
     },
-    [tokenPublicKey, startExitMutation]
+    [tokenPublicKey, startExitMutation, utils]
   );
 
   const handleSell = useCallback(
@@ -858,17 +860,7 @@ export function DashboardClient() {
           solAmountPerWallet,
           slippageBps,
         });
-        const summaryParts = [
-          `${result.submitted} submitted`,
-          `${result.failed} failed`,
-        ];
-        if (result.funding.funded > 0) {
-          summaryParts.push(`${result.funding.funded} funded`);
-        }
-        if (result.excessReturn.returned > 0) {
-          summaryParts.push(`${result.excessReturn.returned} excess returned`);
-        }
-        toast.success(`Buy submitted: ${summaryParts.join(", ")}`, {
+        toast.success(formatBuyHoldingsToast(result), {
           id: toastId,
         });
         await Promise.all([
@@ -919,7 +911,8 @@ export function DashboardClient() {
     if (!activeExitId) return;
     await cancelExitMutation.mutateAsync({ exitId: activeExitId });
     await exitStatusQuery.refetch();
-  }, [activeExitId, cancelExitMutation, exitStatusQuery]);
+    void utils.activeProcess.list.invalidate();
+  }, [activeExitId, cancelExitMutation, exitStatusQuery, utils]);
 
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;

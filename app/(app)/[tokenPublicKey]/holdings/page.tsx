@@ -12,6 +12,7 @@ import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sideba
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { formatSol, formatTokenCount } from "@/lib/utils/format";
+import { formatBuyHoldingsToast } from "@/lib/utils/buy-holdings-toast-message";
 import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
@@ -372,17 +373,7 @@ export default function Page() {
         solAmountPerWallet,
         slippageBps,
       });
-      const summaryParts = [
-        `${result.submitted} submitted`,
-        `${result.failed} failed`,
-      ];
-      if (result.funding.funded > 0) {
-        summaryParts.push(`${result.funding.funded} funded`);
-      }
-      if (result.excessReturn.returned > 0) {
-        summaryParts.push(`${result.excessReturn.returned} excess returned`);
-      }
-      toast.success(`Buy submitted: ${summaryParts.join(", ")}`, {
+      toast.success(formatBuyHoldingsToast(result), {
         id: toastId,
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
@@ -425,6 +416,7 @@ export default function Page() {
       setLocalExitId(result.exitId);
       setManualExitDialogOpen(true);
       setDismissedExitId(null);
+      void utils.activeProcess.list.invalidate();
       toast.success("Exit started", { id: toastId });
     } catch (error) {
       const message =
@@ -440,6 +432,7 @@ export default function Page() {
       await cancelExitMutation.mutateAsync({ exitId: activeExitId });
       toast.success("Exit cancelled", { id: toastId });
       await exitStatusQuery.refetch();
+      void utils.activeProcess.list.invalidate();
     } catch (error) {
       const message =
         error instanceof Error ? error.message : "Failed to cancel exit";

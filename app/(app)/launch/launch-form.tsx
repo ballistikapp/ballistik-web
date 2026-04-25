@@ -324,6 +324,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       setActiveLaunchId(data.launchId);
       setIsProgressOpen(true);
       setLaunchNotified(false);
+      void utils.activeProcess.list.invalidate();
     },
     onError: (error) => {
       toast.error("Failed to start launch", {
@@ -352,6 +353,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       setActiveLaunchId(data.launchId);
       setIsProgressOpen(true);
       setLaunchNotified(false);
+      void utils.activeProcess.list.invalidate();
       router.push("/launch");
     },
     onError: (error) => {

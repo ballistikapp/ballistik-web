@@ -39,12 +39,14 @@ import type { ContextUser } from "@/server/schemas/auth.schema";
 import { UserPlan } from "@/lib/generated/prisma/client";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
 import { getEnv } from "@/lib/config/env";
+import { bundledExitFeeSol } from "@/lib/config/usage-fees.config";
 import {
   recoverWalletSolBalances,
   resolveReturnSolToMainWallet,
   sweepSystemDevRealizedSol,
 } from "@/server/services/holding-sol-recovery";
 import { deriveHoldingExitTerminalStatus } from "@/server/services/holding-exit-status";
+import { usageFeeService } from "@/server/services/usage-fee.service";
 
 const cancelledExits = new Set<string>();
 
@@ -90,6 +92,10 @@ type ExitSummary = {
   systemDevImmediateSweepLamports: number;
   totalJitoTipLamports: number;
   totalJitoTipSol: number;
+  exitFeeSol: number;
+  exitFeeCollected: boolean;
+  exitFeeSignature: string | null;
+  exitFeeError: string | null;
 };
 
 const DEFAULT_JITO_TIP_SOL = 0.005;
@@ -1066,6 +1072,66 @@ async function runExitFlow(exitId: string) {
       { solRecoveredLamports }
     );
 
+    const finalOutcome = deriveHoldingExitTerminalStatus({
+      failedChunks: failedChunks.length,
+      cleanupFailedWallets,
+    });
+    const exitFee = {
+      collected: false,
+      signature: null as string | null,
+      error: null as string | null,
+    };
+
+    if (failedChunks.length === 0) {
+      try {
+        const feeResult = await usageFeeService.collectFromMainWallet({
+          userId: exit.userId,
+          totalFeeSol: bundledExitFeeSol,
+          reason: "exit.bundled_sell",
+          txSource: "EXIT",
+          tokenPublicKey: exit.tokenPublicKey,
+          referenceId: exitId,
+        });
+        exitFee.collected = !feeResult.skipped;
+        exitFee.signature = feeResult.signature;
+        if (!feeResult.skipped) {
+          await walletService.refreshWalletBalances(
+            exit.tokenPublicKey,
+            exit.userId,
+            [feeResult.fromPublicKey],
+            true
+          );
+        }
+        await appendExitLog(
+          exitId,
+          "INFO",
+          feeResult.skipped
+            ? "Bundled exit fee skipped"
+            : "Bundled exit fee collected",
+          "fee",
+          {
+            amountSol: bundledExitFeeSol,
+            signature: feeResult.signature,
+            fromPublicKey: feeResult.fromPublicKey,
+            toPublicKey: feeResult.toPublicKey,
+            skipped: feeResult.skipped,
+          }
+        );
+      } catch (error) {
+        exitFee.error = error instanceof Error ? error.message : String(error);
+        await appendExitLog(
+          exitId,
+          "WARN",
+          "Bundled exit fee collection failed",
+          "fee",
+          {
+            amountSol: bundledExitFeeSol,
+            message: exitFee.error,
+          }
+        );
+      }
+    }
+
     const summary: ExitSummary = {
       totalWallets: nonZeroBalances.length,
       totalChunks: chunks.length,
@@ -1088,12 +1154,12 @@ async function runExitFlow(exitId: string) {
       systemDevImmediateSweepLamports,
       totalJitoTipLamports: bundlesProcessed * tipLamports,
       totalJitoTipSol: (bundlesProcessed * tipLamports) / 1_000_000_000,
+      exitFeeSol: bundledExitFeeSol,
+      exitFeeCollected: exitFee.collected,
+      exitFeeSignature: exitFee.signature,
+      exitFeeError: exitFee.error,
     };
 
-    const finalOutcome = deriveHoldingExitTerminalStatus({
-      failedChunks: failedChunks.length,
-      cleanupFailedWallets,
-    });
     await updateExit(exitId, {
       status: finalOutcome.status,
       progress: 100,
