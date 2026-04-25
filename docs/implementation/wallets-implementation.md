@@ -8,7 +8,7 @@ When a token launch uses `devWalletOption = use_main`, the token's dev wallet an
 
 ## Data Model
 
-- `Wallet.tokenPublicKey` is used for operational wallets (bundler/volume/distribution).
+- `Wallet.tokenPublicKey` is used for operational wallets (bundler/volume/buyer/distribution).
 - Dev wallets are shared across tokens via `TokenDevWallet` join model.
 - Main wallet is user-scoped via `User.mainWallet`.
 - `Wallet.isSystemWallet` (`Boolean @default(false)`) marks the platform-provided dev wallet.
@@ -45,13 +45,21 @@ Creator rewards are **not available** for tokens using the system dev wallet —
 - Per-session state and recovery metadata live in `VolumeBotWallet`.
 - Reclaim and close-accounts actions update both the wallet balance and the session wallet status.
 
+## Buyer Wallets
+
+- Buyer wallets are token-scoped `Wallet` rows with `type = BUYER`.
+- They are generated from the holdings/dashboard `BUY` dialog as a separate step before buying.
+- Each generated buyer wallet is charged through the shared generated-wallet usage-fee policy (`0.02 SOL` each before plan discounts/waivers).
+- Newly created buyer wallets are included in operational wallet queries and are eligible for holdings buy, sell, exit, send, return, balance refresh, dashboard stats, and transaction refresh flows.
+
 ## Queries and Services
 
 tRPC procedures:
 
-- `wallet.getOperationalByToken` fetches operational wallets by `tokenPublicKey`.
+- `wallet.getOperationalByToken` fetches operational wallets by `tokenPublicKey` (`BUNDLER`, `VOLUME`, `BUYER`, `DISTRIBUTION`).
   - Supports optional pagination: `page`, `pageSize` (default `1` / `200`, max `200`).
   - Returns `totalCount` alongside the current page of wallets.
+- `wallet.createBuyerByToken` generates token-scoped `BUYER` wallets and collects the generated-wallet usage fee from the main wallet before persisting the new wallet rows.
 - `wallet.getDevByToken` fetches dev wallet for a token via `TokenDevWallet`.
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.

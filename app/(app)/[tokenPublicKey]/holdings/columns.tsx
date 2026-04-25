@@ -23,6 +23,7 @@ const walletTypeLabels: Record<WalletType, string> = {
   DEV: "Dev",
   BUNDLER: "Bundler",
   VOLUME: "Volume",
+  BUYER: "Buyer",
   DISTRIBUTION: "Distribution",
 };
 
@@ -34,6 +35,7 @@ const walletTypeVariants: Record<
   DEV: "secondary",
   BUNDLER: "outline",
   VOLUME: "outline",
+  BUYER: "outline",
   DISTRIBUTION: "outline",
 };
 

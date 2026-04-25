@@ -64,22 +64,24 @@ The app shell sidebar shows badges (holdings / wallets with balance / active vol
 
 1. User opens the `BUY` dialog from the holdings page or from the dashboard action beside `SELL`.
 2. Dialog lists existing eligible token wallets except the standalone main wallet. The dev wallet is selected by default; operational wallets are available but unselected. If the main wallet is also the token dev wallet, that shared main/dev address remains eligible as the dev wallet.
-3. User enters `SOL per wallet`; v1 does not generate wallets and does not support Jito or token-target buys.
-4. Advanced settings are collapsed by default and currently expose slippage in basis points.
-5. Client sends `holding.buyByToken` with token public key, selected wallet public keys, SOL amount per wallet, and slippage.
-6. Service verifies token ownership, resolves allowed wallets with private keys, fetches wallet SOL balances, and estimates each wallet's required SOL including buy amount, ATA rent when needed, transaction buffer, and an extra pump-fee reserve (`max(2%, 0.002 SOL)`).
-7. When a selected buying wallet has insufficient SOL, the main wallet funds only the estimated deficit before the buy.
-8. Buy transactions use `buildBuyTokenTransaction` with quote-derived `minTokensOut` from the configured slippage.
-9. Buy submissions are concurrency-limited using the same bounded RPC fan-out pattern as holding sells.
-10. After buying, only wallets that received top-up funding are considered for excess return, and the service returns only SOL above that wallet's pre-buy balance threshold.
-11. Per-wallet buy send failures are logged with wallet, mint, amount, slippage, and transaction logs when available. If every selected wallet fails to buy, the mutation throws a user-facing error instead of returning a successful `0 submitted` result.
-12. Client refreshes holdings, selected wallet balances, main wallet balance, dashboard stats, and sidebar counts after completion.
+3. User may create token-scoped `BUYER` wallets from the dialog before buying. The creation step charges the generated-wallet platform fee (`0.02 SOL` each) through the shared usage-fee policy: Free pays full, Developer receives the configured discount, and Pro is waived.
+4. Newly created buyer wallets are automatically selected for the current buy after `wallet.createBuyerByToken` succeeds and wallet queries refetch.
+5. User enters `SOL per wallet`; buy flow does not support Jito or token-target buys.
+6. Advanced settings are collapsed by default and currently expose slippage in basis points.
+7. Client sends `holding.buyByToken` with token public key, selected wallet public keys, SOL amount per wallet, and slippage.
+8. Service verifies token ownership, resolves allowed wallets with private keys, fetches wallet SOL balances, and estimates each wallet's required SOL including buy amount, ATA rent when needed, the wallet account's post-buy rent-exempt residual, transaction buffer, and an extra pump-fee reserve (`max(2%, 0.002 SOL)`).
+9. When a selected buying wallet has insufficient SOL, the main wallet funds only the estimated deficit before the buy.
+10. Buy transactions use `buildBuyTokenTransaction` with quote-derived `minTokensOut` from the configured slippage.
+11. Buy submissions are concurrency-limited using the same bounded RPC fan-out pattern as holding sells.
+12. After buying, only wallets that received top-up funding are considered for excess return, and the service returns only SOL above that wallet's pre-buy balance threshold.
+13. Per-wallet buy send failures are logged with wallet, mint, amount, slippage, and transaction logs when available. If every selected wallet fails to buy, the mutation throws a user-facing error instead of returning a successful `0 submitted` result.
+14. Client refreshes holdings, selected wallet balances, main wallet balance, dashboard stats, and sidebar counts after completion.
 
 ## UI Behavior
 
 - The shared `SELL` dialog has `Sell` and `Exit` tabs. The Sell tab can operate on refreshed wallet holdings or on a constrained selected-row wallet set.
 - The `BUY` dialog is separate from `SELL`/`Exit`, is available from both holdings and dashboard, and performs regular per-wallet buys without tabs.
-- BUY v1 uses existing wallets only. Wallet generation is intentionally excluded from this pass.
+- BUY supports generating token-scoped `BUYER` wallets directly in the dialog as a separate step before the user clicks `Buy`.
 - BUY v1 uses SOL-per-wallet as the only amount mode. Token-target buying can be added later as a quote-driven mode with explicit max SOL handling.
 - BUY advanced settings are collapsed behind an accordion and start with slippage.
 - Full `SELL` openings do not depend on holdings table row selection. They open from current page/dashboard data, show wallets with positive balances, and select all wallets by default. They refresh on open only when holdings data is stale by more than one minute.

@@ -180,7 +180,7 @@ async function getAllowedWallets(
     prisma.wallet.findMany({
       where: {
         tokenPublicKey,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+        type: { in: ["BUNDLER", "VOLUME", "BUYER", "DISTRIBUTION"] },
       },
       select: { publicKey: true, type: true },
     }),

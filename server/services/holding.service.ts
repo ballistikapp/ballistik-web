@@ -61,6 +61,7 @@ type BuyWalletState = {
   wallet: WalletWithKey;
   balanceLamports: number;
   ataExists: boolean;
+  minimumPostBuyLamports: number;
   requiredLamports: number;
   topUpLamports: number;
 };
@@ -224,7 +225,7 @@ async function getAllowedWallets(
     prisma.wallet.findMany({
       where: {
         tokenPublicKey,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+        type: { in: ["BUNDLER", "VOLUME", "BUYER", "DISTRIBUTION"] },
       },
       select: { publicKey: true, type: true },
     }),
@@ -275,7 +276,7 @@ async function getAllowedWalletsWithKeys(
     prisma.wallet.findMany({
       where: {
         tokenPublicKey,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+        type: { in: ["BUNDLER", "VOLUME", "BUYER", "DISTRIBUTION"] },
       },
       select: { publicKey: true, type: true, privateKey: true, isSystemWallet: true },
     }),
@@ -837,13 +838,19 @@ export const holdingService = {
       bs58.decode(mainWallet.privateKey)
     );
 
-    const ataRentLamports = await retryRpcWithTimeout(
-      () =>
-        connection.getMinimumBalanceForRentExemption(
-          TOKEN_ACCOUNT_RENT_EXEMPT_BYTES
-        ),
-      rpcConfig.tuning.rpcTimeoutMs
-    );
+    const [ataRentLamports, walletRentLamports] = await Promise.all([
+      retryRpcWithTimeout(
+        () =>
+          connection.getMinimumBalanceForRentExemption(
+            TOKEN_ACCOUNT_RENT_EXEMPT_BYTES
+          ),
+        rpcConfig.tuning.rpcTimeoutMs
+      ),
+      retryRpcWithTimeout(
+        () => connection.getMinimumBalanceForRentExemption(0),
+        rpcConfig.tuning.rpcTimeoutMs
+      ),
+    ]);
     const [walletStates, mainBalanceLamports] = await Promise.all([
       mapWithConcurrency<WalletWithKey, BuyWalletState>(
         wallets,
@@ -857,16 +864,19 @@ export const holdingService = {
             ),
             tokenAccountExists(connection, wallet.publicKey, mintPublicKey),
           ]);
+          const minimumPostBuyLamports = walletRentLamports;
           const requiredLamports =
             Number(buyLamports) +
             BUY_TX_FEE_BUFFER_LAMPORTS +
             buyExtraFeeReserveLamports +
+            minimumPostBuyLamports +
             (ataExists ? 0 : ataRentLamports);
           const topUpLamports = Math.max(requiredLamports - balanceLamports, 0);
           return {
             wallet,
             balanceLamports,
             ataExists,
+            minimumPostBuyLamports,
             requiredLamports,
             topUpLamports,
           };
@@ -1104,8 +1114,15 @@ export const holdingService = {
             () => connection.getBalance(source.publicKey),
             rpcConfig.tuning.rpcTimeoutMs
           );
+          const shouldDrainToZero = state.balanceLamports === 0;
+          const retainedLamports = shouldDrainToZero
+            ? 0
+            : Math.max(state.balanceLamports, state.minimumPostBuyLamports);
+          const sourceFeeBufferLamports = shouldDrainToZero
+            ? 0
+            : RETURN_TX_FEE_BUFFER_LAMPORTS;
           const excessLamports = Math.max(
-            balanceLamports - state.balanceLamports - RETURN_TX_FEE_BUFFER_LAMPORTS,
+            balanceLamports - retainedLamports - sourceFeeBufferLamports,
             0
           );
           if (excessLamports <= 0) {
@@ -1142,12 +1159,19 @@ export const holdingService = {
           );
           tx.recentBlockhash = blockhash;
           tx.lastValidBlockHeight = lastValidBlockHeight;
-          tx.feePayer = source.publicKey;
+          tx.feePayer = shouldDrainToZero
+            ? mainWalletKeypair.publicKey
+            : source.publicKey;
           const signature = await retryRpcWithTimeout(
             () =>
-              sendAndConfirmTransaction(connection, tx, [source], {
-                commitment: "confirmed",
-              }),
+              sendAndConfirmTransaction(
+                connection,
+                tx,
+                shouldDrainToZero ? [mainWalletKeypair, source] : [source],
+                {
+                  commitment: "confirmed",
+                }
+              ),
             rpcConfig.tuning.confirmTimeoutMs
           );
           if (trackId) {

@@ -11,6 +11,15 @@ export type GetOperationalWalletsByTokenInput = z.infer<
   typeof getOperationalWalletsByTokenSchema
 >;
 
+export const createBuyerWalletsByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1, "Token public key is required"),
+  count: z.number().int().min(1).max(50),
+});
+
+export type CreateBuyerWalletsByTokenInput = z.infer<
+  typeof createBuyerWalletsByTokenSchema
+>;
+
 export const getDevWalletByTokenSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
 });

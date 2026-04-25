@@ -10,6 +10,7 @@ import {
 import bs58 from "bs58";
 import { prisma } from "@/lib/prisma";
 import { WalletType } from "@/lib/generated/prisma/client";
+import type { UserPlan } from "@/lib/generated/prisma/client";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
 import { rpcConfig } from "@/lib/config/rpc.config";
@@ -23,15 +24,30 @@ import {
   computeSponsoredRecoverableLamports,
   resolveBatchReclaimMode,
 } from "@/lib/utils/sol-recovery";
+import {
+  calculateBuyerWalletUsageFees,
+  discountBuyerWalletUsageFees,
+  waiveBuyerWalletUsageFees,
+} from "@/lib/config/usage-fees.config";
 import type {
+  CreateBuyerWalletsByTokenInput,
   WalletTransferResult,
   WithdrawMainSolResult,
 } from "@/server/schemas/wallet.schema";
 import { withActionLock } from "@/server/security/api-abuse";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { grpcAccessService } from "@/server/services/grpc-access.service";
+import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
+import { usageFeeService } from "@/server/services/usage-fee.service";
 import type { AppTransactionSource } from "@/lib/generated/prisma/client";
 
 const log = logger.child({ service: "wallet" });
+const OPERATIONAL_WALLET_TYPES = [
+  WalletType.BUNDLER,
+  WalletType.VOLUME,
+  WalletType.BUYER,
+  WalletType.DISTRIBUTION,
+];
 
 export const walletService = {
   async getOperationalWalletsByToken(
@@ -59,7 +75,7 @@ export const walletService = {
     const where = {
       tokenPublicKey,
       type: {
-        in: [WalletType.BUNDLER, WalletType.VOLUME, WalletType.DISTRIBUTION],
+        in: OPERATIONAL_WALLET_TYPES,
       },
     };
     const [wallets, totalCount] = await Promise.all([
@@ -166,6 +182,89 @@ export const walletService = {
     }
 
     return { privateKey: mainWallet.privateKey };
+  },
+
+  async createBuyerWalletsByToken(
+    input: CreateBuyerWalletsByTokenInput,
+    userId: string,
+    userPlan: { plan: UserPlan }
+  ) {
+    const actionKey = `wallet:create-buyer:${userId}:${input.tokenPublicKey}`;
+    return await withActionLock(actionKey, async () => {
+      const token = await prisma.token.findFirst({
+        where: { publicKey: input.tokenPublicKey, userId },
+        select: {
+          publicKey: true,
+          name: true,
+          symbol: true,
+        },
+      });
+
+      if (!token) {
+        throw new AppError("Token not found", 404);
+      }
+
+      const rawFees = calculateBuyerWalletUsageFees(input.count);
+      const discountRate = grpcAccessService.getPlatformFeeDiscountRate(userPlan);
+      const usageFees =
+        discountRate >= 1
+          ? waiveBuyerWalletUsageFees(rawFees)
+          : discountRate > 0
+            ? discountBuyerWalletUsageFees(rawFees, discountRate)
+            : rawFees;
+
+      const keypairs = Array.from({ length: input.count }, () =>
+        Keypair.generate()
+      );
+      const wallets = keypairs.map((keypair) => ({
+        publicKey: keypair.publicKey.toBase58(),
+        privateKey: bs58.encode(keypair.secretKey),
+      }));
+
+      await Promise.all(
+        wallets.map((wallet) =>
+          persistGeneratedPrivateKey({
+            service: "walletService",
+            operation: "createBuyerWalletsByToken.generateWallet",
+            publicKey: wallet.publicKey,
+            privateKey: wallet.privateKey,
+          })
+        )
+      );
+
+      await usageFeeService.collectFromMainWallet({
+        userId,
+        totalFeeSol: usageFees.totalFeeSol,
+        reason: "wallet.create_buyer",
+        txSource: "WALLET",
+        tokenPublicKey: token.publicKey,
+      });
+
+      await prisma.wallet.createMany({
+        data: wallets.map((wallet) => ({
+          publicKey: wallet.publicKey,
+          privateKey: wallet.privateKey,
+          type: WalletType.BUYER,
+          tokenPublicKey: token.publicKey,
+          userId,
+        })),
+      });
+
+      const now = new Date();
+
+      return {
+        token,
+        wallets: wallets.map((wallet) => ({
+          publicKey: wallet.publicKey,
+          type: WalletType.BUYER,
+          balanceSol: 0,
+          balanceRefreshedAt: null,
+          createdAt: now,
+          updatedAt: now,
+        })),
+        usageFees,
+      };
+    });
   },
 
   async refreshMainWalletBalance(userId: string) {
@@ -572,7 +671,7 @@ export const walletService = {
       prisma.wallet.findMany({
         where: {
           tokenPublicKey,
-          type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+          type: { in: OPERATIONAL_WALLET_TYPES },
         },
         select: {
           publicKey: true,
@@ -834,7 +933,7 @@ export const walletService = {
       prisma.wallet.findMany({
         where: {
           tokenPublicKey,
-          type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+          type: { in: OPERATIONAL_WALLET_TYPES },
         },
         select: { publicKey: true },
       }),
@@ -1060,7 +1159,7 @@ export const walletService = {
       prisma.wallet.findMany({
         where: {
           tokenPublicKey,
-          type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+          type: { in: OPERATIONAL_WALLET_TYPES },
         },
         select: { publicKey: true, privateKey: true, type: true },
       }),

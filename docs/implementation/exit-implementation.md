@@ -49,7 +49,10 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
    - if a system dev wallet sold in the exit, immediately sweep realized SOL from that system wallet back to the user main wallet
    - return the remaining available SOL to the main wallet when enabled, using the main wallet as fee payer when possible and falling back otherwise
 6. **Fee collection**:
-   - collect a fixed `0.1 SOL` bundled exit fee from the user's main wallet after all sell bundles land successfully
+   - collect the bundled exit platform fee from the user's main wallet after all sell bundles land successfully
+   - base bundled exit fee is `0.1 SOL`
+   - `DEVELOPER` users receive the shared 25% platform-fee discount (`0.075 SOL`)
+   - `PRO` users have the bundled exit platform fee waived
    - do not collect the fee when any sell chunk fails
    - log fee transfer failures separately without rewriting the sell / cleanup outcome
 7. **Finalize**:
@@ -172,7 +175,7 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 - The dialog opens on demand or automatically on the Exit tab when a running exit exists
 - Dialog shows a detailed pre-flight description of each exit step
 - Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
-- Dialog discloses the fixed `0.1 SOL` bundled exit fee at the bottom of the Exit tab and requires a final confirmation before starting
+- Dialog discloses the bundled exit fee at the bottom of the Exit tab, including the user's active plan waiver/discount, and requires a final confirmation before starting
 - Exit preflight totals should reflect deduped holdings data so shared main/dev launches do not inflate wallet counts or token totals.
 - Dialog includes a "Return SOL to main wallet" toggle with a clear description of SOL sweeping behavior, and it is checked by default when the dialog opens
 - System dev wallet exits always force SOL return to the main wallet even if the toggle was off in the request

@@ -38,6 +38,14 @@ export type VolumeBotUsageFeeBreakdown = {
   totalFeeSol: number;
 };
 
+export type BuyerWalletUsageFeeBreakdown = {
+  platformFeeWaived: boolean;
+  platformFeeDiscountRate: number;
+  generatedWalletCount: number;
+  generatedWalletFeeSol: number;
+  totalFeeSol: number;
+};
+
 export function calculateLaunchGeneratedWalletCount(
   input: Pick<
     LaunchUsageFeeInput,
@@ -114,6 +122,20 @@ export function calculateVolumeBotUsageFees(
   };
 }
 
+export function calculateBuyerWalletUsageFees(
+  generatedWalletCount: number
+): BuyerWalletUsageFeeBreakdown {
+  const normalizedCount = Math.max(0, Math.floor(generatedWalletCount));
+  const generatedWalletFeeValue = normalizedCount * generatedWalletFeeSol;
+  return {
+    platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
+    generatedWalletCount: normalizedCount,
+    generatedWalletFeeSol: generatedWalletFeeValue,
+    totalFeeSol: generatedWalletFeeValue,
+  };
+}
+
 export function waiveLaunchUsageFees(
   breakdown: LaunchUsageFeeBreakdown
 ): LaunchUsageFeeBreakdown {
@@ -143,6 +165,18 @@ export function waiveVolumeBotUsageFees(
   };
 }
 
+export function waiveBuyerWalletUsageFees(
+  breakdown: BuyerWalletUsageFeeBreakdown
+): BuyerWalletUsageFeeBreakdown {
+  return {
+    ...breakdown,
+    platformFeeWaived: true,
+    platformFeeDiscountRate: 1,
+    generatedWalletFeeSol: 0,
+    totalFeeSol: 0,
+  };
+}
+
 function roundSol(amount: number): number {
   return Math.round(amount * 1_000_000_000) / 1_000_000_000;
 }
@@ -163,6 +197,18 @@ export function discountVolumeBotUsageFees(
   breakdown: VolumeBotUsageFeeBreakdown,
   discountRate: number
 ): VolumeBotUsageFeeBreakdown {
+  const multiplier = 1 - discountRate;
+  return {
+    ...breakdown,
+    platformFeeDiscountRate: discountRate,
+    totalFeeSol: roundSol(breakdown.totalFeeSol * multiplier),
+  };
+}
+
+export function discountBuyerWalletUsageFees(
+  breakdown: BuyerWalletUsageFeeBreakdown,
+  discountRate: number
+): BuyerWalletUsageFeeBreakdown {
   const multiplier = 1 - discountRate;
   return {
     ...breakdown,

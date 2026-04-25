@@ -12,14 +12,16 @@
 - `0.1 SOL` for vanity token mint
 - `0.1 SOL` to remove launch attribution text from token description
 - `0.1 SOL` when bundle buy is enabled
+- `0.1 SOL` for bundled exit sells
 
 ## Scope Rules
 
-- Generated-wallet fee applies to generated wallets created by feature workflows (launch and volume bot).
+- Generated-wallet fee applies to generated wallets created by feature workflows (launch, volume bot, and BUY-dialog buyer wallet creation).
 - Auth/signup generated main wallets are excluded from usage-fee charging.
 - Vanity mint fee applies only when vanity mint is enabled for launch.
 - Attribution-removal fee applies only when user opts to remove `Launched with ballistik.app` from launch metadata description.
 - Bundle-buy fee applies when launch runs with `bundleBuyEnabled = true`.
+- Bundled-exit fee applies only when all exit sell chunks land successfully.
 
 ## Plan-Based Fee Policy
 
@@ -35,6 +37,7 @@ Fee adjustment is determined by the user's active plan via `grpcAccessService.ge
 - Individual fee line items remain at their nominal values for display.
 - `discountLaunchUsageFees(breakdown, rate)` and `discountVolumeBotUsageFees(breakdown, rate)` apply the discount to the total.
 - `waiveLaunchUsageFees(breakdown)` and `waiveVolumeBotUsageFees(breakdown)` zero out all fees for Pro.
+- Bundled exits apply the same discount rate to the fixed exit fee before collection.
 - The same fee-decision logic must be applied consistently to quote generation (client preview + server preview) and actual fee collection.
 - Network fees, Solana transaction fees, Jito tips, rent, and other execution costs are not affected by any plan.
 
@@ -75,6 +78,12 @@ Generated wallet count for launch:
 Total usage fee is:
 
 - `generatedWalletCount * 0.02`
+
+### BUY Dialog Buyer Wallets
+
+Total usage fee is:
+
+- `buyerWalletCount * 0.02`
 
 ## Enforcement
 
@@ -123,6 +132,9 @@ All pre-operation quotes use a shared vocabulary across launch and volume bot:
 - `server/services/grpc-access.service.ts`
 - `server/services/launch.service.ts`
 - `server/services/volume-bot.service.ts`
+- `server/services/wallet.service.ts`
+- `components/holdings/holding-buy-dialog.tsx`
+- `server/services/holding-exit.service.ts`
 - `app/(app)/launch/launch-form.tsx`
 - `app/(app)/launch/launch-overview-dialog.tsx`
 - `app/(app)/[tokenPublicKey]/volume-bot/new/page.tsx`

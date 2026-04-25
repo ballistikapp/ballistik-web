@@ -70,6 +70,8 @@ export function DashboardTransactions({
   transactions,
   tokenPublicKey,
 }: DashboardTransactionsProps) {
+  const transactionsHref = `/${tokenPublicKey}/transactions`;
+
   if (transactions.length === 0) {
     return (
       <Card>
@@ -80,6 +82,15 @@ export function DashboardTransactions({
         <CardContent className="flex items-center justify-center py-8">
           <p className="text-muted-foreground text-sm">No transactions yet</p>
         </CardContent>
+        <CardFooter className="justify-end">
+          <Link
+            href={transactionsHref}
+            className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+          >
+            Transactions
+            <IconExternalLink className="size-3.5" />
+          </Link>
+        </CardFooter>
       </Card>
     );
   }
@@ -212,12 +223,14 @@ export function DashboardTransactions({
           })}
         </div>
       </CardContent>
-      <CardFooter className="justify-center">
-        <Button variant="ghost" size="sm" asChild>
-          <Link href={`/${tokenPublicKey}/transactions`}>
-            View all transactions
-          </Link>
-        </Button>
+      <CardFooter className="justify-end">
+        <Link
+          href={transactionsHref}
+          className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+        >
+          Transactions
+          <IconExternalLink className="size-3.5" />
+        </Link>
       </CardFooter>
     </Card>
   );

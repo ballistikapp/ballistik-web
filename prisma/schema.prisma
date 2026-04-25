@@ -126,6 +126,7 @@ enum WalletType {
   DEV
   BUNDLER
   VOLUME
+  BUYER
   DISTRIBUTION
 }
 

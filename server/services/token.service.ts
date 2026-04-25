@@ -260,6 +260,7 @@ export const tokenService = {
             in: [
               WalletType.BUNDLER,
               WalletType.VOLUME,
+              WalletType.BUYER,
               WalletType.DISTRIBUTION,
             ],
           },

@@ -9,6 +9,7 @@ import type { AppRouter } from "@/server/trpc/routers/_app";
 import { trpc } from "@/lib/trpc/client";
 import { cn } from "@/lib/utils";
 import { bundledExitFeeSol } from "@/lib/config/usage-fees.config";
+import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -123,6 +124,10 @@ function formatTokenAmount(value: number) {
   return value >= 0.01 ? value.toFixed(4) : value.toFixed(6);
 }
 
+function roundSol(amount: number) {
+  return Math.round(amount * 1_000_000_000) / 1_000_000_000;
+}
+
 export function HoldingSellExitDialog({
   open,
   onOpenChange,
@@ -162,6 +167,7 @@ export function HoldingSellExitDialog({
   );
   const autoRefreshRunRef = React.useRef(false);
 
+  const { data: currentUser } = trpc.auth.me.useQuery();
   const selectedMode = Boolean(selectedHoldings);
   const { mutateAsync: refreshHoldingsByToken } =
     trpc.holding.refreshByToken.useMutation();
@@ -375,6 +381,8 @@ export function HoldingSellExitDialog({
         systemDevImmediateSweepFailures?: number;
         systemDevImmediateSweepLamports?: number;
         totalJitoTipSol?: number;
+        exitFeeSol?: number;
+        exitFeeCollected?: boolean;
       }
     | undefined;
   const exitInput = exit?.input as
@@ -394,6 +402,18 @@ export function HoldingSellExitDialog({
   const estimatedBundles =
     walletsWithBalance > 0 ? Math.ceil(walletsWithBalance / EXIT_CHUNK_SIZE) : 0;
   const estimatedTotalTipSol = activeTipSol * estimatedBundles;
+  const exitFeeDiscountRate =
+    currentUser?.plan === "PRO"
+      ? 1
+      : currentUser?.plan === "DEVELOPER"
+        ? DEVELOPER_FEE_DISCOUNT_RATE
+        : 0;
+  const exitFeeSol =
+    exitFeeDiscountRate >= 1
+      ? 0
+      : roundSol(bundledExitFeeSol * (1 - exitFeeDiscountRate));
+  const exitFeeWaived = exitFeeDiscountRate >= 1;
+  const exitFeeDiscounted = exitFeeDiscountRate > 0 && !exitFeeWaived;
 
   const showProgress = Boolean(exit);
   const showSummary =
@@ -751,16 +771,31 @@ export function HoldingSellExitDialog({
                     .
                   </p>
                 </div>
-                <div className="min-w-0 overflow-hidden rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
-                  <p className="min-w-0 wrap-break-word">
-                    A{" "}
-                    <span className="font-mono tabular-nums">
-                      {bundledExitFeeSol.toFixed(1)} SOL
-                    </span>{" "}
-                    bundled exit fee will be deducted from your main wallet after
-                    the sell bundles land successfully.
-                  </p>
-                </div>
+                {!exitFeeWaived && (
+                  <div className="min-w-0 overflow-hidden rounded-md border border-amber-500/30 bg-amber-500/5 p-3 text-xs text-amber-700 dark:text-amber-300">
+                    <p className="min-w-0 wrap-break-word">
+                      {exitFeeDiscounted ? (
+                        <>
+                          Developer active. The bundled exit fee is reduced by{" "}
+                          {Math.round(exitFeeDiscountRate * 100)}% to{" "}
+                          <span className="font-mono tabular-nums">
+                            {exitFeeSol.toFixed(4)} SOL
+                          </span>{" "}
+                          after the sell bundles land successfully.
+                        </>
+                      ) : (
+                        <>
+                          A{" "}
+                          <span className="font-mono tabular-nums">
+                            {exitFeeSol.toFixed(1)} SOL
+                          </span>{" "}
+                          bundled exit fee will be deducted from your main wallet
+                          after the sell bundles land successfully.
+                        </>
+                      )}
+                    </p>
+                  </div>
+                )}
               </>
             )}
 
@@ -861,6 +896,18 @@ export function HoldingSellExitDialog({
                           {summary?.totalJitoTipSol?.toFixed?.(4) ?? "-"} SOL
                         </span>
                       </div>
+                      {!exitFeeWaived && (
+                        <div className="grid min-w-0 grid-cols-[1fr_minmax(0,1.25fr)] items-start gap-2 sm:items-center">
+                          <span className="min-w-0">Bundled exit fee</span>
+                          <span className="min-w-0 text-right font-mono text-[11px] leading-snug tabular-nums sm:text-xs">
+                            {summary?.exitFeeSol?.toFixed?.(4) ?? "-"} SOL
+                            {summary?.exitFeeCollected === false &&
+                            (summary?.exitFeeSol ?? 0) > 0
+                              ? " (not collected)"
+                              : ""}
+                          </span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -1078,12 +1125,31 @@ export function HoldingSellExitDialog({
             <span className="font-mono tabular-nums">
               {estimatedTotalTipSol.toFixed(4)} SOL
             </span>
-            . A{" "}
-            <span className="font-mono tabular-nums">
-              {bundledExitFeeSol.toFixed(1)} SOL
-            </span>{" "}
-            bundled exit fee will be deducted from your main wallet after the sell
-            bundles land successfully.
+            .
+            {!exitFeeWaived && (
+              <>
+                {" "}
+                {exitFeeDiscounted ? (
+                  <>
+                    Developer active. The bundled exit fee is reduced by{" "}
+                    {Math.round(exitFeeDiscountRate * 100)}% to{" "}
+                    <span className="font-mono tabular-nums">
+                      {exitFeeSol.toFixed(4)} SOL
+                    </span>{" "}
+                    after the sell bundles land successfully.
+                  </>
+                ) : (
+                  <>
+                    A{" "}
+                    <span className="font-mono tabular-nums">
+                      {exitFeeSol.toFixed(1)} SOL
+                    </span>{" "}
+                    bundled exit fee will be deducted from your main wallet after
+                    the sell bundles land successfully.
+                  </>
+                )}
+              </>
+            )}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

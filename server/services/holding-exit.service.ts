@@ -113,6 +113,35 @@ type StoredHoldingExitInput = StartExitInput & {
   };
 };
 
+function roundSol(amount: number) {
+  return Math.round(amount * 1_000_000_000) / 1_000_000_000;
+}
+
+function applyBundledExitFeePolicy(plan: ContextUser["plan"]) {
+  const platformFeeDiscountRate = grpcAccessService.getPlatformFeeDiscountRate({
+    plan,
+  });
+  if (platformFeeDiscountRate >= 1) {
+    return {
+      platformFeeWaived: true,
+      platformFeeDiscountRate,
+      totalFeeSol: 0,
+    };
+  }
+  if (platformFeeDiscountRate > 0) {
+    return {
+      platformFeeWaived: false,
+      platformFeeDiscountRate,
+      totalFeeSol: roundSol(bundledExitFeeSol * (1 - platformFeeDiscountRate)),
+    };
+  }
+  return {
+    platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
+    totalFeeSol: bundledExitFeeSol,
+  };
+}
+
 async function appendExitLog(
   exitId: string,
   level: "INFO" | "WARN" | "ERROR" | "STEP",
@@ -180,7 +209,7 @@ async function getAllowedWalletsWithKeys(
     prisma.wallet.findMany({
       where: {
         tokenPublicKey,
-        type: { in: ["BUNDLER", "VOLUME", "DISTRIBUTION"] },
+        type: { in: ["BUNDLER", "VOLUME", "BUYER", "DISTRIBUTION"] },
       },
       select: { publicKey: true, privateKey: true, isSystemWallet: true },
     }),
@@ -734,6 +763,7 @@ async function runExitFlow(exitId: string) {
     checkCancelled();
     const input = exit.input as StoredHoldingExitInput;
     const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
+    const exitFeePolicy = applyBundledExitFeePolicy(requestPlan);
 
     const { token, wallets, mainWallet } = await getAllowedWalletsWithKeys(
       exit.tokenPublicKey,
@@ -1086,7 +1116,7 @@ async function runExitFlow(exitId: string) {
       try {
         const feeResult = await usageFeeService.collectFromMainWallet({
           userId: exit.userId,
-          totalFeeSol: bundledExitFeeSol,
+          totalFeeSol: exitFeePolicy.totalFeeSol,
           reason: "exit.bundled_sell",
           txSource: "EXIT",
           tokenPublicKey: exit.tokenPublicKey,
@@ -1106,11 +1136,16 @@ async function runExitFlow(exitId: string) {
           exitId,
           "INFO",
           feeResult.skipped
-            ? "Bundled exit fee skipped"
+            ? exitFeePolicy.platformFeeWaived
+              ? "Bundled exit fee waived"
+              : "Bundled exit fee skipped"
             : "Bundled exit fee collected",
           "fee",
           {
-            amountSol: bundledExitFeeSol,
+            amountSol: exitFeePolicy.totalFeeSol,
+            nominalAmountSol: bundledExitFeeSol,
+            platformFeeDiscountRate: exitFeePolicy.platformFeeDiscountRate,
+            platformFeeWaived: exitFeePolicy.platformFeeWaived,
             signature: feeResult.signature,
             fromPublicKey: feeResult.fromPublicKey,
             toPublicKey: feeResult.toPublicKey,
@@ -1125,7 +1160,10 @@ async function runExitFlow(exitId: string) {
           "Bundled exit fee collection failed",
           "fee",
           {
-            amountSol: bundledExitFeeSol,
+            amountSol: exitFeePolicy.totalFeeSol,
+            nominalAmountSol: bundledExitFeeSol,
+            platformFeeDiscountRate: exitFeePolicy.platformFeeDiscountRate,
+            platformFeeWaived: exitFeePolicy.platformFeeWaived,
             message: exitFee.error,
           }
         );
@@ -1154,7 +1192,7 @@ async function runExitFlow(exitId: string) {
       systemDevImmediateSweepLamports,
       totalJitoTipLamports: bundlesProcessed * tipLamports,
       totalJitoTipSol: (bundlesProcessed * tipLamports) / 1_000_000_000,
-      exitFeeSol: bundledExitFeeSol,
+      exitFeeSol: exitFeePolicy.totalFeeSol,
       exitFeeCollected: exitFee.collected,
       exitFeeSignature: exitFee.signature,
       exitFeeError: exitFee.error,

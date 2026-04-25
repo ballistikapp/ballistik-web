@@ -290,6 +290,7 @@ export default function WalletPage() {
     DEV: "Dev Wallet",
     BUNDLER: "Bundler Wallet",
     VOLUME: "Volume Bot Wallet",
+    BUYER: "Buyer Wallet",
     DISTRIBUTION: "Distribution Wallet",
   }[wallet.type];
   const resolvedWalletTitle = isSharedMainDevWallet

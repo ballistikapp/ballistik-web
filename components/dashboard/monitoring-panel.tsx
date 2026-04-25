@@ -17,6 +17,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
+import { formatRefreshAge } from "@/lib/utils/relative-time";
 
 const MONITORING_PANEL_STATE_KEY = "dashboard:monitoring-panel:minimized";
 type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
@@ -130,7 +131,9 @@ export function MonitoringPanel({
                 statusIndicatorClass
               )}
             />
-            <span className="tabular-nums">{secondsAgo}s ago</span>
+            <span className="tabular-nums">
+              {formatRefreshAge(secondsAgo)}
+            </span>
             {minimized ? (
               <ChevronUp className="size-3.5" />
             ) : (

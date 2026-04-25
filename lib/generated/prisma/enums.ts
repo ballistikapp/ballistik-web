@@ -23,6 +23,7 @@ export const WalletType = {
   DEV: 'DEV',
   BUNDLER: 'BUNDLER',
   VOLUME: 'VOLUME',
+  BUYER: 'BUYER',
   DISTRIBUTION: 'DISTRIBUTION'
 } as const
 

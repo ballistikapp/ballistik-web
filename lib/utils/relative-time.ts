@@ -1,5 +1,12 @@
 import { format } from "date-fns";
 
+/** Compact age for dashboard refresh UIs: "12s ago", "6m ago", "2h ago". */
+export function formatRefreshAge(seconds: number): string {
+  if (seconds < 60) return `${seconds}s ago`;
+  if (seconds < 60 * 60) return `${Math.floor(seconds / 60)}m ago`;
+  return `${Math.floor(seconds / (60 * 60))}h ago`;
+}
+
 export function formatRefreshTime(dateValue?: Date | string | null) {
   if (!dateValue) return "Never";
   const date = typeof dateValue === "string" ? new Date(dateValue) : dateValue;

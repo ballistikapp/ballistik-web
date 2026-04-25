@@ -25,6 +25,7 @@ import {
 } from "./dashboard-log-payload";
 import { formatBuyHoldingsToast } from "@/lib/utils/buy-holdings-toast-message";
 import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
+import { formatRefreshAge } from "@/lib/utils/relative-time";
 
 const POLL_INTERVAL = 30_000;
 const DEBOUNCE_MS = 2_000;
@@ -75,12 +76,6 @@ function shouldDefaultMonitoring(
       ? new Date(launchCompletedAt)
       : launchCompletedAt;
   return Date.now() - launchTime.getTime() < MONITORING_HOUR_THRESHOLD;
-}
-
-function formatRefreshAge(seconds: number): string {
-  if (seconds < 60) return `${seconds}s ago`;
-  if (seconds < 60 * 60) return `${Math.floor(seconds / 60)}m ago`;
-  return `${Math.floor(seconds / (60 * 60))}h ago`;
 }
 
 export function DashboardClient() {
@@ -1107,7 +1102,11 @@ export function DashboardClient() {
             isRefreshing={isAnyRefreshActive}
             refreshStatusLabel={refreshStatusLabel}
           />
-          <DashboardStats header={statsData.header} metrics={statsData.metrics} />
+          <DashboardStats
+            header={statsData.header}
+            tokenPublicKey={tokenPublicKey}
+            metrics={statsData.metrics}
+          />
           <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-8 @5xl/main:items-stretch">
             <div className="min-w-0 @5xl/main:col-span-3">
               <DashboardOperations

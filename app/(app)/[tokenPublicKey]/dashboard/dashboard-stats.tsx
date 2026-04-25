@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import {
   IconChartBar,
   IconCoins,
+  IconExternalLink,
   IconTrendingUp,
   IconTrendingDown,
   IconActivity,
@@ -68,6 +70,7 @@ interface HeaderData {
 
 interface DashboardStatsProps {
   header: HeaderData;
+  tokenPublicKey: string;
   metrics: {
     holdingsValue: HoldingsData;
     pnl: PnlData;
@@ -77,11 +80,14 @@ interface DashboardStatsProps {
 
 export function DashboardStats({
   header,
+  tokenPublicKey,
   metrics,
 }: DashboardStatsProps) {
   const { holdingsValue, pnl, activity } = metrics;
   const isProfitable = pnl.net >= 0;
   const [pnlDialogOpen, setPnlDialogOpen] = useState(false);
+  const transactionsHref = `/${tokenPublicKey}/transactions`;
+  const holdingsHref = `/${tokenPublicKey}/holdings`;
 
   return (
     <div className="grid grid-cols-1 gap-4 @xl/main:grid-cols-2 @5xl/main:grid-cols-4">
@@ -105,7 +111,7 @@ export function DashboardStats({
       </Card>
 
       <Card className="@container/card">
-        <CardHeader>
+        <CardHeader className="h-full">
           <CardDescription className="flex items-center gap-1.5">
             <IconActivity className="size-4" />
             Volume & Activity
@@ -113,12 +119,12 @@ export function DashboardStats({
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatSol(activity.totalVolume)} SOL
           </CardTitle>
-          <div className="flex flex-col gap-1.5 mt-1">
+          <div className="flex flex-1 flex-col justify-between gap-1.5 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
               Buy: {formatSol(activity.buyVolume)} · Sell:{" "}
               {formatSol(activity.sellVolume)}
             </span>
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="flex items-center gap-1.5">
               <Badge
                 variant="outline"
                 className="text-muted-foreground text-xs"
@@ -126,6 +132,14 @@ export function DashboardStats({
                 {activity.transactionCount} tx
                 {activity.transactionCount !== 1 ? "s" : ""}
               </Badge>
+              <div className="flex-1" />
+              <Link
+                href={transactionsHref}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+              >
+                Transactions
+                <IconExternalLink className="size-3.5" />
+              </Link>
             </div>
           </div>
         </CardHeader>
@@ -174,7 +188,7 @@ export function DashboardStats({
       />
 
       <Card className="@container/card">
-        <CardHeader>
+        <CardHeader className="h-full">
           <CardDescription className="flex items-center gap-1.5">
             <IconCoins className="size-4" />
             Holdings Value
@@ -182,10 +196,19 @@ export function DashboardStats({
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatSol(holdingsValue.valueSol)} SOL
           </CardTitle>
-          <div className="flex flex-col gap-1 mt-1">
+          <div className="flex flex-1 flex-col justify-between gap-1 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
               {formatTokenCount(holdingsValue.tokenCount)} tokens held
             </span>
+            <div className="flex justify-end">
+              <Link
+                href={holdingsHref}
+                className="inline-flex items-center gap-1 text-sm text-muted-foreground transition-colors hover:text-foreground hover:underline"
+              >
+                Holdings
+                <IconExternalLink className="size-3.5" />
+              </Link>
+            </div>
           </div>
         </CardHeader>
       </Card>

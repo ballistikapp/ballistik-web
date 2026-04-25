@@ -5,6 +5,19 @@ import Link from "next/link";
 import { ExternalLink } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
+import { generatedWalletFeeSol } from "@/lib/config/usage-fees.config";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import {
   Accordion,
   AccordionContent,
@@ -53,6 +66,8 @@ const DEFAULT_SLIPPAGE_BPS = 500;
 const BUY_WALLET_PAGE_SIZE = 200;
 const BUY_EXTRA_FEE_RESERVE_BPS = 200;
 const BUY_MIN_EXTRA_FEE_RESERVE_SOL = 0.002;
+const BUY_WALLET_RENT_RESERVE_SOL = 0.001;
+const BUYER_WALLET_MAX_CREATE_COUNT = 50;
 
 function getBuyReserveSol(solAmountPerWallet: number) {
   return Math.max(
@@ -79,6 +94,12 @@ function formatSolAmount(value: number) {
   return value >= 0.01 ? value.toFixed(4) : value.toFixed(6);
 }
 
+function getPlanDiscountRate(plan: string | undefined) {
+  if (plan === "PRO") return 1;
+  if (plan === "DEVELOPER") return DEVELOPER_FEE_DISCOUNT_RATE;
+  return 0;
+}
+
 export function HoldingBuyDialog({
   open,
   onOpenChange,
@@ -94,6 +115,8 @@ export function HoldingBuyDialog({
   const [selectedWallets, setSelectedWallets] = React.useState<
     Record<string, boolean>
   >({});
+  const [buyerWalletCount, setBuyerWalletCount] = React.useState("1");
+  const utils = trpc.useUtils();
 
   const operationalWalletsQuery = trpc.wallet.getOperationalByToken.useQuery(
     {
@@ -111,6 +134,10 @@ export function HoldingBuyDialog({
     {},
     { enabled: open && Boolean(tokenPublicKey) }
   );
+  const authQuery = trpc.auth.me.useQuery(undefined, {
+    enabled: open,
+  });
+  const createBuyerWallets = trpc.wallet.createBuyerByToken.useMutation();
 
   const wallets = React.useMemo(
     () =>
@@ -159,10 +186,26 @@ export function HoldingBuyDialog({
     setSolAmount("0.01");
     setSlippageBps(String(DEFAULT_SLIPPAGE_BPS));
     setSelectedWallets({});
+    setBuyerWalletCount("1");
   }, [open]);
 
   const parsedSolAmount = Number.parseFloat(solAmount);
   const parsedSlippageBps = Number.parseInt(slippageBps, 10);
+  const parsedBuyerWalletCount = Number.parseInt(buyerWalletCount, 10);
+  const buyerWalletCountIsValid =
+    Number.isInteger(parsedBuyerWalletCount) &&
+    parsedBuyerWalletCount >= 1 &&
+    parsedBuyerWalletCount <= BUYER_WALLET_MAX_CREATE_COUNT;
+  const platformFeeDiscountRate = getPlanDiscountRate(authQuery.data?.plan);
+  const nominalBuyerWalletFeeSol = buyerWalletCountIsValid
+    ? parsedBuyerWalletCount * generatedWalletFeeSol
+    : 0;
+  const buyerWalletGenerationFeeIsWaived = platformFeeDiscountRate >= 1;
+  const chargedBuyerWalletFeeSol =
+    buyerWalletGenerationFeeIsWaived
+      ? 0
+      : nominalBuyerWalletFeeSol * (1 - platformFeeDiscountRate);
+  const generateFeeLabel = `${formatSolAmount(chargedBuyerWalletFeeSol)} SOL`;
   const selectedBuyWallets = React.useMemo(
     () => wallets.filter((wallet) => selectedWallets[wallet.publicKey]),
     [selectedWallets, wallets]
@@ -175,7 +218,10 @@ export function HoldingBuyDialog({
     Number.isFinite(parsedSolAmount) && parsedSolAmount > 0
       ? selectedBuyWallets.reduce((sum, wallet) => {
           const currentBalance = wallet.balanceSol ?? 0;
-          const required = parsedSolAmount + getBuyReserveSol(parsedSolAmount);
+          const required =
+            parsedSolAmount +
+            getBuyReserveSol(parsedSolAmount) +
+            BUY_WALLET_RENT_RESERVE_SOL;
           const deficit = required - currentBalance;
           return deficit > 0 ? sum + deficit : sum;
         }, 0)
@@ -191,6 +237,44 @@ export function HoldingBuyDialog({
     setSelectedWallets(
       Object.fromEntries(wallets.map((wallet) => [wallet.publicKey, checked]))
     );
+  };
+
+  const handleGenerateBuyerWallets = async () => {
+    if (!buyerWalletCountIsValid) {
+      toast.error(
+        `Enter a wallet count between 1 and ${BUYER_WALLET_MAX_CREATE_COUNT}`
+      );
+      return;
+    }
+
+    try {
+      const result = await createBuyerWallets.mutateAsync({
+        tokenPublicKey,
+        count: parsedBuyerWalletCount,
+      });
+      const createdPublicKeys = result.wallets.map((wallet) => wallet.publicKey);
+      setSelectedWallets((current) => ({
+        ...current,
+        ...Object.fromEntries(
+          createdPublicKeys.map((publicKey) => [publicKey, true])
+        ),
+      }));
+      await Promise.all([
+        operationalWalletsQuery.refetch(),
+        mainWalletQuery.refetch(),
+        utils.wallet.getOperationalByToken.invalidate({ tokenPublicKey }),
+        utils.wallet.getMain.invalidate(),
+      ]);
+      toast.success(
+        `Generated ${createdPublicKeys.length} buyer wallet${createdPublicKeys.length === 1 ? "" : "s"}`
+      );
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Failed to generate buyer wallets";
+      toast.error(message);
+    }
   };
 
   const handleConfirm = async () => {
@@ -285,6 +369,107 @@ export function HoldingBuyDialog({
                   </Button>
                 </div>
               </div>
+              <Accordion
+                type="single"
+                collapsible
+                className="border-b bg-muted/20"
+              >
+                <AccordionItem value="wallet-generation" className="border-b-0">
+                  <AccordionTrigger className="rounded-none px-3 py-2 hover:no-underline">
+                    <span className="flex min-w-0 flex-col gap-0.5">
+                      <span>Generate buyer wallets</span>
+                      {buyerWalletGenerationFeeIsWaived ? null : (
+                        <span className="text-xs font-normal text-muted-foreground">
+                          {formatSolAmount(generatedWalletFeeSol)} SOL each ·
+                          fee{" "}
+                          <span className="font-mono">{generateFeeLabel}</span>
+                        </span>
+                      )}
+                    </span>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-3 pb-3">
+                    <div className="grid gap-2 sm:grid-cols-[1fr_auto] sm:items-end">
+                      <div className="grid gap-1.5">
+                        <Label htmlFor="buyerWalletCount" className="text-xs">
+                          Wallet count
+                        </Label>
+                        <Input
+                          id="buyerWalletCount"
+                          type="number"
+                          min="1"
+                          max={BUYER_WALLET_MAX_CREATE_COUNT}
+                          step="1"
+                          value={buyerWalletCount}
+                          onChange={(event) =>
+                            setBuyerWalletCount(event.target.value)
+                          }
+                          className="h-8 w-24"
+                          disabled={isBuying || createBuyerWallets.isPending}
+                        />
+                        {platformFeeDiscountRate > 0 &&
+                        !buyerWalletGenerationFeeIsWaived ? (
+                          <p className="text-[11px] text-muted-foreground">
+                            Developer plan applies a{" "}
+                            {Math.round(platformFeeDiscountRate * 100)}%
+                            platform-fee discount.
+                          </p>
+                        ) : null}
+                      </div>
+                      <AlertDialog>
+                        <AlertDialogTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            disabled={
+                              isBuying ||
+                              createBuyerWallets.isPending ||
+                              !buyerWalletCountIsValid ||
+                              !tokenPublicKey
+                            }
+                          >
+                            {createBuyerWallets.isPending
+                              ? "Generating..."
+                              : "Generate"}
+                          </Button>
+                        </AlertDialogTrigger>
+                        <AlertDialogContent size="sm">
+                          <AlertDialogHeader>
+                            <AlertDialogTitle>
+                              Generate buyer wallets?
+                            </AlertDialogTitle>
+                            <AlertDialogDescription>
+                              {`This will generate ${parsedBuyerWalletCount} buyer wallet${parsedBuyerWalletCount === 1 ? "" : "s"} for `}
+                              <span className="font-mono">
+                                ${tokenSymbol}
+                              </span>
+                              .
+                              {buyerWalletGenerationFeeIsWaived ? null : (
+                                <>
+                                  {" "}
+                                  Platform fee:{" "}
+                                  <span className="font-mono">
+                                    {generateFeeLabel}
+                                  </span>
+                                  .
+                                </>
+                              )}
+                            </AlertDialogDescription>
+                          </AlertDialogHeader>
+                          <AlertDialogFooter>
+                            <AlertDialogCancel>Cancel</AlertDialogCancel>
+                            <AlertDialogAction
+                              onClick={handleGenerateBuyerWallets}
+                            >
+                              Generate
+                            </AlertDialogAction>
+                          </AlertDialogFooter>
+                        </AlertDialogContent>
+                      </AlertDialog>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              </Accordion>
               <div className="max-h-[34vh] min-h-28 overflow-y-auto p-1.5">
                 {isLoadingWallets ? (
                   <div className="flex items-center justify-center gap-2 p-6 text-sm text-muted-foreground">

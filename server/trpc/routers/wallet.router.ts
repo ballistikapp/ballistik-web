@@ -6,6 +6,7 @@ import {
 } from "../trpc";
 import { walletService } from "@/server/services/wallet.service";
 import {
+  createBuyerWalletsByTokenSchema,
   getWalletByTokenSchema,
   getDevWalletByTokenSchema,
   getMainWalletSchema,
@@ -20,6 +21,15 @@ import {
 } from "@/server/schemas/wallet.schema";
 
 export const walletRouter = router({
+  createBuyerByToken: sensitiveProcedure
+    .input(createBuyerWalletsByTokenSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await walletService.createBuyerWalletsByToken(
+        input,
+        ctx.user.id,
+        { plan: ctx.user.plan }
+      );
+    }),
   getOperationalByToken: protectedRateLimitedProcedure
     .input(getOperationalWalletsByTokenSchema)
     .query(async ({ input, ctx }) => {
