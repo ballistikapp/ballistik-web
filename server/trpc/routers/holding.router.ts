@@ -8,6 +8,7 @@ import { holdingService } from "@/server/services/holding.service";
 import { holdingExitService } from "@/server/services/holding-exit.service";
 import {
   activeExitSchema,
+  buyHoldingsByTokenSchema,
   cancelExitSchema,
   exitStatusSchema,
   listHoldingsByTokenSchema,
@@ -40,6 +41,11 @@ export const holdingRouter = router({
     .input(sellHoldingsByTokenSchema)
     .mutation(async ({ input, ctx }) => {
       return await holdingService.sellByToken(input, ctx.user.id);
+    }),
+  buyByToken: sensitiveProcedure
+    .input(buyHoldingsByTokenSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await holdingService.buyByToken(input, ctx.user.id);
     }),
   startExit: expensiveProtectedProcedure
     .input(startExitSchema)

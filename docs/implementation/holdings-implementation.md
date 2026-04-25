@@ -8,6 +8,7 @@ Holdings show per-wallet token balances, holding percentage vs mint supply, and 
 
 - `holding.listByToken` fetches holdings for a token (optionally filtered by wallet) and includes token mint supply metadata for `Holding %`.
 - `holding.refreshByToken` refreshes holdings via Shyft `getTokenBalance()` per wallet (fetches only the target token's balance). Falls back to batched RPC `getMultipleParsedAccounts` when `SHYFT_API_KEY` is not set.
+- `holding.buyByToken` submits buy transactions for selected wallets using a SOL amount per wallet.
 - `holding.sellByToken` submits sell transactions for selected wallets at a percentage of on-chain token balances.
 
 ## Access Rules
@@ -43,25 +44,50 @@ The app shell sidebar shows badges (holdings / wallets with balance / active vol
 
 ## Sell Flow
 
-1. User selects holdings rows and opens the Sell dialog.
-2. Client sends `holding.sellByToken` with token public key, wallet public keys, sell percentage, and optional toggles (`closeAta`, `returnSolToMainWallet`).
-3. Service fetches on-chain token balances, computes sell amounts, and submits RPC sell transactions per wallet.
-4. Sell transactions can use the main wallet as fee payer when available.
-5. Sell submissions are concurrency-limited via `rpcConfig.tuning.sellConcurrency` (default 5) instead of unbounded fan-out.
-6. Sell RPC calls now use `retryRpcWithTimeout`:
+1. User opens the shared `SELL` dialog from the dashboard/holdings page or selects table rows and clicks `Sell Selected`.
+2. For full `SELL` openings, the dialog hydrates immediately from the dashboard/holdings data already on the page, lists wallets with positive token balances, and selects all wallets by default. Users can adjust the wallet selection before selling.
+   - The dialog auto-refreshes holdings only when the known holdings refresh timestamp is older than one minute.
+   - A manual Refresh button in the wallet selector lets users force a holdings refresh before selling.
+3. For `Sell Selected`, the dialog opens on the Sell tab with the selected table wallets only, preserving the focused selected-wallet flow.
+4. Client sends `holding.sellByToken` with token public key, selected wallet public keys, sell percentage, and optional toggles (`closeAta`, `returnSolToMainWallet`).
+5. Service fetches on-chain token balances, computes sell amounts, and submits RPC sell transactions per wallet.
+6. Sell transactions can use the main wallet as fee payer when available.
+7. Sell submissions are concurrency-limited via `rpcConfig.tuning.sellConcurrency` (default 5) instead of unbounded fan-out.
+8. Sell RPC calls now use `retryRpcWithTimeout`:
    - `getLatestBlockhash` uses `rpcConfig.tuning.rpcTimeoutMs` (30s default)
    - `sendAndConfirmTransaction` uses `rpcConfig.tuning.confirmTimeoutMs` (120s default)
-7. If close ATA is enabled, the service closes empty associated token accounts after selling.
-8. If return SOL is enabled, the service returns the maximum available SOL from processed wallets to the main wallet. It tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
-9. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
+9. If close ATA is enabled, the service closes empty associated token accounts after selling.
+10. If return SOL is enabled, the service returns the maximum available SOL from processed wallets to the main wallet. It tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
+11. Client invalidates `holding.listByToken` after mutations so all mounted consumers refetch.
+
+## Buy Flow
+
+1. User opens the `BUY` dialog from the holdings page or from the dashboard action beside `SELL`.
+2. Dialog lists existing eligible token wallets except the standalone main wallet. The dev wallet is selected by default; operational wallets are available but unselected. If the main wallet is also the token dev wallet, that shared main/dev address remains eligible as the dev wallet.
+3. User enters `SOL per wallet`; v1 does not generate wallets and does not support Jito or token-target buys.
+4. Advanced settings are collapsed by default and currently expose slippage in basis points.
+5. Client sends `holding.buyByToken` with token public key, selected wallet public keys, SOL amount per wallet, and slippage.
+6. Service verifies token ownership, resolves allowed wallets with private keys, fetches wallet SOL balances, and estimates each wallet's required SOL including buy amount, ATA rent when needed, transaction buffer, and an extra pump-fee reserve (`max(2%, 0.002 SOL)`).
+7. When a selected buying wallet has insufficient SOL, the main wallet funds only the estimated deficit before the buy.
+8. Buy transactions use `buildBuyTokenTransaction` with quote-derived `minTokensOut` from the configured slippage.
+9. Buy submissions are concurrency-limited using the same bounded RPC fan-out pattern as holding sells.
+10. After buying, only wallets that received top-up funding are considered for excess return, and the service returns only SOL above that wallet's pre-buy balance threshold.
+11. Per-wallet buy send failures are logged with wallet, mint, amount, slippage, and transaction logs when available. If every selected wallet fails to buy, the mutation throws a user-facing error instead of returning a successful `0 submitted` result.
+12. Client refreshes holdings, selected wallet balances, main wallet balance, dashboard stats, and sidebar counts after completion.
 
 ## UI Behavior
 
-- Bulk sell action operates on selected holdings rows.
+- The shared `SELL` dialog has `Sell` and `Exit` tabs. The Sell tab can operate on refreshed wallet holdings or on a constrained selected-row wallet set.
+- The `BUY` dialog is separate from `SELL`/`Exit`, is available from both holdings and dashboard, and performs regular per-wallet buys without tabs.
+- BUY v1 uses existing wallets only. Wallet generation is intentionally excluded from this pass.
+- BUY v1 uses SOL-per-wallet as the only amount mode. Token-target buying can be added later as a quote-driven mode with explicit max SOL handling.
+- BUY advanced settings are collapsed behind an accordion and start with slippage.
+- Full `SELL` openings do not depend on holdings table row selection. They open from current page/dashboard data, show wallets with positive balances, and select all wallets by default. They refresh on open only when holdings data is stale by more than one minute.
+- The holdings table toolbar exposes `Sell Selected` for selected-row sells. A separate `SELL` button in the holdings summary area opens the full shared dialog.
 - Shared `main = dev` holdings should appear as one logical wallet row, not duplicated role rows.
 - Manual refresh is available; auto refresh uses `RefreshCache` staleness.
 - Header layout keeps title on the left and refresh controls on the right.
-- Metrics cards are shown under the header and summarize currently loaded holdings rows.
+- Metrics cards are shown under the header in three columns: active wallets with ATAs tracked, holdings value with total tokens and supply share, and the standalone `SELL` action.
 - Holding percentage uses `tokenBalance / totalMintSupply * 100`.
 - Mint supply is fetched by `holding.listByToken` from RPC (`getTokenSupply`) and returned with the list payload.
 - Mint supply lookups use a short-lived in-memory cache (10s TTL, capped map size) to reduce repeated RPC calls across paginated requests.

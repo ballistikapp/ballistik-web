@@ -6,6 +6,7 @@ import { DashboardOperations } from "@/app/(app)/[tokenPublicKey]/dashboard/dash
 import { PriceChart } from "@/app/(app)/[tokenPublicKey]/dashboard/price-chart";
 import { marketingMockDashboard } from "@/lib/config/marketing-mock-dashboard.config";
 import { MarketingMockCreatorRewardsCard } from "./marketing-mock-creator-rewards-card";
+import { DashboardBuySellActions } from "@/app/(app)/[tokenPublicKey]/dashboard/dashboard-buy-sell-actions";
 
 export function MarketingMockDashboardView() {
   const m = marketingMockDashboard;
@@ -18,25 +19,28 @@ export function MarketingMockDashboardView() {
         isRefreshing={false}
         refreshStatusLabel={m.refreshStatusLabel}
       />
-      <DashboardStats
-        header={m.statsHeader}
-        metrics={m.metrics}
-        onOpenExitDialog={() => {}}
-        exitDisabled={false}
-        exitPending={false}
-      />
-      <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-2 @5xl/main:items-stretch">
-        <div className="min-w-0">
+      <DashboardStats header={m.statsHeader} metrics={m.metrics} />
+      <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-8 @5xl/main:items-stretch">
+        <div className="min-w-0 @5xl/main:col-span-3">
           <DashboardOperations
             operations={m.operations}
             tokenPublicKey={m.tokenPublicKey}
           />
         </div>
-        <div className="min-w-0">
+        <div className="min-w-0 @5xl/main:col-span-3">
           <MarketingMockCreatorRewardsCard
             claimableSol={m.creatorRewards.claimableSol}
             paidOutSol={m.creatorRewards.paidOutSol}
             lastReconciledAt={m.creatorRewards.lastReconciledAt}
+          />
+        </div>
+        <div className="min-w-0 @5xl/main:col-span-2">
+          <DashboardBuySellActions
+            onOpenBuyDialog={() => {}}
+            onOpenExitDialog={() => {}}
+            buyDisabled={false}
+            exitDisabled={false}
+            hasHoldings
           />
         </div>
       </div>

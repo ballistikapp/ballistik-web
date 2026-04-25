@@ -158,7 +158,8 @@ The UI polls `holding.exitStatus` every 2 seconds while status is `PENDING` or `
 
 ## UI Behavior
 
-- Exit dialog opens on demand or automatically when a running exit exists
+- Exit is available as the `Exit` tab in the shared `SELL` dialog, which opens from both the dashboard and holdings page
+- The dialog opens on demand or automatically on the Exit tab when a running exit exists
 - Dialog shows a detailed pre-flight description of each exit step
 - Dialog shows estimated total Jito tip before start (`tip per bundle × estimated bundles`)
 - Exit preflight totals should reflect deduped holdings data so shared main/dev launches do not inflate wallet counts or token totals.

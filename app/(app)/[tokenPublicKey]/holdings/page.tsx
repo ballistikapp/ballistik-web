@@ -5,16 +5,18 @@ import type { inferRouterOutputs } from "@trpc/server";
 import type { AppRouter } from "@/server/trpc/routers/_app";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
-import { IconRefresh } from "@tabler/icons-react";
+import { IconArrowDown, IconCoins, IconRefresh, IconWallet } from "@tabler/icons-react";
 import type { PaginationState } from "@tanstack/react-table";
 import { trpc } from "@/lib/trpc/client";
 import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { formatRefreshTime } from "@/lib/utils/relative-time";
+import { formatSol, formatTokenCount } from "@/lib/utils/format";
+import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
-import { HoldingSellDialog } from "@/components/holdings/holding-sell-dialog";
-import { HoldingExitDialog } from "@/components/holdings/holding-exit-dialog";
+import { HoldingBuyDialog } from "@/components/holdings/holding-buy-dialog";
+import { HoldingSellExitDialog } from "@/components/holdings/holding-sell-exit-dialog";
 import {
   DataTable,
   DataTablePagination,
@@ -24,6 +26,11 @@ import {
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { getColumns } from "./columns";
 
 function formatCompact(value: number) {
@@ -33,11 +40,32 @@ function formatCompact(value: number) {
   }).format(value);
 }
 
+const SELL_DIALOG_REFRESH_STALE_MS = 60_000;
+
+function isRefreshStale(
+  refreshTimestamp: Date | string | null,
+  staleMs: number
+) {
+  return (
+    !refreshTimestamp ||
+    Date.now() - new Date(refreshTimestamp).getTime() > staleMs
+  );
+}
+
 export default function Page() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const utils = trpc.useUtils();
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
-  const [sellDialogOpen, setSellDialogOpen] = useState(false);
+  const [buyDialogOpen, setBuyDialogOpen] = useState(false);
+  const [sellExitDialogOpen, setSellExitDialogOpen] = useState(false);
+  const [sellExitInitialTab, setSellExitInitialTab] = useState<"sell" | "exit">(
+    "sell"
+  );
+  const [sellExitShouldRefreshOnOpen, setSellExitShouldRefreshOnOpen] =
+    useState(false);
+  const [selectedDialogHoldings, setSelectedDialogHoldings] = useState<
+    { walletPublicKey: string; tokenBalance: number }[] | undefined
+  >(undefined);
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
@@ -86,9 +114,15 @@ export default function Page() {
   const { data: testRunLogConfig } = trpc.testRunLog.getConfig.useQuery(undefined, {
     enabled: !!tokenPublicKey,
   });
+  const { data: dashboardStats } = trpc.dashboard.getStats.useQuery(
+    { tokenPublicKey: tokenPublicKey || "" },
+    { enabled: !!tokenPublicKey && !!tokenData }
+  );
   const appendTestRunEvent = trpc.testRunLog.appendEvent.useMutation();
   const { mutateAsync: sellHoldings, isPending: isSelling } =
     trpc.holding.sellByToken.useMutation();
+  const { mutateAsync: buyHoldings, isPending: isBuying } =
+    trpc.holding.buyByToken.useMutation();
   const { mutateAsync: refreshWalletBalances } =
     trpc.wallet.refreshBalances.useMutation();
   const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
@@ -132,29 +166,38 @@ export default function Page() {
   const walletsWithBalance = holdingsData?.walletsWithBalance ?? 0;
   const totalSupply = holdingsData?.totalSupply ?? null;
   const hasHoldings = totalBalance > 0;
+  const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
+  const sellDialogInitialHoldings = useMemo(
+    () =>
+      holdings.map((holding) => ({
+        walletPublicKey: holding.wallet.publicKey,
+        tokenBalance: Number(holding.tokenBalance),
+      })),
+    [holdings]
+  );
   const totalSupplyShare =
     totalSupply && totalSupply > 0 ? (totalBalance / totalSupply) * 100 : null;
+  const holdingsValueSol = dashboardStats?.metrics.holdingsValue.valueSol ?? null;
   const metricCards = useMemo(
     () => [
       {
         label: "Active Wallets",
+        icon: IconWallet,
         value: formatCompact(walletsWithBalance),
+        secondary: `${formatCompact(totalCount)} ATAs tracked`,
       },
       {
-        label: `Total ${tokenData?.symbol ?? "Token"}`,
-        value: formatCompact(totalBalance),
-      },
-      {
-        label: "Supply Share",
+        label: "Holdings Value",
+        icon: IconCoins,
         value:
-          totalSupplyShare === null ? "--" : `${totalSupplyShare.toFixed(2)}%`,
-      },
-      {
-        label: "ATAs Tracked",
-        value: formatCompact(totalCount),
+          holdingsValueSol === null ? "--" : `${formatSol(holdingsValueSol)} SOL`,
+        secondary: `${formatTokenCount(totalBalance)} ${tokenData?.symbol ?? "tokens"
+          } · ${totalSupplyShare === null ? "--" : `${totalSupplyShare.toFixed(2)}%`
+          } supply share`,
       },
     ],
     [
+      holdingsValueSol,
       totalCount,
       tokenData?.symbol,
       totalBalance,
@@ -166,7 +209,6 @@ export default function Page() {
     () => holdings.filter((holding) => rowSelection[holding.id]),
     [holdings, rowSelection]
   );
-  const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const lastSnapshotKeyRef = useRef<string | null>(null);
 
@@ -220,8 +262,8 @@ export default function Page() {
       const showToast = options?.showToast !== false;
       const toastId = showToast
         ? toast.loading("Refreshing holdings...", {
-            icon: <Spinner className="size-4" />,
-          })
+          icon: <Spinner className="size-4" />,
+        })
         : null;
       try {
         await refreshHoldings({ tokenPublicKey });
@@ -269,14 +311,12 @@ export default function Page() {
   );
 
   const handleSell = async (
+    walletPublicKeys: string[],
     sellPercentage: number,
     closeAta: boolean,
     returnSolToMainWallet: boolean
   ) => {
-    if (!tokenPublicKey || selectedHoldings.length === 0) return;
-    const walletPublicKeys = Array.from(
-      new Set(selectedHoldings.map((holding) => holding.wallet.publicKey))
-    );
+    if (!tokenPublicKey || walletPublicKeys.length === 0) return;
     const toastId = toast.loading("Submitting sell transactions...");
     try {
       const result = await sellHoldings({
@@ -286,25 +326,7 @@ export default function Page() {
         closeAta,
         returnSolToMainWallet,
       });
-      const summaryParts = [
-        `${result.submitted} submitted`,
-        `${result.failed} failed`,
-      ];
-      if (closeAta && result.ataClose) {
-        summaryParts.push(`${result.ataClose.closed} ATA closed`);
-        if (result.ataClose.failed > 0) {
-          summaryParts.push(`${result.ataClose.failed} close failed`);
-        }
-      }
-      if (result.effectiveReturnSolToMainWallet && result.solRecovery) {
-        summaryParts.push(
-          `${result.solRecovery.recovered} wallet SOL returned`
-        );
-        if (result.solRecovery.failed > 0) {
-          summaryParts.push(`${result.solRecovery.failed} SOL return failed`);
-        }
-      }
-      toast.success(`Sell submitted: ${summaryParts.join(", ")}`, {
+      toast.success(formatSellHoldingsToast(result, closeAta), {
         id: toastId,
       });
       await refreshHoldings({ tokenPublicKey, walletPublicKeys });
@@ -322,7 +344,8 @@ export default function Page() {
         actualValue: result,
       });
       void utils.holding.listByToken.invalidate({ tokenPublicKey });
-      setSellDialogOpen(false);
+      setSellExitDialogOpen(false);
+      setSelectedDialogHoldings(undefined);
     } catch (error) {
       logHoldingsEvent({
         eventType: "run_issue",
@@ -331,6 +354,58 @@ export default function Page() {
       });
       const message =
         error instanceof Error ? error.message : "Failed to submit sells";
+      toast.error(message, { id: toastId });
+    }
+  };
+
+  const handleBuy = async (
+    walletPublicKeys: string[],
+    solAmountPerWallet: number,
+    slippageBps: number
+  ) => {
+    if (!tokenPublicKey || walletPublicKeys.length === 0) return;
+    const toastId = toast.loading("Submitting buy transactions...");
+    try {
+      const result = await buyHoldings({
+        tokenPublicKey,
+        walletPublicKeys,
+        solAmountPerWallet,
+        slippageBps,
+      });
+      const summaryParts = [
+        `${result.submitted} submitted`,
+        `${result.failed} failed`,
+      ];
+      if (result.funding.funded > 0) {
+        summaryParts.push(`${result.funding.funded} funded`);
+      }
+      if (result.excessReturn.returned > 0) {
+        summaryParts.push(`${result.excessReturn.returned} excess returned`);
+      }
+      toast.success(`Buy submitted: ${summaryParts.join(", ")}`, {
+        id: toastId,
+      });
+      await refreshHoldings({ tokenPublicKey, walletPublicKeys });
+      await refreshRelatedWalletData(walletPublicKeys);
+      logHoldingsEvent({
+        eventType: "trade_result",
+        action: "buy-from-holdings-page",
+        expectedValue: {
+          solAmountPerWallet,
+          slippageBps,
+        },
+        actualValue: result,
+      });
+      void utils.holding.listByToken.invalidate({ tokenPublicKey });
+      setBuyDialogOpen(false);
+    } catch (error) {
+      logHoldingsEvent({
+        eventType: "run_issue",
+        action: "holdings-buy",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      const message =
+        error instanceof Error ? error.message : "Failed to submit buys";
       toast.error(message, { id: toastId });
     }
   };
@@ -399,18 +474,14 @@ export default function Page() {
     })();
   }, [exitStatus, handleRefresh, refreshRelatedWalletData]);
 
-  const handleOpenExitDialog = () => {
-    if (!hasHoldings) return;
-    setManualExitDialogOpen(true);
-    setDismissedExitId(null);
-  };
-
-  const handleExitDialogOpenChange = (open: boolean) => {
+  const handleSellExitDialogOpenChange = (open: boolean) => {
+    setSellExitDialogOpen(open);
     setManualExitDialogOpen(open);
     if (open) {
       setDismissedExitId(null);
       return;
     }
+    setSelectedDialogHoldings(undefined);
     if (activeExitId) {
       setDismissedExitId(activeExitId);
     }
@@ -426,7 +497,7 @@ export default function Page() {
     const isStale =
       !refreshTimestamp ||
       Date.now() - new Date(refreshTimestamp).getTime() >=
-        cacheConfig.staleMs.holdings;
+      cacheConfig.staleMs.holdings;
     if (!isStale) return;
     if (autoRefreshTriggered.current) return;
     autoRefreshTriggered.current = true;
@@ -514,20 +585,71 @@ export default function Page() {
         }
       />
 
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {metricCards.map((metric) => (
-          <div
-            key={metric.label}
-            className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm"
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+        {metricCards.map((metric) => {
+          const Icon = metric.icon;
+          return (
+            <div
+              key={metric.label}
+              className="rounded-xl border border-border/70 bg-card px-4 py-3 shadow-sm"
+            >
+              <p className="flex items-center gap-1.5 text-[11px] uppercase tracking-wide text-muted-foreground">
+                <Icon className="size-4" />
+                {metric.label}
+              </p>
+              <p className="mt-1 text-xl font-semibold tabular-nums">
+                {metric.value}
+              </p>
+              <p className="mt-1 text-xs text-muted-foreground tabular-nums">
+                {metric.secondary}
+              </p>
+            </div>
+          );
+        })}
+        <div className="flex h-full w-full flex-col items-stretch justify-center gap-2 max-md:mx-auto max-md:flex-row md:ml-auto md:max-w-44">
+          <Button
+            variant="outline"
+            size="lg"
+            className="w-full min-w-0 max-md:flex-1 px-4 text-base font-semibold"
+            type="button"
+              onClick={() => setBuyDialogOpen(true)}
+              disabled={isBuying || !tokenPublicKey}
           >
-            <p className="text-[11px] uppercase tracking-wide text-muted-foreground">
-              {metric.label}
-            </p>
-            <p className="mt-1 text-xl font-semibold tabular-nums">
-              {metric.value}
-            </p>
-          </div>
-        ))}
+            <span className="flex-1 text-center text-primary">BUY</span>
+            <IconCoins data-icon="inline-end" className="text-primary" />
+          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="block w-full min-w-0 max-md:flex-1">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full min-w-0 max-md:flex-1 px-4 text-base font-semibold"
+                  onClick={() => {
+                    setSellExitInitialTab("sell");
+                    setSelectedDialogHoldings(undefined);
+                    setSellExitShouldRefreshOnOpen(
+                      isRefreshStale(
+                        refreshTimestamp,
+                        SELL_DIALOG_REFRESH_STALE_MS
+                      )
+                    );
+                    setSellExitDialogOpen(true);
+                  }}
+                  disabled={!hasHoldings || isSelling}
+                >
+                  <span className="flex-1 text-center text-destructive">SELL</span>
+                  <IconArrowDown data-icon="inline-end" className="text-destructive" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {!hasHoldings ? (
+              <TooltipContent side="left" sideOffset={4}>
+                No holdings available to sell.
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
+        </div>
       </div>
 
       <DataTable
@@ -554,24 +676,22 @@ export default function Page() {
             />
             <div className="flex flex-wrap items-center gap-2">
               <Button
-                variant="destructive"
-                size="sm"
-                onClick={() => setSellDialogOpen(true)}
-                disabled={selectedHoldings.length === 0 || isSelling}
-              >
-                Sell
-              </Button>
-              <Button
                 variant="outline"
                 size="sm"
-                onClick={handleOpenExitDialog}
-                disabled={
-                  !hasHoldings ||
-                  startExitMutation.isPending ||
-                  exitStatus === "RUNNING"
-                }
+                onClick={() => {
+                  setSellExitInitialTab("sell");
+                  setSellExitShouldRefreshOnOpen(false);
+                  setSelectedDialogHoldings(
+                    selectedHoldings.map((holding) => ({
+                      walletPublicKey: holding.wallet.publicKey,
+                      tokenBalance: Number(holding.tokenBalance),
+                    }))
+                  );
+                  setSellExitDialogOpen(true);
+                }}
+                disabled={selectedHoldings.length === 0 || isSelling}
               >
-                Exit
+                Sell Selected
               </Button>
               <DataTableViewOptions table={table} />
             </div>
@@ -580,29 +700,40 @@ export default function Page() {
         pagination={(table) => <DataTablePagination table={table} />}
       />
 
-      <HoldingSellDialog
-        open={sellDialogOpen}
-        onOpenChange={setSellDialogOpen}
-        holdings={selectedHoldings.map((holding) => ({
-          walletPublicKey: holding.wallet.publicKey,
-          tokenBalance: Number(holding.tokenBalance),
-        }))}
+      <HoldingSellExitDialog
+        open={sellExitDialogOpen || isExitDialogOpen}
+        onOpenChange={handleSellExitDialogOpenChange}
+        tokenPublicKey={tokenPublicKey}
         tokenSymbol={tokenData.symbol}
-        isSubmitting={isSelling}
-        onConfirm={handleSell}
-      />
-      <HoldingExitDialog
-        open={isExitDialogOpen}
-        onOpenChange={handleExitDialogOpenChange}
+        initialTab={
+          isExitDialogOpen && !sellExitDialogOpen ? "exit" : sellExitInitialTab
+        }
+        initialHoldings={sellDialogInitialHoldings}
+        selectedHoldings={selectedDialogHoldings}
+        shouldRefreshOnOpen={sellExitShouldRefreshOnOpen}
         exit={exitData}
-        tokenSymbol={tokenData.symbol}
         totalWallets={totalCount}
         walletsWithBalance={walletsWithBalance}
         totalBalance={totalBalance}
-        isSubmitting={startExitMutation.isPending}
-        isCancelling={cancelExitMutation.isPending}
-        onConfirm={handleExit}
-        onCancel={handleCancelExit}
+        isSelling={isSelling}
+        isStartingExit={startExitMutation.isPending}
+        isCancellingExit={cancelExitMutation.isPending}
+        onSell={handleSell}
+        onExit={handleExit}
+        onCancelExit={handleCancelExit}
+        onHoldingsRefreshed={() => {
+          void refetchRefreshCache();
+          void utils.holding.listByToken.invalidate({ tokenPublicKey });
+          invalidateTokenSidebarCounts(utils, tokenPublicKey);
+        }}
+      />
+      <HoldingBuyDialog
+        open={buyDialogOpen}
+        onOpenChange={setBuyDialogOpen}
+        tokenPublicKey={tokenPublicKey}
+        tokenSymbol={tokenData.symbol}
+        isBuying={isBuying}
+        onBuy={handleBuy}
       />
     </div>
   );

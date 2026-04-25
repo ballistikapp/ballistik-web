@@ -16,7 +16,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   formatMarketCap,
   formatPriceSol,
@@ -74,17 +73,11 @@ interface DashboardStatsProps {
     pnl: PnlData;
     activity: ActivityData;
   };
-  onOpenExitDialog: () => void;
-  exitDisabled?: boolean;
-  exitPending?: boolean;
 }
 
 export function DashboardStats({
   header,
   metrics,
-  onOpenExitDialog,
-  exitDisabled = false,
-  exitPending = false,
 }: DashboardStatsProps) {
   const { holdingsValue, pnl, activity } = metrics;
   const isProfitable = pnl.net >= 0;
@@ -181,7 +174,7 @@ export function DashboardStats({
       />
 
       <Card className="@container/card">
-        <CardHeader className="h-full flex flex-col">
+        <CardHeader>
           <CardDescription className="flex items-center gap-1.5">
             <IconCoins className="size-4" />
             Holdings Value
@@ -189,18 +182,10 @@ export function DashboardStats({
           <CardTitle className="text-2xl font-semibold tabular-nums @[250px]/card:text-3xl">
             {formatSol(holdingsValue.valueSol)} SOL
           </CardTitle>
-          <div className="mt-auto flex justify-between items-end w-full gap-2 pt-3">
+          <div className="flex flex-col gap-1 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
               {formatTokenCount(holdingsValue.tokenCount)} tokens held
             </span>
-            <Button
-              variant="destructive"
-              className="h-8 self-end px-5 text-sm font-semibold"
-              onClick={onOpenExitDialog}
-              disabled={exitDisabled}
-            >
-              {exitPending ? "Starting..." : "Sell All and Exit"}
-            </Button>
           </div>
         </CardHeader>
       </Card>

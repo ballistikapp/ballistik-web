@@ -10,6 +10,7 @@ import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import {
   Keypair,
   PublicKey,
+  SystemProgram,
   Transaction,
   sendAndConfirmTransaction,
   type Connection,
@@ -24,6 +25,12 @@ import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
+import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
+import {
+  computeBuyQuote,
+  computeMinTokensOutForBuy,
+  fetchPumpQuoteState,
+} from "@/server/solana/pump-quotes";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import {
   recoverWalletSolBalances,
@@ -31,12 +38,14 @@ import {
   sweepSystemDevRealizedSol,
 } from "@/server/services/holding-sol-recovery";
 import type {
+  BuyHoldingsByTokenInput,
   ListHoldingsByTokenInput,
   RefreshHoldingsByTokenInput,
   SellHoldingsByTokenInput,
 } from "@/server/schemas/holding.schema";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
 import { getEnv } from "@/lib/config/env";
+import { logger } from "@/lib/logger";
 
 type WalletRecord = {
   publicKey: string;
@@ -48,6 +57,14 @@ type WalletWithKey = WalletRecord & {
   isSystemWallet?: boolean;
 };
 
+type BuyWalletState = {
+  wallet: WalletWithKey;
+  balanceLamports: number;
+  ataExists: boolean;
+  requiredLamports: number;
+  topUpLamports: number;
+};
+
 const HOLDING_MUTATION_BATCH_SIZE = 100;
 const HOLDING_UPDATE_BATCH_SIZE = 50;
 const HOLDING_RPC_BATCH_SIZE = 100;
@@ -56,6 +73,12 @@ const HOLDING_MUTATION_CONCURRENCY = 3;
 const TOKEN_SUPPLY_CACHE_TTL_MS = 10_000;
 const TOKEN_SUPPLY_CACHE_MAX_SIZE = 200;
 const MONITORING_REFRESH_MIN_INTERVAL_MS = 12_000;
+const BUY_TX_FEE_BUFFER_LAMPORTS = 15_000;
+const BUY_EXTRA_FEE_RESERVE_BPS = 200;
+const BUY_MIN_EXTRA_FEE_RESERVE_LAMPORTS = 2_000_000;
+const RETURN_TX_FEE_BUFFER_LAMPORTS = 5_000;
+const TOKEN_ACCOUNT_RENT_EXEMPT_BYTES = 165;
+const log = logger.child({ service: "holding" });
 
 const tokenSupplyCache = new Map<
   string,
@@ -80,6 +103,46 @@ function dedupeWalletsByPublicKey<T extends { publicKey: string }>(wallets: T[])
   return Array.from(
     new Map(wallets.map((wallet) => [wallet.publicKey, wallet])).values()
   );
+}
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function getTransactionErrorLogs(error: unknown) {
+  if (!error || typeof error !== "object") {
+    return null;
+  }
+
+  const candidate = error as { logs?: unknown; transactionLogs?: unknown };
+  const logs = Array.isArray(candidate.logs)
+    ? candidate.logs
+    : candidate.transactionLogs;
+
+  return Array.isArray(logs)
+    ? logs.filter((entry): entry is string => typeof entry === "string")
+    : null;
+}
+
+function getBuyExtraFeeReserveLamports(buyLamports: bigint) {
+  const proportionalReserve =
+    (buyLamports * BigInt(BUY_EXTRA_FEE_RESERVE_BPS)) / BigInt(10_000);
+  return Number(
+    proportionalReserve > BigInt(BUY_MIN_EXTRA_FEE_RESERVE_LAMPORTS)
+      ? proportionalReserve
+      : BigInt(BUY_MIN_EXTRA_FEE_RESERVE_LAMPORTS)
+  );
+}
+
+function getBuyFailureMessage(message: string) {
+  if (
+    message.includes("insufficient funds for rent") ||
+    message.includes("insufficient lamports")
+  ) {
+    return "Selected wallet needs more SOL for the buy, token account rent, and pump fees. Add SOL or lower the buy amount.";
+  }
+
+  return message;
 }
 
 function compareHoldingsByRecency<T extends HoldingRowLike>(a: T, b: T) {
@@ -283,6 +346,29 @@ async function getTokenBalanceForWallet(
         error.name === "TokenAccountNotFoundError")
     ) {
       return BigInt(0);
+    }
+    throw error;
+  }
+}
+
+async function tokenAccountExists(
+  connection: Connection,
+  walletPublicKey: string,
+  mintPublicKey: PublicKey
+) {
+  try {
+    const owner = new PublicKey(walletPublicKey);
+    const ata = await getAssociatedTokenAddress(mintPublicKey, owner);
+    await getAccount(connection, ata);
+    return true;
+  } catch (error) {
+    if (
+      error instanceof Error &&
+      (error.message.includes("Account does not exist") ||
+        error.message.includes("could not find account") ||
+        error.name === "TokenAccountNotFoundError")
+    ) {
+      return false;
     }
     throw error;
   }
@@ -709,6 +795,455 @@ export const holdingService = {
       });
       throw error;
     }
+  },
+
+  async buyByToken(input: BuyHoldingsByTokenInput, userId: string) {
+    const { token, wallets: resolvedWallets } = await getAllowedWalletsWithKeys(
+      input.tokenPublicKey,
+      userId,
+      input.walletPublicKeys
+    );
+    const wallets = resolvedWallets.filter(
+      (wallet) => wallet.type !== "MAIN_WALLET"
+    );
+
+    if (wallets.length === 0) {
+      throw new AppError("No valid wallets selected", 400);
+    }
+
+    const connection = getSolanaConnection();
+    const mintPublicKey = new PublicKey(token.publicKey);
+    const buyLamports = BigInt(
+      Math.floor(input.solAmountPerWallet * 1_000_000_000)
+    );
+    if (buyLamports <= BigInt(0)) {
+      throw new AppError("Buy amount must be greater than zero", 400);
+    }
+    const buyExtraFeeReserveLamports = getBuyExtraFeeReserveLamports(buyLamports);
+
+    const mainWalletRecord = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        mainWallet: {
+          select: { publicKey: true, privateKey: true },
+        },
+      },
+    });
+    const mainWallet = mainWalletRecord?.mainWallet;
+    if (!mainWallet?.privateKey) {
+      throw new AppError("Main wallet not found", 400);
+    }
+    const mainWalletKeypair = Keypair.fromSecretKey(
+      bs58.decode(mainWallet.privateKey)
+    );
+
+    const ataRentLamports = await retryRpcWithTimeout(
+      () =>
+        connection.getMinimumBalanceForRentExemption(
+          TOKEN_ACCOUNT_RENT_EXEMPT_BYTES
+        ),
+      rpcConfig.tuning.rpcTimeoutMs
+    );
+    const [walletStates, mainBalanceLamports] = await Promise.all([
+      mapWithConcurrency<WalletWithKey, BuyWalletState>(
+        wallets,
+        rpcConfig.tuning.transferConcurrency,
+        async (wallet) => {
+          const publicKey = new PublicKey(wallet.publicKey);
+          const [balanceLamports, ataExists] = await Promise.all([
+            retryRpcWithTimeout(
+              () => connection.getBalance(publicKey),
+              rpcConfig.tuning.rpcTimeoutMs
+            ),
+            tokenAccountExists(connection, wallet.publicKey, mintPublicKey),
+          ]);
+          const requiredLamports =
+            Number(buyLamports) +
+            BUY_TX_FEE_BUFFER_LAMPORTS +
+            buyExtraFeeReserveLamports +
+            (ataExists ? 0 : ataRentLamports);
+          const topUpLamports = Math.max(requiredLamports - balanceLamports, 0);
+          return {
+            wallet,
+            balanceLamports,
+            ataExists,
+            requiredLamports,
+            topUpLamports,
+          };
+        }
+      ),
+      retryRpcWithTimeout(
+        () => connection.getBalance(mainWalletKeypair.publicKey),
+        rpcConfig.tuning.rpcTimeoutMs
+      ),
+    ]);
+
+    const topUpTotalLamports = walletStates.reduce(
+      (sum, state) => sum + state.topUpLamports,
+      0
+    );
+    const mainSafetyBufferLamports =
+      (walletStates.length + 1) * BUY_TX_FEE_BUFFER_LAMPORTS;
+    if (topUpTotalLamports + mainSafetyBufferLamports > mainBalanceLamports) {
+      throw new AppError("Main wallet has insufficient SOL for buy funding", 400);
+    }
+
+    const topUpResults = await mapWithConcurrency(
+      walletStates.filter((state) => state.topUpLamports > 0),
+      rpcConfig.tuning.transferConcurrency,
+      async (state) => {
+        const amountSol = state.topUpLamports / 1_000_000_000;
+        const trackId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_FUND",
+            source: "HOLDING",
+            tokenPublicKey: token.publicKey,
+            walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+            fromAddress: mainWalletKeypair.publicKey.toBase58(),
+            toAddress: state.wallet.publicKey,
+            solAmount: amountSol,
+          })
+          .then((result) => result.id)
+          .catch(() => null);
+
+        try {
+          const destination = new PublicKey(state.wallet.publicKey);
+          const { blockhash, lastValidBlockHeight } =
+            await retryRpcWithTimeout(
+              () => connection.getLatestBlockhash("confirmed"),
+              rpcConfig.tuning.rpcTimeoutMs
+            );
+          const tx = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: mainWalletKeypair.publicKey,
+              toPubkey: destination,
+              lamports: state.topUpLamports,
+            })
+          );
+          tx.recentBlockhash = blockhash;
+          tx.lastValidBlockHeight = lastValidBlockHeight;
+          tx.feePayer = mainWalletKeypair.publicKey;
+          const signature = await retryRpcWithTimeout(
+            () =>
+              sendAndConfirmTransaction(connection, tx, [mainWalletKeypair], {
+                commitment: "confirmed",
+              }),
+            rpcConfig.tuning.confirmTimeoutMs
+          );
+          if (trackId) {
+            await appTransactionService
+              .confirm(trackId, { signature })
+              .catch(() => {});
+          }
+          return {
+            walletPublicKey: state.wallet.publicKey,
+            status: "SUBMITTED" as const,
+            signature,
+            topUpLamports: state.topUpLamports,
+          };
+        } catch (error) {
+          const message = error instanceof Error ? error.message : String(error);
+          if (trackId) {
+            await appTransactionService
+              .fail(trackId, { errorMessage: message })
+              .catch(() => {});
+          }
+          return {
+            walletPublicKey: state.wallet.publicKey,
+            status: "FAILED" as const,
+            error: message,
+            topUpLamports: state.topUpLamports,
+          };
+        }
+      }
+    );
+
+    const failedTopUps = topUpResults.filter(
+      (result) => result.status === "FAILED"
+    );
+    if (failedTopUps.length > 0) {
+      throw new AppError(
+        `Failed to fund ${failedTopUps.length} selected wallet${failedTopUps.length === 1 ? "" : "s"}`,
+        400
+      );
+    }
+
+    let quoteState: Awaited<ReturnType<typeof fetchPumpQuoteState>> | null = null;
+    try {
+      quoteState = await fetchPumpQuoteState(mintPublicKey, mainWalletKeypair);
+    } catch {}
+
+    const buyResults = await mapWithConcurrency(
+      wallets,
+      rpcConfig.tuning.sellConcurrency,
+      async (wallet) => {
+        let buyTrackId: string | null = null;
+        try {
+          const buyer = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+          const minTokensOut = quoteState
+            ? BigInt(
+                computeMinTokensOutForBuy(
+                  quoteState,
+                  buyLamports,
+                  input.slippageBps
+                ).toString()
+              )
+            : BigInt(1);
+          const quotedTokensOut = quoteState
+            ? computeBuyQuote(quoteState, buyLamports).tokensOut
+            : null;
+          const buyTx = await buildBuyTokenTransaction(
+            buyer,
+            mintPublicKey,
+            buyLamports,
+            undefined,
+            minTokensOut
+          );
+          const { blockhash, lastValidBlockHeight } =
+            await retryRpcWithTimeout(
+              () => connection.getLatestBlockhash("confirmed"),
+              rpcConfig.tuning.rpcTimeoutMs
+            );
+          buyTx.recentBlockhash = blockhash;
+          buyTx.lastValidBlockHeight = lastValidBlockHeight;
+          buyTx.feePayer = buyer.publicKey;
+
+          buyTrackId = await appTransactionService
+            .create({
+              userId,
+              type: "TRADE_BUY",
+              source: "HOLDING",
+              tokenPublicKey: token.publicKey,
+              walletPublicKey: wallet.publicKey,
+              fromAddress: wallet.publicKey,
+              solAmount: input.solAmountPerWallet,
+              tokenAmount: quotedTokensOut ? Number(quotedTokensOut) : null,
+            })
+            .then((result) => result.id)
+            .catch(() => null);
+
+          const signature = await retryRpcWithTimeout(
+            () =>
+              sendAndConfirmTransaction(connection, buyTx, [buyer], {
+                commitment: "confirmed",
+              }),
+            rpcConfig.tuning.confirmTimeoutMs
+          );
+          if (buyTrackId) {
+            await appTransactionService
+              .confirm(buyTrackId, { signature })
+              .catch(() => {});
+          }
+          await testRunLogService.appendServerEvent({
+            eventType: "wallet_transaction",
+            source: "holding.service",
+            tokenPublicKey: token.publicKey,
+            action: "holding.buyTransaction",
+            userId,
+            wallets: [wallet.publicKey],
+            signature,
+            status: "submitted",
+            expectedValue: {
+              solAmountPerWallet: input.solAmountPerWallet,
+              slippageBps: input.slippageBps,
+              minTokensOut: minTokensOut.toString(),
+            },
+          });
+          return {
+            walletPublicKey: wallet.publicKey,
+            status: "SUBMITTED" as const,
+            signature,
+            solAmountLamports: buyLamports.toString(),
+            quotedTokensOut: quotedTokensOut?.toString() ?? null,
+          };
+        } catch (error) {
+          const message = getErrorMessage(error);
+          const transactionLogs = getTransactionErrorLogs(error);
+          log.error("Holding buy failed", {
+            tokenPublicKey: token.publicKey,
+            walletPublicKey: wallet.publicKey,
+            solAmountPerWallet: input.solAmountPerWallet,
+            slippageBps: input.slippageBps,
+            errorName: error instanceof Error ? error.name : "UnknownError",
+            errorMessage: message,
+            transactionLogs,
+          });
+          if (buyTrackId) {
+            await appTransactionService
+              .fail(buyTrackId, { errorMessage: message })
+              .catch(() => {});
+          }
+          return {
+            walletPublicKey: wallet.publicKey,
+            status: "FAILED" as const,
+            error: message,
+            solAmountLamports: buyLamports.toString(),
+            quotedTokensOut: null,
+          };
+        }
+      }
+    );
+
+    const toppedUpByWallet = new Map(
+      walletStates
+        .filter((state) => state.topUpLamports > 0)
+        .map((state) => [state.wallet.publicKey, state])
+    );
+    const excessReturnResults = await mapWithConcurrency(
+      wallets.filter((wallet) => toppedUpByWallet.has(wallet.publicKey)),
+      rpcConfig.tuning.transferConcurrency,
+      async (wallet) => {
+        const state = toppedUpByWallet.get(wallet.publicKey);
+        if (!state) {
+          return { walletPublicKey: wallet.publicKey, status: "SKIPPED" as const };
+        }
+        try {
+          const source = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
+          const balanceLamports = await retryRpcWithTimeout(
+            () => connection.getBalance(source.publicKey),
+            rpcConfig.tuning.rpcTimeoutMs
+          );
+          const excessLamports = Math.max(
+            balanceLamports - state.balanceLamports - RETURN_TX_FEE_BUFFER_LAMPORTS,
+            0
+          );
+          if (excessLamports <= 0) {
+            return {
+              walletPublicKey: wallet.publicKey,
+              status: "SKIPPED" as const,
+            };
+          }
+
+          const trackId = await appTransactionService
+            .create({
+              userId,
+              type: "TRANSFER_RETURN",
+              source: "HOLDING",
+              tokenPublicKey: token.publicKey,
+              walletPublicKey: wallet.publicKey,
+              fromAddress: wallet.publicKey,
+              toAddress: mainWalletKeypair.publicKey.toBase58(),
+              solAmount: excessLamports / 1_000_000_000,
+            })
+            .then((result) => result.id)
+            .catch(() => null);
+          const { blockhash, lastValidBlockHeight } =
+            await retryRpcWithTimeout(
+              () => connection.getLatestBlockhash("confirmed"),
+              rpcConfig.tuning.rpcTimeoutMs
+            );
+          const tx = new Transaction().add(
+            SystemProgram.transfer({
+              fromPubkey: source.publicKey,
+              toPubkey: mainWalletKeypair.publicKey,
+              lamports: excessLamports,
+            })
+          );
+          tx.recentBlockhash = blockhash;
+          tx.lastValidBlockHeight = lastValidBlockHeight;
+          tx.feePayer = source.publicKey;
+          const signature = await retryRpcWithTimeout(
+            () =>
+              sendAndConfirmTransaction(connection, tx, [source], {
+                commitment: "confirmed",
+              }),
+            rpcConfig.tuning.confirmTimeoutMs
+          );
+          if (trackId) {
+            await appTransactionService
+              .confirm(trackId, { signature })
+              .catch(() => {});
+          }
+          return {
+            walletPublicKey: wallet.publicKey,
+            status: "SUBMITTED" as const,
+            signature,
+            returnedLamports: excessLamports,
+          };
+        } catch (error) {
+          return {
+            walletPublicKey: wallet.publicKey,
+            status: "FAILED" as const,
+            error: error instanceof Error ? error.message : String(error),
+          };
+        }
+      }
+    );
+
+    const refreshWalletPublicKeys = Array.from(
+      new Set([
+        mainWalletKeypair.publicKey.toBase58(),
+        ...wallets.map((wallet) => wallet.publicKey),
+      ])
+    );
+    try {
+      await walletService.refreshWalletBalances(
+        token.publicKey,
+        userId,
+        refreshWalletPublicKeys,
+        true,
+        "holding.buyByToken"
+      );
+    } catch {}
+    invalidateStatsCache(token.publicKey);
+
+    const submitted = buyResults.filter((result) => result.status === "SUBMITTED");
+    const failed = buyResults.filter((result) => result.status === "FAILED");
+    const returned = excessReturnResults.filter(
+      (result) => result.status === "SUBMITTED"
+    );
+    const returnFailed = excessReturnResults.filter(
+      (result) => result.status === "FAILED"
+    );
+
+    await testRunLogService.appendServerEvent({
+      eventType: "trade_result",
+      source: "holding.service",
+      tokenPublicKey: token.publicKey,
+      action: "holding.buyByToken",
+      userId,
+      wallets: wallets.map((wallet) => wallet.publicKey),
+      expectedValue: {
+        solAmountPerWallet: input.solAmountPerWallet,
+        slippageBps: input.slippageBps,
+      },
+      actualValue: {
+        submitted: submitted.length,
+        failed: failed.length,
+        funded: topUpResults.length,
+        returned: returned.length,
+        returnFailed: returnFailed.length,
+      },
+    });
+
+    if (submitted.length === 0 && failed.length > 0) {
+      const failureMessage = getBuyFailureMessage(
+        failed[0]?.error ?? "transaction failed"
+      );
+      throw new AppError(`Buy failed: ${failureMessage}`, 400, {
+        tokenPublicKey: token.publicKey,
+        failedWallets: failed.map((result) => result.walletPublicKey),
+      });
+    }
+
+    return {
+      tokenPublicKey: token.publicKey,
+      submitted: submitted.length,
+      failed: failed.length,
+      results: buyResults,
+      funding: {
+        funded: topUpResults.length,
+        failed: failedTopUps.length,
+        totalFundedSol: topUpTotalLamports / 1_000_000_000,
+        results: topUpResults,
+      },
+      excessReturn: {
+        returned: returned.length,
+        failed: returnFailed.length,
+        results: excessReturnResults,
+      },
+    };
   },
 
   async sellByToken(input: SellHoldingsByTokenInput, userId: string) {

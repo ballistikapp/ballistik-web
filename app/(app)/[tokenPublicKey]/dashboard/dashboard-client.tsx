@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
@@ -15,12 +15,15 @@ import { DashboardTransactions } from "./dashboard-transactions";
 import { DashboardDefiPools } from "./dashboard-defi-pools";
 import { PriceChart } from "./price-chart";
 import { MonitoringPanel } from "@/components/dashboard/monitoring-panel";
-import { HoldingExitDialog } from "@/components/holdings/holding-exit-dialog";
+import { HoldingBuyDialog } from "@/components/holdings/holding-buy-dialog";
+import { HoldingSellExitDialog } from "@/components/holdings/holding-sell-exit-dialog";
 import { CreatorRewardsCard } from "./creator-rewards-card";
+import { DashboardBuySellActions } from "./dashboard-buy-sell-actions";
 import {
   buildDashboardFullSnapshotPayload,
   buildDashboardSummaryPayload,
 } from "./dashboard-log-payload";
+import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
 
 const POLL_INTERVAL = 30_000;
 const DEBOUNCE_MS = 2_000;
@@ -31,9 +34,20 @@ const HOLDINGS_REFRESH_DEBOUNCE_MS = 1_500;
 const MONITORING_HOLDINGS_SAFETY_INTERVAL_MS = 12_000;
 const MONITORING_ACTIVITY_WINDOW_MS = 60_000;
 const HOLDINGS_STALE_THRESHOLD_MS = 20_000;
+const SELL_DIALOG_REFRESH_STALE_MS = 60_000;
 const ACCOUNT_SUBSCRIPTION_HREF = "/account/subscription";
 
 type MonitoringHealthState = "off" | "healthy" | "degraded" | "failed";
+
+function isRefreshStale(
+  refreshTimestamp: Date | string | null,
+  staleMs: number
+) {
+  return (
+    !refreshTimestamp ||
+    Date.now() - new Date(refreshTimestamp).getTime() > staleMs
+  );
+}
 
 function getStoredMonitoringOverride(tokenPublicKey: string): boolean | null {
   if (typeof window === "undefined") return null;
@@ -79,6 +93,13 @@ export function DashboardClient() {
   const [lastSseEventAt, setLastSseEventAt] = useState<number | null>(null);
   const [grpcConnected, setGrpcConnected] = useState<boolean | null>(null);
   const [nowMs, setNowMs] = useState(() => Date.now());
+  const [buyDialogOpen, setBuyDialogOpen] = useState(false);
+  const [sellExitDialogOpen, setSellExitDialogOpen] = useState(false);
+  const [sellExitInitialTab, setSellExitInitialTab] = useState<"sell" | "exit">(
+    "sell"
+  );
+  const [sellExitShouldRefreshOnOpen, setSellExitShouldRefreshOnOpen] =
+    useState(false);
   const [manualExitDialogOpen, setManualExitDialogOpen] = useState(false);
   const [localExitId, setLocalExitId] = useState<string | null>(null);
   const [dismissedExitId, setDismissedExitId] = useState<string | null>(null);
@@ -138,6 +159,16 @@ export function DashboardClient() {
       },
     }
   );
+  const {
+    data: refreshCache,
+    refetch: refetchRefreshCache,
+  } = trpc.refreshCache.getByScope.useQuery(
+    {
+      tokenPublicKey: tokenPublicKey || "",
+      scope: "HOLDINGS",
+    },
+    { enabled: !!tokenPublicKey && !!tokenData }
+  );
 
   const isRecentLaunch = statsData
     ? shouldDefaultMonitoring(statsData.header.launchCompletedAt)
@@ -164,8 +195,13 @@ export function DashboardClient() {
   const appendTestRunEvent = trpc.testRunLog.appendEvent.useMutation();
   const { mutateAsync: refreshBalances } =
     trpc.wallet.refreshBalances.useMutation();
+  const refreshMainBalance = trpc.wallet.refreshMainBalance.useMutation();
   const { mutateAsync: refreshHoldings } =
     trpc.holding.refreshByToken.useMutation();
+  const { mutateAsync: sellHoldings, isPending: isSelling } =
+    trpc.holding.sellByToken.useMutation();
+  const { mutateAsync: buyHoldings, isPending: isBuying } =
+    trpc.holding.buyByToken.useMutation();
   const { mutateAsync: monitoringRefreshHoldings } =
     trpc.holding.monitoringRefreshByToken.useMutation();
   const { mutateAsync: refreshTransactions } =
@@ -740,6 +776,145 @@ export function DashboardClient() {
     [tokenPublicKey, startExitMutation]
   );
 
+  const handleSell = useCallback(
+    async (
+      walletPublicKeys: string[],
+      sellPercentage: number,
+      closeAta: boolean,
+      returnSolToMainWallet: boolean
+    ) => {
+      if (!tokenPublicKey || walletPublicKeys.length === 0) return;
+      const toastId = toast.loading("Submitting sell transactions...");
+      try {
+        const result = await sellHoldings({
+          tokenPublicKey,
+          walletPublicKeys,
+          sellPercentage,
+          closeAta,
+          returnSolToMainWallet,
+        });
+        toast.success(formatSellHoldingsToast(result, closeAta), {
+          id: toastId,
+        });
+        await Promise.all([
+          refreshHoldings({ tokenPublicKey, walletPublicKeys }),
+          refreshBalances({
+            tokenPublicKey,
+            walletPublicKeys: result.effectiveReturnSolToMainWallet
+              ? undefined
+              : walletPublicKeys,
+            force: true,
+          }),
+          refreshMainBalance.mutateAsync({}),
+        ]);
+        rereadDashboardData();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
+        logDashboardEvent({
+          eventType: "trade_result",
+          action: "sell-from-dashboard",
+          expectedValue: {
+            sellPercentage,
+            closeAta,
+            returnSolToMainWallet,
+          },
+          actualValue: result,
+        });
+        setSellExitDialogOpen(false);
+      } catch (error) {
+        logDashboardEvent({
+          eventType: "run_issue",
+          action: "dashboard-sell",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const message =
+          error instanceof Error ? error.message : "Failed to submit sells";
+        toast.error(message, { id: toastId });
+      }
+    },
+    [
+      logDashboardEvent,
+      refreshBalances,
+      refreshHoldings,
+      refreshMainBalance,
+      rereadDashboardData,
+      sellHoldings,
+      tokenPublicKey,
+      utils,
+    ]
+  );
+
+  const handleBuy = useCallback(
+    async (
+      walletPublicKeys: string[],
+      solAmountPerWallet: number,
+      slippageBps: number
+    ) => {
+      if (!tokenPublicKey || walletPublicKeys.length === 0) return;
+      const toastId = toast.loading("Submitting buy transactions...");
+      try {
+        const result = await buyHoldings({
+          tokenPublicKey,
+          walletPublicKeys,
+          solAmountPerWallet,
+          slippageBps,
+        });
+        const summaryParts = [
+          `${result.submitted} submitted`,
+          `${result.failed} failed`,
+        ];
+        if (result.funding.funded > 0) {
+          summaryParts.push(`${result.funding.funded} funded`);
+        }
+        if (result.excessReturn.returned > 0) {
+          summaryParts.push(`${result.excessReturn.returned} excess returned`);
+        }
+        toast.success(`Buy submitted: ${summaryParts.join(", ")}`, {
+          id: toastId,
+        });
+        await Promise.all([
+          refreshHoldings({ tokenPublicKey, walletPublicKeys }),
+          refreshBalances({
+            tokenPublicKey,
+            walletPublicKeys,
+            force: true,
+          }),
+          refreshMainBalance.mutateAsync({}),
+        ]);
+        rereadDashboardData();
+        invalidateTokenSidebarCounts(utils, tokenPublicKey);
+        logDashboardEvent({
+          eventType: "trade_result",
+          action: "buy-from-dashboard",
+          expectedValue: {
+            solAmountPerWallet,
+            slippageBps,
+          },
+          actualValue: result,
+        });
+        setBuyDialogOpen(false);
+      } catch (error) {
+        logDashboardEvent({
+          eventType: "run_issue",
+          action: "dashboard-buy",
+          error: error instanceof Error ? error.message : String(error),
+        });
+        const message =
+          error instanceof Error ? error.message : "Failed to submit buys";
+        toast.error(message, { id: toastId });
+      }
+    },
+    [
+      buyHoldings,
+      logDashboardEvent,
+      refreshBalances,
+      refreshHoldings,
+      refreshMainBalance,
+      rereadDashboardData,
+      tokenPublicKey,
+      utils,
+    ]
+  );
+
   const handleCancelExit = useCallback(async () => {
     if (!activeExitId) return;
     await cancelExitMutation.mutateAsync({ exitId: activeExitId });
@@ -749,18 +924,25 @@ export function DashboardClient() {
   const exitData = exitStatusQuery.data ?? activeExitQuery.data ?? null;
   const exitStatus = exitData?.status;
   const hasHoldings = (statsData?.holdingsBreakdown.userTotalTokens ?? 0) > 0;
+  const holdingsRefreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const shouldAutoOpen =
     Boolean(activeExitId) && dismissedExitId !== activeExitId;
   const isExitDialogOpen = manualExitDialogOpen || shouldAutoOpen;
 
   const handleOpenExitDialog = useCallback(() => {
     if (!hasHoldings) return;
+    setSellExitInitialTab("sell");
+    setSellExitShouldRefreshOnOpen(
+      isRefreshStale(holdingsRefreshTimestamp, SELL_DIALOG_REFRESH_STALE_MS)
+    );
+    setSellExitDialogOpen(true);
     setManualExitDialogOpen(true);
     setDismissedExitId(null);
-  }, [hasHoldings]);
+  }, [hasHoldings, holdingsRefreshTimestamp]);
 
-  const handleExitDialogOpenChange = useCallback(
+  const handleSellExitDialogOpenChange = useCallback(
     (open: boolean) => {
+      setSellExitDialogOpen(open);
       setManualExitDialogOpen(open);
       if (open) {
         setDismissedExitId(null);
@@ -795,6 +977,14 @@ export function DashboardClient() {
     ).length ?? 0;
   const totalWallets = statsData?.holdingsBreakdown.userWallets.length ?? 0;
   const totalBalance = statsData?.holdingsBreakdown.userTotalTokens ?? 0;
+  const sellDialogInitialHoldings = useMemo(
+    () =>
+      statsData?.holdingsBreakdown.userWallets.map((wallet) => ({
+        walletPublicKey: wallet.publicKey,
+        tokenBalance: Number(wallet.tokenBalance),
+      })) ?? [],
+    [statsData?.holdingsBreakdown.userWallets]
+  );
 
   useEffect(() => {
     if (
@@ -924,28 +1114,32 @@ export function DashboardClient() {
             isRefreshing={isAnyRefreshActive}
             refreshStatusLabel={refreshStatusLabel}
           />
-          <DashboardStats
-            header={statsData.header}
-            metrics={statsData.metrics}
-            onOpenExitDialog={handleOpenExitDialog}
-            exitDisabled={
-              !hasHoldings ||
-              startExitMutation.isPending ||
-              exitStatus === "RUNNING"
-            }
-            exitPending={startExitMutation.isPending}
-          />
-          <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-2 @5xl/main:items-stretch">
-            <div className="min-w-0">
+          <DashboardStats header={statsData.header} metrics={statsData.metrics} />
+          <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-8 @5xl/main:items-stretch">
+            <div className="min-w-0 @5xl/main:col-span-3">
               <DashboardOperations
                 operations={statsData.operations}
                 tokenPublicKey={tokenPublicKey}
               />
             </div>
-            <div className="min-w-0 empty:hidden">
+            <div className="min-w-0 empty:hidden @5xl/main:col-span-3">
               <CreatorRewardsCard
                 tokenPublicKey={tokenPublicKey}
                 onClaimSuccess={rereadDashboardData}
+              />
+            </div>
+            <div className="min-w-0 @5xl/main:col-span-2">
+              <DashboardBuySellActions
+                onOpenBuyDialog={() => setBuyDialogOpen(true)}
+                onOpenExitDialog={handleOpenExitDialog}
+                buyDisabled={isBuying || !tokenPublicKey}
+                hasHoldings={hasHoldings}
+                exitDisabled={
+                  !hasHoldings ||
+                  isSelling ||
+                  startExitMutation.isPending ||
+                  exitStatus === "RUNNING"
+                }
               />
             </div>
           </div>
@@ -966,18 +1160,38 @@ export function DashboardClient() {
             transactions={statsData.recentTransactions}
             tokenPublicKey={tokenPublicKey}
           />
-          <HoldingExitDialog
-            open={isExitDialogOpen}
-            onOpenChange={handleExitDialogOpenChange}
-            exit={exitData}
+          <HoldingSellExitDialog
+            open={sellExitDialogOpen || isExitDialogOpen}
+            onOpenChange={handleSellExitDialogOpenChange}
+            tokenPublicKey={tokenPublicKey}
             tokenSymbol={tokenData.symbol}
+            initialTab={
+              isExitDialogOpen && !sellExitDialogOpen ? "exit" : sellExitInitialTab
+            }
+            initialHoldings={sellDialogInitialHoldings}
+            shouldRefreshOnOpen={sellExitShouldRefreshOnOpen}
+            exit={exitData}
             totalWallets={totalWallets}
             walletsWithBalance={walletsWithBalance}
             totalBalance={totalBalance}
-            isSubmitting={startExitMutation.isPending}
-            isCancelling={cancelExitMutation.isPending}
-            onConfirm={handleExit}
-            onCancel={handleCancelExit}
+            isSelling={isSelling}
+            isStartingExit={startExitMutation.isPending}
+            isCancellingExit={cancelExitMutation.isPending}
+            onSell={handleSell}
+            onExit={handleExit}
+            onCancelExit={handleCancelExit}
+            onHoldingsRefreshed={() => {
+              refetchRefreshCache();
+              rereadDashboardData();
+            }}
+          />
+          <HoldingBuyDialog
+            open={buyDialogOpen}
+            onOpenChange={setBuyDialogOpen}
+            tokenPublicKey={tokenPublicKey}
+            tokenSymbol={tokenData.symbol}
+            isBuying={isBuying}
+            onBuy={handleBuy}
           />
         </>
       )}

@@ -41,6 +41,17 @@ export type SellHoldingsByTokenInput = z.infer<
   typeof sellHoldingsByTokenSchema
 >;
 
+export const buyHoldingsByTokenSchema = z.object({
+  tokenPublicKey: z.string().min(1, "Token public key is required"),
+  walletPublicKeys: z.array(z.string().min(1)).min(1),
+  solAmountPerWallet: z.number().min(0.001).max(10),
+  slippageBps: z.number().int().min(0).max(10_000).default(500),
+});
+
+export type BuyHoldingsByTokenInput = z.infer<
+  typeof buyHoldingsByTokenSchema
+>;
+
 export const startExitSchema = z.object({
   tokenPublicKey: z.string().min(1, "Token public key is required"),
   jitoTipSol: z.number().min(0).max(1).default(0.005),

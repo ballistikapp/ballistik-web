@@ -143,7 +143,7 @@ export function CreatorRewardsCard({
           </div>
           <div className="flex shrink-0 items-center gap-2">
             <Button
-              variant="default"
+              variant="outline"
               size="sm"
               className="h-8 px-3 text-xs font-semibold"
               onClick={handleClaim}

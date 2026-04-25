@@ -78,7 +78,7 @@ export function MonitoringPanel({
     const tick = () => {
       if (dataUpdatedAt > 0) {
         const elapsed = Math.floor((Date.now() - dataUpdatedAt) / 1000);
-        setSecondsAgo(elapsed);
+        setSecondsAgo((current) => (current === elapsed ? current : elapsed));
       }
     };
 
