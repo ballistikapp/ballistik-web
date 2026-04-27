@@ -1,4 +1,5 @@
 import "server-only";
+import { BorshCoder, EventParser, type Idl } from "@coral-xyz/anchor";
 import { Prisma, prisma } from "@/lib/prisma";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
@@ -6,6 +7,7 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { getPumpIdl, PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
 import {
   LAMPORTS_PER_SOL,
   type ParsedTransactionWithMeta,
@@ -35,6 +37,7 @@ type ParsedTransactionResult = {
   feeAmount: number;
   slot: bigint | null;
   blockTime: Date | null;
+  amountSource: "PUMP_EVENT" | "BALANCE_DELTA";
 };
 
 export class PendingSignatureIngestionError extends Error {
@@ -66,9 +69,27 @@ type TokenTransactionListRow = {
   updatedAt: Date;
 };
 
+type TokenTransactionMetrics = {
+  buys: { total: number; owned: number; external: number };
+  sells: { total: number; owned: number; external: number };
+  volume: { total: number; owned: number; external: number };
+  traders: { total: number; owned: number; external: number };
+};
+
+type PumpTradeEvent = {
+  mint: string;
+  user: string;
+  isBuy: boolean;
+  solAmount: number;
+  tokenAmount: number;
+};
+
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const PARSE_RETRY_DELAYS_MS = [200, 500];
 const TOKEN_TRANSACTION_UPDATE_BATCH_SIZE = 50;
+const DEFAULT_PUMP_TOKEN_DECIMALS = 6;
+
+let pumpEventParser: EventParser | null = null;
 
 type TokenBalanceEntry = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
@@ -104,6 +125,18 @@ function sumTokenBalancesByOwner(
     totals.set(balance.owner, (totals.get(balance.owner) ?? 0) + amount);
   });
   return totals;
+}
+
+function getTokenDecimals(
+  tx: ParsedTransactionWithMeta,
+  mint: string
+): number {
+  const balances = [
+    ...(tx.meta?.preTokenBalances ?? []),
+    ...(tx.meta?.postTokenBalances ?? []),
+  ];
+  const balance = balances.find((entry) => entry.mint === mint);
+  return balance?.uiTokenAmount?.decimals ?? DEFAULT_PUMP_TOKEN_DECIMALS;
 }
 
 function resolveAccountKey(
@@ -160,6 +193,184 @@ function getWrappedSolDiffForOwner(
     WRAPPED_SOL_MINT
   );
   return postBalance - preBalance;
+}
+
+function getPumpEventParser() {
+  if (!pumpEventParser) {
+    pumpEventParser = new EventParser(
+      PUMP_PROGRAM_ID,
+      new BorshCoder(getPumpIdl() as Idl)
+    );
+  }
+  return pumpEventParser;
+}
+
+function asBigInt(value: unknown): bigint | null {
+  if (typeof value === "bigint") return value;
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return BigInt(Math.trunc(value));
+  }
+  if (typeof value === "string" && value.length > 0) {
+    try {
+      return BigInt(value);
+    } catch {
+      return null;
+    }
+  }
+  if (
+    value &&
+    typeof value === "object" &&
+    "toString" in value &&
+    typeof value.toString === "function"
+  ) {
+    try {
+      return BigInt(value.toString());
+    } catch {
+      return null;
+    }
+  }
+  return null;
+}
+
+function asPublicKeyString(value: unknown): string | null {
+  if (typeof value === "string") return value;
+  if (
+    value &&
+    typeof value === "object" &&
+    "toBase58" in value &&
+    typeof value.toBase58 === "function"
+  ) {
+    return value.toBase58();
+  }
+  return null;
+}
+
+function numbersDiffer(a: number, b: number, epsilon: number) {
+  return Math.abs(a - b) > epsilon;
+}
+
+function parsePumpTradeEvents(
+  tx: ParsedTransactionWithMeta,
+  tokenPublicKey: string
+): PumpTradeEvent[] {
+  const logs = tx.meta?.logMessages;
+  if (!logs?.length) return [];
+
+  const tokenDecimals = getTokenDecimals(tx, tokenPublicKey);
+  const tokenDivisor = 10 ** tokenDecimals;
+  const events: PumpTradeEvent[] = [];
+
+  try {
+    for (const event of getPumpEventParser().parseLogs(logs)) {
+      if (event.name !== "TradeEvent") continue;
+      const data = event.data as Record<string, unknown>;
+      const mint = asPublicKeyString(data.mint);
+      const user = asPublicKeyString(data.user);
+      const solRaw = asBigInt(data.sol_amount ?? data.solAmount);
+      const tokenRaw = asBigInt(data.token_amount ?? data.tokenAmount);
+      const isBuy = data.is_buy ?? data.isBuy;
+
+      if (
+        mint !== tokenPublicKey ||
+        !user ||
+        solRaw === null ||
+        tokenRaw === null ||
+        typeof isBuy !== "boolean"
+      ) {
+        continue;
+      }
+
+      events.push({
+        mint,
+        user,
+        isBuy,
+        solAmount: Number(solRaw) / LAMPORTS_PER_SOL,
+        tokenAmount: Number(tokenRaw) / tokenDivisor,
+      });
+    }
+  } catch {
+    return [];
+  }
+
+  return events;
+}
+
+function takeMatchingTradeEvent(
+  events: PumpTradeEvent[],
+  owner: string,
+  isBuy: boolean
+) {
+  const index = events.findIndex(
+    (event) => event.user === owner && event.isBuy === isBuy
+  );
+  if (index < 0) return null;
+  const [event] = events.splice(index, 1);
+  return event ?? null;
+}
+
+function emptyTransactionMetrics(): TokenTransactionMetrics {
+  return {
+    buys: { total: 0, owned: 0, external: 0 },
+    sells: { total: 0, owned: 0, external: 0 },
+    volume: { total: 0, owned: 0, external: 0 },
+    traders: { total: 0, owned: 0, external: 0 },
+  };
+}
+
+async function getTokenTransactionMetrics(
+  where: Prisma.TokenTransactionWhereInput
+): Promise<TokenTransactionMetrics> {
+  const metrics = emptyTransactionMetrics();
+  const [byTypeAndOwnership, traderRows] = await Promise.all([
+    prisma.tokenTransaction.groupBy({
+      by: ["transactionType", "isOwned"],
+      where: {
+        ...where,
+        transactionType: { in: ["BUY", "SELL"] },
+      },
+      _sum: { solAmount: true },
+      _count: { _all: true },
+    }),
+    prisma.tokenTransaction.groupBy({
+      by: ["walletPublicKey", "isOwned"],
+      where,
+      _count: { _all: true },
+    }),
+  ]);
+
+  for (const row of byTypeAndOwnership) {
+    const bucket =
+      row.transactionType === "BUY"
+        ? metrics.buys
+        : row.transactionType === "SELL"
+          ? metrics.sells
+          : null;
+    if (!bucket) continue;
+
+    const count = row._count._all;
+    const volume = Number(row._sum.solAmount ?? 0);
+    bucket.total += count;
+    metrics.volume.total += volume;
+
+    if (row.isOwned) {
+      bucket.owned += count;
+      metrics.volume.owned += volume;
+    } else {
+      bucket.external += count;
+      metrics.volume.external += volume;
+    }
+  }
+
+  for (const row of traderRows) {
+    metrics.traders.total += 1;
+    if (row.isOwned) {
+      metrics.traders.owned += 1;
+    } else {
+      metrics.traders.external += 1;
+    }
+  }
+
+  return metrics;
 }
 
 async function getAllowedWallets(
@@ -310,12 +521,39 @@ function parseTransactionForTokenOwners(
   const txBlockTime = tx.blockTime ? new Date(tx.blockTime * 1000) : null;
   const txFee = (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL;
   const txFailed = Boolean(tx.meta?.err);
+  const tradeEvents = parsePumpTradeEvents(tx, tokenPublicKey);
 
   owners.forEach((owner) => {
     const preAmount = preByOwner.get(owner) ?? 0;
     const postAmount = postByOwner.get(owner) ?? 0;
     const tokenDiff = postAmount - preAmount;
     if (tokenDiff === 0) return;
+
+    const matchedTrade = takeMatchingTradeEvent(
+      tradeEvents,
+      owner,
+      tokenDiff > 0
+    );
+    if (matchedTrade) {
+      const transactionType = matchedTrade.isBuy ? "BUY" : "SELL";
+      const solAmount = matchedTrade.solAmount;
+      const tokenAmount = matchedTrade.tokenAmount;
+      results.push({
+        walletPublicKey: owner,
+        transactionType,
+        status: txFailed ? "FAILED" : "CONFIRMED",
+        transactionSignature: signature,
+        solAmount,
+        tokenAmount,
+        pricePerToken: tokenAmount ? solAmount / tokenAmount : 0,
+        slippageBps: 0,
+        feeAmount: txFee,
+        slot: txSlot,
+        blockTime: txBlockTime,
+        amountSource: "PUMP_EVENT",
+      });
+      return;
+    }
 
     const systemSolDiff = getSystemSolDiff(tx, owner);
     const wrappedSolDiff = getWrappedSolDiffForOwner(tx, owner);
@@ -339,6 +577,7 @@ function parseTransactionForTokenOwners(
         feeAmount: txFee,
         slot: txSlot,
         blockTime: txBlockTime,
+        amountSource: "BALANCE_DELTA",
       });
       return;
     }
@@ -357,6 +596,7 @@ function parseTransactionForTokenOwners(
       feeAmount: txFee,
       slot: txSlot,
       blockTime: txBlockTime,
+      amountSource: "BALANCE_DELTA",
     });
   });
 
@@ -385,6 +625,15 @@ export const transactionService = {
     const pageSize = input.pageSize ?? 25;
     const skip = (page - 1) * pageSize;
     const take = pageSize;
+    const flatWhere: Prisma.TokenTransactionWhereInput = {
+      tokenPublicKey: token.publicKey,
+      AND: [
+        { walletPublicKey: { not: bondingCurvePublicKey } },
+        ...(input.walletPublicKey
+          ? [{ walletPublicKey: input.walletPublicKey }]
+          : []),
+      ],
+    };
     const { rows, totalCount } = groupBySignature
       ? await (async () => {
           const [groupedRows, groupedCountRows] = await Promise.all([
@@ -442,12 +691,7 @@ export const transactionService = {
       : await (async () => {
           const [flatRows, count] = await Promise.all([
             prisma.tokenTransaction.findMany({
-              where: {
-                tokenPublicKey: token.publicKey,
-                ...(input.walletPublicKey
-                  ? { walletPublicKey: input.walletPublicKey }
-                  : {}),
-              },
+              where: flatWhere,
               select: {
                 id: true,
                 walletPublicKey: true,
@@ -466,18 +710,15 @@ export const transactionService = {
                 createdAt: true,
                 updatedAt: true,
               },
-              orderBy: [{ slot: { sort: "desc", nulls: "last" } }, { blockTime: "desc" }, { createdAt: "desc" }],
+              orderBy: [
+                { slot: { sort: "desc", nulls: "last" } },
+                { blockTime: "desc" },
+                { createdAt: "desc" },
+              ],
               skip,
               take,
             }),
-            prisma.tokenTransaction.count({
-              where: {
-                tokenPublicKey: token.publicKey,
-                ...(input.walletPublicKey
-                  ? { walletPublicKey: input.walletPublicKey }
-                  : {}),
-              },
-            }),
+            prisma.tokenTransaction.count({ where: flatWhere }),
           ]);
 
           return {
@@ -491,6 +732,7 @@ export const transactionService = {
             totalCount: count,
           };
         })();
+    const metrics = await getTokenTransactionMetrics(flatWhere);
 
     const items = rows.map((row) => ({
       ...row,
@@ -500,7 +742,7 @@ export const transactionService = {
       },
     }));
 
-    return { items, totalCount };
+    return { items, totalCount, metrics };
   },
 
   async ingestTokenSignatures(input: {
@@ -657,10 +899,16 @@ export const transactionService = {
         const existingPrice = Number(existingTx.pricePerToken ?? 0);
         const existingSol = Number(existingTx.solAmount ?? 0);
         const existingToken = Number(existingTx.tokenAmount ?? 0);
+        const hasPumpEventCorrection =
+          transaction.amountSource === "PUMP_EVENT" &&
+          (numbersDiffer(existingSol, transaction.solAmount, 0.5 / LAMPORTS_PER_SOL) ||
+            numbersDiffer(existingToken, transaction.tokenAmount, 0.000001) ||
+            numbersDiffer(existingPrice, transaction.pricePerToken, 0.000000000001));
         const shouldUpdate =
           (existingPrice === 0 && transaction.pricePerToken > 0) ||
           (existingSol === 0 && transaction.solAmount > 0) ||
-          (existingToken === 0 && transaction.tokenAmount > 0);
+          (existingToken === 0 && transaction.tokenAmount > 0) ||
+          hasPumpEventCorrection;
         if (!shouldUpdate) return null;
         return {
           id: existingTx.id,

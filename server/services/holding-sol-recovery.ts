@@ -9,6 +9,7 @@ import {
 } from "@solana/web3.js";
 import bs58 from "bs58";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import {
   computeRecoverableLamports,
@@ -226,22 +227,46 @@ export async function recoverWalletSolBalances({
           ? mainWalletKeypair.publicKey
           : owner.publicKey;
 
-      const returnTrackId = userId
-        ? await appTransactionService
+      const mainPkRecovery = mainWalletKeypair.publicKey.toBase58();
+      const intentSolRecovery = lamports / 1_000_000_000;
+      const isSelfRecovery = wallet.publicKey === mainPkRecovery;
+      const returnTrackRows: { id: string; walletPublicKey: string }[] = [];
+      if (userId) {
+        const senderId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_RETURN",
+            source,
+            tokenPublicKey,
+            walletPublicKey: wallet.publicKey,
+            fromAddress: wallet.publicKey,
+            toAddress: mainPkRecovery,
+            intentSolAmount: isSelfRecovery ? 0 : -intentSolRecovery,
+            referenceId,
+          })
+          .then((result) => result.id)
+          .catch(() => null);
+        if (senderId)
+          returnTrackRows.push({ id: senderId, walletPublicKey: wallet.publicKey });
+        if (!isSelfRecovery) {
+          const receiverId = await appTransactionService
             .create({
               userId,
               type: "TRANSFER_RETURN",
               source,
               tokenPublicKey,
-              walletPublicKey: wallet.publicKey,
+              walletPublicKey: mainPkRecovery,
               fromAddress: wallet.publicKey,
-              toAddress: mainWalletKeypair.publicKey.toBase58(),
-              solAmount: lamports / 1_000_000_000,
+              toAddress: mainPkRecovery,
+              intentSolAmount: intentSolRecovery,
               referenceId,
             })
             .then((result) => result.id)
-            .catch(() => null)
-        : null;
+            .catch(() => null);
+          if (receiverId)
+            returnTrackRows.push({ id: receiverId, walletPublicKey: mainPkRecovery });
+        }
+      }
 
       try {
         const signature = await sendAndConfirmTransaction(
@@ -254,10 +279,18 @@ export async function recoverWalletSolBalances({
             commitment: "confirmed",
           }
         );
-        if (returnTrackId) {
+        if (returnTrackRows.length > 0) {
           await appTransactionService
-            .confirm(returnTrackId, { signature })
+            .confirmMany(
+              returnTrackRows.map((r) => r.id),
+              { signature }
+            )
             .catch(() => {});
+          await settleSignature({
+            signature,
+            rows: returnTrackRows,
+            connection,
+          }).catch(() => {});
         }
         await testRunLogService.appendServerEvent({
           eventType: "wallet_transaction",
@@ -283,9 +316,12 @@ export async function recoverWalletSolBalances({
         });
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        if (returnTrackId) {
+        if (returnTrackRows.length > 0) {
           await appTransactionService
-            .fail(returnTrackId, { errorMessage: message })
+            .failMany(
+              returnTrackRows.map((r) => r.id),
+              { errorMessage: message }
+            )
             .catch(() => {});
         }
         results.push({
@@ -401,22 +437,45 @@ export async function sweepSystemDevRealizedSol({
   sweepTx.lastValidBlockHeight = lastValidBlockHeight;
   sweepTx.feePayer = systemDevKeypair.publicKey;
 
-  const sweepTrackId = userId
-    ? await appTransactionService
+  const sweepDevPk = systemDevKeypair.publicKey.toBase58();
+  const sweepMainPk = mainWalletKeypair.publicKey.toBase58();
+  const sweepIntent = sweepLamports / 1_000_000_000;
+  const sweepIsSelf = sweepDevPk === sweepMainPk;
+  const sweepTrackRows: { id: string; walletPublicKey: string }[] = [];
+  if (userId) {
+    const senderId = await appTransactionService
+      .create({
+        userId,
+        type: "TRANSFER_RETURN",
+        source,
+        tokenPublicKey,
+        walletPublicKey: sweepDevPk,
+        fromAddress: sweepDevPk,
+        toAddress: sweepMainPk,
+        intentSolAmount: sweepIsSelf ? 0 : -sweepIntent,
+        referenceId,
+      })
+      .then((r) => r.id)
+      .catch(() => null);
+    if (senderId) sweepTrackRows.push({ id: senderId, walletPublicKey: sweepDevPk });
+    if (!sweepIsSelf) {
+      const receiverId = await appTransactionService
         .create({
           userId,
           type: "TRANSFER_RETURN",
           source,
           tokenPublicKey,
-          walletPublicKey: systemDevKeypair.publicKey.toBase58(),
-          fromAddress: systemDevKeypair.publicKey.toBase58(),
-          toAddress: mainWalletKeypair.publicKey.toBase58(),
-          solAmount: sweepLamports / 1_000_000_000,
+          walletPublicKey: sweepMainPk,
+          fromAddress: sweepDevPk,
+          toAddress: sweepMainPk,
+          intentSolAmount: sweepIntent,
           referenceId,
         })
-        .then((result) => result.id)
-        .catch(() => null)
-    : null;
+        .then((r) => r.id)
+        .catch(() => null);
+      if (receiverId) sweepTrackRows.push({ id: receiverId, walletPublicKey: sweepMainPk });
+    }
+  }
 
   try {
     const signature = await sendAndConfirmTransaction(
@@ -428,10 +487,14 @@ export async function sweepSystemDevRealizedSol({
       }
     );
 
-    if (sweepTrackId) {
+    if (sweepTrackRows.length > 0) {
       await appTransactionService
-        .confirm(sweepTrackId, { signature })
+        .confirmMany(
+          sweepTrackRows.map((r) => r.id),
+          { signature }
+        )
         .catch(() => {});
+      await settleSignature({ signature, rows: sweepTrackRows, connection }).catch(() => {});
     }
 
     await testRunLogService.appendServerEvent({
@@ -461,9 +524,12 @@ export async function sweepSystemDevRealizedSol({
     };
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
-    if (sweepTrackId) {
+    if (sweepTrackRows.length > 0) {
       await appTransactionService
-        .fail(sweepTrackId, { errorMessage: message })
+        .failMany(
+          sweepTrackRows.map((r) => r.id),
+          { errorMessage: message }
+        )
         .catch(() => {});
     }
     throw error;

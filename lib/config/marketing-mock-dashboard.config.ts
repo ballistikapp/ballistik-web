@@ -29,29 +29,32 @@ const activityBuyVolume = 9200;
 const activitySellVolume = 9200;
 const activityTransactionCount = 24_320;
 
-/** User P&L components — net = sell + rewards - buy - fees - creation */
-const pnlTotalBuyVolume = 850;
-const pnlTotalSellVolume = 3200;
-const pnlCreatorRewardsClaimedSol = 180;
-const pnlPlatformFees = 12;
-const pnlLaunchFees = 18;
-const pnlExitFees = 4;
-const pnlVolumeBotFees = 8;
-const pnlJitoTipsSol = 3;
-const pnlTotalFees = round4(
-  pnlPlatformFees +
-    pnlLaunchFees +
-    pnlExitFees +
-    pnlVolumeBotFees +
-    pnlJitoTipsSol
-);
-const pnlCreationCostSol = 12;
+/** User P&L components — signed wallet deltas (net = sum of all). */
+const pnlTokenBuys = -850;
+const pnlTokenSells = 3200;
+const pnlTokenCreates = -1;
+const pnlPlatformFees = -12;
+const pnlLaunchFees = -18;
+const pnlExitFees = -4;
+const pnlVolumeBotFees = -8;
+const pnlWalletFees = -2;
+const pnlJitoTips = -3;
+const pnlTransfers = -0.05;
+const pnlAtaOps = 0.02;
+const pnlTokenOps = -0.005;
+const pnlRewardsClaim = 180;
+const pnlRewardsPayout = -0.0001;
+const pnlCreatorRewards = round4(pnlRewardsClaim + pnlRewardsPayout);
 const pnlNet = round4(
-  pnlTotalSellVolume +
-    pnlCreatorRewardsClaimedSol -
-    pnlTotalBuyVolume -
-    pnlTotalFees -
-    pnlCreationCostSol
+  pnlTokenBuys +
+    pnlTokenSells +
+    pnlTokenCreates +
+    pnlPlatformFees +
+    pnlJitoTips +
+    pnlTransfers +
+    pnlAtaOps +
+    pnlTokenOps +
+    pnlCreatorRewards
 );
 
 function buildPriceHistory(
@@ -105,9 +108,9 @@ export const marketingMockDashboard = {
     },
     pnl: {
       net: pnlNet,
-      totalBuyVolume: pnlTotalBuyVolume,
-      totalSellVolume: pnlTotalSellVolume,
-      creatorRewardsClaimedSol: pnlCreatorRewardsClaimedSol,
+      tokenBuys: pnlTokenBuys,
+      tokenSells: pnlTokenSells,
+      tokenCreates: pnlTokenCreates,
       platformFees: pnlPlatformFees,
       launchFees: pnlLaunchFees,
       launchFeeBreakdown: {
@@ -121,9 +124,16 @@ export const marketingMockDashboard = {
       },
       exitFees: pnlExitFees,
       volumeBotFees: pnlVolumeBotFees,
-      jitoTipsSol: pnlJitoTipsSol,
-      totalFees: pnlTotalFees,
-      creationCostSol: pnlCreationCostSol,
+      walletFees: pnlWalletFees,
+      jitoTips: pnlJitoTips,
+      transfers: pnlTransfers,
+      ataOps: pnlAtaOps,
+      tokenOps: pnlTokenOps,
+      creatorRewards: pnlCreatorRewards,
+      rewardsClaim: pnlRewardsClaim,
+      rewardsPayout: pnlRewardsPayout,
+      unsettledRowCount: 0,
+      isComplete: true,
     },
     activity: {
       totalVolume: round4(activityBuyVolume + activitySellVolume),

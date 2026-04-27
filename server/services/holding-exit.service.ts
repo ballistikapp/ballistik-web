@@ -35,6 +35,7 @@ import type {
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 import { UserPlan } from "@/lib/generated/prisma/client";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
@@ -69,6 +70,35 @@ type WalletBalance = {
   wallet: WalletRecord;
   balance: bigint;
 };
+
+async function getWalletSolDeltaFromConfirmedTransaction(
+  connection: Connection,
+  signature: string,
+  walletPublicKey: string
+) {
+  let tx: Awaited<ReturnType<Connection["getTransaction"]>> = null;
+
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    tx = await connection.getTransaction(signature, {
+      commitment: "confirmed",
+      maxSupportedTransactionVersion: 0,
+    });
+    if (tx) break;
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+  }
+
+  if (!tx?.meta) return null;
+
+  const accountKeys = tx.transaction.message.getAccountKeys();
+  const walletIndex = accountKeys.staticAccountKeys.findIndex(
+    (key) => key.toBase58() === walletPublicKey
+  );
+  if (walletIndex < 0) return null;
+
+  const preLamports = tx.meta.preBalances[walletIndex] ?? 0;
+  const postLamports = tx.meta.postBalances[walletIndex] ?? 0;
+  return (postLamports - preLamports) / 1_000_000_000;
+}
 
 type ExitSummary = {
   totalWallets: number;
@@ -384,30 +414,56 @@ async function fundUnderfundedWallets({
     tx.feePayer = mainWallet.publicKey;
 
     try {
-      const batchTrackIds: string[] = [];
+      const fundTrackRows: { id: string; walletPublicKey: string }[] = [];
+      const mainPk = mainWallet.publicKey.toBase58();
       if (userId) {
+        // Sender row on main wallet — captures the funding tx fee + total outflow
+        const senderId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_FUND",
+            source: "EXIT",
+            tokenPublicKey,
+            walletPublicKey: mainPk,
+            fromAddress: mainPk,
+            intentSolAmount: -batchTotal / 1_000_000_000,
+            referenceId: exitId,
+          })
+          .then((r) => r.id)
+          .catch(() => null);
+        if (senderId) fundTrackRows.push({ id: senderId, walletPublicKey: mainPk });
         for (const item of batch) {
+          const recvPk = item.publicKey.toBase58();
+          if (recvPk === mainPk) continue;
           const id = await appTransactionService
             .create({
               userId,
               type: "TRANSFER_FUND",
               source: "EXIT",
               tokenPublicKey,
-              walletPublicKey: mainWallet.publicKey.toBase58(),
-              fromAddress: mainWallet.publicKey.toBase58(),
-              toAddress: item.publicKey.toBase58(),
-              solAmount: item.needed / 1_000_000_000,
+              walletPublicKey: recvPk,
+              fromAddress: mainPk,
+              toAddress: recvPk,
+              intentSolAmount: item.needed / 1_000_000_000,
               referenceId: exitId,
             })
             .then((r) => r.id)
             .catch(() => null);
-          if (id) batchTrackIds.push(id);
+          if (id) fundTrackRows.push({ id, walletPublicKey: recvPk });
         }
       }
       const signature = await sendAndConfirmTransaction(connection, tx, [mainWallet], {
         commitment: "confirmed",
       });
-      if (batchTrackIds.length > 0) await appTransactionService.confirmMany(batchTrackIds, { signature }).catch(() => {});
+      if (fundTrackRows.length > 0) {
+        await appTransactionService
+          .confirmMany(
+            fundTrackRows.map((r) => r.id),
+            { signature }
+          )
+          .catch(() => {});
+        await settleSignature({ signature, rows: fundTrackRows, connection }).catch(() => {});
+      }
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "holding-exit.service",
@@ -636,14 +692,16 @@ async function closeAtasAndRecoverSol({
             );
             closeTx.recentBlockhash = latestBlockhash.blockhash;
             closeTx.feePayer = mainWallet.publicKey;
+            const ataMainPk = mainWallet.publicKey.toBase58();
             const ataCloseTrackId = userId
               ? await appTransactionService.create({
                   userId,
                   type: "ACCOUNT_ATA_CLOSE",
                   source: "EXIT",
                   tokenPublicKey,
-                  walletPublicKey: wallet.publicKey,
+                  walletPublicKey: ataMainPk,
                   fromAddress: wallet.publicKey,
+                  toAddress: ataMainPk,
                   referenceId: exitId,
                 }).then((r) => r.id).catch(() => null)
               : null;
@@ -651,7 +709,14 @@ async function closeAtasAndRecoverSol({
               mainWallet,
               owner,
             ]);
-            if (ataCloseTrackId) await appTransactionService.confirm(ataCloseTrackId, { signature }).catch(() => {});
+            if (ataCloseTrackId) {
+              await appTransactionService.confirm(ataCloseTrackId, { signature }).catch(() => {});
+              await settleSignature({
+                signature,
+                rows: [{ id: ataCloseTrackId, walletPublicKey: ataMainPk }],
+                connection,
+              }).catch(() => {});
+            }
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "holding-exit.service",
@@ -872,6 +937,8 @@ async function runExitFlow(exitId: string) {
           { seller: seller.publicKey }
         );
 
+        let bundleSellTrackId: string | null = null;
+        let tipperTrackId: string | null = null;
         try {
           checkCancelled();
           const { transactions, signerGroups } = await buildExitBundleTransactions({
@@ -884,19 +951,40 @@ async function runExitFlow(exitId: string) {
           });
 
           checkCancelled();
-          const bundleSellTrackId = await appTransactionService
+          const sellerPk = seller.publicKey;
+          const tipperPk = mainKeypair.publicKey.toBase58();
+          bundleSellTrackId = await appTransactionService
             .create({
               userId: exit.userId,
               type: "TRADE_SELL",
               source: "EXIT",
               tokenPublicKey: exit.tokenPublicKey,
-              walletPublicKey: seller.publicKey,
-              fromAddress: seller.publicKey,
+              walletPublicKey: sellerPk,
+              fromAddress: sellerPk,
               tokenAmount: Number(chunkTotal),
               referenceId: exitId,
             })
             .then((r) => r.id)
             .catch(() => null);
+          // Tipper row on the tip-bearing (last) signature, only when the
+          // tipper is a different wallet from the seller (avoids unique
+          // [signature, walletPublicKey] conflict).
+          tipperTrackId =
+            tipLamports > 0 && tipperPk !== sellerPk
+              ? await appTransactionService
+                  .create({
+                    userId: exit.userId,
+                    type: "JITO_TIP",
+                    source: "EXIT",
+                    tokenPublicKey: exit.tokenPublicKey,
+                    walletPublicKey: tipperPk,
+                    fromAddress: tipperPk,
+                    intentSolAmount: -tipLamports / 1_000_000_000,
+                    referenceId: exitId,
+                  })
+                  .then((r) => r.id)
+                  .catch(() => null)
+              : null;
           const bundleResult = await sendJitoBundle(
             transactions,
             signerGroups,
@@ -910,10 +998,33 @@ async function runExitFlow(exitId: string) {
             }
           );
           const sellSignature = bundleResult.signatures.at(-1) ?? null;
-          if (bundleSellTrackId && sellSignature) {
-            await appTransactionService
-              .confirm(bundleSellTrackId, { signature: sellSignature })
-              .catch(() => {});
+          if (sellSignature) {
+            const lastTxRows: { id: string; walletPublicKey: string }[] = [];
+            if (bundleSellTrackId)
+              lastTxRows.push({ id: bundleSellTrackId, walletPublicKey: sellerPk });
+            if (tipperTrackId)
+              lastTxRows.push({ id: tipperTrackId, walletPublicKey: tipperPk });
+            if (lastTxRows.length > 0) {
+              await appTransactionService
+                .confirmMany(
+                  lastTxRows.map((r) => r.id),
+                  { signature: sellSignature }
+                )
+                .catch(() => {});
+              await settleSignature({
+                signature: sellSignature,
+                rows: lastTxRows,
+                connection: getSolanaConnection(),
+              }).catch(() => {});
+              if (bundleSellTrackId) {
+                await appTransactionService
+                  .settleTrade(bundleSellTrackId, {
+                    signature: sellSignature,
+                    tokenAmount: Number(chunkTotal),
+                  })
+                  .catch(() => {});
+              }
+            }
           }
           const systemDevSweep = {
             attempted: false,
@@ -988,6 +1099,14 @@ async function runExitFlow(exitId: string) {
           };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
+          const failIds = [bundleSellTrackId, tipperTrackId].filter(
+            (id): id is string => Boolean(id)
+          );
+          if (failIds.length > 0) {
+            await appTransactionService
+              .failMany(failIds, { errorMessage: message })
+              .catch(() => {});
+          }
           if (message === "Exit cancelled by user") {
             throw error;
           }

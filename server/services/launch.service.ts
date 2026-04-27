@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { UserPlan, type Prisma } from "@/lib/generated/prisma/client";
 import { AppError, isAppError } from "@/server/errors";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { logger } from "@/lib/logger";
 import {
   launchInputFromStorageSchema,
@@ -1136,23 +1137,50 @@ async function fundWalletsFromMain(
       );
     });
     transaction.feePayer = mainWalletKeypair.publicKey;
-    const fundTrackIds: string[] = [];
+    type FundRow = { id: string; walletPublicKey: string };
+    const fundTrackRows: FundRow[] = [];
     if (userId) {
+      // Sender row (main wallet) — captures the funding tx fee + total outflow
+      const senderId = await appTransactionService
+        .create({
+          userId,
+          type: "TRANSFER_FUND",
+          source: "LAUNCH",
+          walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+          fromAddress: mainWalletKeypair.publicKey.toBase58(),
+          intentSolAmount:
+            -Number(
+              batch.reduce((s, t) => s + t.topUpLamports, BigInt(0))
+            ) / 1_000_000_000,
+          referenceId: launchId,
+        })
+        .then((r) => r.id)
+        .catch(() => null);
+      if (senderId)
+        fundTrackRows.push({
+          id: senderId,
+          walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+        });
+      // One receiver row per target
       for (const target of batch) {
         const id = await appTransactionService
           .create({
             userId,
             type: "TRANSFER_FUND",
             source: "LAUNCH",
-            walletPublicKey: mainWalletKeypair.publicKey.toBase58(),
+            walletPublicKey: target.publicKey.toBase58(),
             fromAddress: mainWalletKeypair.publicKey.toBase58(),
             toAddress: target.publicKey.toBase58(),
-            solAmount: Number(target.topUpLamports) / 1_000_000_000,
+            intentSolAmount: Number(target.topUpLamports) / 1_000_000_000,
             referenceId: launchId,
           })
           .then((r) => r.id)
           .catch(() => null);
-        if (id) fundTrackIds.push(id);
+        if (id)
+          fundTrackRows.push({
+            id,
+            walletPublicKey: target.publicKey.toBase58(),
+          });
       }
     }
     const signature = await sendAndConfirmTransaction(
@@ -1161,7 +1189,15 @@ async function fundWalletsFromMain(
       [mainWalletKeypair],
       { commitment: "confirmed" }
     );
-    if (fundTrackIds.length > 0) await appTransactionService.confirmMany(fundTrackIds, { signature }).catch(() => {});
+    if (fundTrackRows.length > 0) {
+      await appTransactionService
+        .confirmMany(
+          fundTrackRows.map((r) => r.id),
+          { signature }
+        )
+        .catch(() => {});
+      await settleSignature({ signature, rows: fundTrackRows, connection }).catch(() => {});
+    }
     await testRunLogService.appendServerEvent({
       eventType: "wallet_transaction",
       source: "launch.service",
@@ -2111,14 +2147,15 @@ async function distributeTokensToWallets(
         const { blockhash } = await connection.getLatestBlockhash("confirmed");
         transaction.recentBlockhash = blockhash;
         transaction.feePayer = sourceWallet.publicKey;
+        const sourcePk = sourceWallet.publicKey.toBase58();
         const distTrackId = userId
           ? await appTransactionService.create({
               userId,
               type: "TOKEN_DISTRIBUTE",
               source: "LAUNCH",
               tokenPublicKey: mint.toBase58(),
-              walletPublicKey: sourceWallet.publicKey.toBase58(),
-              fromAddress: sourceWallet.publicKey.toBase58(),
+              walletPublicKey: sourcePk,
+              fromAddress: sourcePk,
               toAddress: destination.publicKey.toBase58(),
               referenceId: launchId,
             }).then((r) => r.id).catch(() => null)
@@ -2129,7 +2166,14 @@ async function distributeTokensToWallets(
           [sourceWallet],
           { commitment: "confirmed" }
         );
-        if (distTrackId) await appTransactionService.confirm(distTrackId, { signature }).catch(() => {});
+        if (distTrackId) {
+          await appTransactionService.confirm(distTrackId, { signature }).catch(() => {});
+          await settleSignature({
+            signature,
+            rows: [{ id: distTrackId, walletPublicKey: sourcePk }],
+            connection,
+          }).catch(() => {});
+        }
         await testRunLogService.appendServerEvent({
           eventType: "wallet_transaction",
           source: "launch.service",
@@ -2383,19 +2427,46 @@ async function returnExcessSolToMain(
         reclaimMode === "main-sponsored"
           ? mainPublicKey
           : sourceWallet.publicKey;
-      const returnTrackId = userId
-        ? await appTransactionService.create({
+      const senderPk = sourceWallet.publicKey.toBase58();
+      const mainPk = mainPublicKey.toBase58();
+      const intentSol = lamportsToSend / 1_000_000_000;
+      const isSelfTransfer = senderPk === mainPk;
+      const returnTrackRows: { id: string; walletPublicKey: string }[] = [];
+      if (userId) {
+        const senderId = await appTransactionService
+          .create({
             userId,
             type: "TRANSFER_RETURN",
             source: "LAUNCH",
             tokenPublicKey,
-            walletPublicKey: sourceWallet.publicKey.toBase58(),
-            fromAddress: sourceWallet.publicKey.toBase58(),
-            toAddress: mainPublicKey.toBase58(),
-            solAmount: lamportsToSend / 1_000_000_000,
+            walletPublicKey: senderPk,
+            fromAddress: senderPk,
+            toAddress: mainPk,
+            intentSolAmount: isSelfTransfer ? 0 : -intentSol,
             referenceId: launchId,
-          }).then((r) => r.id).catch(() => null)
-        : null;
+          })
+          .then((r) => r.id)
+          .catch(() => null);
+        if (senderId) returnTrackRows.push({ id: senderId, walletPublicKey: senderPk });
+        if (!isSelfTransfer) {
+          const receiverId = await appTransactionService
+            .create({
+              userId,
+              type: "TRANSFER_RETURN",
+              source: "LAUNCH",
+              tokenPublicKey,
+              walletPublicKey: mainPk,
+              fromAddress: senderPk,
+              toAddress: mainPk,
+              intentSolAmount: intentSol,
+              referenceId: launchId,
+            })
+            .then((r) => r.id)
+            .catch(() => null);
+          if (receiverId)
+            returnTrackRows.push({ id: receiverId, walletPublicKey: mainPk });
+        }
+      }
       const signature = await sendAndConfirmTransaction(
         connection,
         transaction,
@@ -2404,7 +2475,15 @@ async function returnExcessSolToMain(
           : [sourceWallet],
         { commitment: "confirmed" }
       );
-      if (returnTrackId) await appTransactionService.confirm(returnTrackId, { signature }).catch(() => {});
+      if (returnTrackRows.length > 0) {
+        await appTransactionService
+          .confirmMany(
+            returnTrackRows.map((r) => r.id),
+            { signature }
+          )
+          .catch(() => {});
+        await settleSignature({ signature, rows: returnTrackRows, connection }).catch(() => {});
+      }
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "launch.service",
@@ -2950,7 +3029,7 @@ async function reclaimManagedLaunchWallets(
             walletPublicKey,
             fromAddress: walletPublicKey,
             toAddress: mainPublicKey.toBase58(),
-            solAmount: lamportsToSend / 1_000_000_000,
+            intentSolAmount: -lamportsToSend / 1_000_000_000,
             referenceId: launchId,
           }).then((r) => r.id).catch(() => null)
         : null;
@@ -2960,7 +3039,14 @@ async function reclaimManagedLaunchWallets(
         [mainWalletKeypair, sourceWallet],
         { commitment: "confirmed" }
       );
-      if (reclaimTrackId) await appTransactionService.confirm(reclaimTrackId, { signature }).catch(() => {});
+      if (reclaimTrackId) {
+        await appTransactionService.confirm(reclaimTrackId, { signature }).catch(() => {});
+        await settleSignature({
+          signature,
+          rows: [{ id: reclaimTrackId, walletPublicKey }],
+          connection,
+        }).catch(() => {});
+      }
       await prisma.launchRecoveryWallet.updateMany({
         where: {
           launchId,
@@ -3659,7 +3745,7 @@ export const launchService = {
                 walletPublicKey: wallet.publicKey,
                 fromAddress: wallet.publicKey,
                 toAddress: mainPublicKey.toBase58(),
-                solAmount: balanceLamports / 1_000_000_000,
+                intentSolAmount: -balanceLamports / 1_000_000_000,
                 referenceId: launchId,
               })
               .then((r) => r.id)
@@ -3670,7 +3756,14 @@ export const launchService = {
               [mainKeypair, sender],
               { commitment: "confirmed" }
             );
-            if (recoverTrackId) await appTransactionService.confirm(recoverTrackId, { signature }).catch(() => {});
+            if (recoverTrackId) {
+              await appTransactionService.confirm(recoverTrackId, { signature }).catch(() => {});
+              await settleSignature({
+                signature,
+                rows: [{ id: recoverTrackId, walletPublicKey: wallet.publicKey }],
+                connection,
+              }).catch(() => {});
+            }
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "launch.service",
@@ -4247,41 +4340,39 @@ export const launchService = {
         const latestBlockhash =
           await connection.getLatestBlockhash("confirmed");
         createTx.recentBlockhash = latestBlockhash.blockhash;
-        const createTrackId = await appTransactionService
+        const devPk = devWalletKeypair.publicKey.toBase58();
+        // One row per (signature × user-owned wallet). When create + dev buy
+        // share a single tx, the TRADE_BUY row owns the entire wallet delta.
+        // Pure-create path uses a single TRADE_CREATE row instead.
+        const createOrBuyTrackId = await appTransactionService
           .create({
             userId: user.id,
-            type: "TRADE_CREATE",
+            type: devBuyAmountSol > 0 ? "TRADE_BUY" : "TRADE_CREATE",
             source: "LAUNCH",
             tokenPublicKey: mintPublicKey,
-            walletPublicKey: devWalletKeypair.publicKey.toBase58(),
-            fromAddress: devWalletKeypair.publicKey.toBase58(),
+            walletPublicKey: devPk,
+            fromAddress: devPk,
+            intentSolAmount: devBuyAmountSol > 0 ? -devBuyAmountSol : null,
             referenceId: launchId,
           })
           .then((r) => r.id)
           .catch(() => null);
-        const devBuyTrackId = devBuyAmountSol > 0
-          ? await appTransactionService
-              .create({
-                userId: user.id,
-                type: "TRADE_BUY",
-                source: "LAUNCH",
-                tokenPublicKey: mintPublicKey,
-                walletPublicKey: devWalletKeypair.publicKey.toBase58(),
-                fromAddress: devWalletKeypair.publicKey.toBase58(),
-                solAmount: devBuyAmountSol,
-                referenceId: launchId,
-              })
-              .then((r) => r.id)
-              .catch(() => null)
-          : null;
         createSignature = await sendAndConfirmTransaction(
           connection,
           createTx,
           [devWalletKeypair, mintKeypair],
           { commitment: "confirmed" }
         );
-        if (createTrackId) await appTransactionService.confirm(createTrackId, { signature: createSignature }).catch(() => {});
-        if (devBuyTrackId) await appTransactionService.confirm(devBuyTrackId, { signature: createSignature }).catch(() => {});
+        if (createOrBuyTrackId) {
+          await appTransactionService
+            .confirm(createOrBuyTrackId, { signature: createSignature })
+            .catch(() => {});
+          await settleSignature({
+            signature: createSignature,
+            rows: [{ id: createOrBuyTrackId, walletPublicKey: devPk }],
+            connection,
+          }).catch(() => {});
+        }
         await testRunLogService.appendServerEvent({
           eventType: "wallet_transaction",
           source: "launch.service",
@@ -4355,15 +4446,16 @@ export const launchService = {
             const latestBlockhash =
               await connection.getLatestBlockhash("confirmed");
             tx.recentBlockhash = latestBlockhash.blockhash;
+            const buyerPk = buyer.publicKey.toBase58();
             const buyTrackId = await appTransactionService
               .create({
                 userId: user.id,
                 type: "TRADE_BUY",
                 source: "LAUNCH",
                 tokenPublicKey: mintPublicKey,
-                walletPublicKey: buyer.publicKey.toBase58(),
-                fromAddress: buyer.publicKey.toBase58(),
-                solAmount: Number(amountLamports) / 1_000_000_000,
+                walletPublicKey: buyerPk,
+                fromAddress: buyerPk,
+                intentSolAmount: -(Number(amountLamports) / 1_000_000_000),
                 referenceId: launchId,
               })
               .then((r) => r.id)
@@ -4376,7 +4468,16 @@ export const launchService = {
                 commitment: "confirmed",
               }
             );
-            if (buyTrackId) await appTransactionService.confirm(buyTrackId, { signature }).catch(() => {});
+            if (buyTrackId) {
+              await appTransactionService
+                .confirm(buyTrackId, { signature })
+                .catch(() => {});
+              await settleSignature({
+                signature,
+                rows: [{ id: buyTrackId, walletPublicKey: buyerPk }],
+                connection,
+              }).catch(() => {});
+            }
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "launch.service",

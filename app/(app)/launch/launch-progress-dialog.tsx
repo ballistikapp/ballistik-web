@@ -108,6 +108,7 @@ export function LaunchProgressDialog({
           utils.token.getByPublicKey.invalidate({ publicKey: tokenPublicKey }),
         ]);
         invalidateTokenSidebarCounts(utils, tokenPublicKey);
+        onClose();
         router.push(`/${tokenPublicKey}/dashboard`);
       } finally {
         setPreparingDashboard(false);
@@ -117,6 +118,7 @@ export function LaunchProgressDialog({
     refreshBalances,
     refreshHoldings,
     refreshTransactions,
+    onClose,
     router,
     tokenPublicKey,
     utils,

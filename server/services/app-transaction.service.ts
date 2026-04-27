@@ -18,10 +18,10 @@ type CreateAppTransactionInput = {
   walletPublicKey?: string | null;
   fromAddress?: string | null;
   toAddress?: string | null;
+  intentSolAmount?: number | null;
   solAmount?: number | null;
   tokenAmount?: number | null;
   pricePerToken?: number | null;
-  jitoTipLamports?: number | null;
   bundleId?: string | null;
   referenceId?: string | null;
   description?: string | null;
@@ -36,6 +36,12 @@ type ConfirmInput = {
 type FailInput = {
   signature?: string | null;
   errorMessage: string;
+};
+
+type SettleTradeInput = {
+  signature?: string | null;
+  tokenAmount?: number | null;
+  pricePerToken?: number | null;
 };
 
 type ListFilters = {
@@ -144,10 +150,10 @@ export const appTransactionService = {
         walletPublicKey: input.walletPublicKey ?? undefined,
         fromAddress: input.fromAddress ?? undefined,
         toAddress: input.toAddress ?? undefined,
+        intentSolAmount: input.intentSolAmount ?? undefined,
         solAmount: input.solAmount ?? undefined,
         tokenAmount: input.tokenAmount ?? undefined,
         pricePerToken: input.pricePerToken ?? undefined,
-        jitoTipLamports: input.jitoTipLamports ?? undefined,
         bundleId: input.bundleId ?? undefined,
         referenceId: input.referenceId ?? undefined,
         transactionSignature: input.transactionSignature ?? undefined,
@@ -166,10 +172,10 @@ export const appTransactionService = {
       walletPublicKey: input.walletPublicKey ?? undefined,
       fromAddress: input.fromAddress ?? undefined,
       toAddress: input.toAddress ?? undefined,
+      intentSolAmount: input.intentSolAmount ?? undefined,
       solAmount: input.solAmount ?? undefined,
       tokenAmount: input.tokenAmount ?? undefined,
       pricePerToken: input.pricePerToken ?? undefined,
-      jitoTipLamports: input.jitoTipLamports ?? undefined,
       bundleId: input.bundleId ?? undefined,
       referenceId: input.referenceId ?? undefined,
       transactionSignature: input.transactionSignature ?? undefined,
@@ -204,6 +210,29 @@ export const appTransactionService = {
         transactionSignature: input.signature,
         blockTime: input.blockTime ?? undefined,
       },
+    });
+  },
+
+  async settleTrade(id: string, input: SettleTradeInput) {
+    const data: Prisma.AppTransactionUpdateInput = {
+      ...(input.signature !== undefined && {
+        transactionSignature: input.signature,
+      }),
+      ...(input.tokenAmount !== undefined && {
+        tokenAmount: input.tokenAmount,
+      }),
+      ...(input.pricePerToken !== undefined && {
+        pricePerToken: input.pricePerToken,
+      }),
+    };
+
+    if (Object.keys(data).length === 0) {
+      return await prisma.appTransaction.findUnique({ where: { id } });
+    }
+
+    return await prisma.appTransaction.update({
+      where: { id },
+      data,
     });
   },
 
@@ -303,24 +332,24 @@ export const appTransactionService = {
       bySource[row.source].count += count;
     }
 
-    const totalFees = (byType["FEE_USAGE"]?.solAmount ?? 0) + (byType["FEE_SUBSCRIPTION"]?.solAmount ?? 0);
-    const totalFunding = (byType["TRANSFER_FUND"]?.solAmount ?? 0);
-    const totalReturns = (byType["TRANSFER_RETURN"]?.solAmount ?? 0) + (byType["TRANSFER_RECLAIM"]?.solAmount ?? 0);
-    const totalBuys = (byType["TRADE_BUY"]?.solAmount ?? 0);
-    const totalSells = (byType["TRADE_SELL"]?.solAmount ?? 0);
+    const totalFees = byType["FEE_USAGE"]?.solAmount ?? 0;
+    const totalBuys = byType["TRADE_BUY"]?.solAmount ?? 0;
+    const totalSells = byType["TRADE_SELL"]?.solAmount ?? 0;
 
     const totalTransactions = rows.reduce((sum, r) => sum + r._count.id, 0);
+
+    const netPnl = Object.entries(byType)
+      .filter(([type]) => type !== "FEE_SUBSCRIPTION")
+      .reduce((sum, [, v]) => sum + v.solAmount, 0);
 
     return {
       byType,
       bySource,
       summary: {
         totalFees,
-        totalFunding,
-        totalReturns,
         totalBuys,
         totalSells,
-        netPnl: totalSells - totalBuys,
+        netPnl,
         totalTransactions,
       },
     };
@@ -451,7 +480,6 @@ export async function trackBundleTransactions<T>(
     tokenPublicKey?: string | null;
     referenceId?: string | null;
     bundleId: string;
-    jitoTipLamports?: number;
   },
   txItems: TrackBundleItem[][],
   fn: () => Promise<{ signatures: string[] } & T>
@@ -469,18 +497,6 @@ export async function trackBundleTransactions<T>(
       }));
       const records = await appTransactionService.createMany(inputs);
       allRecordIds.push(records.map((r) => r.id));
-    }
-
-    if (common.jitoTipLamports && allRecordIds.length > 0) {
-      const lastGroup = allRecordIds[allRecordIds.length - 1];
-      if (lastGroup.length > 0) {
-        await prisma.appTransaction
-          .update({
-            where: { id: lastGroup[lastGroup.length - 1] },
-            data: { jitoTipLamports: common.jitoTipLamports },
-          })
-          .catch(() => {});
-      }
     }
   } catch (err) {
     log.warn("Failed to create AppTransaction bundle tracking rows", {

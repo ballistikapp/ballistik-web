@@ -19,7 +19,11 @@ export function MarketingMockDashboardView() {
         isRefreshing={false}
         refreshStatusLabel={m.refreshStatusLabel}
       />
-      <DashboardStats header={m.statsHeader} metrics={m.metrics} />
+      <DashboardStats
+        header={m.statsHeader}
+        tokenPublicKey={m.tokenPublicKey}
+        metrics={m.metrics}
+      />
       <div className="grid grid-cols-1 gap-4 @5xl/main:grid-cols-8 @5xl/main:items-stretch">
         <div className="min-w-0 @5xl/main:col-span-3">
           <DashboardOperations

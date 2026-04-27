@@ -343,26 +343,6 @@ export function getColumns(): ColumnDef<AppTransaction>[] {
       },
     },
     {
-      accessorKey: "jitoTipLamports",
-      header: ({ column }) => (
-        <DataTableColumnHeader
-          column={column}
-          title="Jito Tip"
-          className="justify-end"
-        />
-      ),
-      cell: ({ row }) => {
-        const tip = row.original.jitoTipLamports;
-        if (tip == null)
-          return <div className="text-right text-muted-foreground">—</div>;
-        return (
-          <div className="text-right font-mono text-sm">
-            {(tip / 1e9).toFixed(6)} SOL
-          </div>
-        );
-      },
-    },
-    {
       accessorKey: "errorMessage",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="Error" />

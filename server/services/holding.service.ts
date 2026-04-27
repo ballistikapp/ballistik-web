@@ -24,6 +24,7 @@ import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { buildSellTransaction } from "@/server/solana/pump-new-idl";
 import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
 import {
@@ -1027,7 +1028,7 @@ export const holdingService = {
               tokenPublicKey: token.publicKey,
               walletPublicKey: wallet.publicKey,
               fromAddress: wallet.publicKey,
-              solAmount: input.solAmountPerWallet,
+              intentSolAmount: -input.solAmountPerWallet,
               tokenAmount: quotedTokensOut ? Number(quotedTokensOut) : null,
             })
             .then((result) => result.id)
@@ -1044,6 +1045,11 @@ export const holdingService = {
             await appTransactionService
               .confirm(buyTrackId, { signature })
               .catch(() => {});
+            await settleSignature({
+              signature,
+              rows: [{ id: buyTrackId, walletPublicKey: wallet.publicKey }],
+              connection,
+            }).catch(() => {});
           }
           await testRunLogService.appendServerEvent({
             eventType: "wallet_transaction",
@@ -1108,6 +1114,7 @@ export const holdingService = {
         if (!state) {
           return { walletPublicKey: wallet.publicKey, status: "SKIPPED" as const };
         }
+        const trackRows: { id: string; walletPublicKey: string }[] = [];
         try {
           const source = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
           const balanceLamports = await retryRpcWithTimeout(
@@ -1132,7 +1139,10 @@ export const holdingService = {
             };
           }
 
-          const trackId = await appTransactionService
+          const mainPk = mainWalletKeypair.publicKey.toBase58();
+          const intentSol = excessLamports / 1_000_000_000;
+          const isSelf = wallet.publicKey === mainPk;
+          const senderId = await appTransactionService
             .create({
               userId,
               type: "TRANSFER_RETURN",
@@ -1140,11 +1150,28 @@ export const holdingService = {
               tokenPublicKey: token.publicKey,
               walletPublicKey: wallet.publicKey,
               fromAddress: wallet.publicKey,
-              toAddress: mainWalletKeypair.publicKey.toBase58(),
-              solAmount: excessLamports / 1_000_000_000,
+              toAddress: mainPk,
+              intentSolAmount: isSelf ? 0 : -intentSol,
             })
             .then((result) => result.id)
             .catch(() => null);
+          if (senderId) trackRows.push({ id: senderId, walletPublicKey: wallet.publicKey });
+          if (!isSelf) {
+            const receiverId = await appTransactionService
+              .create({
+                userId,
+                type: "TRANSFER_RETURN",
+                source: "HOLDING",
+                tokenPublicKey: token.publicKey,
+                walletPublicKey: mainPk,
+                fromAddress: wallet.publicKey,
+                toAddress: mainPk,
+                intentSolAmount: intentSol,
+              })
+              .then((result) => result.id)
+              .catch(() => null);
+            if (receiverId) trackRows.push({ id: receiverId, walletPublicKey: mainPk });
+          }
           const { blockhash, lastValidBlockHeight } =
             await retryRpcWithTimeout(
               () => connection.getLatestBlockhash("confirmed"),
@@ -1174,10 +1201,14 @@ export const holdingService = {
               ),
             rpcConfig.tuning.confirmTimeoutMs
           );
-          if (trackId) {
+          if (trackRows.length > 0) {
             await appTransactionService
-              .confirm(trackId, { signature })
+              .confirmMany(
+                trackRows.map((r) => r.id),
+                { signature }
+              )
               .catch(() => {});
+            await settleSignature({ signature, rows: trackRows, connection }).catch(() => {});
           }
           return {
             walletPublicKey: wallet.publicKey,
@@ -1186,6 +1217,17 @@ export const holdingService = {
             returnedLamports: excessLamports,
           };
         } catch (error) {
+          if (trackRows.length > 0) {
+            await appTransactionService
+              .failMany(
+                trackRows.map((r) => r.id),
+                {
+                  errorMessage:
+                    error instanceof Error ? error.message : String(error),
+                }
+              )
+              .catch(() => {});
+          }
           return {
             walletPublicKey: wallet.publicKey,
             status: "FAILED" as const,
@@ -1366,6 +1408,10 @@ export const holdingService = {
               seller.publicKey.toBase58()
               ? mainWalletKeypair
               : seller;
+          const sellerBalanceBeforeLamports = await retryRpcWithTimeout(
+            () => connection.getBalance(seller.publicKey),
+            rpcConfig.tuning.rpcTimeoutMs
+          );
           const signers =
             feePayer.publicKey.toBase58() === seller.publicKey.toBase58()
               ? [seller]
@@ -1379,19 +1425,42 @@ export const holdingService = {
           sellTx.recentBlockhash = blockhash;
           sellTx.lastValidBlockHeight = lastValidBlockHeight;
           sellTx.feePayer = feePayer.publicKey;
+          const sellerPk = wallet.publicKey;
+          const feePayerPk = feePayer.publicKey.toBase58();
+          const feePayerDifferent = feePayerPk !== sellerPk;
+          const sellTrackRows: { id: string; walletPublicKey: string }[] = [];
           sellTrackId = await appTransactionService
             .create({
               userId,
               type: "TRADE_SELL",
               source: "HOLDING",
               tokenPublicKey: token.publicKey,
-              walletPublicKey: wallet.publicKey,
-              fromAddress: wallet.publicKey,
-              solAmount: null,
+              walletPublicKey: sellerPk,
+              fromAddress: sellerPk,
               tokenAmount: Number(sellAmount),
             })
             .then((r) => r.id)
             .catch(() => null);
+          if (sellTrackId)
+            sellTrackRows.push({ id: sellTrackId, walletPublicKey: sellerPk });
+          if (feePayerDifferent) {
+            const feePayerRowId = await appTransactionService
+              .create({
+                userId,
+                type: "TRADE_SELL",
+                source: "HOLDING",
+                tokenPublicKey: token.publicKey,
+                walletPublicKey: feePayerPk,
+                fromAddress: feePayerPk,
+              })
+              .then((r) => r.id)
+              .catch(() => null);
+            if (feePayerRowId)
+              sellTrackRows.push({
+                id: feePayerRowId,
+                walletPublicKey: feePayerPk,
+              });
+          }
           const signature = await retryRpcWithTimeout(
             () =>
               sendAndConfirmTransaction(connection, sellTx, signers, {
@@ -1399,7 +1468,23 @@ export const holdingService = {
               }),
             rpcConfig.tuning.confirmTimeoutMs
           );
-          if (sellTrackId) await appTransactionService.confirm(sellTrackId, { signature }).catch(() => {});
+          if (sellTrackRows.length > 0) {
+            await appTransactionService
+              .confirmMany(
+                sellTrackRows.map((r) => r.id),
+                { signature }
+              )
+              .catch(() => {});
+            await settleSignature({ signature, rows: sellTrackRows, connection }).catch(() => {});
+            if (sellTrackId) {
+              await appTransactionService
+                .settleTrade(sellTrackId, {
+                  signature,
+                  tokenAmount: Number(sellAmount),
+                })
+                .catch(() => {});
+            }
+          }
           await testRunLogService.appendServerEvent({
             eventType: "wallet_transaction",
             source: "holding.service",
@@ -1520,21 +1605,73 @@ export const holdingService = {
               feePayer.publicKey.toBase58() === owner.publicKey.toBase58()
                 ? [feePayer]
                 : [feePayer, owner];
-            const closeTrackId = await appTransactionService
+            const ownerPk = wallet.publicKey;
+            const destinationPk = destination.toBase58();
+            const feePayerPkClose = feePayer.publicKey.toBase58();
+            const closeTrackRows: { id: string; walletPublicKey: string }[] = [];
+            // Owner releases the ATA's rent (positive delta when destination = owner).
+            const ownerRowId = await appTransactionService
               .create({
                 userId,
                 type: "ACCOUNT_ATA_CLOSE",
                 source: "HOLDING",
                 tokenPublicKey: token.publicKey,
-                walletPublicKey: wallet.publicKey,
-                fromAddress: wallet.publicKey,
+                walletPublicKey: ownerPk,
+                fromAddress: ownerPk,
+                toAddress: destinationPk,
               })
               .then((r) => r.id)
               .catch(() => null);
+            if (ownerRowId)
+              closeTrackRows.push({ id: ownerRowId, walletPublicKey: ownerPk });
+            // Destination wallet (if user-owned and different) receives the rent.
+            if (destinationPk !== ownerPk) {
+              const destRowId = await appTransactionService
+                .create({
+                  userId,
+                  type: "ACCOUNT_ATA_CLOSE",
+                  source: "HOLDING",
+                  tokenPublicKey: token.publicKey,
+                  walletPublicKey: destinationPk,
+                  fromAddress: ownerPk,
+                  toAddress: destinationPk,
+                })
+                .then((r) => r.id)
+                .catch(() => null);
+              if (destRowId)
+                closeTrackRows.push({ id: destRowId, walletPublicKey: destinationPk });
+            }
+            // Fee payer (if user-owned and different from owner+destination) absorbs the tx fee.
+            if (
+              feePayerPkClose !== ownerPk &&
+              feePayerPkClose !== destinationPk
+            ) {
+              const feeRowId = await appTransactionService
+                .create({
+                  userId,
+                  type: "ACCOUNT_ATA_CLOSE",
+                  source: "HOLDING",
+                  tokenPublicKey: token.publicKey,
+                  walletPublicKey: feePayerPkClose,
+                  fromAddress: feePayerPkClose,
+                })
+                .then((r) => r.id)
+                .catch(() => null);
+              if (feeRowId)
+                closeTrackRows.push({ id: feeRowId, walletPublicKey: feePayerPkClose });
+            }
             const signature = await sendAndConfirmTransaction(connection, closeTx, signers, {
               commitment: "confirmed",
             });
-            if (closeTrackId) await appTransactionService.confirm(closeTrackId, { signature }).catch(() => {});
+            if (closeTrackRows.length > 0) {
+              await appTransactionService
+                .confirmMany(
+                  closeTrackRows.map((r) => r.id),
+                  { signature }
+                )
+                .catch(() => {});
+              await settleSignature({ signature, rows: closeTrackRows, connection }).catch(() => {});
+            }
             await testRunLogService.appendServerEvent({
               eventType: "wallet_transaction",
               source: "holding.service",

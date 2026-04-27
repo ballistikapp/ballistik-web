@@ -7,18 +7,21 @@ Transactions are split into two storage layers:
 - `TokenTransaction` stores token-wide activity and is the source for the `/[tokenPublicKey]/transactions` page.
 - `Transaction` (legacy/current table) remains for wallet-scoped pages and workflows.
 
-Rows are stored per action (wallet + signature + action type), with SOL amount, token amount, and derived price per token.
+Rows are stored per action (wallet + signature + action type), with SOL amount, token amount, and derived price per token. `TokenTransaction` represents market activity, so amounts should match pump.fun trade records rather than full wallet balance deltas.
+
+Operational wallet deltas, including account rent, network fees, tips, and token creation costs, are tracked separately in `AppTransaction` for P&L and cost accounting.
 
 ## tRPC Procedures
 
-- `transaction.listByToken` returns a pumpfun-like list view: rows are grouped by signature into a single display row, excluding bonding-curve side when present and preferring owned wallet identity when available.
+- `transaction.listByToken` returns token activity rows plus server-side header metrics. By default it keeps the legacy grouped-by-signature view for existing callers.
+- The `/[tokenPublicKey]/transactions` page calls `transaction.listByToken` with `groupBySignature: false`, so bundled pump.fun buys render as one row per wallet trade. The flat view excludes the bonding-curve side of each transaction and shows owned/external trader rows.
 - `transaction.refreshByToken` fetches token-related signatures and persists unseen or stale action rows.
 
 ## Price Calculation
 
-- Token deltas come from pre/post token balances for the owner and the token mint.
-- SOL deltas come from the wallet system account when present.
-- If the wrapped SOL (wSOL) token balance delta is larger than the system account delta, use the wSOL delta instead.
+- Pump.fun `TradeEvent` logs are preferred when available. `sol_amount` becomes `TokenTransaction.solAmount`, and `token_amount` becomes `TokenTransaction.tokenAmount`.
+- Token amounts are converted using token decimals from parsed token balances, with pump.fun's six-decimal token default as fallback.
+- If no matching `TradeEvent` is present, ingestion falls back to the legacy balance-delta parser: token deltas come from pre/post token balances, and SOL deltas come from the wallet system account or wSOL delta.
 - Price per token is calculated as `solAmount / tokenAmount`.
 
 ## Refresh Behavior
@@ -31,6 +34,7 @@ The `refreshByToken` service is optimized for speed and incremental updates:
 4. Writes are idempotent with unique dedupe keys, so overlap/retries are safe.
 5. `RefreshCache` is touched after refresh so the UI can decide staleness and trigger background refetch.
 6. Parsed transaction batches now use `retryRpcWithTimeout` with `rpcConfig.tuning.parseTimeoutMs` (45s default) to avoid long-tail RPC hangs while still retrying transient failures.
+7. Existing rows are corrected to pump.fun event amounts only when their signatures are encountered by normal refresh/stale-row retry. There is no historical backfill sweep.
 
 ### Database Indexes
 
@@ -48,7 +52,7 @@ The `refreshByToken` service is optimized for speed and incremental updates:
 
 ## Transactions Header Metrics
 
-The transactions page header shows metrics for currently loaded table rows with owned vs external splits:
+The transactions page header uses server-side metrics across all matching token transaction rows, not just the current page. Metrics use the same flat-row filter as the page table, with owned vs external splits:
 - Buys (count)
 - Sells (count)
 - Volume (SOL)

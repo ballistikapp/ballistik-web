@@ -13,8 +13,9 @@ type DashboardStatsLike = {
     };
     pnl: {
       net: number;
-      totalBuyVolume: number;
-      totalSellVolume: number;
+      tokenBuys: number;
+      tokenSells: number;
+      tokenCreates: number;
       platformFees: number;
       launchFees: number;
       launchFeeBreakdown: {
@@ -28,9 +29,16 @@ type DashboardStatsLike = {
       } | null;
       exitFees: number;
       volumeBotFees: number;
-      jitoTipsSol: number;
-      totalFees: number;
-      creationCostSol: number;
+      walletFees: number;
+      jitoTips: number;
+      transfers: number;
+      ataOps: number;
+      tokenOps: number;
+      creatorRewards: number;
+      rewardsClaim: number;
+      rewardsPayout: number;
+      unsettledRowCount: number;
+      isComplete: boolean;
     };
     activity: {
       totalVolume: number;

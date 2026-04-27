@@ -28,16 +28,20 @@ export type AggregateAppTransaction = {
 
 export type AppTransactionAvgAggregateOutputType = {
   solAmount: runtime.Decimal | null
+  intentSolAmount: runtime.Decimal | null
+  lamportsDelta: number | null
+  txFeeLamports: number | null
   tokenAmount: runtime.Decimal | null
   pricePerToken: runtime.Decimal | null
-  jitoTipLamports: number | null
 }
 
 export type AppTransactionSumAggregateOutputType = {
   solAmount: runtime.Decimal | null
+  intentSolAmount: runtime.Decimal | null
+  lamportsDelta: bigint | null
+  txFeeLamports: number | null
   tokenAmount: runtime.Decimal | null
   pricePerToken: runtime.Decimal | null
-  jitoTipLamports: number | null
 }
 
 export type AppTransactionMinAggregateOutputType = {
@@ -53,9 +57,11 @@ export type AppTransactionMinAggregateOutputType = {
   fromAddress: string | null
   toAddress: string | null
   solAmount: runtime.Decimal | null
+  intentSolAmount: runtime.Decimal | null
+  lamportsDelta: bigint | null
+  txFeeLamports: number | null
   tokenAmount: runtime.Decimal | null
   pricePerToken: runtime.Decimal | null
-  jitoTipLamports: number | null
   referenceId: string | null
   description: string | null
   errorMessage: string | null
@@ -77,9 +83,11 @@ export type AppTransactionMaxAggregateOutputType = {
   fromAddress: string | null
   toAddress: string | null
   solAmount: runtime.Decimal | null
+  intentSolAmount: runtime.Decimal | null
+  lamportsDelta: bigint | null
+  txFeeLamports: number | null
   tokenAmount: runtime.Decimal | null
   pricePerToken: runtime.Decimal | null
-  jitoTipLamports: number | null
   referenceId: string | null
   description: string | null
   errorMessage: string | null
@@ -101,9 +109,11 @@ export type AppTransactionCountAggregateOutputType = {
   fromAddress: number
   toAddress: number
   solAmount: number
+  intentSolAmount: number
+  lamportsDelta: number
+  txFeeLamports: number
   tokenAmount: number
   pricePerToken: number
-  jitoTipLamports: number
   referenceId: number
   description: number
   errorMessage: number
@@ -116,16 +126,20 @@ export type AppTransactionCountAggregateOutputType = {
 
 export type AppTransactionAvgAggregateInputType = {
   solAmount?: true
+  intentSolAmount?: true
+  lamportsDelta?: true
+  txFeeLamports?: true
   tokenAmount?: true
   pricePerToken?: true
-  jitoTipLamports?: true
 }
 
 export type AppTransactionSumAggregateInputType = {
   solAmount?: true
+  intentSolAmount?: true
+  lamportsDelta?: true
+  txFeeLamports?: true
   tokenAmount?: true
   pricePerToken?: true
-  jitoTipLamports?: true
 }
 
 export type AppTransactionMinAggregateInputType = {
@@ -141,9 +155,11 @@ export type AppTransactionMinAggregateInputType = {
   fromAddress?: true
   toAddress?: true
   solAmount?: true
+  intentSolAmount?: true
+  lamportsDelta?: true
+  txFeeLamports?: true
   tokenAmount?: true
   pricePerToken?: true
-  jitoTipLamports?: true
   referenceId?: true
   description?: true
   errorMessage?: true
@@ -165,9 +181,11 @@ export type AppTransactionMaxAggregateInputType = {
   fromAddress?: true
   toAddress?: true
   solAmount?: true
+  intentSolAmount?: true
+  lamportsDelta?: true
+  txFeeLamports?: true
   tokenAmount?: true
   pricePerToken?: true
-  jitoTipLamports?: true
   referenceId?: true
   description?: true
   errorMessage?: true
@@ -189,9 +207,11 @@ export type AppTransactionCountAggregateInputType = {
   fromAddress?: true
   toAddress?: true
   solAmount?: true
+  intentSolAmount?: true
+  lamportsDelta?: true
+  txFeeLamports?: true
   tokenAmount?: true
   pricePerToken?: true
-  jitoTipLamports?: true
   referenceId?: true
   description?: true
   errorMessage?: true
@@ -300,9 +320,11 @@ export type AppTransactionGroupByOutputType = {
   fromAddress: string | null
   toAddress: string | null
   solAmount: runtime.Decimal | null
+  intentSolAmount: runtime.Decimal | null
+  lamportsDelta: bigint | null
+  txFeeLamports: number | null
   tokenAmount: runtime.Decimal | null
   pricePerToken: runtime.Decimal | null
-  jitoTipLamports: number | null
   referenceId: string | null
   description: string | null
   errorMessage: string | null
@@ -347,9 +369,11 @@ export type AppTransactionWhereInput = {
   fromAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   toAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   solAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.BigIntNullableFilter<"AppTransaction"> | bigint | number | null
+  txFeeLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   tokenAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   referenceId?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   description?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
@@ -373,9 +397,11 @@ export type AppTransactionOrderByWithRelationInput = {
   fromAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   toAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   solAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrderInput | Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrderInput | Prisma.SortOrder
   tokenAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   pricePerToken?: Prisma.SortOrderInput | Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrderInput | Prisma.SortOrder
   referenceId?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -388,6 +414,7 @@ export type AppTransactionOrderByWithRelationInput = {
 
 export type AppTransactionWhereUniqueInput = Prisma.AtLeast<{
   id?: string
+  transactionSignature_walletPublicKey?: Prisma.AppTransactionTransactionSignatureWalletPublicKeyCompoundUniqueInput
   AND?: Prisma.AppTransactionWhereInput | Prisma.AppTransactionWhereInput[]
   OR?: Prisma.AppTransactionWhereInput[]
   NOT?: Prisma.AppTransactionWhereInput | Prisma.AppTransactionWhereInput[]
@@ -402,9 +429,11 @@ export type AppTransactionWhereUniqueInput = Prisma.AtLeast<{
   fromAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   toAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   solAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.BigIntNullableFilter<"AppTransaction"> | bigint | number | null
+  txFeeLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   tokenAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   referenceId?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   description?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
@@ -413,7 +442,7 @@ export type AppTransactionWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"AppTransaction"> | Date | string
   user?: Prisma.XOR<Prisma.UserScalarRelationFilter, Prisma.UserWhereInput>
   token?: Prisma.XOR<Prisma.TokenNullableScalarRelationFilter, Prisma.TokenWhereInput> | null
-}, "id">
+}, "id" | "transactionSignature_walletPublicKey">
 
 export type AppTransactionOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -428,9 +457,11 @@ export type AppTransactionOrderByWithAggregationInput = {
   fromAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   toAddress?: Prisma.SortOrderInput | Prisma.SortOrder
   solAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrderInput | Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrderInput | Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrderInput | Prisma.SortOrder
   tokenAmount?: Prisma.SortOrderInput | Prisma.SortOrder
   pricePerToken?: Prisma.SortOrderInput | Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrderInput | Prisma.SortOrder
   referenceId?: Prisma.SortOrderInput | Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
   errorMessage?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -460,9 +491,11 @@ export type AppTransactionScalarWhereWithAggregatesInput = {
   fromAddress?: Prisma.StringNullableWithAggregatesFilter<"AppTransaction"> | string | null
   toAddress?: Prisma.StringNullableWithAggregatesFilter<"AppTransaction"> | string | null
   solAmount?: Prisma.DecimalNullableWithAggregatesFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.DecimalNullableWithAggregatesFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.BigIntNullableWithAggregatesFilter<"AppTransaction"> | bigint | number | null
+  txFeeLamports?: Prisma.IntNullableWithAggregatesFilter<"AppTransaction"> | number | null
   tokenAmount?: Prisma.DecimalNullableWithAggregatesFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.DecimalNullableWithAggregatesFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.IntNullableWithAggregatesFilter<"AppTransaction"> | number | null
   referenceId?: Prisma.StringNullableWithAggregatesFilter<"AppTransaction"> | string | null
   description?: Prisma.StringNullableWithAggregatesFilter<"AppTransaction"> | string | null
   errorMessage?: Prisma.StringNullableWithAggregatesFilter<"AppTransaction"> | string | null
@@ -482,9 +515,11 @@ export type AppTransactionCreateInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -508,9 +543,11 @@ export type AppTransactionUncheckedCreateInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -530,9 +567,11 @@ export type AppTransactionUpdateInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -556,9 +595,11 @@ export type AppTransactionUncheckedUpdateInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -580,9 +621,11 @@ export type AppTransactionCreateManyInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -602,9 +645,11 @@ export type AppTransactionUpdateManyMutationInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -626,9 +671,11 @@ export type AppTransactionUncheckedUpdateManyInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -647,6 +694,11 @@ export type AppTransactionOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
 }
 
+export type AppTransactionTransactionSignatureWalletPublicKeyCompoundUniqueInput = {
+  transactionSignature: string
+  walletPublicKey: string
+}
+
 export type AppTransactionCountOrderByAggregateInput = {
   id?: Prisma.SortOrder
   userId?: Prisma.SortOrder
@@ -660,9 +712,11 @@ export type AppTransactionCountOrderByAggregateInput = {
   fromAddress?: Prisma.SortOrder
   toAddress?: Prisma.SortOrder
   solAmount?: Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrder
   tokenAmount?: Prisma.SortOrder
   pricePerToken?: Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrder
   referenceId?: Prisma.SortOrder
   description?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
@@ -673,9 +727,11 @@ export type AppTransactionCountOrderByAggregateInput = {
 
 export type AppTransactionAvgOrderByAggregateInput = {
   solAmount?: Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrder
   tokenAmount?: Prisma.SortOrder
   pricePerToken?: Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrder
 }
 
 export type AppTransactionMaxOrderByAggregateInput = {
@@ -691,9 +747,11 @@ export type AppTransactionMaxOrderByAggregateInput = {
   fromAddress?: Prisma.SortOrder
   toAddress?: Prisma.SortOrder
   solAmount?: Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrder
   tokenAmount?: Prisma.SortOrder
   pricePerToken?: Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrder
   referenceId?: Prisma.SortOrder
   description?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
@@ -715,9 +773,11 @@ export type AppTransactionMinOrderByAggregateInput = {
   fromAddress?: Prisma.SortOrder
   toAddress?: Prisma.SortOrder
   solAmount?: Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrder
   tokenAmount?: Prisma.SortOrder
   pricePerToken?: Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrder
   referenceId?: Prisma.SortOrder
   description?: Prisma.SortOrder
   errorMessage?: Prisma.SortOrder
@@ -728,9 +788,11 @@ export type AppTransactionMinOrderByAggregateInput = {
 
 export type AppTransactionSumOrderByAggregateInput = {
   solAmount?: Prisma.SortOrder
+  intentSolAmount?: Prisma.SortOrder
+  lamportsDelta?: Prisma.SortOrder
+  txFeeLamports?: Prisma.SortOrder
   tokenAmount?: Prisma.SortOrder
   pricePerToken?: Prisma.SortOrder
-  jitoTipLamports?: Prisma.SortOrder
 }
 
 export type AppTransactionCreateNestedManyWithoutUserInput = {
@@ -852,9 +914,11 @@ export type AppTransactionCreateWithoutUserInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -876,9 +940,11 @@ export type AppTransactionUncheckedCreateWithoutUserInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -929,9 +995,11 @@ export type AppTransactionScalarWhereInput = {
   fromAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   toAddress?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   solAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.BigIntNullableFilter<"AppTransaction"> | bigint | number | null
+  txFeeLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   tokenAmount?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.DecimalNullableFilter<"AppTransaction"> | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.IntNullableFilter<"AppTransaction"> | number | null
   referenceId?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   description?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
   errorMessage?: Prisma.StringNullableFilter<"AppTransaction"> | string | null
@@ -951,9 +1019,11 @@ export type AppTransactionCreateWithoutTokenInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -975,9 +1045,11 @@ export type AppTransactionUncheckedCreateWithoutTokenInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -1024,9 +1096,11 @@ export type AppTransactionCreateManyUserInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -1046,9 +1120,11 @@ export type AppTransactionUpdateWithoutUserInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1070,9 +1146,11 @@ export type AppTransactionUncheckedUpdateWithoutUserInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1093,9 +1171,11 @@ export type AppTransactionUncheckedUpdateManyWithoutUserInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1116,9 +1196,11 @@ export type AppTransactionCreateManyTokenInput = {
   fromAddress?: string | null
   toAddress?: string | null
   solAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: bigint | number | null
+  txFeeLamports?: number | null
   tokenAmount?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: number | null
   referenceId?: string | null
   description?: string | null
   errorMessage?: string | null
@@ -1138,9 +1220,11 @@ export type AppTransactionUpdateWithoutTokenInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1162,9 +1246,11 @@ export type AppTransactionUncheckedUpdateWithoutTokenInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1185,9 +1271,11 @@ export type AppTransactionUncheckedUpdateManyWithoutTokenInput = {
   fromAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   toAddress?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   solAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  intentSolAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
+  lamportsDelta?: Prisma.NullableBigIntFieldUpdateOperationsInput | bigint | number | null
+  txFeeLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   tokenAmount?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
   pricePerToken?: Prisma.NullableDecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string | null
-  jitoTipLamports?: Prisma.NullableIntFieldUpdateOperationsInput | number | null
   referenceId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1211,9 +1299,11 @@ export type AppTransactionSelect<ExtArgs extends runtime.Types.Extensions.Intern
   fromAddress?: boolean
   toAddress?: boolean
   solAmount?: boolean
+  intentSolAmount?: boolean
+  lamportsDelta?: boolean
+  txFeeLamports?: boolean
   tokenAmount?: boolean
   pricePerToken?: boolean
-  jitoTipLamports?: boolean
   referenceId?: boolean
   description?: boolean
   errorMessage?: boolean
@@ -1237,9 +1327,11 @@ export type AppTransactionSelectCreateManyAndReturn<ExtArgs extends runtime.Type
   fromAddress?: boolean
   toAddress?: boolean
   solAmount?: boolean
+  intentSolAmount?: boolean
+  lamportsDelta?: boolean
+  txFeeLamports?: boolean
   tokenAmount?: boolean
   pricePerToken?: boolean
-  jitoTipLamports?: boolean
   referenceId?: boolean
   description?: boolean
   errorMessage?: boolean
@@ -1263,9 +1355,11 @@ export type AppTransactionSelectUpdateManyAndReturn<ExtArgs extends runtime.Type
   fromAddress?: boolean
   toAddress?: boolean
   solAmount?: boolean
+  intentSolAmount?: boolean
+  lamportsDelta?: boolean
+  txFeeLamports?: boolean
   tokenAmount?: boolean
   pricePerToken?: boolean
-  jitoTipLamports?: boolean
   referenceId?: boolean
   description?: boolean
   errorMessage?: boolean
@@ -1289,9 +1383,11 @@ export type AppTransactionSelectScalar = {
   fromAddress?: boolean
   toAddress?: boolean
   solAmount?: boolean
+  intentSolAmount?: boolean
+  lamportsDelta?: boolean
+  txFeeLamports?: boolean
   tokenAmount?: boolean
   pricePerToken?: boolean
-  jitoTipLamports?: boolean
   referenceId?: boolean
   description?: boolean
   errorMessage?: boolean
@@ -1300,7 +1396,7 @@ export type AppTransactionSelectScalar = {
   updatedAt?: boolean
 }
 
-export type AppTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tokenPublicKey" | "type" | "source" | "status" | "transactionSignature" | "bundleId" | "walletPublicKey" | "fromAddress" | "toAddress" | "solAmount" | "tokenAmount" | "pricePerToken" | "jitoTipLamports" | "referenceId" | "description" | "errorMessage" | "blockTime" | "createdAt" | "updatedAt", ExtArgs["result"]["appTransaction"]>
+export type AppTransactionOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "userId" | "tokenPublicKey" | "type" | "source" | "status" | "transactionSignature" | "bundleId" | "walletPublicKey" | "fromAddress" | "toAddress" | "solAmount" | "intentSolAmount" | "lamportsDelta" | "txFeeLamports" | "tokenAmount" | "pricePerToken" | "referenceId" | "description" | "errorMessage" | "blockTime" | "createdAt" | "updatedAt", ExtArgs["result"]["appTransaction"]>
 export type AppTransactionInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   token?: boolean | Prisma.AppTransaction$tokenArgs<ExtArgs>
@@ -1333,9 +1429,11 @@ export type $AppTransactionPayload<ExtArgs extends runtime.Types.Extensions.Inte
     fromAddress: string | null
     toAddress: string | null
     solAmount: runtime.Decimal | null
+    intentSolAmount: runtime.Decimal | null
+    lamportsDelta: bigint | null
+    txFeeLamports: number | null
     tokenAmount: runtime.Decimal | null
     pricePerToken: runtime.Decimal | null
-    jitoTipLamports: number | null
     referenceId: string | null
     description: string | null
     errorMessage: string | null
@@ -1779,9 +1877,11 @@ export interface AppTransactionFieldRefs {
   readonly fromAddress: Prisma.FieldRef<"AppTransaction", 'String'>
   readonly toAddress: Prisma.FieldRef<"AppTransaction", 'String'>
   readonly solAmount: Prisma.FieldRef<"AppTransaction", 'Decimal'>
+  readonly intentSolAmount: Prisma.FieldRef<"AppTransaction", 'Decimal'>
+  readonly lamportsDelta: Prisma.FieldRef<"AppTransaction", 'BigInt'>
+  readonly txFeeLamports: Prisma.FieldRef<"AppTransaction", 'Int'>
   readonly tokenAmount: Prisma.FieldRef<"AppTransaction", 'Decimal'>
   readonly pricePerToken: Prisma.FieldRef<"AppTransaction", 'Decimal'>
-  readonly jitoTipLamports: Prisma.FieldRef<"AppTransaction", 'Int'>
   readonly referenceId: Prisma.FieldRef<"AppTransaction", 'String'>
   readonly description: Prisma.FieldRef<"AppTransaction", 'String'>
   readonly errorMessage: Prisma.FieldRef<"AppTransaction", 'String'>

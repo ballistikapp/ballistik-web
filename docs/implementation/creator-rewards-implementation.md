@@ -131,10 +131,10 @@ Full claim flow with concurrency locking:
 ### P&L Formula
 
 ```
-net = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
+net = totalSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - jitoTipsSol - creationCostSol
 ```
 
-Only confirmed `REWARD_PAYOUT` rows feed P&L. The `creatorRewardsClaimedSol` field is queried from AppTransaction alongside other cost/revenue queries.
+Only confirmed `REWARD_PAYOUT` rows feed the creator rewards portion of P&L. The `creatorRewardsClaimedSol` field is queried from AppTransaction alongside other app-executed trade, fee, tip, and launch residual queries.
 
 ### UI Components
 

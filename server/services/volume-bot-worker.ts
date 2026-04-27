@@ -30,6 +30,7 @@ import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { walletService } from "@/server/services/wallet.service";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { dashboardEvents } from "@/server/events/dashboard-events";
 import { persistVolumeBotLog } from "@/server/services/log-persistence.service";
@@ -412,7 +413,7 @@ export const processVolumeBotWalletRange = async (
         tokenPublicKey: session.tokenPublicKey,
         walletPublicKey: volumeWallet.walletPublicKey,
         fromAddress: volumeWallet.walletPublicKey,
-        solAmount: action === "BUY" ? tradeAmountSol : null,
+        intentSolAmount: action === "BUY" ? -tradeAmountSol : tradeAmountSol,
         referenceId: session.id,
       })
       .then((r) => r.id)
@@ -588,7 +589,14 @@ export const processVolumeBotWalletRange = async (
     }
 
     if (signature) {
-      if (tradeTrackId) await appTransactionService.confirm(tradeTrackId, { signature }).catch(() => {});
+      if (tradeTrackId) {
+        await appTransactionService.confirm(tradeTrackId, { signature }).catch(() => {});
+        await settleSignature({
+          signature,
+          rows: [{ id: tradeTrackId, walletPublicKey: volumeWallet.walletPublicKey }],
+          connection,
+        }).catch(() => {});
+      }
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "volume-bot-worker",
@@ -618,6 +626,18 @@ export const processVolumeBotWalletRange = async (
       action === "BUY" ? Math.abs(solDelta) : -Math.abs(solDelta);
     const now = new Date();
     const actualSolAbs = Math.abs(solDelta);
+    if (tradeTrackId) {
+      await appTransactionService
+        .settleTrade(tradeTrackId, {
+          signature,
+          tokenAmount: Number(tokenAmount) / 1_000_000,
+          pricePerToken:
+            tokenAmount > BigInt(0)
+              ? actualSolAbs / (Number(tokenAmount) / 1_000_000)
+              : null,
+        })
+        .catch(() => {});
+    }
     let pauseWallet = false;
     let slippage: number | null = null;
     if (tradeAmountSol > 0) {
@@ -1037,7 +1057,14 @@ export const closeVolumeBotAccounts = async (sessionId: string) => {
         .then((r) => r.id)
         .catch(() => null);
       const signature = await sendAndConfirmTransaction(connection, tx, [walletKeypair]);
-      if (closeTrackId) await appTransactionService.confirm(closeTrackId, { signature }).catch(() => {});
+      if (closeTrackId) {
+        await appTransactionService.confirm(closeTrackId, { signature }).catch(() => {});
+        await settleSignature({
+          signature,
+          rows: [{ id: closeTrackId, walletPublicKey: volumeWallet.walletPublicKey }],
+          connection,
+        }).catch(() => {});
+      }
       await testRunLogService.appendServerEvent({
         eventType: "wallet_transaction",
         source: "volume-bot-worker",

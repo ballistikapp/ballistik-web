@@ -6,6 +6,7 @@ import { getEnv } from "@/lib/config/env";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { retryRpc } from "@/lib/utils/rpc-retry";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
 import { derivePumpAddresses, DISCRIMINATORS } from "@/server/solana/pump-new-idl";
 import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
@@ -663,7 +664,7 @@ export const creatorRewardsService = {
         source: "CREATOR_REWARD",
         tokenPublicKey,
         walletPublicKey: creatorWallet.publicKey,
-        solAmount: lamportsToSol(vaultRewards),
+        intentSolAmount: lamportsToSol(vaultRewards),
       });
       const claimTrackId = claimRecord.id;
 
@@ -680,6 +681,11 @@ export const creatorRewardsService = {
           signature,
           blockTime: new Date(),
         });
+        await settleSignature({
+          signature,
+          rows: [{ id: claimTrackId, walletPublicKey: creatorWallet.publicKey }],
+          connection,
+        }).catch(() => {});
 
         log.info("Pump claim successful", {
           signature,
@@ -711,7 +717,9 @@ export const creatorRewardsService = {
       const rewardsFromVault = pumpClaimedLamports + TX_FEE_LAMPORTS;
       const ledgerDeduction = rewardsFromVault < claimableLamports ? rewardsFromVault : claimableLamports;
 
-      const payoutRecord = await appTransactionService.create({
+      const isSelfPayout = creatorWallet.publicKey === user.mainWallet.publicKey;
+      const payoutTrackRows: { id: string; walletPublicKey: string }[] = [];
+      const payoutSenderRecord = await appTransactionService.create({
         userId,
         type: "REWARD_PAYOUT",
         source: "CREATOR_REWARD",
@@ -719,9 +727,29 @@ export const creatorRewardsService = {
         walletPublicKey: creatorWallet.publicKey,
         fromAddress: creatorWallet.publicKey,
         toAddress: user.mainWallet.publicKey,
-        solAmount: lamportsToSol(payoutLamports),
+        intentSolAmount: isSelfPayout ? 0 : -lamportsToSol(payoutLamports),
       });
-      const payoutTrackId = payoutRecord.id;
+      payoutTrackRows.push({
+        id: payoutSenderRecord.id,
+        walletPublicKey: creatorWallet.publicKey,
+      });
+      if (!isSelfPayout) {
+        const payoutReceiverRecord = await appTransactionService.create({
+          userId,
+          type: "REWARD_PAYOUT",
+          source: "CREATOR_REWARD",
+          tokenPublicKey,
+          walletPublicKey: user.mainWallet.publicKey,
+          fromAddress: creatorWallet.publicKey,
+          toAddress: user.mainWallet.publicKey,
+          intentSolAmount: lamportsToSol(payoutLamports),
+        });
+        payoutTrackRows.push({
+          id: payoutReceiverRecord.id,
+          walletPublicKey: user.mainWallet.publicKey,
+        });
+      }
+      const payoutTrackIds = payoutTrackRows.map((r) => r.id);
 
       try {
         const payoutSignature = await payoutToMainWallet(
@@ -738,10 +766,15 @@ export const creatorRewardsService = {
           },
         });
 
-        await appTransactionService.confirm(payoutTrackId, {
+        await appTransactionService.confirmMany(payoutTrackIds, {
           signature: payoutSignature,
           blockTime: new Date(),
         });
+        await settleSignature({
+          signature: payoutSignature,
+          rows: payoutTrackRows,
+          connection,
+        }).catch(() => {});
 
         invalidateStatsCache(tokenPublicKey);
 
@@ -762,7 +795,7 @@ export const creatorRewardsService = {
         };
       } catch (error) {
         const msg = error instanceof Error ? error.message : String(error);
-        await appTransactionService.fail(payoutTrackId, { errorMessage: msg }).catch(() => {});
+        await appTransactionService.failMany(payoutTrackIds, { errorMessage: msg }).catch(() => {});
         if (error instanceof AppError) throw error;
         throw new AppError("Reward payout failed. Please try again.", 500);
       }

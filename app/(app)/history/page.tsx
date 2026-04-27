@@ -204,7 +204,6 @@ export default function HistoryPage() {
           fromAddress: false,
           toAddress: false,
           bundleId: false,
-          jitoTipLamports: false,
           errorMessage: false,
           transactionSignature: false,
         }}

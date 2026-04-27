@@ -166,6 +166,7 @@ export function HoldingSellExitDialog({
     []
   );
   const autoRefreshRunRef = React.useRef(false);
+  const wasDialogOpenRef = React.useRef(false);
 
   const { data: currentUser } = trpc.auth.me.useQuery();
   const selectedMode = Boolean(selectedHoldings);
@@ -217,9 +218,11 @@ export function HoldingSellExitDialog({
   ]);
 
   React.useEffect(() => {
-    if (!open) return;
-    setActiveTab(initialTab);
-  }, [initialTab, open]);
+    if (open && !wasDialogOpenRef.current) {
+      setActiveTab(initialTab);
+    }
+    wasDialogOpenRef.current = open;
+  }, [open, initialTab]);
 
   React.useEffect(() => {
     if (!open) return;

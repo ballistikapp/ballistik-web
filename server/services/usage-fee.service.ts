@@ -17,6 +17,7 @@ import { rpcConfig } from "@/lib/config/rpc.config";
 import { retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import type { AppTransactionSource, AppTransactionType } from "@/lib/generated/prisma/client";
 
 type CollectUsageFeeInput = {
@@ -163,15 +164,16 @@ export const usageFeeService = {
     const isSubscriptionFee = input.reason === "pro.weekly" || input.reason === "developer.weekly";
     const feeType: AppTransactionType = isSubscriptionFee ? "FEE_SUBSCRIPTION" : "FEE_USAGE";
     const feeSource: AppTransactionSource = input.txSource ?? (isSubscriptionFee ? "BILLING" : "WALLET");
+    const senderPk = sender.publicKey.toBase58();
     const trackId = await appTransactionService
       .create({
         userId: input.userId,
         type: feeType,
         source: feeSource,
-        walletPublicKey: sender.publicKey.toBase58(),
-        fromAddress: sender.publicKey.toBase58(),
+        walletPublicKey: senderPk,
+        fromAddress: senderPk,
         toAddress: collectorPublicKey.toBase58(),
-        solAmount: input.totalFeeSol,
+        intentSolAmount: -input.totalFeeSol,
         tokenPublicKey: input.tokenPublicKey,
         referenceId: input.referenceId,
       })
@@ -194,7 +196,14 @@ export const usageFeeService = {
           throw error;
         }
       }
-      if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+      if (trackId) {
+        await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+        await settleSignature({
+          signature,
+          rows: [{ id: trackId, walletPublicKey: senderPk }],
+          connection,
+        }).catch(() => {});
+      }
     } catch (error) {
       if (trackId) await appTransactionService.fail(trackId, { errorMessage: error instanceof Error ? error.message : "Unknown error" }).catch(() => {});
       throw error;

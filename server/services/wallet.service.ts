@@ -36,6 +36,7 @@ import type {
 } from "@/server/schemas/wallet.schema";
 import { withActionLock } from "@/server/security/api-abuse";
 import { appTransactionService } from "@/server/services/app-transaction.service";
+import { settleSignature } from "@/server/services/app-transaction-settler";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { usageFeeService } from "@/server/services/usage-fee.service";
@@ -403,15 +404,16 @@ export const walletService = {
         };
       };
 
+      const senderPk = sender.publicKey.toBase58();
       const trackId = await appTransactionService
         .create({
           userId,
           type: "TRANSFER_WITHDRAW",
           source: source ?? "WALLET",
-          walletPublicKey: sender.publicKey.toBase58(),
-          fromAddress: sender.publicKey.toBase58(),
+          walletPublicKey: senderPk,
+          fromAddress: senderPk,
           toAddress: destinationPublicKey,
-          solAmount: amountSol,
+          intentSolAmount: amountSol != null ? -amountSol : null,
         })
         .then((r) => r.id)
         .catch(() => null);
@@ -427,7 +429,14 @@ export const walletService = {
             throw error;
           }
         }
-        if (trackId) await appTransactionService.confirm(trackId, { signature: submitted.signature }).catch(() => {});
+        if (trackId) {
+          await appTransactionService.confirm(trackId, { signature: submitted.signature }).catch(() => {});
+          await settleSignature({
+            signature: submitted.signature,
+            rows: [{ id: trackId, walletPublicKey: senderPk }],
+            connection,
+          }).catch(() => {});
+        }
       } catch (error) {
         if (trackId) await appTransactionService.fail(trackId, { errorMessage: error instanceof Error ? error.message : "Unknown error" }).catch(() => {});
         throw error;
@@ -976,19 +985,36 @@ export const walletService = {
       targets,
       transferConcurrency,
       async (publicKey) => {
-        const trackId = await appTransactionService
+        const senderPk = sender.publicKey.toBase58();
+        const trackRows: { id: string; walletPublicKey: string }[] = [];
+        const senderId = await appTransactionService
           .create({
             userId,
             type: "TRANSFER_FUND",
             source: source ?? "WALLET",
             tokenPublicKey,
-            walletPublicKey: sender.publicKey.toBase58(),
-            fromAddress: sender.publicKey.toBase58(),
+            walletPublicKey: senderPk,
+            fromAddress: senderPk,
             toAddress: publicKey,
-            solAmount: amountSol,
+            intentSolAmount: -amountSol,
           })
           .then((r) => r.id)
           .catch(() => null);
+        if (senderId) trackRows.push({ id: senderId, walletPublicKey: senderPk });
+        const receiverId = await appTransactionService
+          .create({
+            userId,
+            type: "TRANSFER_FUND",
+            source: source ?? "WALLET",
+            tokenPublicKey,
+            walletPublicKey: publicKey,
+            fromAddress: senderPk,
+            toAddress: publicKey,
+            intentSolAmount: amountSol,
+          })
+          .then((r) => r.id)
+          .catch(() => null);
+        if (receiverId) trackRows.push({ id: receiverId, walletPublicKey: publicKey });
         try {
           const destination = new PublicKey(publicKey);
           const sendTransfer = async () => {
@@ -1016,9 +1042,30 @@ export const walletService = {
             );
           };
 
+          const settleAfterConfirm = async (signature: string) => {
+            if (trackRows.length > 0) {
+              await appTransactionService
+                .confirmMany(
+                  trackRows.map((r) => r.id),
+                  { signature }
+                )
+                .catch(() => {});
+              await settleSignature({ signature, rows: trackRows, connection }).catch(() => {});
+            }
+          };
+          const failAllTracked = async (message: string) => {
+            if (trackRows.length > 0) {
+              await appTransactionService
+                .failMany(
+                  trackRows.map((r) => r.id),
+                  { errorMessage: message }
+                )
+                .catch(() => {});
+            }
+          };
           try {
             const signature = await sendTransfer();
-            if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+            await settleAfterConfirm(signature);
             return {
               publicKey,
               status: "SUBMITTED" as const,
@@ -1028,7 +1075,7 @@ export const walletService = {
             if (error instanceof TransactionExpiredBlockheightExceededError) {
               try {
                 const signature = await sendTransfer();
-                if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+                await settleAfterConfirm(signature);
                 return {
                   publicKey,
                   status: "SUBMITTED" as const,
@@ -1040,7 +1087,7 @@ export const walletService = {
                     ? retryError.message
                     : String(retryError);
                 log.error("Retry transfer failed", { errorMessage: message });
-                if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
+                await failAllTracked(message);
                 return {
                   publicKey,
                   status: "FAILED" as const,
@@ -1052,7 +1099,7 @@ export const walletService = {
             const message =
               error instanceof Error ? error.message : String(error);
             log.error("Transfer failed", { errorMessage: message });
-            if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
+            await failAllTracked(message);
             return {
               publicKey,
               status: "FAILED" as const,
@@ -1271,19 +1318,41 @@ export const walletService = {
       transferConcurrency,
       async (wallet) => {
         const sender = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
-        const trackId = await appTransactionService
+        const senderPk = wallet.publicKey;
+        const mainPk = mainWallet.publicKey;
+        const isSelf = senderPk === mainPk;
+        const intentSol = amountSol ?? 0;
+        const trackRows: { id: string; walletPublicKey: string }[] = [];
+        const senderId = await appTransactionService
           .create({
             userId,
             type: "TRANSFER_RETURN",
             source: source ?? "WALLET",
             tokenPublicKey,
-            walletPublicKey: wallet.publicKey,
-            fromAddress: wallet.publicKey,
-            toAddress: mainWallet.publicKey,
-            solAmount: amountSol,
+            walletPublicKey: senderPk,
+            fromAddress: senderPk,
+            toAddress: mainPk,
+            intentSolAmount: isSelf ? 0 : -intentSol,
           })
           .then((r) => r.id)
           .catch(() => null);
+        if (senderId) trackRows.push({ id: senderId, walletPublicKey: senderPk });
+        if (!isSelf) {
+          const receiverId = await appTransactionService
+            .create({
+              userId,
+              type: "TRANSFER_RETURN",
+              source: source ?? "WALLET",
+              tokenPublicKey,
+              walletPublicKey: mainPk,
+              fromAddress: senderPk,
+              toAddress: mainPk,
+              intentSolAmount: intentSol,
+            })
+            .then((r) => r.id)
+            .catch(() => null);
+          if (receiverId) trackRows.push({ id: receiverId, walletPublicKey: mainPk });
+        }
 
         const computeLamports = async (blockhash: string) => {
           if (useMax) {
@@ -1364,17 +1433,33 @@ export const walletService = {
           );
         };
 
+        const trackIds = trackRows.map((r) => r.id);
+        const settleAfterConfirm = async (signature: string) => {
+          if (trackIds.length > 0) {
+            await appTransactionService
+              .confirmMany(trackIds, { signature })
+              .catch(() => {});
+            await settleSignature({ signature, rows: trackRows, connection }).catch(() => {});
+          }
+        };
+        const failAllTracked = async (message: string) => {
+          if (trackIds.length > 0) {
+            await appTransactionService
+              .failMany(trackIds, { errorMessage: message })
+              .catch(() => {});
+          }
+        };
         try {
           const signature = await sendTransfer();
           if (!signature) {
-            if (trackId) await appTransactionService.fail(trackId, { errorMessage: "Zero balance" }).catch(() => {});
+            await failAllTracked("Zero balance");
             return {
               publicKey: wallet.publicKey,
               status: "SKIPPED" as const,
               signature: null,
             };
           }
-          if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+          await settleAfterConfirm(signature);
           return {
             publicKey: wallet.publicKey,
             status: "SUBMITTED" as const,
@@ -1385,14 +1470,14 @@ export const walletService = {
             try {
               const signature = await sendTransfer();
               if (!signature) {
-                if (trackId) await appTransactionService.fail(trackId, { errorMessage: "Zero balance" }).catch(() => {});
+                await failAllTracked("Zero balance");
                 return {
                   publicKey: wallet.publicKey,
                   status: "SKIPPED" as const,
                   signature: null,
                 };
               }
-              if (trackId) await appTransactionService.confirm(trackId, { signature }).catch(() => {});
+              await settleAfterConfirm(signature);
               return {
                 publicKey: wallet.publicKey,
                 status: "SUBMITTED" as const,
@@ -1404,7 +1489,7 @@ export const walletService = {
                   ? retryError.message
                   : String(retryError);
               log.error("Retry transfer failed", { errorMessage: message });
-              if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
+              await failAllTracked(message);
               return {
                 publicKey: wallet.publicKey,
                 status: "FAILED" as const,
@@ -1416,7 +1501,7 @@ export const walletService = {
           const message =
             error instanceof Error ? error.message : String(error);
           log.error("Transfer failed", { errorMessage: message });
-          if (trackId) await appTransactionService.fail(trackId, { errorMessage: message }).catch(() => {});
+          await failAllTracked(message);
           return {
             publicKey: wallet.publicKey,
             status: "FAILED" as const,

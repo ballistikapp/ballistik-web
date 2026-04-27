@@ -235,7 +235,7 @@ async function setupDashboardPnlTest(
         return { _sum: { solAmount: launch ? launchReturnSol : 0 } };
       }
 
-      return { _sum: { solAmount: 0, jitoTipLamports: 0 } };
+      return { _sum: { solAmount: 0 } };
     }) as typeof prisma.appTransaction.aggregate
   );
   restore(

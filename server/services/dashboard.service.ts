@@ -14,6 +14,8 @@ import { testRunLogService } from "@/server/services/test-run-log.service";
 import { getEnv } from "@/lib/config/env";
 import { logger } from "@/lib/logger";
 import { calculateLaunchUsageFees } from "@/lib/config/usage-fees.config";
+import { settleUnsettledForToken } from "@/server/services/app-transaction-settler";
+import type { AppTransactionType } from "@/lib/generated/prisma/client";
 
 const log = logger.child({ service: "dashboard" });
 
@@ -143,83 +145,82 @@ async function getWalletKeys(tokenPublicKey: string, userId: string) {
 }
 
 async function getOperationalCosts(tokenPublicKey: string, userId: string) {
+  // Trigger backstop sweep for any CONFIRMED row missing lamportsDelta. Bounded
+  // and idempotent — keeps the dashboard authoritative even after RPC blips.
+  await settleUnsettledForToken({ userId, tokenPublicKey, limit: 50 }).catch(
+    () => {}
+  );
+
   const confirmedWhere = { userId, tokenPublicKey, status: "CONFIRMED" as const };
 
-  const [feeAgg, jitoTipAgg, launchReturnAgg, launch, tokenDevWallet] = await Promise.all([
-    prisma.appTransaction.groupBy({
-      by: ["source"],
-      where: { ...confirmedWhere, type: "FEE_USAGE" },
-      _sum: { solAmount: true },
-    }),
-    prisma.appTransaction.aggregate({
-      where: { ...confirmedWhere, jitoTipLamports: { not: null } },
-      _sum: { jitoTipLamports: true },
-    }),
-    prisma.appTransaction.aggregate({
-      where: { ...confirmedWhere, type: "TRANSFER_RETURN", source: "LAUNCH" },
-      _sum: { solAmount: true },
-    }),
-    prisma.launch.findFirst({
-      where: { tokenPublicKey, userId, status: "SUCCEEDED" },
-      select: { id: true, input: true },
-      orderBy: { createdAt: "desc" },
-    }),
-    prisma.tokenDevWallet.findFirst({
-      where: { tokenPublicKey },
-      select: { walletPublicKey: true },
-    }),
-  ]);
-
-  const devBuyAgg =
-    launch && tokenDevWallet
-      ? await prisma.appTransaction.aggregate({
-          where: {
-            ...confirmedWhere,
-            type: "TRADE_BUY",
-            source: "LAUNCH",
-            referenceId: launch.id,
-            walletPublicKey: tokenDevWallet.walletPublicKey,
-          },
-          _sum: { solAmount: true },
-        })
-      : { _sum: { solAmount: null } };
-  const launchBuyAgg = launch
-    ? await prisma.appTransaction.aggregate({
+  const [byTypeRows, feeBySourceRows, unsettledCount, launch] = await Promise.all(
+    [
+      prisma.appTransaction.groupBy({
+        by: ["type"],
         where: {
           ...confirmedWhere,
-          type: "TRADE_BUY",
-          source: "LAUNCH",
-          referenceId: launch.id,
+          type: { not: "FEE_SUBSCRIPTION" },
+          lamportsDelta: { not: null },
         },
-        _sum: { solAmount: true },
-      })
-    : { _sum: { solAmount: null } };
+        _sum: { lamportsDelta: true },
+      }),
+      prisma.appTransaction.groupBy({
+        by: ["source"],
+        where: {
+          ...confirmedWhere,
+          type: "FEE_USAGE",
+          lamportsDelta: { not: null },
+        },
+        _sum: { lamportsDelta: true },
+      }),
+      prisma.appTransaction.count({
+        where: { ...confirmedWhere, lamportsDelta: null },
+      }),
+      prisma.launch.findFirst({
+        where: { tokenPublicKey, userId, status: "SUCCEEDED" },
+        select: { id: true, input: true },
+        orderBy: { createdAt: "desc" },
+      }),
+    ]
+  );
 
-  // TRANSFER_FUND records don't have tokenPublicKey because wallets are
-  // funded before the mint is generated — query by launch referenceId instead
-  const launchFundAgg = launch
-    ? await prisma.appTransaction.aggregate({
-        where: { userId, status: "CONFIRMED", type: "TRANSFER_FUND", source: "LAUNCH", referenceId: launch.id },
-        _sum: { solAmount: true },
-      })
-    : { _sum: { solAmount: null } };
+  const sumByType = (t: AppTransactionType) =>
+    Number(
+      byTypeRows.find((r) => r.type === t)?._sum.lamportsDelta ?? BigInt(0)
+    ) / 1_000_000_000;
 
   const feeBySource = (source: string) =>
-    round4(Number(feeAgg.find((f) => f.source === source)?._sum.solAmount ?? 0));
-  const launchFees = feeBySource("LAUNCH");
-  const exitFees = feeBySource("EXIT");
-  const volumeBotFees = feeBySource("VOLUME_BOT");
-  const platformFees = round4(launchFees + exitFees + volumeBotFees);
-  const jitoTipsSol = round4(
-    Number(jitoTipAgg._sum.jitoTipLamports ?? 0) / 1e9
+    Number(
+      feeBySourceRows.find((f) => f.source === source)?._sum.lamportsDelta ??
+        BigInt(0)
+    ) / 1_000_000_000;
+
+  // Signed deltas: outflows < 0, inflows > 0.
+  const tradeBuysDelta = round4(sumByType("TRADE_BUY"));
+  const tradeSellsDelta = round4(sumByType("TRADE_SELL"));
+  const tradeCreatesDelta = round4(sumByType("TRADE_CREATE"));
+  const platformFeesDelta = round4(sumByType("FEE_USAGE"));
+  const jitoTipsDelta = round4(sumByType("JITO_TIP"));
+  const transfersDelta = round4(
+    sumByType("TRANSFER_FUND") +
+      sumByType("TRANSFER_RETURN") +
+      sumByType("TRANSFER_RECLAIM") +
+      sumByType("TRANSFER_WITHDRAW")
   );
-  const devBuySol = round4(Number(devBuyAgg._sum.solAmount ?? 0));
-  const launchBuySol = round4(Number(launchBuyAgg._sum.solAmount ?? 0));
-  const launchFunding = round4(Number(launchFundAgg._sum.solAmount ?? 0));
-  const launchReturns = round4(Number(launchReturnAgg._sum.solAmount ?? 0));
-  const creationCostSol = round4(
-    Math.max(0, launchFunding - launchReturns - launchBuySol)
+  const ataOpsDelta = round4(
+    sumByType("ACCOUNT_ATA_CREATE") + sumByType("ACCOUNT_ATA_CLOSE")
   );
+  const tokenOpsDelta = round4(
+    sumByType("TOKEN_DISTRIBUTE") + sumByType("TOKEN_CONSOLIDATE")
+  );
+  const rewardsClaimDelta = round4(sumByType("REWARD_CLAIM"));
+  const rewardsPayoutDelta = round4(sumByType("REWARD_PAYOUT"));
+  const creatorRewardsDelta = round4(rewardsClaimDelta + rewardsPayoutDelta);
+
+  const launchFeesDelta = round4(feeBySource("LAUNCH"));
+  const exitFeesDelta = round4(feeBySource("EXIT"));
+  const volumeBotFeesDelta = round4(feeBySource("VOLUME_BOT"));
+  const walletFeesDelta = round4(feeBySource("WALLET"));
 
   const launchInput = launch?.input as Record<string, unknown> | null;
   const launchFeeBreakdown = launchInput
@@ -246,15 +247,24 @@ async function getOperationalCosts(tokenPublicKey: string, userId: string) {
     : null;
 
   return {
-    platformFees,
-    launchFees,
+    tradeBuysDelta,
+    tradeSellsDelta,
+    tradeCreatesDelta,
+    platformFeesDelta,
+    jitoTipsDelta,
+    transfersDelta,
+    ataOpsDelta,
+    tokenOpsDelta,
+    creatorRewardsDelta,
+    rewardsClaimDelta,
+    rewardsPayoutDelta,
+    launchFeesDelta,
+    exitFeesDelta,
+    volumeBotFeesDelta,
+    walletFeesDelta,
     launchFeeBreakdown,
-    exitFees,
-    volumeBotFees,
-    jitoTipsSol,
-    totalFees: platformFees,
-    devBuySol,
-    creationCostSol,
+    unsettledRowCount: unsettledCount,
+    isComplete: unsettledCount === 0,
   };
 }
 
@@ -551,20 +561,6 @@ async function getPriceHistory(tokenPublicKey: string) {
   return downsamplePriceHistory(filteredPoints, PRICE_HISTORY_TARGET_POINTS);
 }
 
-async function getClaimedCreatorRewards(tokenPublicKey: string, userId: string): Promise<number> {
-  const agg = await prisma.appTransaction.aggregate({
-    where: {
-      userId,
-      tokenPublicKey,
-      type: "REWARD_PAYOUT",
-      source: "CREATOR_REWARD",
-      status: "CONFIRMED",
-    },
-    _sum: { solAmount: true },
-  });
-  return round4(Number(agg._sum.solAmount ?? 0));
-}
-
 async function buildStatsResponse(
   tokenPublicKey: string,
   userId: string
@@ -596,8 +592,21 @@ async function buildStatsResponse(
   const isComplete = currentPrice?.isComplete ?? false;
 
   const defaultCosts = {
-    platformFees: 0,
-    launchFees: 0,
+    tradeBuysDelta: 0,
+    tradeSellsDelta: 0,
+    tradeCreatesDelta: 0,
+    platformFeesDelta: 0,
+    jitoTipsDelta: 0,
+    transfersDelta: 0,
+    ataOpsDelta: 0,
+    tokenOpsDelta: 0,
+    creatorRewardsDelta: 0,
+    rewardsClaimDelta: 0,
+    rewardsPayoutDelta: 0,
+    launchFeesDelta: 0,
+    exitFeesDelta: 0,
+    volumeBotFeesDelta: 0,
+    walletFeesDelta: 0,
     launchFeeBreakdown: null as {
       generatedWalletFeeSol: number;
       generatedWalletCount: number;
@@ -607,12 +616,8 @@ async function buildStatsResponse(
       attributionRemovalFeeSol: number;
       bundleBuyFeeSol: number;
     } | null,
-    exitFees: 0,
-    volumeBotFees: 0,
-    jitoTipsSol: 0,
-    totalFees: 0,
-    devBuySol: 0,
-    creationCostSol: 0,
+    unsettledRowCount: 0,
+    isComplete: true,
   };
 
   const results = await Promise.allSettled([
@@ -622,7 +627,6 @@ async function buildStatsResponse(
     getOperations(tokenPublicKey, userId),
     getRecentTransactions(tokenPublicKey),
     isComplete ? Promise.resolve([]) : getPriceHistory(tokenPublicKey),
-    getClaimedCreatorRewards(tokenPublicKey, userId),
   ]);
 
   const costs = results[0].status === "fulfilled" ? results[0].value : defaultCosts;
@@ -631,12 +635,11 @@ async function buildStatsResponse(
   const operations = results[3].status === "fulfilled" ? results[3].value : { botSessions: [] };
   const recentTransactions = results[4].status === "fulfilled" ? results[4].value : [];
   const priceHistory = results[5].status === "fulfilled" ? results[5].value : [];
-  const creatorRewardsClaimed = results[6].status === "fulfilled" ? results[6].value : 0;
   const failedSubQueries: string[] = [];
 
   for (const [i, r] of results.entries()) {
     if (r.status === "rejected") {
-      const names = ["costs", "volumes", "holdings", "operations", "transactions", "priceHistory", "creatorRewards"];
+      const names = ["costs", "volumes", "holdings", "operations", "transactions", "priceHistory"];
       failedSubQueries.push(names[i] ?? `unknown-${i}`);
       log.error(`Dashboard sub-query failed: ${names[i]}`, {
         tokenPublicKey,
@@ -646,9 +649,18 @@ async function buildStatsResponse(
   }
 
   const holdingsValue = holdingsBreakdown.holdingsValueSol;
-  const totalBuyVolume = round4(volumes.ownedBuyVolume + costs.devBuySol);
-  const creatorRewardsClaimedSol = round4(creatorRewardsClaimed);
-  const pnl = round4(volumes.ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - costs.totalFees - costs.creationCostSol);
+  // Net P&L is the sum of every signed wallet delta we tracked for the token.
+  const pnl = round4(
+    costs.tradeBuysDelta +
+      costs.tradeSellsDelta +
+      costs.tradeCreatesDelta +
+      costs.platformFeesDelta +
+      costs.jitoTipsDelta +
+      costs.transfersDelta +
+      costs.ataOpsDelta +
+      costs.tokenOpsDelta +
+      costs.creatorRewardsDelta
+  );
 
   const marketCapSol = round4(priceSol * tokenTotalSupply);
 
@@ -686,17 +698,24 @@ async function buildStatsResponse(
       },
       pnl: {
         net: pnl,
-        totalBuyVolume,
-        totalSellVolume: volumes.ownedSellVolume,
-        creatorRewardsClaimedSol,
-        platformFees: costs.platformFees,
-        launchFees: costs.launchFees,
+        tokenBuys: costs.tradeBuysDelta,
+        tokenSells: costs.tradeSellsDelta,
+        tokenCreates: costs.tradeCreatesDelta,
+        platformFees: costs.platformFeesDelta,
+        launchFees: costs.launchFeesDelta,
+        exitFees: costs.exitFeesDelta,
+        volumeBotFees: costs.volumeBotFeesDelta,
+        walletFees: costs.walletFeesDelta,
         launchFeeBreakdown: costs.launchFeeBreakdown,
-        exitFees: costs.exitFees,
-        volumeBotFees: costs.volumeBotFees,
-        jitoTipsSol: costs.jitoTipsSol,
-        totalFees: costs.totalFees,
-        creationCostSol: costs.creationCostSol,
+        jitoTips: costs.jitoTipsDelta,
+        transfers: costs.transfersDelta,
+        ataOps: costs.ataOpsDelta,
+        tokenOps: costs.tokenOpsDelta,
+        creatorRewards: costs.creatorRewardsDelta,
+        rewardsClaim: costs.rewardsClaimDelta,
+        rewardsPayout: costs.rewardsPayoutDelta,
+        unsettledRowCount: costs.unsettledRowCount,
+        isComplete: costs.isComplete,
       },
       activity: {
         totalVolume: round4(

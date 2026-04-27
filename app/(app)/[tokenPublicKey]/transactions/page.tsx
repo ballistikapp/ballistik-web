@@ -35,6 +35,13 @@ function formatSplit(owned: string, external: string) {
   return `Owned ${owned} · External ${external}`;
 }
 
+const DEFAULT_TRANSACTION_METRICS = {
+  buys: { total: 0, owned: 0, external: 0 },
+  sells: { total: 0, owned: 0, external: 0 },
+  volume: { total: 0, owned: 0, external: 0 },
+  traders: { total: 0, owned: 0, external: 0 },
+};
+
 export default function TransactionsPage() {
   const { tokenPublicKey } = useParams<{ tokenPublicKey: string }>();
   const utils = trpc.useUtils();
@@ -61,6 +68,7 @@ export default function TransactionsPage() {
     trpc.transaction.listByToken.useQuery(
       {
         tokenPublicKey: tokenPublicKey || "",
+        groupBySignature: false,
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
       },
@@ -103,51 +111,7 @@ export default function TransactionsPage() {
   const refreshTimestamp = refreshCache?.lastRefreshedAt ?? null;
   const autoRefreshTriggered = useRef(false);
   const lastSnapshotKeyRef = useRef<string | null>(null);
-  const metrics = useMemo(() => {
-    const buyRows = transactions.filter((tx) => tx.transactionType === "BUY");
-    const sellRows = transactions.filter((tx) => tx.transactionType === "SELL");
-    const volumeRows = transactions.filter(
-      (tx) => tx.transactionType === "BUY" || tx.transactionType === "SELL"
-    );
-
-    const ownedBuys = buyRows.filter((tx) => tx.isOwned).length;
-    const externalBuys = buyRows.length - ownedBuys;
-    const ownedSells = sellRows.filter((tx) => tx.isOwned).length;
-    const externalSells = sellRows.length - ownedSells;
-
-    const ownedVolume = volumeRows
-      .filter((tx) => tx.isOwned)
-      .reduce((sum, tx) => sum + Number(tx.solAmount), 0);
-    const externalVolume = volumeRows
-      .filter((tx) => !tx.isOwned)
-      .reduce((sum, tx) => sum + Number(tx.solAmount), 0);
-
-    const ownedTraders = new Set(
-      transactions.filter((tx) => tx.isOwned).map((tx) => tx.walletPublicKey)
-    ).size;
-    const externalTraders = new Set(
-      transactions.filter((tx) => !tx.isOwned).map((tx) => tx.walletPublicKey)
-    ).size;
-
-    return {
-      buys: { total: buyRows.length, owned: ownedBuys, external: externalBuys },
-      sells: {
-        total: sellRows.length,
-        owned: ownedSells,
-        external: externalSells,
-      },
-      volume: {
-        total: ownedVolume + externalVolume,
-        owned: ownedVolume,
-        external: externalVolume,
-      },
-      traders: {
-        total: ownedTraders + externalTraders,
-        owned: ownedTraders,
-        external: externalTraders,
-      },
-    };
-  }, [transactions]);
+  const metrics = transactionsData?.metrics ?? DEFAULT_TRANSACTION_METRICS;
   const metricCards = useMemo(
     () => [
       {
@@ -209,6 +173,7 @@ export default function TransactionsPage() {
       void utils.transaction.listByToken.invalidate();
       const latestTransactions = await utils.transaction.listByToken.fetch({
         tokenPublicKey,
+        groupBySignature: false,
         page: pagination.pageIndex + 1,
         pageSize: pagination.pageSize,
       });

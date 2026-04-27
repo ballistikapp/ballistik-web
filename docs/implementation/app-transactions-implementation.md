@@ -4,7 +4,7 @@
 
 `AppTransaction` is a unified operational ledger that captures every on-chain operation the app produces. It tracks the full lifecycle of transactions from PENDING through CONFIRMED or FAILED.
 
-This table does **not** replace `TokenTransaction`, which tracks market activity (including external traders) and powers price charts, volume metrics, and sell-side P&L. App-initiated trades appear in both tables — they serve different query patterns. The dashboard P&L uses both sources: sell volumes from `TokenTransaction` and dev buy + fee data from `AppTransaction` (see [Dashboard P&L Integration](#dashboard-pl-integration)).
+This table does **not** replace `TokenTransaction`, which tracks market activity (including external traders) and powers price charts, volume metrics, and transaction lists. App-initiated trades appear in both tables — they serve different query patterns. Dashboard P&L is sourced from `AppTransaction` only (see [Dashboard P&L Integration](#dashboard-pl-integration)).
 
 ## Data Model
 
@@ -23,10 +23,12 @@ This table does **not** replace `TokenTransaction`, which tracks market activity
 | `walletPublicKey` | String? | Actor wallet — the wallet performing the action |
 | `fromAddress` | String? | Source address |
 | `toAddress` | String? | Destination address |
-| `solAmount` | Decimal? | SOL amount involved |
+| `intentSolAmount` | Decimal? | Display-only intent value the producer set before send (signed: outflows negative). Never used for P&L. |
+| `solAmount` | Decimal? | **Signed wallet delta in SOL** for `walletPublicKey` on `transactionSignature`, computed from `meta.preBalances`/`postBalances` after confirmation. Outflows negative, inflows positive. P&L is `SUM(solAmount)`. |
+| `lamportsDelta` | BigInt? | Same value as `solAmount` but in raw lamports for exact-precision SUM math. P&L uses this. |
+| `txFeeLamports` | Int? | The portion of `meta.fee` attributable to this row's wallet (non-zero only when the wallet is the fee payer). Informational. |
 | `tokenAmount` | Decimal? | Token amount involved |
 | `pricePerToken` | Decimal? | Price per token (TRADE types only) |
-| `jitoTipLamports` | Int? | Jito tip amount on the last tx in a bundle |
 | `referenceId` | String? | Soft link to related record (launch ID, exit ID, session ID) |
 | `description` | String? | Auto-generated human-readable summary |
 | `errorMessage` | String? | Populated on FAILED status |
@@ -48,7 +50,8 @@ Combined two-level enum. UI derives category by splitting on first underscore.
 | TRANSFER | `TRANSFER_RECLAIM` | SOL reclaim from failed/recovery wallets |
 | TRANSFER | `TRANSFER_WITHDRAW` | SOL withdraw (main → external) |
 | FEE | `FEE_USAGE` | Platform usage fee |
-| FEE | `FEE_PRO` | Pro subscription payment |
+| FEE | `FEE_SUBSCRIPTION` | Subscription payment |
+| FEE | `JITO_TIP` | Jito bundle tip on the tipper wallet (only created when the tipper has no other row on the tip-bearing signature) |
 | TOKEN | `TOKEN_DISTRIBUTE` | SPL token distribution |
 | TOKEN | `TOKEN_CONSOLIDATE` | SPL token consolidation |
 | ACCOUNT | `ACCOUNT_ATA_CREATE` | Create associated token account |
@@ -88,13 +91,18 @@ Each retry attempt (e.g., on `TransactionExpiredBlockheightExceededError`) creat
 
 ### Multi-instruction transactions
 
-One row per logical operation. Batch funding of N wallets produces N rows sharing the same `transactionSignature`.
+**One row per (signature × user-owned wallet).** A batch funding from main → 5 operational wallets in one transaction produces 6 rows (1 sender + 5 receivers), all sharing the same `transactionSignature`. After settlement:
+- The sender row's `lamportsDelta` is the negative of the total amount sent + the tx fee.
+- Each receiver row's `lamportsDelta` is the positive amount they received.
+- `SUM(lamportsDelta)` over the bundle equals the negative tx fee (the only real P&L impact of an internal transfer).
+
+Per the unique constraint `[transactionSignature, walletPublicKey]`, a wallet that is both sender and receiver on the same signature (self-transfer) collapses to a single row. Producers must skip the receiver row when sender and receiver are the same wallet.
 
 For launch funding, those `TRANSFER_FUND` rows remain the operational ledger of main-wallet top-ups. Failed-launch auto reclaim does not derive its cap from these best-effort rows; it uses the persisted `LaunchRecoveryWallet.fundedLamports` snapshot written during launch funding so shared wallets can only return launch-specific SOL.
 
 ### Jito bundles
 
-One row per transaction in the bundle. All rows share the same `bundleId`. The last transaction row gets `jitoTipLamports` populated.
+One row per (transaction in the bundle × user-owned wallet). All rows share the same `bundleId`. The tip-bearing signature gets a `JITO_TIP` row on the tipper wallet whenever the tipper does not otherwise have a row on that signature; if it would conflict, the tip is naturally captured in the tipper's existing row's wallet delta.
 
 ## Context via `referenceId`
 
@@ -148,39 +156,82 @@ Protected procedure. Aggregates confirmed `AppTransaction` data for a token, gro
 
 ## Dashboard P&L Integration
 
-The token dashboard P&L combines data from two sources:
+The token dashboard P&L equals the actual SOL change across the user's managed
+wallets attributable to this token, computed as a single SUM over signed
+wallet-delta rows in `AppTransaction`. `TokenTransaction` is still used for
+market activity, transaction tables, price charts, and reconciliation, but it
+does not feed P&L.
 
-- **Sell volume**: `TokenTransaction.groupBy` where `isOwned: true`, `transactionType: 'SELL'`
-- **Buy volume**: `TokenTransaction` owned buy volume + the confirmed `AppTransaction.TRADE_BUY` for the token's recorded dev wallet on the successful launch. The dev buy during token creation is recorded with the exact configured dev buy amount, which is more accurate than the `TokenTransaction.CREATE` row because that row includes creation overhead.
-- **Fees**: `AppTransaction` aggregation of `FEE_USAGE` and `FEE_PRO` types for the token, plus Jito tips from `jitoTipLamports`.
+### Wallet-delta semantics
 
-This dashboard metric is portfolio P&L for the token's managed wallets. It is not intended to reconcile one-to-one with main-wallet balance movement.
+Every row's `solAmount`/`lamportsDelta` is the signed lamport delta on the
+row's actor wallet (`walletPublicKey`) for the row's transaction signature,
+computed from `meta.preBalances`/`postBalances` after confirmation. Outflows
+are negative, inflows are positive. The delta naturally includes every cost on
+that wallet for that tx: network fee, priority fee, pump.fun swap fee, ATA
+rent, and the Jito tip when the wallet was the tipper.
 
-P&L formula:
+This means there is **no derived "creation cost" residual**, no "intent vs
+realized" reconciliation, and no special-cased per-source math. Internal
+transfers cancel between sender and receiver rows except for the tx fee.
+
+### P&L formula
 
 ```
-totalBuyVolume = ownedBuyVolume (TokenTransaction) + devBuySol (AppTransaction)
-creatorRewardsClaimedSol = sum of confirmed REWARD_PAYOUT solAmount (AppTransaction)
-pnl = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
+P&L = SUM(AppTransaction.lamportsDelta) / 1e9
+WHERE userId = U AND tokenPublicKey = T AND status = 'CONFIRMED'
+  AND type != 'FEE_SUBSCRIPTION'  -- subscriptions are global, not per-token
 ```
 
-`creationCostSol` is the residual launch funding that was not returned to the main wallet and was not spent on launch buys:
+Computed in `dashboard.service.ts:getOperationalCosts()` via two `groupBy`
+queries (one by `type`, one by `source` for the per-feature fee breakdown),
+plus a count of unsettled CONFIRMED rows.
 
-```
-creationCostSol = launchFunding - launchReturns - launchBuySol
-launchBuySol = sum of confirmed AppTransaction.TRADE_BUY rows for the successful launch
-```
+### Settlement (`server/services/app-transaction-settler.ts`)
 
-This is computed in `dashboard.service.ts` via `getOperationalCosts()` and `getClaimedCreatorRewards()`, which run parallel queries against `AppTransaction`:
-1. Fee aggregation (grouped by type for `FEE_USAGE` / `FEE_PRO`)
-2. Jito tip aggregation (sum of `jitoTipLamports`)
-3. Dev buy aggregation (the confirmed `TRADE_BUY` where source is `LAUNCH`, `referenceId` matches the successful launch, and `walletPublicKey` matches `TokenDevWallet.walletPublicKey`)
-4. Launch buy aggregation (all confirmed `TRADE_BUY` rows where source is `LAUNCH` and `referenceId` matches the successful launch)
-5. Claimed creator rewards (`REWARD_PAYOUT` where source is `CREATOR_REWARD`, status `CONFIRMED`)
+Producers create rows in `PENDING` with an `intentSolAmount`, send the
+transaction, then call `settleSignature({ signature, rows })`. The settler
+fetches `getTransaction` once and writes `lamportsDelta`, `solAmount`,
+`txFeeLamports`, and `blockTime` for each row from the same `meta` payload —
+so all rows tied to one signature settle from one RPC call.
 
-The P&L card shows a clickable details dialog (`pnl-details-dialog.tsx`) breaking down: bought, sold, trading P&L, platform fees, pro fees, Jito tips, and net P&L.
+### Backstop sweep
 
-If realized SOL from a sale is still held on a managed wallet such as the system dev wallet, that value still belongs in portfolio P&L. Sweeping it back to the main wallet is a separate wallet-recovery concern.
+`settleUnsettledForToken` runs at the start of every dashboard cache miss
+(bounded to 50 rows). It finds CONFIRMED rows where `lamportsDelta` is null
+(producer missed the sync settle, RPC blip, process death between submit and
+settle) and re-settles them via `getTransaction`. Idempotent: a row already
+settled is left alone. The dashboard surfaces `unsettledRowCount > 0` as an
+"Incomplete" badge until the next settle.
+
+### Per-row producer rules
+
+Every producer that submits a transaction must:
+
+1. Before send, create one PENDING row per user-owned wallet that the
+   transaction will touch, set `intentSolAmount` (signed) for display, leave
+   `lamportsDelta` null.
+2. After confirm, call `confirmMany(ids, signature)` then
+   `settleSignature({ signature, rows })`.
+3. On failure, call `failMany(ids, errorMessage)`.
+
+When sender and receiver are the same wallet (self-transfer), produce only one
+row to satisfy the unique `[transactionSignature, walletPublicKey]` constraint.
+
+### Mapping to dashboard breakdown
+
+The P&L details dialog groups types into UI sections:
+
+| Section | Types |
+|---------|-------|
+| Trades | `TRADE_BUY`, `TRADE_SELL`, `TRADE_CREATE` |
+| Costs | `FEE_USAGE` (split by source: LAUNCH/EXIT/VOLUME_BOT/WALLET), `JITO_TIP`, `TRANSFER_*`, `ACCOUNT_ATA_*`, `TOKEN_*` |
+| Rewards | `REWARD_CLAIM` + `REWARD_PAYOUT` |
+
+`launchFeeBreakdown` (generated wallets, vanity, attribution removal, bundler)
+is sourced from `Launch.input` config (intent), not from row sums. Any
+discrepancy between intent and actual `LAUNCH`-source `FEE_USAGE` delta is
+shown as a residual line ("Tx fees (collection)").
 
 ### `tokenPublicKey` on fee records
 
@@ -207,7 +258,7 @@ Located in `app/(app)/history/` with `page.tsx` (data fetching + toolbar) and `c
 | `launch.service.ts` | 7 | TRANSFER_FUND, TOKEN_DISTRIBUTE, TRANSFER_RETURN, TRANSFER_RECLAIM, TRADE_CREATE, TRADE_BUY |
 | `bundle-create-and-buy.ts` | 1 (bundle) | TRADE_CREATE, TRADE_BUY |
 | `wallet.service.ts` | 3 | TRANSFER_WITHDRAW, TRANSFER_FUND, TRANSFER_RETURN |
-| `usage-fee.service.ts` | 1 | FEE_USAGE, FEE_PRO |
+| `usage-fee.service.ts` | 1 | FEE_USAGE, FEE_SUBSCRIPTION |
 | `holding.service.ts` | 3 | TRADE_SELL, TRANSFER_RETURN, ACCOUNT_ATA_CLOSE |
 | `holding-exit.service.ts` | 3 + 1 bundle | TRANSFER_FUND, ACCOUNT_ATA_CLOSE, TRANSFER_RETURN, TRADE_SELL |
 | `volume-bot-worker.ts` | 3 | TRADE_BUY, TRADE_SELL, ACCOUNT_ATA_CLOSE |

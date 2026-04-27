@@ -8,8 +8,8 @@ The token dashboard (`/[tokenPublicKey]/dashboard`) is the central monitoring pa
 
 The dashboard uses two transaction models:
 
-- **`TokenTransaction`**: Market activity (including external traders). Powers price charts, volume/activity metrics, recent transactions, sell-side P&L, and market buy volume. Filtered by `isOwned: true` for user-scoped metrics.
-- **`AppTransaction`**: Operational ledger. Provides the dev buy amount (`TRADE_BUY` from `LAUNCH` source), fee aggregation (`FEE_USAGE`, `FEE_PRO`, Jito tips), and claimed creator rewards (`REWARD_PAYOUT` from `CREATOR_REWARD` source) for the P&L calculation. See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration) for details.
+- **`TokenTransaction`**: Market activity (including external traders). Powers price charts, volume/activity metrics, and recent transactions.
+- **`AppTransaction`**: Operational ledger. Provides app-executed trade amounts, token-scoped usage fees (`FEE_USAGE`), Jito tips, launch residual costs, and claimed creator rewards (`REWARD_PAYOUT` from `CREATOR_REWARD` source) for the P&L calculation. See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration) for details.
 
 External holders on the dashboard are sourced separately from live SPL token accounts, not from `TokenTransaction`. `holdersService.getCurrentHolders()` first attempts a live Solana RPC holder lookup, supports both classic SPL Token and Token-2022 account programs, reads owner + amount bytes, aggregates balances by owner wallet, and sorts the result descending. If the current RPC provider blocks the required index methods, the service falls back to reconstructing current holder balances from confirmed `TokenTransaction` buy/create/sell deltas and emits a concise warning log so the provider limitation remains visible during operations. `dashboard.getStats` then excludes user-managed wallets and the bonding curve wallet so the `External Holders` panel reflects current non-user holders rather than historical traders as closely as current data sources allow.
 
@@ -96,30 +96,57 @@ For tokens where `isComplete === true` (graduated from bonding curve):
 
 ### P&L Calculation
 
+P&L is the **actual signed SOL change across the user's managed wallets**
+attributable to this token, expressed as a SUM over per-row wallet deltas:
+
 ```
-totalBuyVolume = ownedBuyVolume + devBuySol
-creatorRewardsClaimedSol = sum of confirmed REWARD_PAYOUT (CREATOR_REWARD source)
-P&L = ownedSellVolume + creatorRewardsClaimedSol - totalBuyVolume - totalFees - creationCostSol
+P&L = SUM(AppTransaction.lamportsDelta) / 1e9
+WHERE userId = U AND tokenPublicKey = T AND status = 'CONFIRMED'
+  AND type != 'FEE_SUBSCRIPTION'
 ```
 
-- `ownedBuyVolume` / `ownedSellVolume`: from `TokenTransaction.groupBy` where `isOwned: true`, `status: 'CONFIRMED'`
-- `devBuySol`: from the confirmed `AppTransaction.TRADE_BUY` for the token's recorded dev wallet (`TokenDevWallet.walletPublicKey`) on the successful launch. This is used instead of the `TokenTransaction.CREATE` row, which includes creation overhead in its `solAmount`.
-- `creationCostSol`: residual launch funding that was not returned to the main wallet and was not spent on launch buys. It is derived as `launchFunding - launchReturns - launchBuySol`, where `launchBuySol` sums all confirmed launch `TRADE_BUY` rows for the successful launch.
-- `totalFees`: platform fees (`FEE_USAGE`) + pro fees (`FEE_PRO`) from `AppTransaction.groupBy`
-- Jito tips are displayed in the P&L details dialog but not subtracted from net P&L (they are included in the on-chain transaction costs, not a separate fee)
+Every confirmed `AppTransaction` row carries a signed lamport delta computed
+from `meta.preBalances`/`postBalances` for that row's wallet on that row's
+signature. Outflows are negative, inflows positive. Each delta naturally
+includes every cost on that wallet for that tx — network fee, priority fee,
+pump.fun swap fee, ATA rent, Jito tip when the wallet is the tipper.
 
-The P&L is purely realized portfolio P&L for the token's managed wallets — unrealized holdings value is not included. Holdings value is displayed separately on its own card.
+There is no derived "creation cost" or per-source residual. Internal transfers
+between user wallets cancel out except for the on-chain tx fee.
 
-Realized sell proceeds count toward portfolio P&L even if they are still sitting on a managed wallet such as the system dev wallet. Returning SOL to the user's main wallet is handled by separate wallet recovery flows and does not change the P&L formula.
+See [App Transactions — Dashboard P&L Integration](app-transactions-implementation.md#dashboard-pl-integration)
+for the producer rules, settlement flow, and breakdown mapping.
+
+The P&L is purely realized portfolio P&L for the token's managed wallets —
+unrealized holdings value is not included. Holdings value is displayed
+separately on its own card.
+
+Realized sell proceeds count toward portfolio P&L even if they are still
+sitting on a managed wallet such as the system dev wallet. Returning SOL to
+the user's main wallet is handled by separate wallet recovery flows and shows
+up in P&L as `TRANSFER_RETURN` paired rows that net to the on-chain tx fee.
 
 ### P&L Details Dialog
 
-Clicking the P&L card opens a breakdown dialog (`pnl-details-dialog.tsx`) showing:
-- **Trading section**: bought (total spent), sold (total received), trading P&L
-- **Costs section**: platform fees, pro subscription fees, Jito tips
-- **Net P&L**: trading P&L minus fees
+Clicking the P&L card opens a breakdown dialog (`pnl-details-dialog.tsx`)
+showing the signed wallet-delta totals, grouped into:
 
-All data comes from the `pnl` object in the `dashboard.getStats` response — no additional API call.
+- **Trades**: `TRADE_BUY`, `TRADE_SELL`, `TRADE_CREATE`.
+- **Costs**: `FEE_USAGE` (broken down by `source`: launch/exit/volume bot/wallet, with launch fees further broken down from `Launch.input` config), `JITO_TIP`, `TRANSFER_*`, `ACCOUNT_ATA_*`, `TOKEN_*`.
+- **Rewards**: `REWARD_CLAIM` + `REWARD_PAYOUT` net.
+- **Net P&L**: sum of every signed delta — equal to the actual SOL change in the user's wallets attributable to this token.
+
+All data comes from the `pnl` object in the `dashboard.getStats` response — no
+additional API call.
+
+If `unsettledRowCount > 0` (some confirmed rows have not yet had their
+`lamportsDelta` written by the settler), the dialog and the card show an
+"Incomplete" badge. Each subsequent dashboard cache miss runs a bounded
+backstop sweep (`settleUnsettledForToken`) that re-settles missing rows.
+
+P&L is sourced from confirmed `AppTransaction` rows only. `TokenTransaction`
+ingestion still drives activity, recent transactions, price history, and chart
+data, but it is not used as a P&L fallback.
 
 ### Data Flow: Monitoring Mode ON
 

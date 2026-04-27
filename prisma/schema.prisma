@@ -569,6 +569,7 @@ enum AppTransactionType {
   TRANSFER_WITHDRAW
   FEE_USAGE
   FEE_SUBSCRIPTION
+  JITO_TIP
   TOKEN_DISTRIBUTE
   TOKEN_CONSOLIDATE
   ACCOUNT_ATA_CREATE
@@ -602,9 +603,11 @@ model AppTransaction {
   fromAddress          String?
   toAddress            String?
   solAmount            Decimal?
+  intentSolAmount      Decimal?
+  lamportsDelta        BigInt?
+  txFeeLamports        Int?
   tokenAmount          Decimal?
   pricePerToken        Decimal?
-  jitoTipLamports      Int?
   referenceId          String?
   description          String?
   errorMessage         String?
@@ -615,10 +618,12 @@ model AppTransaction {
   @@index([userId, tokenPublicKey, createdAt])
   @@index([userId, source, createdAt])
   @@index([userId, type, createdAt])
+  @@unique([transactionSignature, walletPublicKey])
   @@index([transactionSignature])
   @@index([bundleId])
   @@index([referenceId])
   @@index([status])
+  @@index([userId, tokenPublicKey, status, type])
   @@map("AppTransaction")
 }
 

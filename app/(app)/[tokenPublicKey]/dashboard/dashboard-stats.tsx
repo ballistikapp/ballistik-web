@@ -34,11 +34,14 @@ interface HoldingsData {
 
 interface PnlData {
   net: number;
-  totalBuyVolume: number;
-  totalSellVolume: number;
-  creatorRewardsClaimedSol: number;
+  tokenBuys: number;
+  tokenSells: number;
+  tokenCreates: number;
   platformFees: number;
   launchFees: number;
+  exitFees: number;
+  volumeBotFees: number;
+  walletFees: number;
   launchFeeBreakdown: {
     generatedWalletFeeSol: number;
     generatedWalletCount: number;
@@ -48,11 +51,15 @@ interface PnlData {
     attributionRemovalFeeSol: number;
     bundleBuyFeeSol: number;
   } | null;
-  exitFees: number;
-  volumeBotFees: number;
-  jitoTipsSol: number;
-  totalFees: number;
-  creationCostSol: number;
+  jitoTips: number;
+  transfers: number;
+  ataOps: number;
+  tokenOps: number;
+  creatorRewards: number;
+  rewardsClaim: number;
+  rewardsPayout: number;
+  unsettledRowCount: number;
+  isComplete: boolean;
 }
 
 interface ActivityData {
@@ -85,6 +92,25 @@ export function DashboardStats({
 }: DashboardStatsProps) {
   const { holdingsValue, pnl, activity } = metrics;
   const isProfitable = pnl.net >= 0;
+  const pnlIncomplete = !pnl.isComplete;
+  // Inflows = positive deltas; outflows = negative deltas. We split the signed
+  // numbers back into "spent" / "received" purely for the card subtitle.
+  const totalSpent =
+    -Math.min(0, pnl.tokenBuys) +
+    -Math.min(0, pnl.tokenCreates) +
+    -Math.min(0, pnl.platformFees) +
+    -Math.min(0, pnl.jitoTips) +
+    -Math.min(0, pnl.transfers) +
+    -Math.min(0, pnl.ataOps) +
+    -Math.min(0, pnl.tokenOps) +
+    -Math.min(0, pnl.creatorRewards);
+  const totalReceived =
+    Math.max(0, pnl.tokenSells) +
+    Math.max(0, pnl.tokenCreates) +
+    Math.max(0, pnl.creatorRewards) +
+    Math.max(0, pnl.transfers) +
+    Math.max(0, pnl.ataOps) +
+    Math.max(0, pnl.tokenOps);
   const [pnlDialogOpen, setPnlDialogOpen] = useState(false);
   const transactionsHref = `/${tokenPublicKey}/transactions`;
   const holdingsHref = `/${tokenPublicKey}/holdings`;
@@ -156,7 +182,7 @@ export function DashboardStats({
             ) : (
               <IconTrendingDown className="size-4 text-red-500" />
             )}
-            P&L
+            Realized P&amp;L
           </CardDescription>
           <CardTitle
             className={`text-2xl font-semibold tabular-nums @[250px]/card:text-3xl ${
@@ -168,9 +194,15 @@ export function DashboardStats({
           </CardTitle>
           <div className="flex flex-col gap-1 mt-1">
             <span className="text-xs text-muted-foreground tabular-nums">
-              Spent: {formatSol(pnl.totalBuyVolume + pnl.totalFees + pnl.creationCostSol)} · Received:{" "}
-              {formatSol(pnl.totalSellVolume + pnl.creatorRewardsClaimedSol)}
+              Outflow: {formatSol(totalSpent)} · Inflow:{" "}
+              {formatSol(totalReceived)}
             </span>
+            {pnlIncomplete && (
+              <span className="text-xs text-amber-500">
+                {pnl.unsettledRowCount} unsettled tx
+                {pnl.unsettledRowCount === 1 ? "" : "s"}
+              </span>
+            )}
             <div className="flex items-center justify-end gap-1.5 mt-1">
               <span className="text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100">
                 Click for details
