@@ -4,7 +4,6 @@ type FixedTotalBundleAllocationParams = {
   totalLamports: bigint;
   targetLamportsPerWallet: bigint;
   variancePercent: number;
-  minLamportsPerWallet: bigint;
   seed: string;
 };
 
@@ -79,14 +78,10 @@ export function allocateFixedTotalBundleLamports(
 
   const totalLamports = bigintToSafeNumber(params.totalLamports);
   const targetLamportsPerWallet = bigintToSafeNumber(params.targetLamportsPerWallet);
-  const minLamportsPerWallet = bigintToSafeNumber(params.minLamportsPerWallet);
   const varianceRatio = Math.max(0, params.variancePercent) / 100;
   const averageFloor = Math.floor(totalLamports / walletCount);
   const averageCeil = Math.ceil(totalLamports / walletCount);
-  let lowerBound = Math.max(
-    minLamportsPerWallet,
-    Math.floor(targetLamportsPerWallet * (1 - varianceRatio))
-  );
+  let lowerBound = Math.floor(targetLamportsPerWallet * (1 - varianceRatio));
   let upperBound = Math.max(
     lowerBound,
     Math.floor(targetLamportsPerWallet * (1 + varianceRatio))

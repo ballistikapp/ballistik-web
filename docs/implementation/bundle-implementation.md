@@ -35,9 +35,11 @@ Transaction packing layout (max buyers):
 5. 1 buy (+ tip if enabled)
 
 ### Buy Amounts
-- Each bundler buy uses random variance:
-  - `amount = bundlerBuyAmountSol ± (bundlerBuyAmountSol * bundlerBuyVariancePercent / 100)`
-- Buys with non-positive amounts are skipped.
+- Bundle buy uses a fixed total spend:
+  - `totalBundleSpend = bundlerWalletCount * bundlerBuyAmountSol`
+- Variance changes how that fixed total is distributed across bundler wallets.
+- The `0.05 SOL` minimum applies to the user's configured `bundlerBuyAmountSol`, not to each randomized buy amount.
+- Buy amounts represent the raw pump buy spend; wallet balance deltas may be higher because account rent, program fees, and transaction fees are charged separately.
 
 ### Jito Tip
 - If `jitoTipAmountSol > 0`, a SOL transfer is appended to the last transaction.

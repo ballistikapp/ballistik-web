@@ -8,6 +8,7 @@ import { grpcManager } from "@/server/solana/grpc-manager";
 import { ingestionQueue } from "@/server/services/ingestion-queue.service";
 import { getEnv } from "@/lib/config/env";
 import { grpcAccessService } from "@/server/services/grpc-access.service";
+import { UserPlan } from "@/lib/generated/prisma/client";
 
 export const dashboardRouter = router({
   getStats: protectedProcedure
@@ -28,10 +29,13 @@ export const dashboardRouter = router({
       ctx.user,
       "dashboard-live-monitoring"
     );
+    const entitled =
+      access.accessMode === "all" || ctx.user.plan === UserPlan.PRO;
+    const accessReason = entitled ? access.reason : "not_pro";
     return {
       available: access.allowed,
-      entitled: access.allowed,
-      accessReason: access.reason,
+      entitled,
+      accessReason,
       infraAvailable: access.infraAvailable,
       tokenConfigured: access.tokenConfigured,
       accessMode: access.accessMode,

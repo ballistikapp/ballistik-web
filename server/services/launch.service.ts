@@ -87,7 +87,6 @@ function lamportsToSol(lamports: bigint) {
 }
 
 const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.05;
-const MIN_BUNDLER_BUY_AMOUNT_LAMPORTS = toLamports(MIN_BUNDLER_BUY_AMOUNT_SOL);
 
 function normalizeSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
@@ -1455,7 +1454,6 @@ async function buildLaunchFundingPlan(params: {
           totalLamports: totalBundleBuyLamports,
           targetLamportsPerWallet: toLamports(params.bundlerBuyAmountSol),
           variancePercent: params.bundlerBuyVariancePercent,
-          minLamportsPerWallet: MIN_BUNDLER_BUY_AMOUNT_LAMPORTS,
           seed:
             params.allocationSeed ??
             `preview:${params.bundlerWalletCount}:${params.bundlerBuyAmountSol}:${params.bundlerBuyVariancePercent}`,
@@ -2015,7 +2013,6 @@ function buildBundlerBuyTargets(
     totalLamports: toLamports(wallets.length * bundlerBuyAmountSol),
     targetLamportsPerWallet: toLamports(bundlerBuyAmountSol),
     variancePercent: bundlerBuyVariancePercent,
-    minLamportsPerWallet: MIN_BUNDLER_BUY_AMOUNT_LAMPORTS,
     seed,
   });
 

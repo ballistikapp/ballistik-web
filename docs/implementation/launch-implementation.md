@@ -340,6 +340,7 @@ Note: No off-chain token amount calculation is needed. The program determines to
 - Bundle buy uses a fixed total spend:
   - `totalBundleSpend = bundlerWalletCount * bundlerBuyAmountSol`
 - Variance changes how that fixed total is distributed across bundler wallets.
+- The `0.05 SOL` minimum applies to the user's configured `bundlerBuyAmountSol`, not to each randomized buy amount.
 - The per-wallet bundle amounts are generated once per launch attempt and then reused for both wallet funding and transaction building.
 - Buy amounts represent the actual spend; ATA rent is funded separately.
 - User volume accumulator rent is funded separately for each buy wallet.

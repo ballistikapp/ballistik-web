@@ -719,8 +719,9 @@ export function DashboardClient() {
   const monitoringDisabledMessage =
     grpcStatusQuery.data?.accessReason === "not_pro"
       ? "Live monitoring requires Pro. Upgrade to unlock gRPC-backed features."
-      : grpcStatusQuery.data?.accessReason === "grpc_disabled" ||
-          grpcStatusQuery.data?.accessReason === "grpc_not_configured"
+      : grpcStatusQuery.data?.entitled &&
+          (grpcStatusQuery.data?.accessReason === "grpc_disabled" ||
+            grpcStatusQuery.data?.accessReason === "grpc_not_configured")
         ? "Live monitoring is currently unavailable."
         : null;
   const monitoringHealthState: MonitoringHealthState = !isMonitoring
