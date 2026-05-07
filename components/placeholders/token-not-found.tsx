@@ -1,6 +1,5 @@
 "use client";
 
-import * as React from "react";
 import { IconFolderCode, IconAlertTriangle } from "@tabler/icons-react";
 import Link from "next/link";
 
@@ -14,7 +13,6 @@ import {
   EmptyTitle,
 } from "@/components/ui/empty";
 import { trpc } from "@/lib/trpc/client";
-import { AuthDialog } from "@/components/auth/auth-dialog";
 
 type Props = {
   error?: {
@@ -27,7 +25,6 @@ type Props = {
 };
 
 export function TokenNotFound({ error, onRetry }: Props) {
-  const [authDialogOpen, setAuthDialogOpen] = React.useState(false);
   const { data: currentUser, isLoading: isAuthLoading } =
     trpc.auth.me.useQuery();
   const { data: tokensData, isLoading: isTokensLoading } =
@@ -81,44 +78,41 @@ export function TokenNotFound({ error, onRetry }: Props) {
   }
 
   return (
-    <>
-      <Empty>
-        <EmptyHeader>
-          <EmptyMedia variant="icon">
-            <IconFolderCode />
-          </EmptyMedia>
-          <EmptyTitle>Token Not Found</EmptyTitle>
-          <EmptyDescription>
-            {!isAuthenticated
-              ? "Please log in to view your tokens or launch a new one."
-              : hasTokens
+    <Empty>
+      <EmptyHeader>
+        <EmptyMedia variant="icon">
+          <IconFolderCode />
+        </EmptyMedia>
+        <EmptyTitle>Token Not Found</EmptyTitle>
+        <EmptyDescription>
+          {!isAuthenticated
+            ? "Please log in to view your tokens or launch a new one."
+            : hasTokens
               ? "Please select a token from the sidebar to view its details."
               : "You haven't created any tokens yet. Launch your first token to get started."}
-          </EmptyDescription>
-        </EmptyHeader>
-        <EmptyContent>
-          <div className="flex flex-col gap-4 w-full items-center">
+        </EmptyDescription>
+      </EmptyHeader>
+      <EmptyContent>
+        <div className="flex flex-col gap-4 w-full items-center">
+          <Button
+            asChild
+            size="lg"
+            className="w-full max-w-md h-12 text-lg font-semibold"
+          >
+            <Link href="/launch">Launch New Token</Link>
+          </Button>
+          {!isAuthenticated && (
             <Button
               asChild
+              variant="outline"
               size="lg"
-              className="w-full max-w-md h-12 text-lg font-semibold"
+              className="w-full max-w-md h-12 text-lg"
             >
-              <Link href="/launch">Launch New Token</Link>
+              <Link href="/auth">Login</Link>
             </Button>
-            {!isAuthenticated && (
-              <Button
-                variant="outline"
-                size="lg"
-                onClick={() => setAuthDialogOpen(true)}
-                className="w-full max-w-md h-12 text-lg"
-              >
-                Login
-              </Button>
-            )}
-          </div>
-        </EmptyContent>
-      </Empty>
-      <AuthDialog open={authDialogOpen} onOpenChange={setAuthDialogOpen} />
-    </>
+          )}
+        </div>
+      </EmptyContent>
+    </Empty>
   );
 }

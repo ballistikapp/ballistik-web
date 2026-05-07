@@ -54,6 +54,7 @@ export interface JWTPayload {
   publicKey: string;
   name?: string;
   plan: UserPlanType;
+  authWalletPublicKey?: string | null;
   iat?: number;
   exp?: number;
 }
@@ -62,11 +63,16 @@ export function signToken(
   userId: string,
   publicKey: string,
   name: string,
-  plan: UserPlanType
+  plan: UserPlanType,
+  authWalletPublicKey?: string | null
 ): string {
-  return jwt.sign({ userId, publicKey, name, plan }, resolveJwtSecret(), {
-    expiresIn: resolveJwtExpiration(),
-  });
+  return jwt.sign(
+    { userId, publicKey, name, plan, authWalletPublicKey: authWalletPublicKey ?? null },
+    resolveJwtSecret(),
+    {
+      expiresIn: resolveJwtExpiration(),
+    }
+  );
 }
 
 export function verifyToken(token: string): JWTPayload | null {

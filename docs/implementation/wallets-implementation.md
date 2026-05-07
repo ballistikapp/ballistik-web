@@ -4,6 +4,8 @@
 
 Wallets are token-scoped for operational usage, while the main wallet is user-scoped. The wallets page and wallet detail pages separate operational wallets (bundler/volume/distribution) from the main and dev wallets, with different fetch paths and behavior.
 
+Wallet-adapter authentication does not replace the Main Wallet. The connected wallet is stored separately as `User.authWalletPublicKey` for login/linking, and the server-held Main Wallet remains the funding, fee, recovery, and execution wallet used by app actions.
+
 When a token launch uses `devWalletOption = use_main`, the token's dev wallet and the user's main wallet share the same wallet address. In that case, the UI should present a single shared wallet concept labeled `Main Wallet (used as dev)` instead of rendering duplicate main/dev presentations for the same public key.
 
 ## Data Model
@@ -11,6 +13,8 @@ When a token launch uses `devWalletOption = use_main`, the token's dev wallet an
 - `Wallet.tokenPublicKey` is used for operational wallets (bundler/volume/buyer/distribution).
 - Dev wallets are shared across tokens via `TokenDevWallet` join model.
 - Main wallet is user-scoped via `User.mainWallet`.
+- Wallet-adapter login identity is user-scoped via `User.authWalletPublicKey` and is not a `Wallet` row.
+- App-managed `Wallet` rows are not valid wallet-adapter login identities for other accounts. A connected wallet can only be linked as an auth wallet when it is external to the app-managed wallet table, or when it is the current user's own Main Wallet during authenticated linking.
 - `Wallet.isSystemWallet` (`Boolean @default(false)`) marks the platform-provided dev wallet.
 - System dev wallet stores an empty string `""` as `privateKey` (placeholder — never decoded). The `isSystemWallet` flag prevents any code from trying to use it. The actual signing key is loaded from env.
 
@@ -205,16 +209,22 @@ Invalidation triggers:
 
 Wallet queries override the global 5-minute `staleTime` with `cacheConfig.staleMs.wallets` (60s) so that navigating to a page with stale cached data triggers a background refetch as a safety net.
 
-## Account Page (User-Scoped Main Wallet)
+## Account Pages (User-Scoped)
 
-Route: `/account` — top-level, not token-scoped.
+Routes:
 
-The account page is the user's "My Account" view combined with the main wallet detail. It lives outside the `[tokenPublicKey]` scope because the main wallet is user-scoped.
+- `/account` redirects to `/account/main-wallet`.
+- `/account/main-wallet` shows the user's Main Wallet operations.
+- `/account/auth-wallet` shows wallet-adapter login linking.
+- `/account/subscription` shows subscription management.
+
+The account pages are top-level, not token-scoped. They live outside the `[tokenPublicKey]` scope because the main wallet and wallet-adapter login identity are user-scoped.
 
 ### Sections
 
-1. **Account Info**: display name (editable inline), account creation date.
-2. **Main Wallet**: SOL balance with refresh, public key (copyable), private key (on-demand dialog), View on Solscan link, Send SOL action.
+1. **Main Wallet** (`/account/main-wallet`): display name (editable inline), SOL balance with refresh, public key (copyable), private key (on-demand dialog), View on Solscan link, Deposit, Withdraw, and Send SOL action.
+2. **Auth Wallet** (`/account/auth-wallet`): linked wallet-adapter public key or link flow using a connected wallet signature.
+3. **Subscription** (`/account/subscription`): paid plan purchase, upgrade, extension, and billing history.
 
 ### Backend Procedures
 
@@ -223,7 +233,7 @@ The account page is the user's "My Account" view combined with the main wallet d
 
 ### Send SOL Flow
 
-The account page uses `AccountSendDialog` to send SOL from the main wallet to token-scoped wallets:
+The main-wallet account page uses `AccountSendDialog` to send SOL from the main wallet to token-scoped wallets:
 
 1. User selects a token from a dropdown (`token.getUserTokens`).
 2. Wallets for the selected token are loaded (`wallet.getOperationalByToken` + `wallet.getDevByToken`).
@@ -232,10 +242,11 @@ The account page uses `AccountSendDialog` to send SOL from the main wallet to to
 
 ### Deposit & Withdraw (User-Scoped Main Wallet)
 
-The account page and auth dropdown also expose user-scoped main wallet actions:
+The main-wallet account page and auth dropdown also expose user-scoped main wallet actions:
 
-- **Deposit**: informational only (no mutation). Shows the main wallet public key, copy action, and QR code. Users fund this wallet to use app features.
+- **Deposit**: informational only (no mutation). Shows the main wallet public key, copy action, and QR code. Users fund this wallet to use app features, including users who signed in through wallet adapter.
 - **Withdraw**: sends SOL from the user's main wallet to any external wallet address.
+- **Wallet Login**: shows linked connected-wallet status. If no connected wallet is linked, authenticated users can connect a wallet, sign a one-time challenge, and link it for future login. Linking is performed only on `/account/auth-wallet`; the header dropdown links to that page rather than embedding the adapter controls.
 
 Withdraw behavior:
 
@@ -264,6 +275,7 @@ Withdraw behavior:
 ### Cache Invalidation
 
 - `auth.updateName` success invalidates `auth.me`.
+- `auth.linkWalletAdapter` success invalidates `auth.me`.
 - Send SOL success invalidates `wallet.getMain`, `wallet.getOperationalByToken`, and `wallet.getDevByToken` (same pattern as `WalletTransferDialog`).
 
 ## Migrations

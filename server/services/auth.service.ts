@@ -1,18 +1,26 @@
 import "server-only";
 import { prisma } from "@/lib/prisma";
-import { Keypair } from "@solana/web3.js";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { AppError } from "@/server/errors";
 import type {
-  RegisterInput,
   LoginWithPrivateKeyInput,
   AuthUserOutput,
   UpdateNameInput,
+  CreateWalletChallengeInput,
+  LoginWithWalletSignatureInput,
+  LinkWalletAdapterInput,
 } from "@/server/schemas";
-import { UserPlan, WalletType } from "@/lib/generated/prisma/client";
+import {
+  AuthChallengePurpose,
+  UserPlan,
+  WalletType,
+} from "@/lib/generated/prisma/client";
 import { logger } from "@/lib/logger";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import { signToken } from "@/lib/auth/jwt";
+import { randomBytes } from "crypto";
+import nacl from "tweetnacl";
 import {
   addDays,
   createOpaqueRefreshToken,
@@ -32,8 +40,44 @@ type SessionRequestMeta = {
 
 type SessionUser = Pick<
   AuthUserOutput,
-  "id" | "name" | "plan" | "mainWalletPublicKey"
+  "id" | "name" | "plan" | "mainWalletPublicKey" | "authWalletPublicKey"
 >;
+
+const WALLET_CHALLENGE_TTL_MS = 5 * 60 * 1000;
+
+function createWalletAuthMessage(input: {
+  publicKey: string;
+  nonce: string;
+  purpose: AuthChallengePurpose;
+}) {
+  const action =
+    input.purpose === AuthChallengePurpose.WALLET_LINK
+      ? "Link this wallet to your BALLISTIK account."
+      : "Sign in to BALLISTIK.";
+
+  return [
+    action,
+    "",
+    `Wallet: ${input.publicKey}`,
+    `Nonce: ${input.nonce}`,
+    "Only sign this message if you trust this site.",
+  ].join("\n");
+}
+
+function validateSolanaPublicKey(publicKey: string) {
+  try {
+    return new PublicKey(publicKey).toBase58();
+  } catch {
+    throw new AppError("Invalid wallet public key", 400);
+  }
+}
+
+function generateMainWallet() {
+  const keypair = Keypair.generate();
+  const privateKey = bs58.encode(keypair.secretKey);
+  const publicKey = keypair.publicKey.toBase58();
+  return { keypair, privateKey, publicKey };
+}
 
 function sanitizeMeta(meta?: SessionRequestMeta) {
   const ip = meta?.clientIp?.trim() || null;
@@ -42,99 +86,6 @@ function sanitizeMeta(meta?: SessionRequestMeta) {
 }
 
 export const authService = {
-  async register(input: RegisterInput): Promise<AuthUserOutput> {
-    try {
-      let keypair: Keypair;
-      let privateKey: string;
-      let publicKey: string;
-      let isGenerated = false;
-
-      if (input.generateWallet) {
-        keypair = Keypair.generate();
-        privateKey = bs58.encode(keypair.secretKey);
-        publicKey = keypair.publicKey.toBase58();
-        await persistGeneratedPrivateKey({
-          service: "authService",
-          operation: "register",
-          publicKey,
-          privateKey,
-        });
-        isGenerated = true;
-      } else {
-        try {
-          const secretKey = bs58.decode(input.privateKey!);
-          keypair = Keypair.fromSecretKey(secretKey);
-          privateKey = input.privateKey!;
-          publicKey = keypair.publicKey.toBase58();
-        } catch {
-          throw new AppError("Invalid private key format", 400);
-        }
-      }
-
-      const existingWallet = await prisma.wallet.findUnique({
-        where: { publicKey },
-      });
-
-      if (existingWallet) {
-        throw new AppError("Wallet already exists", 400);
-      }
-
-      const existingUser = await prisma.user.findUnique({
-        where: { mainWalletPublicKey: publicKey },
-      });
-
-      if (existingUser) {
-        throw new AppError("User already exists with this wallet", 400);
-      }
-
-      await prisma.wallet.create({
-        data: {
-          publicKey,
-          privateKey,
-          type: WalletType.MAIN_WALLET,
-          isImported: !isGenerated,
-        },
-      });
-
-      const accountName =
-        input.accountName?.trim() ||
-        `${publicKey.slice(0, 4)}-${publicKey.slice(-4)}`;
-
-      const user = await prisma.user.create({
-        data: {
-          name: accountName,
-          plan: UserPlan.FREE,
-          mainWalletPublicKey: publicKey,
-        },
-      });
-
-      const result: AuthUserOutput = {
-        id: user.id,
-        name: user.name,
-        plan: user.plan,
-        mainWalletPublicKey: user.mainWalletPublicKey,
-        mainWalletBalanceSol: 0,
-        createdAt: user.createdAt,
-        updatedAt: user.updatedAt,
-      };
-
-      if (isGenerated) {
-        result.generatedWallet = {
-          publicKey,
-          privateKey,
-        };
-      }
-
-      return result;
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-      logger.error("Registration error", error);
-      throw new AppError("Failed to register user", 500, { error });
-    }
-  },
-
   async loginWithPrivateKey(
     input: LoginWithPrivateKeyInput
   ): Promise<AuthUserOutput> {
@@ -174,6 +125,7 @@ export const authService = {
         name: user.name,
         plan: resolveEffectiveUserPlan(user.plan, user.paidPlanExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
+        authWalletPublicKey: user.authWalletPublicKey,
         mainWalletBalanceSol: Number(wallet.balanceSol ?? 0),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,
@@ -185,6 +137,295 @@ export const authService = {
       logger.error("Login error", error);
       throw new AppError("Failed to login", 500, { error });
     }
+  },
+
+  async createWalletChallenge(input: CreateWalletChallengeInput) {
+    const publicKey = validateSolanaPublicKey(input.publicKey);
+    const purpose = input.purpose as AuthChallengePurpose;
+    const nonce = randomBytes(24).toString("base64url");
+    const expiresAt = new Date(Date.now() + WALLET_CHALLENGE_TTL_MS);
+    const message = createWalletAuthMessage({ publicKey, nonce, purpose });
+
+    await prisma.authChallenge.create({
+      data: {
+        publicKey,
+        nonce,
+        purpose,
+        expiresAt,
+      },
+    });
+
+    return {
+      publicKey,
+      nonce,
+      purpose,
+      message,
+      expiresAt,
+    };
+  },
+
+  async loginWithWalletSignature(
+    input: LoginWithWalletSignatureInput
+  ): Promise<AuthUserOutput> {
+    const authWalletPublicKey = await this.verifyWalletChallenge({
+      publicKey: input.publicKey,
+      nonce: input.nonce,
+      signature: input.signature,
+      purpose: AuthChallengePurpose.WALLET_LOGIN,
+    });
+
+    const linkedUser = await prisma.user.findUnique({
+      where: { authWalletPublicKey },
+      select: {
+        id: true,
+        name: true,
+        plan: true,
+        paidPlanExpiresAt: true,
+        mainWalletPublicKey: true,
+        authWalletPublicKey: true,
+        createdAt: true,
+        updatedAt: true,
+        mainWallet: {
+          select: { balanceSol: true },
+        },
+      },
+    });
+
+    if (linkedUser) {
+      return {
+        id: linkedUser.id,
+        name: linkedUser.name,
+        plan: resolveEffectiveUserPlan(
+          linkedUser.plan,
+          linkedUser.paidPlanExpiresAt
+        ),
+        mainWalletPublicKey: linkedUser.mainWalletPublicKey,
+        authWalletPublicKey: linkedUser.authWalletPublicKey,
+        mainWalletBalanceSol: Number(linkedUser.mainWallet?.balanceSol ?? 0),
+        createdAt: linkedUser.createdAt,
+        updatedAt: linkedUser.updatedAt,
+      };
+    }
+
+    const legacyUser = await prisma.user.findUnique({
+      where: { mainWalletPublicKey: authWalletPublicKey },
+      select: { id: true },
+    });
+
+    if (legacyUser) {
+      throw new AppError(
+        "This wallet belongs to an existing account. Sign in with your private key first, then link wallet login from Account.",
+        409
+      );
+    }
+
+    const managedWallet = await prisma.wallet.findUnique({
+      where: { publicKey: authWalletPublicKey },
+      select: { publicKey: true },
+    });
+
+    if (managedWallet) {
+      throw new AppError(
+        "This wallet is already managed by sollabs. Choose a different connected wallet for wallet login.",
+        409
+      );
+    }
+
+    if (input.intent === "login") {
+      throw new AppError(
+        "No account is linked to this wallet. Create an account first or sign in with your private key.",
+        404
+      );
+    }
+
+    const generated = generateMainWallet();
+    await persistGeneratedPrivateKey({
+      service: "authService",
+      operation: "loginWithWalletSignature.createMainWallet",
+      publicKey: generated.publicKey,
+      privateKey: generated.privateKey,
+    });
+
+    const accountName =
+      input.accountName?.trim() ||
+      `${authWalletPublicKey.slice(0, 4)}-${authWalletPublicKey.slice(-4)}`;
+
+    const user = await prisma.$transaction(async (tx) => {
+      await tx.wallet.create({
+        data: {
+          publicKey: generated.publicKey,
+          privateKey: generated.privateKey,
+          type: WalletType.MAIN_WALLET,
+          isImported: false,
+        },
+      });
+
+      return await tx.user.create({
+        data: {
+          name: accountName,
+          plan: UserPlan.FREE,
+          mainWalletPublicKey: generated.publicKey,
+          authWalletPublicKey,
+        },
+      });
+    });
+
+    return {
+      id: user.id,
+      name: user.name,
+      plan: user.plan,
+      mainWalletPublicKey: user.mainWalletPublicKey,
+      authWalletPublicKey: user.authWalletPublicKey,
+      mainWalletBalanceSol: 0,
+      createdAt: user.createdAt,
+      updatedAt: user.updatedAt,
+      generatedWallet: {
+        publicKey: generated.publicKey,
+        privateKey: generated.privateKey,
+      },
+    };
+  },
+
+  async linkWalletAdapter(userId: string, input: LinkWalletAdapterInput) {
+    const authWalletPublicKey = await this.verifyWalletChallenge({
+      publicKey: input.publicKey,
+      nonce: input.nonce,
+      signature: input.signature,
+      purpose: AuthChallengePurpose.WALLET_LINK,
+    });
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        plan: true,
+        mainWalletPublicKey: true,
+        authWalletPublicKey: true,
+      },
+    });
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (user.authWalletPublicKey === authWalletPublicKey) {
+      return user;
+    }
+
+    if (user.authWalletPublicKey) {
+      throw new AppError("Wallet login is already linked", 400);
+    }
+
+    const existingLink = await prisma.user.findUnique({
+      where: { authWalletPublicKey },
+      select: { id: true },
+    });
+
+    if (existingLink && existingLink.id !== userId) {
+      throw new AppError("This wallet is already linked to another account", 409);
+    }
+
+    const mainWalletUser = await prisma.user.findUnique({
+      where: { mainWalletPublicKey: authWalletPublicKey },
+      select: { id: true },
+    });
+
+    if (mainWalletUser && mainWalletUser.id !== userId) {
+      throw new AppError(
+        "This wallet belongs to another existing account. Choose a different connected wallet.",
+        409
+      );
+    }
+
+    const managedWallet = await prisma.wallet.findUnique({
+      where: { publicKey: authWalletPublicKey },
+      select: { publicKey: true },
+    });
+
+    if (managedWallet && authWalletPublicKey !== user.mainWalletPublicKey) {
+      throw new AppError(
+        "This wallet is already managed by sollabs. Choose a different connected wallet.",
+        409
+      );
+    }
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: { authWalletPublicKey },
+      select: {
+        id: true,
+        name: true,
+        plan: true,
+        mainWalletPublicKey: true,
+        authWalletPublicKey: true,
+      },
+    });
+
+    return updated;
+  },
+
+  async verifyWalletChallenge(input: {
+    publicKey: string;
+    nonce: string;
+    signature: string;
+    purpose: AuthChallengePurpose;
+  }) {
+    const publicKey = validateSolanaPublicKey(input.publicKey);
+    const now = new Date();
+
+    const challenge = await prisma.authChallenge.findUnique({
+      where: { nonce: input.nonce },
+    });
+
+    if (
+      !challenge ||
+      challenge.publicKey !== publicKey ||
+      challenge.purpose !== input.purpose ||
+      challenge.consumedAt ||
+      challenge.expiresAt <= now
+    ) {
+      throw new AppError("Invalid or expired wallet challenge", 401);
+    }
+
+    const message = createWalletAuthMessage({
+      publicKey,
+      nonce: challenge.nonce,
+      purpose: challenge.purpose,
+    });
+
+    let signature: Uint8Array;
+    try {
+      signature = bs58.decode(input.signature);
+    } catch {
+      throw new AppError("Invalid wallet signature", 400);
+    }
+
+    const verified = nacl.sign.detached.verify(
+      new TextEncoder().encode(message),
+      signature,
+      new PublicKey(publicKey).toBytes()
+    );
+
+    if (!verified) {
+      throw new AppError("Invalid wallet signature", 401);
+    }
+
+    const consumed = await prisma.authChallenge.updateMany({
+      where: {
+        id: challenge.id,
+        consumedAt: null,
+      },
+      data: {
+        consumedAt: now,
+      },
+    });
+
+    if (consumed.count !== 1) {
+      throw new AppError("Wallet challenge already used", 401);
+    }
+
+    return publicKey;
   },
 
   async updateName(userId: string, input: UpdateNameInput) {
@@ -200,7 +441,13 @@ export const authService = {
     const updated = await prisma.user.update({
       where: { id: userId },
       data: { name: input.name.trim() },
-      select: { id: true, name: true, plan: true, mainWalletPublicKey: true },
+      select: {
+        id: true,
+        name: true,
+        plan: true,
+        mainWalletPublicKey: true,
+        authWalletPublicKey: true,
+      },
     });
 
     return updated;
@@ -248,7 +495,8 @@ export const authService = {
         user.id,
         user.mainWalletPublicKey,
         user.name,
-        user.plan
+        user.plan,
+        user.authWalletPublicKey
       ),
       refreshToken,
       refreshExpiresAt,
@@ -276,6 +524,7 @@ export const authService = {
                   plan: true,
                   paidPlanExpiresAt: true,
                   mainWalletPublicKey: true,
+                  authWalletPublicKey: true,
                 },
               },
             },
@@ -389,7 +638,8 @@ export const authService = {
         result.user.id,
         result.user.mainWalletPublicKey,
         result.user.name,
-        result.user.plan
+        result.user.plan,
+        result.user.authWalletPublicKey
       ),
     };
   },
@@ -474,6 +724,7 @@ export const authService = {
           name: true,
           plan: true,
           paidPlanExpiresAt: true,
+          authWalletPublicKey: true,
           mainWalletPublicKey: true,
           createdAt: true,
           updatedAt: true,
@@ -494,6 +745,7 @@ export const authService = {
         name: user.name,
         plan: resolveEffectiveUserPlan(user.plan, user.paidPlanExpiresAt),
         mainWalletPublicKey: user.mainWalletPublicKey,
+        authWalletPublicKey: user.authWalletPublicKey,
         mainWalletBalanceSol: Number(user.mainWallet?.balanceSol ?? 0),
         createdAt: user.createdAt,
         updatedAt: user.updatedAt,

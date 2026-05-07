@@ -1,7 +1,6 @@
 "use client";
 
 import * as React from "react";
-import { IconCreditCard } from "@tabler/icons-react";
 import { trpc } from "@/lib/trpc/client";
 import {
   accountRoutes,
@@ -42,20 +41,22 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
   );
   const resolvedPlan =
     subscriptionOverviewQuery.data?.plan ?? currentUser?.plan ?? null;
-  const subscriptionPlanBadge =
-    resolvedPlan === "PRO" ? "Pro" : resolvedPlan === "FREE" ? "Free" : undefined;
+  const accountPlanBadge =
+    resolvedPlan === "PRO"
+      ? "Pro"
+      : resolvedPlan === "DEVELOPER"
+        ? "Developer"
+        : resolvedPlan === "FREE"
+          ? "Free"
+          : undefined;
   const accountItems = React.useMemo(
-    () => [
-      ...accountRoutes,
-      {
-        title: "Subscription",
-        url: "/account/subscription",
-        icon: IconCreditCard,
-        scope: "global" as const,
-        badge: subscriptionPlanBadge,
-      },
-    ],
-    [subscriptionPlanBadge]
+    () =>
+      accountRoutes.map((item) =>
+        item.url === "/account"
+          ? { ...item, badge: accountPlanBadge }
+          : item
+      ),
+    [accountPlanBadge]
   );
   const tokenWorkspaceItems = React.useMemo(
     () =>

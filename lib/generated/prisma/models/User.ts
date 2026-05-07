@@ -31,6 +31,7 @@ export type UserMinAggregateOutputType = {
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
   mainWalletPublicKey: string | null
+  authWalletPublicKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -42,6 +43,7 @@ export type UserMaxAggregateOutputType = {
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
   mainWalletPublicKey: string | null
+  authWalletPublicKey: string | null
   createdAt: Date | null
   updatedAt: Date | null
 }
@@ -53,6 +55,7 @@ export type UserCountAggregateOutputType = {
   paidPlanStartedAt: number
   paidPlanExpiresAt: number
   mainWalletPublicKey: number
+  authWalletPublicKey: number
   createdAt: number
   updatedAt: number
   _all: number
@@ -66,6 +69,7 @@ export type UserMinAggregateInputType = {
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
   mainWalletPublicKey?: true
+  authWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -77,6 +81,7 @@ export type UserMaxAggregateInputType = {
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
   mainWalletPublicKey?: true
+  authWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
 }
@@ -88,6 +93,7 @@ export type UserCountAggregateInputType = {
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
   mainWalletPublicKey?: true
+  authWalletPublicKey?: true
   createdAt?: true
   updatedAt?: true
   _all?: true
@@ -172,6 +178,7 @@ export type UserGroupByOutputType = {
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
   mainWalletPublicKey: string
+  authWalletPublicKey: string | null
   createdAt: Date
   updatedAt: Date
   _count: UserCountAggregateOutputType | null
@@ -204,6 +211,7 @@ export type UserWhereInput = {
   paidPlanStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   mainWalletPublicKey?: Prisma.StringFilter<"User"> | string
+  authWalletPublicKey?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
@@ -227,6 +235,7 @@ export type UserOrderByWithRelationInput = {
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
+  authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   mainWallet?: Prisma.WalletOrderByWithRelationInput
@@ -246,6 +255,7 @@ export type UserOrderByWithRelationInput = {
 export type UserWhereUniqueInput = Prisma.AtLeast<{
   id?: string
   mainWalletPublicKey?: string
+  authWalletPublicKey?: string
   AND?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
   OR?: Prisma.UserWhereInput[]
   NOT?: Prisma.UserWhereInput | Prisma.UserWhereInput[]
@@ -267,7 +277,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   appTransactions?: Prisma.AppTransactionListRelationFilter
-}, "id" | "mainWalletPublicKey">
+}, "id" | "mainWalletPublicKey" | "authWalletPublicKey">
 
 export type UserOrderByWithAggregationInput = {
   id?: Prisma.SortOrder
@@ -276,6 +286,7 @@ export type UserOrderByWithAggregationInput = {
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
+  authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
   _count?: Prisma.UserCountOrderByAggregateInput
@@ -293,6 +304,7 @@ export type UserScalarWhereWithAggregatesInput = {
   paidPlanStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   mainWalletPublicKey?: Prisma.StringWithAggregatesFilter<"User"> | string
+  authWalletPublicKey?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
 }
@@ -303,6 +315,7 @@ export type UserCreateInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -326,6 +339,7 @@ export type UserUncheckedCreateInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -347,6 +361,7 @@ export type UserUpdateInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -370,6 +385,7 @@ export type UserUncheckedUpdateInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -392,6 +408,7 @@ export type UserCreateManyInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
 }
@@ -402,6 +419,7 @@ export type UserUpdateManyMutationInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -413,6 +431,7 @@ export type UserUncheckedUpdateManyInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
 }
@@ -424,6 +443,7 @@ export type UserCountOrderByAggregateInput = {
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
+  authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -435,6 +455,7 @@ export type UserMaxOrderByAggregateInput = {
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
+  authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -446,6 +467,7 @@ export type UserMinOrderByAggregateInput = {
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
+  authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
   updatedAt?: Prisma.SortOrder
 }
@@ -466,6 +488,10 @@ export type EnumUserPlanFieldUpdateOperationsInput = {
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
+}
+
+export type NullableStringFieldUpdateOperationsInput = {
+  set?: string | null
 }
 
 export type UserCreateNestedOneWithoutSubscriptionPaymentsInput = {
@@ -664,6 +690,7 @@ export type UserCreateWithoutSubscriptionPaymentsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -686,6 +713,7 @@ export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -722,6 +750,7 @@ export type UserUpdateWithoutSubscriptionPaymentsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -744,6 +773,7 @@ export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -764,6 +794,7 @@ export type UserCreateWithoutAuthSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -786,6 +817,7 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -822,6 +854,7 @@ export type UserUpdateWithoutAuthSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -844,6 +877,7 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -864,6 +898,7 @@ export type UserCreateWithoutWalletsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -886,6 +921,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
@@ -911,6 +947,7 @@ export type UserCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
@@ -932,6 +969,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -969,6 +1007,7 @@ export type UserUpdateWithoutWalletsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -991,6 +1030,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
@@ -1022,6 +1062,7 @@ export type UserUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
@@ -1043,6 +1084,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1064,6 +1106,7 @@ export type UserCreateWithoutTokensInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1086,6 +1129,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1122,6 +1166,7 @@ export type UserUpdateWithoutTokensInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1144,6 +1189,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1164,6 +1210,7 @@ export type UserCreateWithoutLaunchesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1186,6 +1233,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1222,6 +1270,7 @@ export type UserUpdateWithoutLaunchesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1244,6 +1293,7 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1264,6 +1314,7 @@ export type UserCreateWithoutHoldingExitsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1286,6 +1337,7 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1322,6 +1374,7 @@ export type UserUpdateWithoutHoldingExitsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1344,6 +1397,7 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1364,6 +1418,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1386,6 +1441,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1422,6 +1478,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1444,6 +1501,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1464,6 +1522,7 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1486,6 +1545,7 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1522,6 +1582,7 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1544,6 +1605,7 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1564,6 +1626,7 @@ export type UserCreateWithoutVanityMintsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1586,6 +1649,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1622,6 +1686,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1644,6 +1709,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1664,6 +1730,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1686,6 +1753,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1722,6 +1790,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1744,6 +1813,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1764,6 +1834,7 @@ export type UserCreateWithoutAppTransactionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
@@ -1786,6 +1857,7 @@ export type UserUncheckedCreateWithoutAppTransactionsInput = {
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
   mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
   wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
@@ -1822,6 +1894,7 @@ export type UserUpdateWithoutAppTransactionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
@@ -1844,6 +1917,7 @@ export type UserUncheckedUpdateWithoutAppTransactionsInput = {
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
@@ -1986,6 +2060,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
   mainWalletPublicKey?: boolean
+  authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
@@ -2010,6 +2085,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
   mainWalletPublicKey?: boolean
+  authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
@@ -2022,6 +2098,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
   mainWalletPublicKey?: boolean
+  authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
@@ -2034,11 +2111,12 @@ export type UserSelectScalar = {
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
   mainWalletPublicKey?: boolean
+  authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "mainWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "mainWalletPublicKey" | "authWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
@@ -2084,6 +2162,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     paidPlanStartedAt: Date | null
     paidPlanExpiresAt: Date | null
     mainWalletPublicKey: string
+    authWalletPublicKey: string | null
     createdAt: Date
     updatedAt: Date
   }, ExtArgs["result"]["user"]>
@@ -2527,6 +2606,7 @@ export interface UserFieldRefs {
   readonly paidPlanStartedAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly paidPlanExpiresAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly mainWalletPublicKey: Prisma.FieldRef<"User", 'String'>
+  readonly authWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly updatedAt: Prisma.FieldRef<"User", 'DateTime'>
 }

@@ -56,6 +56,7 @@ export const ModelName = {
   SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
+  AuthChallenge: 'AuthChallenge',
   Wallet: 'Wallet',
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
@@ -112,6 +113,7 @@ export const UserScalarFieldEnum = {
   paidPlanStartedAt: 'paidPlanStartedAt',
   paidPlanExpiresAt: 'paidPlanExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
+  authWalletPublicKey: 'authWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -160,6 +162,19 @@ export const RefreshTokenScalarFieldEnum = {
 } as const
 
 export type RefreshTokenScalarFieldEnum = (typeof RefreshTokenScalarFieldEnum)[keyof typeof RefreshTokenScalarFieldEnum]
+
+
+export const AuthChallengeScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  nonce: 'nonce',
+  purpose: 'purpose',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AuthChallengeScalarFieldEnum = (typeof AuthChallengeScalarFieldEnum)[keyof typeof AuthChallengeScalarFieldEnum]
 
 
 export const WalletScalarFieldEnum = {

@@ -27,7 +27,7 @@ All logging and limiter keys should reuse these values to avoid route-specific d
 The API uses route tiers instead of one global limit.
 
 - `public` — low-risk public read behavior
-- `auth` — login/register/logout and account bootstrap operations
+- `auth` — login/logout and account bootstrap operations
 - `protected` — authenticated default operations
 - `expensiveMutation` — state-changing flows with heavy RPC/DB cost
 - `sensitiveMutation` — private-key and fund movement actions
@@ -56,9 +56,9 @@ The API uses route tiers instead of one global limit.
 ## Router Classification
 
 - `auth.router.ts`
-  - `register`, `loginWithPrivateKey`, `logout`: `authRateLimitedProcedure`
+  - `loginWithPrivateKey`, `loginWithWalletSignature`, `createWalletChallenge`, `logout`: `authRateLimitedProcedure`
   - `me`: `publicRateLimitedProcedure`
-  - `updateName`: `protectedRateLimitedProcedure`
+  - `updateName`, `linkWalletAdapter`, `logoutAll`: `protectedRateLimitedProcedure`
 - `wallet.router.ts`
   - private key + transfer procedures use `sensitiveProcedure`
   - refresh/fetch procedures use `protectedRateLimitedProcedure` or `expensiveProtectedProcedure`

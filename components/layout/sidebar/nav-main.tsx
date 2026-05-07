@@ -13,6 +13,7 @@ import {
   IconList,
   IconPlus,
   IconRobot,
+  IconUserCircle,
   IconWallet,
 } from "@tabler/icons-react";
 
@@ -90,9 +91,9 @@ export const tokenWorkspaceRoutes: NavMainItem[] = [
 
 export const accountRoutes: NavMainItem[] = [
   {
-    title: "Main Wallet",
+    title: "Account",
     url: "/account",
-    icon: IconWallet,
+    icon: IconUserCircle,
     scope: "global",
   },
   {

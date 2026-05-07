@@ -389,6 +389,7 @@ export const ModelName = {
   SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
+  AuthChallenge: 'AuthChallenge',
   Wallet: 'Wallet',
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
@@ -426,7 +427,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "subscriptionPayment" | "authSession" | "refreshToken" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
+    modelProps: "testTable" | "user" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -797,6 +798,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.RefreshTokenCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.RefreshTokenCountAggregateOutputType> | number
+        }
+      }
+    }
+    AuthChallenge: {
+      payload: Prisma.$AuthChallengePayload<ExtArgs>
+      fields: Prisma.AuthChallengeFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.AuthChallengeFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.AuthChallengeFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        findFirst: {
+          args: Prisma.AuthChallengeFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.AuthChallengeFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        findMany: {
+          args: Prisma.AuthChallengeFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        create: {
+          args: Prisma.AuthChallengeCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        createMany: {
+          args: Prisma.AuthChallengeCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.AuthChallengeCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        delete: {
+          args: Prisma.AuthChallengeDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        update: {
+          args: Prisma.AuthChallengeUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        deleteMany: {
+          args: Prisma.AuthChallengeDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.AuthChallengeUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.AuthChallengeUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>[]
+        }
+        upsert: {
+          args: Prisma.AuthChallengeUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$AuthChallengePayload>
+        }
+        aggregate: {
+          args: Prisma.AuthChallengeAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateAuthChallenge>
+        }
+        groupBy: {
+          args: Prisma.AuthChallengeGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthChallengeGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.AuthChallengeCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AuthChallengeCountAggregateOutputType> | number
         }
       }
     }
@@ -2483,6 +2558,7 @@ export const UserScalarFieldEnum = {
   paidPlanStartedAt: 'paidPlanStartedAt',
   paidPlanExpiresAt: 'paidPlanExpiresAt',
   mainWalletPublicKey: 'mainWalletPublicKey',
+  authWalletPublicKey: 'authWalletPublicKey',
   createdAt: 'createdAt',
   updatedAt: 'updatedAt'
 } as const
@@ -2531,6 +2607,19 @@ export const RefreshTokenScalarFieldEnum = {
 } as const
 
 export type RefreshTokenScalarFieldEnum = (typeof RefreshTokenScalarFieldEnum)[keyof typeof RefreshTokenScalarFieldEnum]
+
+
+export const AuthChallengeScalarFieldEnum = {
+  id: 'id',
+  publicKey: 'publicKey',
+  nonce: 'nonce',
+  purpose: 'purpose',
+  expiresAt: 'expiresAt',
+  consumedAt: 'consumedAt',
+  createdAt: 'createdAt'
+} as const
+
+export type AuthChallengeScalarFieldEnum = (typeof AuthChallengeScalarFieldEnum)[keyof typeof AuthChallengeScalarFieldEnum]
 
 
 export const WalletScalarFieldEnum = {
@@ -3027,6 +3116,20 @@ export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMo
 
 
 /**
+ * Reference to a field of type 'AuthChallengePurpose'
+ */
+export type EnumAuthChallengePurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AuthChallengePurpose'>
+    
+
+
+/**
+ * Reference to a field of type 'AuthChallengePurpose[]'
+ */
+export type ListEnumAuthChallengePurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AuthChallengePurpose[]'>
+    
+
+
+/**
  * Reference to a field of type 'WalletType'
  */
 export type EnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType'>
@@ -3426,6 +3529,7 @@ export type GlobalOmitConfig = {
   subscriptionPayment?: Prisma.SubscriptionPaymentOmit
   authSession?: Prisma.AuthSessionOmit
   refreshToken?: Prisma.RefreshTokenOmit
+  authChallenge?: Prisma.AuthChallengeOmit
   wallet?: Prisma.WalletOmit
   token?: Prisma.TokenOmit
   tokenDevWallet?: Prisma.TokenDevWalletOmit

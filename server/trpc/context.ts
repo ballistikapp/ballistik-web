@@ -48,6 +48,7 @@ export async function createContext(opts?: FetchCreateContextFnOptions) {
         name: payload.name ?? "User",
         plan: payload.plan,
         mainWalletPublicKey: payload.publicKey,
+        authWalletPublicKey: payload.authWalletPublicKey ?? null,
       };
     }
   }

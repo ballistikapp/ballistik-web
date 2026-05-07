@@ -18,6 +18,14 @@ export const UserPlan = {
 export type UserPlan = (typeof UserPlan)[keyof typeof UserPlan]
 
 
+export const AuthChallengePurpose = {
+  WALLET_LOGIN: 'WALLET_LOGIN',
+  WALLET_LINK: 'WALLET_LINK'
+} as const
+
+export type AuthChallengePurpose = (typeof AuthChallengePurpose)[keyof typeof AuthChallengePurpose]
+
+
 export const WalletType = {
   MAIN_WALLET: 'MAIN_WALLET',
   DEV: 'DEV',

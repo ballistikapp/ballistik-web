@@ -6,7 +6,6 @@ import { format } from "date-fns";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 import {
-  PageHeader,
   PageSection,
   PageSectionDivider,
   PageSectionHeader,
@@ -184,7 +183,6 @@ export default function AccountSubscriptionPage() {
   if (overviewQuery.isLoading) {
     return (
       <div className="flex flex-col gap-6">
-        <Skeleton className="h-10 w-56" />
         <Skeleton className="h-40 w-full rounded-xl" />
         <Skeleton className="h-64 w-full rounded-xl" />
       </div>
@@ -194,7 +192,6 @@ export default function AccountSubscriptionPage() {
   if (!overview) {
     return (
       <div className="flex flex-col gap-4 py-10">
-        <PageHeader title="Subscription" />
         <p className="text-sm text-muted-foreground">
           Subscription details are unavailable right now.
         </p>
@@ -209,28 +206,20 @@ export default function AccountSubscriptionPage() {
   return (
     <>
       <div className="flex flex-col gap-6">
-        <PageHeader
-          title="Subscription"
-          rightContent={
-            <div className="w-full text-left md:text-right">
-              <div className="flex flex-wrap items-center gap-2 md:justify-end">
-                <Badge
-                  variant={isPaid ? "default" : "secondary"}
-                  className="h-8 rounded-full px-4 text-sm font-semibold"
-                >
-                  {planLabel(overview.plan)}
-                </Badge>
-              </div>
-              {isPaid && overview.paidPlanExpiresAt && (
-                <p className="mt-2 text-xs text-muted-foreground">
-                  Active until {formatDateTime(overview.paidPlanExpiresAt)}
-                </p>
-              )}
-            </div>
-          }
-        />
-
         <PageSection className="pt-6 md:pt-8">
+          <div className="mb-8 flex flex-wrap items-center gap-3">
+            <Badge
+              variant={isPaid ? "default" : "secondary"}
+              className="h-8 rounded-full px-4 text-sm font-semibold"
+            >
+              {planLabel(overview.plan)}
+            </Badge>
+            {isPaid && overview.paidPlanExpiresAt && (
+              <p className="text-xs text-muted-foreground">
+                Active until {formatDateTime(overview.paidPlanExpiresAt)}
+              </p>
+            )}
+          </div>
           <div className="grid gap-8 lg:grid-cols-2 lg:items-start">
             {/* Developer Tier */}
             <div className="relative overflow-hidden rounded-3xl border border-white/10 bg-linear-to-b from-neutral-900/90 to-black p-5 text-neutral-50 shadow-[0_0_0_1px_rgba(255,255,255,0.02)] sm:p-6 md:p-8">
@@ -422,7 +411,7 @@ export default function AccountSubscriptionPage() {
             </p>
           </div>
 
-          <PageSectionDivider className="my-14 md:my-24" />
+          <PageSectionDivider className="mx-0 my-14 md:mx-0 md:my-24 lg:-ml-6 xl:mx-0 xl:-ml-6" />
 
           <div className="space-y-10 pb-8">
             <PageSectionHeader

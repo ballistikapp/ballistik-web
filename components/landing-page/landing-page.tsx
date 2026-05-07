@@ -53,7 +53,7 @@ export function LandingPage() {
             href="/auth"
             className="bg-black/30 hover:bg-black/60 transition-all duration-300 rounded-lg border-2 border-white/10 hover:border-white/30 flex items-center gap-4 md:gap-8 px-2.5 py-1.5 font-medium text-foreground"
           >
-            <span>GO TO DAPP</span>
+            <span>GO TO APP</span>
             <ChevronRightIcon className="h-5 w-5" />
           </Link>
         </motion.div>
@@ -285,10 +285,7 @@ export function LandingPage() {
                   "Dashboard monitoring falls back to polling",
                   "Volume bot stays available with slower minimum intervals",
                 ].map((feature) => (
-                  <div
-                    key={feature}
-                    className="flex items-start gap-3 text-sm"
-                  >
+                  <div key={feature} className="flex items-start gap-3 text-sm">
                     <span className="mt-1 size-1.5 shrink-0 rounded-full bg-neutral-600" />
                     <span className="text-neutral-400">{feature}</span>
                   </div>
@@ -372,7 +369,9 @@ export function LandingPage() {
                   Pro
                 </p>
                 <div className="flex items-end gap-1.5">
-                  <p className="text-4xl font-semibold text-neutral-100">4.95 SOL</p>
+                  <p className="text-4xl font-semibold text-neutral-100">
+                    4.95 SOL
+                  </p>
                   <p className="text-neutral-500 mb-1">/week</p>
                 </div>
                 <p className="text-sm text-neutral-500 mt-1">
@@ -447,8 +446,7 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
           >
-            Straight answers about plans, fees, and how {SITE_BRAND_NAME}{" "}
-            works.
+            Straight answers about plans, fees, and how {SITE_BRAND_NAME} works.
           </motion.p>
           <div className="h-10" />
           <motion.div

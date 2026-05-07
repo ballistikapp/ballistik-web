@@ -6,8 +6,10 @@ import {
 } from "../trpc";
 import { authService } from "@/server/services";
 import {
-  registerSchema,
   loginWithPrivateKeySchema,
+  createWalletChallengeSchema,
+  loginWithWalletSignatureSchema,
+  linkWalletAdapterSchema,
   refreshSessionSchema,
   updateNameSchema,
 } from "@/server/schemas";
@@ -68,14 +70,14 @@ async function clearSessionCookies() {
 }
 
 export const authRouter = router({
-  register: authRateLimitedProcedure
-    .input(registerSchema)
+  loginWithPrivateKey: authRateLimitedProcedure
+    .input(loginWithPrivateKeySchema)
     .mutation(async ({ input, ctx }) => {
       let user;
       try {
-        user = await authService.register(input);
+        user = await authService.loginWithPrivateKey(input);
       } catch (error) {
-        ctx.logger.warn("Auth register failed", {
+        ctx.logger.warn("Auth login failed", {
           clientIp: ctx.clientIp,
           errorMessage: error instanceof Error ? error.message : String(error),
         });
@@ -94,14 +96,20 @@ export const authRouter = router({
       };
     }),
 
-  loginWithPrivateKey: authRateLimitedProcedure
-    .input(loginWithPrivateKeySchema)
+  createWalletChallenge: authRateLimitedProcedure
+    .input(createWalletChallengeSchema)
+    .mutation(async ({ input }) => {
+      return await authService.createWalletChallenge(input);
+    }),
+
+  loginWithWalletSignature: authRateLimitedProcedure
+    .input(loginWithWalletSignatureSchema)
     .mutation(async ({ input, ctx }) => {
       let user;
       try {
-        user = await authService.loginWithPrivateKey(input);
+        user = await authService.loginWithWalletSignature(input);
       } catch (error) {
-        ctx.logger.warn("Auth login failed", {
+        ctx.logger.warn("Wallet auth login failed", {
           clientIp: ctx.clientIp,
           errorMessage: error instanceof Error ? error.message : String(error),
         });
@@ -159,7 +167,7 @@ export const authRouter = router({
       return null;
     }
 
-    return ctx.user;
+    return await authService.getUserById(ctx.user.id);
   }),
 
   updateName: protectedRateLimitedProcedure
@@ -171,7 +179,33 @@ export const authRouter = router({
         updated.id,
         updated.mainWalletPublicKey,
         updated.name,
-        updated.plan
+        updated.plan,
+        updated.authWalletPublicKey
+      );
+      const cookieStore = await cookies();
+      const secureCookie = await resolveCookieSecure();
+      cookieStore.set(ACCESS_TOKEN_COOKIE, token, {
+        httpOnly: true,
+        secure: secureCookie,
+        sameSite: "lax",
+        maxAge: getAccessTokenMaxAgeSeconds(),
+        path: "/",
+      });
+
+      return updated;
+    }),
+
+  linkWalletAdapter: protectedRateLimitedProcedure
+    .input(linkWalletAdapterSchema)
+    .mutation(async ({ input, ctx }) => {
+      const updated = await authService.linkWalletAdapter(ctx.user.id, input);
+
+      const token = signToken(
+        updated.id,
+        updated.mainWalletPublicKey,
+        updated.name,
+        updated.plan,
+        updated.authWalletPublicKey
       );
       const cookieStore = await cookies();
       const secureCookie = await resolveCookieSecure();

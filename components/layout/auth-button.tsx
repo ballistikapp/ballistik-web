@@ -1,11 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { format } from "date-fns";
+import { useWallet } from "@solana/wallet-adapter-react";
 import {
   IconArrowDownLeft,
   IconArrowUpRight,
-  IconCreditCard,
   IconDotsVertical,
   IconLogout,
   IconCopy,
@@ -40,8 +39,8 @@ import { Badge } from "@/components/ui/badge";
 export function AuthButton() {
   const [depositDialogOpen, setDepositDialogOpen] = React.useState(false);
   const [withdrawDialogOpen, setWithdrawDialogOpen] = React.useState(false);
+  const { disconnect: disconnectAdapter } = useWallet();
   const { data: currentUser, isLoading } = trpc.auth.me.useQuery();
-
   const isLoggedIn = currentUser !== null && currentUser !== undefined;
   const mainWalletQuery = trpc.wallet.getMain.useQuery(
     {},
@@ -66,12 +65,14 @@ export function AuthButton() {
   const subscriptionOverview = subscriptionOverviewQuery.data;
   const effectivePlan = subscriptionOverview?.plan ?? currentUser?.plan ?? null;
   const isPaidPlan = effectivePlan === "PRO" || effectivePlan === "DEVELOPER";
-  const planExpiresAtLabel = subscriptionOverview?.paidPlanExpiresAt
-    ? format(new Date(subscriptionOverview.paidPlanExpiresAt), "MMM d, yyyy")
-    : null;
 
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
+    onSuccess: async () => {
+      try {
+        await disconnectAdapter();
+      } catch {
+        // Adapter cleanup is best-effort; ignore failures.
+      }
       window.location.reload();
     },
     onError: (error) => {
@@ -150,69 +151,58 @@ export function AuthButton() {
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuGroup>
-            <DropdownMenuItem className="cursor-default data-highlighted:bg-transparent data-highlighted:text-foreground">
-              <div className="flex w-full items-center justify-between gap-3">
-                <div className="flex min-w-0 flex-col gap-1">
-                  <span className="truncate text-sm font-medium">
-                    {currentUser.name || "Wallet"}
-                  </span>
-                  <span className="text-muted-foreground truncate text-xs font-mono">
-                    {truncateAddress(currentUser.mainWalletPublicKey)}
-                  </span>
-                </div>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                      onClick={async (event) => {
-                        event.preventDefault();
-                        event.stopPropagation();
-                        await copyToClipboard(
-                          currentUser.mainWalletPublicKey,
-                          "Public Key"
-                        );
-                      }}
-                    >
-                      <IconCopy className="size-4" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>Copy Wallet Public Key</TooltipContent>
-                </Tooltip>
-              </div>
-            </DropdownMenuItem>
-          </DropdownMenuGroup>
-
-          <DropdownMenuSeparator />
-
-          <DropdownMenuLabel className="flex items-center justify-between gap-3">
-            <div className="flex flex-col">
-              <span className="text-xs text-muted-foreground">Balance</span>
-              <span className="text-lg font-mono font-semibold">
+          <DropdownMenuLabel className="flex flex-col">
+            <span>Main Wallet</span>
+            <div className="h-1" />
+            <div className="flex items-center justify-between gap-3">
+              <span className="truncate font-mono text-xs text-muted-foreground">
+                {truncateAddress(currentUser.mainWalletPublicKey)}
+              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    onClick={async (event) => {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      await copyToClipboard(
+                        currentUser.mainWalletPublicKey,
+                        "Public Key"
+                      );
+                    }}
+                  >
+                    <IconCopy />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Copy Wallet Public Key</TooltipContent>
+              </Tooltip>
+            </div>
+            <div className="flex items-center justify-between gap-3">
+              <span className="text-lg font-mono font-semibold text-foreground">
                 {mainWalletBalanceSol.toFixed(4)} SOL
               </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    disabled={refreshMainBalance.isPending}
+                    onClick={handleRefreshMainBalance}
+                  >
+                    {refreshMainBalance.isPending ? (
+                      <Spinner className="size-4" />
+                    ) : (
+                      <IconRefresh />
+                    )}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Refresh</TooltipContent>
+              </Tooltip>
             </div>
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-8 w-8 text-muted-foreground hover:bg-transparent hover:text-foreground"
-                  disabled={refreshMainBalance.isPending}
-                  onClick={handleRefreshMainBalance}
-                >
-                  {refreshMainBalance.isPending ? (
-                    <Spinner className="size-4" />
-                  ) : (
-                    <IconRefresh className="size-4" />
-                  )}
-                </Button>
-              </TooltipTrigger>
-              <TooltipContent>Refresh</TooltipContent>
-            </Tooltip>
           </DropdownMenuLabel>
           <DropdownMenuSeparator />
 
@@ -235,47 +225,32 @@ export function AuthButton() {
               <IconArrowUpRight />
               Withdraw
             </DropdownMenuItem>
+          </DropdownMenuGroup>
+          <DropdownMenuSeparator />
+          <DropdownMenuGroup>
             <DropdownMenuItem asChild>
               <Link href="/account">
                 <IconWallet />
-                Go to Main Wallet
+                Go to Account
+                {effectivePlan ? (
+                  <Badge
+                    variant={isPaidPlan ? "default" : "secondary"}
+                    className="ml-auto"
+                  >
+                    {effectivePlan === "PRO"
+                      ? "Pro"
+                      : effectivePlan === "DEVELOPER"
+                        ? "Developer"
+                        : "Free"}
+                  </Badge>
+                ) : null}
               </Link>
             </DropdownMenuItem>
+            <DropdownMenuItem onClick={handleLogout}>
+              <IconLogout />
+              Log out
+            </DropdownMenuItem>
           </DropdownMenuGroup>
-          <DropdownMenuSeparator />
-          {effectivePlan ? (
-            <>
-              <DropdownMenuLabel className="flex flex-col gap-1">
-                <div>
-                  <Badge variant={isPaidPlan ? "default" : "secondary"}>
-                    {effectivePlan === "PRO"
-                      ? "Pro Plan"
-                      : effectivePlan === "DEVELOPER"
-                        ? "Developer Plan"
-                        : "Free Plan"}
-                  </Badge>
-                </div>
-                {isPaidPlan && planExpiresAtLabel ? (
-                  <span className="text-xs text-muted-foreground">
-                    Active until {planExpiresAtLabel}
-                  </span>
-                ) : null}
-              </DropdownMenuLabel>
-              <DropdownMenuItem asChild>
-                <Link href="/account/subscription">
-                  <IconCreditCard />
-                  {isPaidPlan ? "Manage Subscription" : "View Plans"}
-                </Link>
-              </DropdownMenuItem>
-
-              <DropdownMenuSeparator />
-            </>
-          ) : null}
-
-          <DropdownMenuItem onClick={handleLogout}>
-            <IconLogout />
-            Log out
-          </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
 

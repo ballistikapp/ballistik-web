@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist_Mono } from "next/font/google";
 import localFont from "next/font/local";
 import "./globals.css";
+import "@solana/wallet-adapter-react-ui/styles.css";
 import { BALLISTIK_X_HANDLE } from "@/lib/config/external-links";
 import {
   DEFAULT_SITE_DESCRIPTION,
@@ -20,6 +21,7 @@ import { ClickyAnalytics } from "@/components/analytics/clicky-analytics";
 import { GoogleAnalytics } from "@/components/analytics/google-analytics";
 import { TokenProvider } from "@/contexts/token-context";
 import { SiteJsonLd } from "@/components/seo/site-json-ld";
+import { AppWalletAdapterProvider } from "@/components/providers/wallet-adapter-provider";
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
@@ -114,19 +116,21 @@ export default function RootLayout({
         <NuqsAdapter>
           <TooltipProvider delayDuration={0}>
             <TRPCProvider>
-              <TokenProvider>
-                <NextTopLoader color="#333" height={5} showSpinner={false} />
-                {children}
-                <Toaster
-                  richColors
-                  closeButton
-                  position="bottom-center"
-                  theme="dark"
-                  toastOptions={{
-                    className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
-                  }}
-                />
-              </TokenProvider>
+              <AppWalletAdapterProvider>
+                <TokenProvider>
+                  <NextTopLoader color="#333" height={5} showSpinner={false} />
+                  {children}
+                  <Toaster
+                    richColors
+                    closeButton
+                    position="bottom-center"
+                    theme="dark"
+                    toastOptions={{
+                      className: "shadow-[0_8px_24px_rgba(0,0,0,0.25)]",
+                    }}
+                  />
+                </TokenProvider>
+              </AppWalletAdapterProvider>
             </TRPCProvider>
           </TooltipProvider>
         </NuqsAdapter>

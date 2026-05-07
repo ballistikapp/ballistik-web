@@ -65,6 +65,11 @@ export type AuthSession = Prisma.AuthSessionModel
  */
 export type RefreshToken = Prisma.RefreshTokenModel
 /**
+ * Model AuthChallenge
+ * 
+ */
+export type AuthChallenge = Prisma.AuthChallengeModel
+/**
  * Model Wallet
  * 
  */
