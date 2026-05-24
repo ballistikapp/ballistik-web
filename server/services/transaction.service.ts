@@ -1,13 +1,15 @@
 import "server-only";
-import { BorshCoder, EventParser, type Idl } from "@coral-xyz/anchor";
 import { Prisma, prisma } from "@/lib/prisma";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { retryRpc, retryRpcWithTimeout } from "@/lib/utils/rpc-retry";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
-import { getPumpIdl, PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
+import {
+  parsePumpTradeEvents,
+  type PumpTradeEvent,
+} from "@/server/solana/pump/events";
 import {
   LAMPORTS_PER_SOL,
   type ParsedTransactionWithMeta,
@@ -76,20 +78,10 @@ type TokenTransactionMetrics = {
   traders: { total: number; owned: number; external: number };
 };
 
-type PumpTradeEvent = {
-  mint: string;
-  user: string;
-  isBuy: boolean;
-  solAmount: number;
-  tokenAmount: number;
-};
-
 const WRAPPED_SOL_MINT = "So11111111111111111111111111111111111111112";
 const PARSE_RETRY_DELAYS_MS = [200, 500];
 const TOKEN_TRANSACTION_UPDATE_BATCH_SIZE = 50;
 const DEFAULT_PUMP_TOKEN_DECIMALS = 6;
-
-let pumpEventParser: EventParser | null = null;
 
 type TokenBalanceEntry = NonNullable<
   NonNullable<ParsedTransactionWithMeta["meta"]>["preTokenBalances"]
@@ -195,104 +187,8 @@ function getWrappedSolDiffForOwner(
   return postBalance - preBalance;
 }
 
-function getPumpEventParser() {
-  if (!pumpEventParser) {
-    pumpEventParser = new EventParser(
-      PUMP_PROGRAM_ID,
-      new BorshCoder(getPumpIdl() as Idl)
-    );
-  }
-  return pumpEventParser;
-}
-
-function asBigInt(value: unknown): bigint | null {
-  if (typeof value === "bigint") return value;
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return BigInt(Math.trunc(value));
-  }
-  if (typeof value === "string" && value.length > 0) {
-    try {
-      return BigInt(value);
-    } catch {
-      return null;
-    }
-  }
-  if (
-    value &&
-    typeof value === "object" &&
-    "toString" in value &&
-    typeof value.toString === "function"
-  ) {
-    try {
-      return BigInt(value.toString());
-    } catch {
-      return null;
-    }
-  }
-  return null;
-}
-
-function asPublicKeyString(value: unknown): string | null {
-  if (typeof value === "string") return value;
-  if (
-    value &&
-    typeof value === "object" &&
-    "toBase58" in value &&
-    typeof value.toBase58 === "function"
-  ) {
-    return value.toBase58();
-  }
-  return null;
-}
-
 function numbersDiffer(a: number, b: number, epsilon: number) {
   return Math.abs(a - b) > epsilon;
-}
-
-function parsePumpTradeEvents(
-  tx: ParsedTransactionWithMeta,
-  tokenPublicKey: string
-): PumpTradeEvent[] {
-  const logs = tx.meta?.logMessages;
-  if (!logs?.length) return [];
-
-  const tokenDecimals = getTokenDecimals(tx, tokenPublicKey);
-  const tokenDivisor = 10 ** tokenDecimals;
-  const events: PumpTradeEvent[] = [];
-
-  try {
-    for (const event of getPumpEventParser().parseLogs(logs)) {
-      if (event.name !== "TradeEvent") continue;
-      const data = event.data as Record<string, unknown>;
-      const mint = asPublicKeyString(data.mint);
-      const user = asPublicKeyString(data.user);
-      const solRaw = asBigInt(data.sol_amount ?? data.solAmount);
-      const tokenRaw = asBigInt(data.token_amount ?? data.tokenAmount);
-      const isBuy = data.is_buy ?? data.isBuy;
-
-      if (
-        mint !== tokenPublicKey ||
-        !user ||
-        solRaw === null ||
-        tokenRaw === null ||
-        typeof isBuy !== "boolean"
-      ) {
-        continue;
-      }
-
-      events.push({
-        mint,
-        user,
-        isBuy,
-        solAmount: Number(solRaw) / LAMPORTS_PER_SOL,
-        tokenAmount: Number(tokenRaw) / tokenDivisor,
-      });
-    }
-  } catch {
-    return [];
-  }
-
-  return events;
 }
 
 function takeMatchingTradeEvent(
@@ -521,7 +417,8 @@ function parseTransactionForTokenOwners(
   const txBlockTime = tx.blockTime ? new Date(tx.blockTime * 1000) : null;
   const txFee = (tx.meta?.fee ?? 0) / LAMPORTS_PER_SOL;
   const txFailed = Boolean(tx.meta?.err);
-  const tradeEvents = parsePumpTradeEvents(tx, tokenPublicKey);
+  const tokenDecimals = getTokenDecimals(tx, tokenPublicKey);
+  const tradeEvents = parsePumpTradeEvents(tx, tokenPublicKey, tokenDecimals);
 
   owners.forEach((owner) => {
     const preAmount = preByOwner.get(owner) ?? 0;

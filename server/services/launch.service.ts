@@ -39,12 +39,12 @@ import {
 import bs58 from "bs58";
 import { PumpFunSDK } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
-import { appendLaunchDevBuyInstructions } from "@/server/solana/launch-dev-buy";
 import type { BundleTelemetryEvent } from "@/server/solana/jito-bundle";
 import {
   buildCreateTokenTransaction,
+  buildCreateAndDevBuyVersionedTransaction,
   type PumpMetadataUpload,
-} from "@/server/solana/pump-transaction-builders";
+} from "@/server/solana/pump/transactions";
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
@@ -692,6 +692,15 @@ async function appendBundleTelemetryLog(
         launchId,
         "ERROR",
         "Bundle confirmation timed out before create landed",
+        "create",
+        shared
+      );
+      return;
+    case "bundle_status_check":
+      await appendLog(
+        launchId,
+        "INFO",
+        "Bundle status check (cross-region)",
         "create",
         shared
       );
@@ -4315,28 +4324,7 @@ export const launchService = {
           durationMs: Date.now() - createStartedAt,
         });
       } else {
-        const { createTx } = await buildCreateTokenTransaction(
-          devWalletKeypair,
-          mintKeypair,
-          metadata
-        );
         const connection = getSolanaConnection();
-        if (devBuyAmountSol > 0) {
-          await appendLaunchDevBuyInstructions({
-            createTx,
-            buyer: devWalletKeypair,
-            mint: mintKeypair.publicKey,
-            solAmountLamports: toLamports(devBuyAmountSol),
-            creator: devWalletKeypair.publicKey,
-            minTokensOut: BigInt(1),
-          });
-        }
-        if (!createTx.feePayer) {
-          createTx.feePayer = devWalletKeypair.publicKey;
-        }
-        const latestBlockhash =
-          await connection.getLatestBlockhash("confirmed");
-        createTx.recentBlockhash = latestBlockhash.blockhash;
         const devPk = devWalletKeypair.publicKey.toBase58();
         // One row per (signature × user-owned wallet). When create + dev buy
         // share a single tx, the TRADE_BUY row owns the entire wallet delta.
@@ -4354,12 +4342,46 @@ export const launchService = {
           })
           .then((r) => r.id)
           .catch(() => null);
-        createSignature = await sendAndConfirmTransaction(
-          connection,
-          createTx,
-          [devWalletKeypair, mintKeypair],
-          { commitment: "confirmed" }
-        );
+
+        if (devBuyAmountSol > 0) {
+          // Combined CREATE + dev BUY in a single versioned (v0) transaction
+          // backed by an Address Lookup Table to stay under the 1232-byte limit.
+          const { tx: versionedTx, blockhash, lastValidBlockHeight } =
+            await buildCreateAndDevBuyVersionedTransaction(
+              devWalletKeypair,
+              mintKeypair,
+              metadata,
+              toLamports(devBuyAmountSol),
+              BigInt(1)
+            );
+          createSignature = await connection.sendRawTransaction(
+            versionedTx.serialize(),
+            { skipPreflight: false }
+          );
+          await connection.confirmTransaction(
+            { signature: createSignature, blockhash, lastValidBlockHeight },
+            "confirmed"
+          );
+        } else {
+          const { createTx } = await buildCreateTokenTransaction(
+            devWalletKeypair,
+            mintKeypair,
+            metadata
+          );
+          if (!createTx.feePayer) {
+            createTx.feePayer = devWalletKeypair.publicKey;
+          }
+          const latestBlockhash =
+            await connection.getLatestBlockhash("confirmed");
+          createTx.recentBlockhash = latestBlockhash.blockhash;
+          createSignature = await sendAndConfirmTransaction(
+            connection,
+            createTx,
+            [devWalletKeypair, mintKeypair],
+            { commitment: "confirmed" }
+          );
+        }
+
         if (createOrBuyTrackId) {
           await appTransactionService
             .confirm(createOrBuyTrackId, { signature: createSignature })

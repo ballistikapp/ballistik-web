@@ -13,9 +13,10 @@ import {
 import {
   buildCreateTokenTransaction,
   type PumpMetadataUpload,
-} from "@/server/solana/pump-transaction-builders";
+} from "@/server/solana/pump/transactions";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { settleSignature } from "@/server/services/app-transaction-settler";
+import { mapPumpError } from "@/server/solana/pump/errors";
 
 type BundleLaunchInput = {
   launchId?: string;
@@ -59,10 +60,12 @@ function buildBundleBuyers(
 
 // Bundle layout from buildBundleTransactionsForCreateAndBuys:
 //   tx[0] = create + first buyer
-//   tx[i>=1] = next 3 buyers each
+//   tx[i>=1] = next 2 buyers each (must stay in sync with buysPerTransaction
+//   in bundle-transaction-builder.ts)
+const BUYS_PER_NON_CREATOR_TX = 2;
 function buyerTxIndex(buyerIndex: number): number {
   if (buyerIndex === 0) return 0;
-  return 1 + Math.floor((buyerIndex - 1) / 3);
+  return 1 + Math.floor((buyerIndex - 1) / BUYS_PER_NON_CREATOR_TX);
 }
 
 export async function createAndBuyInBundle(input: BundleLaunchInput) {
@@ -117,6 +120,9 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
       error: simulationResult.value.err,
       logs: simulationResult.value.logs?.slice(0, 30),
     });
+    const combined = `${JSON.stringify(simulationResult.value.err)}\n${(simulationResult.value.logs ?? []).join("\n")}`;
+    const mapped = mapPumpError(combined);
+    if (mapped) throw mapped;
     throw new Error(
       `Create simulation failed: ${JSON.stringify(simulationResult.value.err)}`
     );

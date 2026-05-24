@@ -7,7 +7,7 @@ import { mapWithConcurrency } from "@/lib/utils/async";
 import { walletService } from "@/server/services/wallet.service";
 import { persistHoldingExitLog } from "@/server/services/log-persistence.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
-import { buildSellTransaction } from "@/server/solana/pump-new-idl";
+import { buildSellTransaction } from "@/server/solana/pump/instructions";
 import { sendJitoBundle } from "@/server/solana/jito-bundle";
 import {
   Keypair,

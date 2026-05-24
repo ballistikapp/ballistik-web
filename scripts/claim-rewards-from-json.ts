@@ -35,7 +35,7 @@ import {
   type Connection as SolanaConnection,
 } from "@solana/web3.js";
 import { PrismaClient } from "../lib/generated/prisma/client";
-import { PUMP_PROGRAM_ID } from "../server/solana/pump-idl";
+import { PUMP_PROGRAM_ID } from "../server/solana/pump/idl";
 import { retryRpc } from "../lib/utils/rpc-retry";
 
 dotenv.config({ path: join(process.cwd(), ".env"), quiet: true });

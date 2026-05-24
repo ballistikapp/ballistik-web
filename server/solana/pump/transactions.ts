@@ -1,13 +1,18 @@
-import { AnchorProvider } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
-import { Keypair, type PublicKey, type Transaction } from "@solana/web3.js";
+import {
+  Keypair,
+  TransactionMessage,
+  VersionedTransaction,
+  type PublicKey,
+  type Transaction,
+} from "@solana/web3.js";
 import type { CreateTokenMetadata } from "pumpdotfun-sdk";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { getPumpProgram } from "@/server/solana/pump-idl";
+import { logger } from "@/lib/logger";
 import {
-  buyTokensWithNewIdl,
-  createTokenWithNewIdl,
-} from "@/server/solana/pump-new-idl";
+  buildBuyTokenTransactionRaw,
+  buildCreateTokenTransactionRaw,
+} from "@/server/solana/pump/instructions";
+import { getLaunchLookupTable } from "@/server/solana/pump/lookup-table";
 
 export type PumpMetadataUpload = CreateTokenMetadata & {
   bannerFile?: File | null;
@@ -68,14 +73,7 @@ export async function buildCreateTokenTransaction(
 ) {
   const metadataResult = await uploadPumpMetadata(metadata);
   const metadataUri = metadataResult.metadataUri as string;
-  const provider = new AnchorProvider(
-    getSolanaConnection(),
-    new NodeWallet(creator),
-    { commitment: "finalized" }
-  );
-  const program = getPumpProgram(provider);
-  const createTx = await createTokenWithNewIdl(
-    program,
+  const createTx = await buildCreateTokenTransactionRaw(
     creator,
     mint,
     metadata,
@@ -94,7 +92,7 @@ export async function buildBuyTokenTransaction(
   creator?: PublicKey,
   minTokensOut?: bigint
 ): Promise<Transaction> {
-  const tx = await buyTokensWithNewIdl(
+  const tx = await buildBuyTokenTransactionRaw(
     buyer,
     mint,
     buyAmountLamport,
@@ -103,4 +101,68 @@ export async function buildBuyTokenTransaction(
   );
   tx.feePayer = buyer.publicKey;
   return tx;
+}
+
+export type CreateAndDevBuyVersionedResult = {
+  tx: VersionedTransaction;
+  blockhash: string;
+  lastValidBlockHeight: number;
+};
+
+export async function buildCreateAndDevBuyVersionedTransaction(
+  creator: Keypair,
+  mint: Keypair,
+  metadata: PumpMetadataUpload,
+  devBuyAmountLamports: bigint,
+  minTokensOut: bigint = BigInt(1)
+): Promise<CreateAndDevBuyVersionedResult> {
+  const metadataResult = await uploadPumpMetadata(metadata);
+  const metadataUri = metadataResult.metadataUri as string;
+
+  const [createTx, buyTx, alt, { blockhash, lastValidBlockHeight }] =
+    await Promise.all([
+      buildCreateTokenTransactionRaw(creator, mint, metadata, metadataUri),
+      buildBuyTokenTransactionRaw(
+        creator,
+        mint.publicKey,
+        devBuyAmountLamports,
+        creator.publicKey,
+        minTokensOut
+      ),
+      getLaunchLookupTable(),
+      getSolanaConnection().getLatestBlockhash("confirmed"),
+    ]);
+
+  const instructions = [
+    ...createTx.instructions,
+    ...buyTx.instructions,
+  ];
+
+  const message = new TransactionMessage({
+    payerKey: creator.publicKey,
+    recentBlockhash: blockhash,
+    instructions,
+  }).compileToV0Message([alt]);
+
+  const tx = new VersionedTransaction(message);
+  tx.sign([creator, mint]);
+
+  const serializedLength = tx.serialize().length;
+  logger.info("Built versioned create+dev-buy transaction", {
+    mint: mint.publicKey.toBase58(),
+    creator: creator.publicKey.toBase58(),
+    devBuyAmountSol: Number(devBuyAmountLamports) / 1e9,
+    instructionCount: instructions.length,
+    serializedBytes: serializedLength,
+    altAddress: alt.key.toBase58(),
+    altAddressCount: alt.state.addresses.length,
+  });
+
+  if (serializedLength > 1232) {
+    logger.warn("Versioned transaction exceeds 1232 bytes despite ALT", {
+      serializedBytes: serializedLength,
+    });
+  }
+
+  return { tx, blockhash, lastValidBlockHeight };
 }

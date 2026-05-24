@@ -63,7 +63,7 @@
 
 ### Pump IDL Consolidation
 
-- Review `server/solana/pump-idl.ts` and `server/solana/pump-new-idl.ts` and decide whether to keep manual instruction builders or update the IDL/Anchor path so the duplication can be removed.
+- Done: pump.fun modules consolidated under `server/solana/pump/` (`idl.ts`, `instructions.ts`, `transactions.ts`, `quotes.ts`, `errors.ts`, `lookup-table.ts`, `global-account.ts`, `events.ts`). Manual instruction builders remain separate from the IDL decode path.
 
 ### Token Launch Extension Points
 

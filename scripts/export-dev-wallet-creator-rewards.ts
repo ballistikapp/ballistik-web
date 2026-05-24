@@ -23,7 +23,7 @@ import { join } from "path";
 import { Pool } from "pg";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { PrismaClient } from "../lib/generated/prisma/client";
-import { PUMP_PROGRAM_ID } from "../server/solana/pump-idl";
+import { PUMP_PROGRAM_ID } from "../server/solana/pump/idl";
 import { retryRpc } from "../lib/utils/rpc-retry";
 
 dotenv.config({ path: join(process.cwd(), ".env"), quiet: true });

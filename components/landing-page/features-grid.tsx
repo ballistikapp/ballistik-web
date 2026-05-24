@@ -483,7 +483,7 @@ const items = [
   {
     title: "One-Click Token Launch",
     description:
-      "Deploy your Solana token with metadata, supply, and authority configuration in a single atomic Jito bundle. Up to 10 wallets buy simultaneously at launch.",
+      "Deploy your Solana token with metadata, supply, and authority configuration in a single atomic Jito bundle. Up to 9 wallets buy simultaneously at launch.",
     header: <TokenLaunchHeader />,
     className: "md:col-span-2 bg-linear-to-b from-neutral-900/50 to-black",
     icon: <IconRocket className="h-4 w-4 text-neutral-500" />,

@@ -1,5 +1,3 @@
-import type { Program } from "@coral-xyz/anchor";
-import { BN } from "@coral-xyz/anchor";
 import {
   PublicKey,
   Keypair,
@@ -7,6 +5,7 @@ import {
   TransactionInstruction,
   SystemProgram,
   SYSVAR_RENT_PUBKEY,
+  type AccountMeta,
 } from "@solana/web3.js";
 import {
   getAssociatedTokenAddress,
@@ -20,11 +19,15 @@ import { CreateTokenMetadata } from "pumpdotfun-sdk";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { logger } from "@/lib/logger";
 import { AppError } from "@/server/errors";
-import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
+import { PUMP_PROGRAM_ID } from "@/server/solana/pump/idl";
+import { getBuybackFeeRecipients } from "@/server/solana/pump/global-account";
 
 const GLOBAL_SEED = Buffer.from("global");
 const BONDING_CURVE_SEED = Buffer.from("bonding-curve");
+const BONDING_CURVE_V2_SEED = Buffer.from("bonding-curve-v2");
 const MINT_AUTHORITY_SEED = Buffer.from("mint-authority");
+
+const CASHBACK_FLAG_OFFSET = 82;
 const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
   "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
 );
@@ -104,6 +107,10 @@ export function derivePumpAddresses(mint: PublicKey) {
     [BONDING_CURVE_SEED, mint.toBuffer()],
     PUMP_PROGRAM_ID
   );
+  const [bondingCurveV2] = PublicKey.findProgramAddressSync(
+    [BONDING_CURVE_V2_SEED, mint.toBuffer()],
+    PUMP_PROGRAM_ID
+  );
   const [mintAuthority] = PublicKey.findProgramAddressSync(
     [MINT_AUTHORITY_SEED],
     PUMP_PROGRAM_ID
@@ -112,12 +119,19 @@ export function derivePumpAddresses(mint: PublicKey) {
   return {
     global,
     bondingCurve,
+    bondingCurveV2,
     mintAuthority,
   };
 }
 
-export async function createTokenWithNewIdl(
-  program: Program,
+function encodeStringBorsh(value: string): Buffer {
+  const bytes = Buffer.from(value, "utf8");
+  const len = Buffer.alloc(4);
+  len.writeUInt32LE(bytes.length, 0);
+  return Buffer.concat([len, bytes]);
+}
+
+export async function buildCreateTokenTransactionRaw(
   creator: Keypair,
   mint: Keypair,
   metadata: CreateTokenMetadata,
@@ -338,17 +352,54 @@ export async function createTokenWithNewIdl(
       uri: uri.substring(0, 50) + "...",
       creator: creatorPubkey.toBase58(),
     });
-    const tx = await program.methods
-      .create(name, symbol, uri, creatorPubkey)
-      .accounts({
-        mint: mint.publicKey,
-        associatedBondingCurve,
-        metadata: metadataPDA,
-        user: creatorPubkey,
-      })
-      .signers([mint])
-      .transaction();
 
+    const createData = Buffer.concat([
+      DISCRIMINATORS.CREATE,
+      encodeStringBorsh(name),
+      encodeStringBorsh(symbol),
+      encodeStringBorsh(uri),
+      creatorPubkey.toBuffer(),
+    ]);
+
+    const createIx = new TransactionInstruction({
+      programId: PUMP_PROGRAM_ID,
+      keys: [
+        { pubkey: mint.publicKey, isSigner: true, isWritable: true },
+        {
+          pubkey: addresses.mintAuthority,
+          isSigner: false,
+          isWritable: false,
+        },
+        { pubkey: addresses.bondingCurve, isSigner: false, isWritable: true },
+        { pubkey: associatedBondingCurve, isSigner: false, isWritable: true },
+        { pubkey: addresses.global, isSigner: false, isWritable: false },
+        {
+          pubkey: TOKEN_METADATA_PROGRAM_ID,
+          isSigner: false,
+          isWritable: false,
+        },
+        { pubkey: metadataPDA, isSigner: false, isWritable: true },
+        { pubkey: creatorPubkey, isSigner: true, isWritable: true },
+        {
+          pubkey: SystemProgram.programId,
+          isSigner: false,
+          isWritable: false,
+        },
+        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+        {
+          pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+          isSigner: false,
+          isWritable: false,
+        },
+        { pubkey: SYSVAR_RENT_PUBKEY, isSigner: false, isWritable: false },
+        { pubkey: eventAuthority, isSigner: false, isWritable: false },
+        { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
+      ],
+      data: createData,
+    });
+
+    const tx = new Transaction();
+    tx.add(createIx);
     tx.feePayer = creatorPubkey;
 
     logger.info("Create transaction built", {
@@ -385,7 +436,25 @@ function encodeU64LE(value: bigint): Buffer {
   return buf;
 }
 
-export async function buyTokensWithNewIdl(
+// Mirrors @pump-fun/pump-sdk 1.36.x: pump.fun's legacy buy/sell instructions
+// take exactly 2 trailing remaining accounts — bonding_curve_v2 (read-only)
+// followed by ONE writable buyback fee recipient picked at random from the
+// 8-recipient pool stored in `Global.buyback_fee_recipients`. Passing all 8
+// recipients makes the program read garbage at the bonding_curve_v2 slot and
+// fails with the misleading Anchor 6024 "Overflow"; passing none fails earlier
+// with 6062 BuybackFeeRecipientMissing.
+async function pickBuybackFeeRecipient(): Promise<PublicKey> {
+  const recipients = await getBuybackFeeRecipients();
+  if (recipients.length !== 8) {
+    throw new Error(
+      `Expected 8 buyback fee recipients from Global, got ${recipients.length}`
+    );
+  }
+  const index = Math.floor(Math.random() * recipients.length);
+  return recipients[index];
+}
+
+export async function buildBuyTokenTransactionRaw(
   buyer: Keypair,
   mint: PublicKey,
   solAmountLamports: bigint,
@@ -486,10 +555,7 @@ export async function buyTokensWithNewIdl(
     FEE_PROGRAM_ID
   );
 
-  const [bondingCurveV2] = PublicKey.findProgramAddressSync(
-    [Buffer.from("bonding-curve-v2"), mint.toBuffer()],
-    PUMP_PROGRAM_ID
-  );
+  const buybackFeeRecipient = await pickBuybackFeeRecipient();
 
   logger.info("Building buy_exact_sol_in instruction (raw)", {
     mint: mint.toBase58(),
@@ -497,6 +563,8 @@ export async function buyTokensWithNewIdl(
     solAmountLamports: solAmountLamports.toString(),
     solAmountSol: Number(solAmountLamports) / 1e9,
     bondingCurve: addresses.bondingCurve.toBase58(),
+    bondingCurveV2: addresses.bondingCurveV2.toBase58(),
+    buybackFeeRecipient: buybackFeeRecipient.toBase58(),
   });
 
   const data = Buffer.concat([
@@ -505,6 +573,11 @@ export async function buyTokensWithNewIdl(
     encodeU64LE(minTokensOut ?? BigInt(1)),
   ]);
 
+  // Account layout matches @pump-fun/pump-sdk 1.36.x: 16 fixed accounts +
+  // 2 trailing remaining accounts in this exact order:
+  //   [bonding_curve_v2 (RO), buyback_fee_recipient (W)]
+  // bonding_curve_v2 PDA seeds: ["bonding-curve-v2", mint].
+  // Ref: https://github.com/pump-fun/pump-public-docs/issues/30
   const buyIx = new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
     keys: [
@@ -524,7 +597,8 @@ export async function buyTokensWithNewIdl(
       { pubkey: userVolumeAccumulator, isSigner: false, isWritable: true },
       { pubkey: feeConfig, isSigner: false, isWritable: false },
       { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: bondingCurveV2, isSigner: false, isWritable: false },
+      { pubkey: addresses.bondingCurveV2, isSigner: false, isWritable: false },
+      { pubkey: buybackFeeRecipient, isSigner: false, isWritable: true },
     ],
     data,
   });
@@ -532,7 +606,6 @@ export async function buyTokensWithNewIdl(
   logger.info("Raw buy_exact_sol_in instruction built", {
     accountCount: buyIx.keys.length,
     dataLength: data.length,
-    bondingCurveV2: bondingCurveV2.toBase58(),
   });
 
   const tx = new Transaction();
@@ -614,10 +687,15 @@ export async function buildSellTransaction(
     FEE_PROGRAM_ID
   );
 
-  const [bondingCurveV2] = PublicKey.findProgramAddressSync(
-    [Buffer.from("bonding-curve-v2"), mint.toBuffer()],
-    PUMP_PROGRAM_ID
-  );
+  // Cashback flag lives at byte 82 of the bonding curve account.
+  // Layout matches @pump-fun/pump-sdk 1.36.x:
+  //   non-cashback: 14 fixed + [bonding_curve_v2 (RO), buyback_fee_recipient (W)]
+  //   cashback:     14 fixed + [user_volume_accumulator (W), bonding_curve_v2 (RO), buyback_fee_recipient (W)]
+  // Ref: https://github.com/pump-fun/pump-public-docs/issues/30
+  const cashbackEnabled =
+    bcData.length > CASHBACK_FLAG_OFFSET && bcData[CASHBACK_FLAG_OFFSET] !== 0;
+
+  const buybackFeeRecipient = await pickBuybackFeeRecipient();
 
   const data = Buffer.concat([
     DISCRIMINATORS.SELL,
@@ -625,25 +703,49 @@ export async function buildSellTransaction(
     encodeU64LE(minSolOutput),
   ]);
 
+  const sellKeys: AccountMeta[] = [
+    { pubkey: addresses.global, isSigner: false, isWritable: false },
+    { pubkey: feeRecipient, isSigner: false, isWritable: true },
+    { pubkey: mint, isSigner: false, isWritable: false },
+    { pubkey: addresses.bondingCurve, isSigner: false, isWritable: true },
+    { pubkey: associatedBondingCurve, isSigner: false, isWritable: true },
+    { pubkey: associatedUser, isSigner: false, isWritable: true },
+    { pubkey: seller.publicKey, isSigner: true, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    { pubkey: creatorVault, isSigner: false, isWritable: true },
+    { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: eventAuthority, isSigner: false, isWritable: false },
+    { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
+    { pubkey: feeConfig, isSigner: false, isWritable: false },
+    { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
+  ];
+
+  if (cashbackEnabled) {
+    const [userVolumeAccumulator] = PublicKey.findProgramAddressSync(
+      [Buffer.from("user_volume_accumulator"), seller.publicKey.toBuffer()],
+      PUMP_PROGRAM_ID
+    );
+    sellKeys.push({
+      pubkey: userVolumeAccumulator,
+      isSigner: false,
+      isWritable: true,
+    });
+  }
+
+  sellKeys.push({
+    pubkey: addresses.bondingCurveV2,
+    isSigner: false,
+    isWritable: false,
+  });
+  sellKeys.push({
+    pubkey: buybackFeeRecipient,
+    isSigner: false,
+    isWritable: true,
+  });
+
   const sellIx = new TransactionInstruction({
     programId: PUMP_PROGRAM_ID,
-    keys: [
-      { pubkey: addresses.global, isSigner: false, isWritable: false },
-      { pubkey: feeRecipient, isSigner: false, isWritable: true },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: addresses.bondingCurve, isSigner: false, isWritable: true },
-      { pubkey: associatedBondingCurve, isSigner: false, isWritable: true },
-      { pubkey: associatedUser, isSigner: false, isWritable: true },
-      { pubkey: seller.publicKey, isSigner: true, isWritable: true },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      { pubkey: creatorVault, isSigner: false, isWritable: true },
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: eventAuthority, isSigner: false, isWritable: false },
-      { pubkey: PUMP_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: feeConfig, isSigner: false, isWritable: false },
-      { pubkey: FEE_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: bondingCurveV2, isSigner: false, isWritable: false },
-    ],
+    keys: sellKeys,
     data,
   });
 
@@ -655,22 +757,11 @@ export async function buildSellTransaction(
     mint: mint.toBase58(),
     seller: seller.publicKey.toBase58(),
     amount: amount.toString(),
-    bondingCurveV2: bondingCurveV2.toBase58(),
+    accountCount: sellIx.keys.length,
+    cashbackEnabled,
+    bondingCurveV2: addresses.bondingCurveV2.toBase58(),
+    buybackFeeRecipient: buybackFeeRecipient.toBase58(),
   });
 
   return tx;
-}
-
-export async function sellTokensWithNewIdl(
-  seller: Keypair,
-  mint: PublicKey,
-  amount: BN,
-  minSolOutput: BN
-): Promise<Transaction> {
-  return buildSellTransaction(
-    seller,
-    mint,
-    BigInt(amount.toString()),
-    BigInt(minSolOutput.toString())
-  );
 }

@@ -21,6 +21,8 @@ const envSchema = z.object({
   APP_URL: z.string().url(),
   FEE_COLLECTOR_WALLET_ADDRESS: z.string().min(1),
   SYSTEM_DEV_WALLET_PRIVATE_KEY: z.string().min(1),
+  LAUNCH_LOOKUP_TABLE_ADDRESS: z.string().min(1).optional(),
+  PUMP_BUYBACK_FEE_RECIPIENTS: z.string().min(1).optional(),
 });
 
 const dbEnvSchema = z.object({
@@ -74,6 +76,8 @@ export const getEnv = (): Env => {
     APP_URL: process.env.APP_URL,
     FEE_COLLECTOR_WALLET_ADDRESS: process.env.FEE_COLLECTOR_WALLET_ADDRESS,
     SYSTEM_DEV_WALLET_PRIVATE_KEY: process.env.SYSTEM_DEV_WALLET_PRIVATE_KEY,
+    LAUNCH_LOOKUP_TABLE_ADDRESS: process.env.LAUNCH_LOOKUP_TABLE_ADDRESS,
+    PUMP_BUYBACK_FEE_RECIPIENTS: process.env.PUMP_BUYBACK_FEE_RECIPIENTS,
   });
   return cachedEnv;
 };

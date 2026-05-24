@@ -12,12 +12,14 @@ import bs58 from "bs58";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { logger } from "@/lib/logger";
 import {
+  getBundleStatuses,
   getInflightBundleStatuses,
   getTipAccount,
   sendBundle,
   type JitoInflightBundleStatus,
 } from "@/server/solana/jito-client";
 import { waitForSignaturesViaGrpc } from "@/server/solana/shyft-grpc";
+import { mapPumpError } from "@/server/solana/pump/errors";
 
 const MAX_TRANSACTIONS_PER_BUNDLE = 5;
 const MAX_BUNDLE_SEND_ATTEMPTS = 3;
@@ -28,6 +30,11 @@ const BUNDLE_CONFIRM_INTERVAL_MS = 500;
 const BUNDLE_CONFIRM_INTERVAL_BACKOFF_MS = 2000;
 const BUNDLE_CONFIRM_GRPC_POLL_MS = 100;
 const BUNDLE_CONFIRM_RPC_SLOW_POLL_MS = 3000;
+// getBundleStatuses (cross-region landing check) is polled less frequently
+// than the per-region inflight check to stay within Jito's 1-req/sec
+// per-endpoint budget. The endpoint cooldown system in jito-client handles
+// the rest.
+const BUNDLE_STATUS_CHECK_INTERVAL_MS = 3_000;
 const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
 const MAX_BLOCKHASH_REBUILDS = 2;
@@ -40,6 +47,7 @@ export type BundleTelemetryEvent = {
     | "bundle_confirm_start"
     | "bundle_confirm_summary"
     | "bundle_inflight_status"
+    | "bundle_status_check"
     | "bundle_resend_triggered"
     | "bundle_resent"
     | "bundle_rebuild_triggered"
@@ -236,6 +244,9 @@ export async function sendJitoBundle(
       txIndex: currentProfiles[0].txIndex,
       signature: currentProfiles[0].signature,
     });
+    const combined = `${String(currentProfiles[0].simulationError)}\n${(currentProfiles[0].simulationLogs ?? []).join("\n")}`;
+    const mapped = mapPumpError(combined);
+    if (mapped) throw mapped;
     throw new Error(`Transaction simulation failed: ${currentProfiles[0].simulationError}`);
   }
   if (currentProfiles[0]) {
@@ -245,8 +256,6 @@ export async function sendJitoBundle(
       signature: currentProfiles[0].signature,
     });
   }
-
-  let lastSendEndpoint: string | null = null;
 
   function buildBundleFromVersionedTxs(vtxs: VersionedTransaction[]) {
     const container = new bundle.Bundle([], MAX_TRANSACTIONS_PER_BUNDLE);
@@ -260,15 +269,16 @@ export async function sendJitoBundle(
   let currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
 
   function createSendBundleWithRetries(bundleToSend: bundle.Bundle) {
-    return async () => {
+    return async (): Promise<{ bundleId: string; endpoint: string | null }> => {
       let lastError: Error | null = null;
       for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
         try {
           const result = await sendBundle(bundleToSend);
-          if (typeof result === "object" && result && "endpoint" in result) {
-            lastSendEndpoint =
-              typeof result.endpoint === "string" ? result.endpoint : null;
-          }
+          const endpoint =
+            typeof result === "object" && result && "endpoint" in result &&
+            typeof result.endpoint === "string"
+              ? result.endpoint
+              : null;
           if (!result.ok) {
             const message =
               typeof result.error === "string"
@@ -276,7 +286,7 @@ export async function sendJitoBundle(
                 : result.error?.message || "Jito bundle send failed";
             throw new Error(message);
           }
-          return result.value;
+          return { bundleId: result.value, endpoint };
         } catch (error) {
           const message = error instanceof Error ? error.message : String(error);
           if (
@@ -303,11 +313,13 @@ export async function sendJitoBundle(
 
   let sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
-  const initialBundleId = await sendBundleWithRetries();
+  const initialSend = await sendBundleWithRetries();
+  const initialBundleId = initialSend.bundleId;
+  const initialEndpoint = initialSend.endpoint;
   logger.info("Jito bundle sent", {
     bundleId: initialBundleId,
     signatureCount: currentBuild.signatures.length,
-    endpoint: lastSendEndpoint,
+    endpoint: initialEndpoint,
     tipLamports: currentTipLamports,
   });
   await emitBundleTelemetry(telemetry, {
@@ -315,7 +327,7 @@ export async function sendJitoBundle(
     data: {
       bundleId: initialBundleId,
       signatureCount: currentBuild.signatures.length,
-      endpoint: lastSendEndpoint,
+      endpoint: initialEndpoint,
       tipLamports: currentTipLamports,
       signatures: currentBuild.signatures,
       createSignature: currentBuild.signatures[0] ?? null,
@@ -327,6 +339,7 @@ export async function sendJitoBundle(
   let rebuilds = 0;
   const rebuildAndResend = async (): Promise<{
     bundleId: string;
+    endpoint: string | null;
     signatures: string[];
     blockhashFetchedAt: number;
   }> => {
@@ -410,11 +423,14 @@ export async function sendJitoBundle(
     currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
     sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
-    const newBundleId = await sendBundleWithRetries();
+    const rebuiltSend = await sendBundleWithRetries();
+    const newBundleId = rebuiltSend.bundleId;
+    const newEndpoint = rebuiltSend.endpoint;
 
     logger.info("Bundle rebuilt and resent", {
       rebuild: rebuilds,
       bundleId: newBundleId,
+      endpoint: newEndpoint,
       signatureCount: currentBuild.signatures.length,
       newBlockhash: blockhash,
       tipLamports: currentTipLamports,
@@ -424,6 +440,7 @@ export async function sendJitoBundle(
       data: {
         rebuild: rebuilds,
         bundleId: newBundleId,
+        endpoint: newEndpoint,
         signatureCount: currentBuild.signatures.length,
         newBlockhash: blockhash,
         tipLamports: currentTipLamports,
@@ -434,6 +451,7 @@ export async function sendJitoBundle(
 
     return {
       bundleId: newBundleId,
+      endpoint: newEndpoint,
       signatures: currentBuild.signatures,
       blockhashFetchedAt,
     };
@@ -448,6 +466,7 @@ export async function sendJitoBundle(
     initialBlockhashFetchedAt: blockhashFetchedAt,
     sendBundleWithRetries: () => sendBundleWithRetries(),
     bundleId: initialBundleId,
+    bundleEndpoint: initialEndpoint,
     rebuildAndResend,
   });
   return { bundleId: confirmedBundleId, signatures: currentBuild.signatures };
@@ -606,6 +625,7 @@ async function confirmBundleOnChain({
   initialBlockhashFetchedAt,
   sendBundleWithRetries,
   bundleId,
+  bundleEndpoint,
   rebuildAndResend,
 }: {
   connection: ReturnType<typeof getSolanaConnection>;
@@ -614,10 +634,15 @@ async function confirmBundleOnChain({
   initialSignatures: string[];
   accountKeys: string[];
   initialBlockhashFetchedAt: number;
-  sendBundleWithRetries: () => Promise<string>;
+  sendBundleWithRetries: () => Promise<{
+    bundleId: string;
+    endpoint: string | null;
+  }>;
   bundleId: string;
+  bundleEndpoint: string | null;
   rebuildAndResend?: () => Promise<{
     bundleId: string;
+    endpoint: string | null;
     signatures: string[];
     blockhashFetchedAt: number;
   }>;
@@ -625,6 +650,7 @@ async function confirmBundleOnChain({
   const startedAt = Date.now();
   let lastResendAt = startedAt;
   let currentBundleId = bundleId;
+  let currentBundleEndpoint: string | null = bundleEndpoint;
   let currentSignatures = initialSignatures;
   let currentBlockhashFetchedAt = initialBlockhashFetchedAt;
   let lastSummary: BundleStatusSummary | null = null;
@@ -638,6 +664,7 @@ async function confirmBundleOnChain({
   const fallbackConnection = getFallbackConnection();
   logger.info("Bundle confirmation start", {
     bundleId,
+    bundleEndpoint,
     signatureCount: currentSignatures.length,
     createSignature: currentSignatures[0],
     rpcEndpoint: connection.rpcEndpoint,
@@ -648,6 +675,7 @@ async function confirmBundleOnChain({
     type: "bundle_confirm_start",
     data: {
       bundleId,
+      bundleEndpoint,
       signatureCount: currentSignatures.length,
       createSignature: currentSignatures[0] ?? null,
       rpcEndpoint: connection.rpcEndpoint,
@@ -699,6 +727,7 @@ async function confirmBundleOnChain({
     : BUNDLE_CONFIRM_INTERVAL_MS;
   let rateLimitCount = 0;
   let lastRpcCheckAt = 0;
+  let lastBundleStatusCheckAt = 0;
 
   while (Date.now() - startedAt < BUNDLE_CONFIRM_TIMEOUT_MS) {
     if (grpcState.result?.has(currentSignatures[0])) {
@@ -708,6 +737,57 @@ async function confirmBundleOnChain({
         elapsedMs: Date.now() - startedAt,
       });
       return currentBundleId;
+    }
+
+    if (
+      Date.now() - lastBundleStatusCheckAt >=
+      BUNDLE_STATUS_CHECK_INTERVAL_MS
+    ) {
+      lastBundleStatusCheckAt = Date.now();
+      const bundleStatusResult = await getBundleStatuses([currentBundleId]);
+      if (bundleStatusResult.ok) {
+        const match = bundleStatusResult.value.bundles.find(
+          (entry) => entry.bundleId === currentBundleId
+        );
+        if (match) {
+          const eventData = {
+            bundleId: currentBundleId,
+            bundleEndpoint: currentBundleEndpoint,
+            statusEndpoint: bundleStatusResult.endpoint,
+            slot: match.slot,
+            confirmationStatus: match.confirmationStatus,
+            err: match.err,
+            elapsedMs: Date.now() - startedAt,
+          };
+          await emitBundleTelemetry(onEvent, {
+            type: "bundle_status_check",
+            data: eventData,
+          });
+          if (match.err) {
+            logger.warn("Bundle landed with on-chain error", eventData);
+            throw new Error(
+              `Bundle landed but failed on-chain: ${JSON.stringify(match.err)}`
+            );
+          }
+          if (
+            match.confirmationStatus === "confirmed" ||
+            match.confirmationStatus === "finalized"
+          ) {
+            logger.info("Bundle landed via getBundleStatuses", eventData);
+            return currentBundleId;
+          }
+        }
+      } else {
+        await emitBundleTelemetry(onEvent, {
+          type: "bundle_status_check_error",
+          data: {
+            bundleId: currentBundleId,
+            error: bundleStatusResult.error,
+            source: "bundle_statuses",
+            elapsedMs: Date.now() - startedAt,
+          },
+        });
+      }
     }
 
     if (grpcState.done && grpcState.result === null && !grpcState.active) {
@@ -735,7 +815,10 @@ async function confirmBundleOnChain({
         const summary = summarizeBundleStatuses(statuses);
         lastSummary = summary;
         lastStatusError = null;
-        const inflightResult = await getInflightBundleStatuses([currentBundleId]);
+        const inflightResult = await getInflightBundleStatuses(
+          [currentBundleId],
+          { preferEndpoint: currentBundleEndpoint }
+        );
         if (inflightResult.ok) {
           const matchedStatus =
             inflightResult.value.bundles.find(
@@ -757,6 +840,7 @@ async function confirmBundleOnChain({
           if (inflightStatusKey !== lastLoggedInflightStatus) {
             logger.info("Bundle inflight status", {
               bundleId: currentBundleId,
+              bundleEndpoint: currentBundleEndpoint,
               elapsedMs: Date.now() - startedAt,
               inflightStatus: lastInflightStatus?.status ?? null,
               inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
@@ -767,6 +851,7 @@ async function confirmBundleOnChain({
               type: "bundle_inflight_status",
               data: {
                 bundleId: currentBundleId,
+                bundleEndpoint: currentBundleEndpoint,
                 elapsedMs: Date.now() - startedAt,
                 inflightStatus: lastInflightStatus?.status ?? null,
                 inflightLandedSlot: lastInflightStatus?.landedSlot ?? null,
@@ -809,6 +894,7 @@ async function confirmBundleOnChain({
         if (summaryKey !== lastLoggedSummary) {
           logger.info("Bundle confirmation summary", {
             bundleId: currentBundleId,
+            bundleEndpoint: currentBundleEndpoint,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
             grpcActive: grpcState.active,
@@ -822,6 +908,7 @@ async function confirmBundleOnChain({
             type: "bundle_confirm_summary",
             data: {
               bundleId: currentBundleId,
+              bundleEndpoint: currentBundleEndpoint,
               elapsedMs: Date.now() - startedAt,
               blockhashAgeMs: Date.now() - currentBlockhashFetchedAt,
               grpcActive: grpcState.active,
@@ -890,6 +977,7 @@ async function confirmBundleOnChain({
           try {
             const rebuilt = await rebuildAndResend();
             currentBundleId = rebuilt.bundleId;
+            currentBundleEndpoint = rebuilt.endpoint;
             currentSignatures = rebuilt.signatures;
             currentBlockhashFetchedAt = rebuilt.blockhashFetchedAt;
             lastResendAt = Date.now();
@@ -934,16 +1022,23 @@ async function confirmBundleOnChain({
             },
           });
           const previousBundleId = currentBundleId;
-          currentBundleId = await sendBundleWithRetries();
+          const previousEndpoint = currentBundleEndpoint;
+          const resent = await sendBundleWithRetries();
+          currentBundleId = resent.bundleId;
+          currentBundleEndpoint = resent.endpoint;
           logger.info("Bundle resent", {
             previousBundleId,
+            previousEndpoint,
             bundleId: currentBundleId,
+            endpoint: currentBundleEndpoint,
           });
           await emitBundleTelemetry(onEvent, {
             type: "bundle_resent",
             data: {
               previousBundleId,
+              previousEndpoint,
               bundleId: currentBundleId,
+              endpoint: currentBundleEndpoint,
               elapsedMs: Date.now() - startedAt,
               blockhashAgeMs: blockhashAge,
             },
@@ -998,8 +1093,11 @@ async function confirmBundleOnChain({
   const summaryText = lastSummary
     ? `found=${lastSummary.foundCount} confirmed=${lastSummary.confirmedCount} failed=${lastSummary.failedCount} notFound=${lastSummary.notFoundCount} createStatus=${lastSummary.createStatus}`
     : "no status summary";
+  const bundleEndpointText = currentBundleEndpoint
+    ? ` bundleEndpoint=${currentBundleEndpoint}`
+    : "";
   const inflightSummaryText = lastInflightStatus
-    ? ` inflightStatus=${lastInflightStatus.status} inflightLandedSlot=${lastInflightStatus.landedSlot ?? "null"}`
+    ? ` inflightStatus=${lastInflightStatus.status} inflightLandedSlot=${lastInflightStatus.landedSlot ?? "null"} inflightEndpoint=${lastInflightStatus.endpoint}`
     : "";
   const inflightStatusErrorText = lastInflightStatusError
     ? ` inflightStatusError=${lastInflightStatusError}`
@@ -1011,6 +1109,7 @@ async function confirmBundleOnChain({
     type: "bundle_confirm_timeout",
     data: {
       bundleId: currentBundleId,
+      bundleEndpoint: currentBundleEndpoint,
       elapsedMs: Date.now() - startedAt,
       summary: lastSummary
         ? {
@@ -1034,7 +1133,7 @@ async function confirmBundleOnChain({
     },
   });
   throw new Error(
-    `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${inflightSummaryText}${statusErrorText}${inflightStatusErrorText})`
+    `Bundle sent but CREATE transaction not confirmed on-chain (${summaryText}${bundleEndpointText}${inflightSummaryText}${statusErrorText}${inflightStatusErrorText})`
   );
 }
 

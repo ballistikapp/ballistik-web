@@ -32,7 +32,7 @@ const launchFieldsBase = {
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(10, "Bundler wallet count must be 10 or less"),
+    .max(8, "Bundler wallet count must be 8 or less"),
   bundlerBuyAmountSol: z
     .number()
     .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),
@@ -81,7 +81,7 @@ const launchPreviewFields = {
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(10, "Bundler wallet count must be 10 or less"),
+    .max(8, "Bundler wallet count must be 8 or less"),
   bundlerBuyAmountSol: z
     .number()
     .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),

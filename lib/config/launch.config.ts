@@ -39,7 +39,12 @@ const baseLaunchConfig = {
   // Slippage basis points applied to pump.fun swaps.
   slippageBasisPoints: BigInt(10000),
   // Maximum bundler wallets allowed in a single bundle launch.
-  maxBundleWallets: 10,
+  // Capped at 8 because the dev wallet always buys (min 0.05 SOL) and is
+  // prepended to the bundle, giving 9 total buyers. With 2 buys per non-creator
+  // transaction (see bundle-transaction-builder.ts) this fits Jito's 5-tx
+  // bundle limit: tx1 = create + dev buy, tx2..tx5 = 2 bundler buys each.
+  // Raise this once launch ALT support lands.
+  maxBundleWallets: 8,
   // Extra lamports added to each buy wallet for transaction fees.
   fundingBufferLamports: 4_000_000,
   // Extra lamports reserved for token creation fees.

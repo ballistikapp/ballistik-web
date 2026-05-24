@@ -15,8 +15,8 @@ import { getSolanaConnection } from "@/lib/solana/connection";
 import { rpcLimiter } from "@/lib/solana/rpc-limiter";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { ingestionQueue } from "@/server/services/ingestion-queue.service";
-import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
-import { sellTokensWithNewIdl } from "@/server/solana/pump-new-idl";
+import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
+import { buildSellTransaction } from "@/server/solana/pump/instructions";
 import {
   computeBuyQuote,
   computeSellQuote,
@@ -24,7 +24,7 @@ import {
   computeMinSolOutForSell,
   computeMinTokensOutForBuy,
   fetchPumpQuoteState,
-} from "@/server/solana/pump-quotes";
+} from "@/server/solana/pump/quotes";
 import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
@@ -552,11 +552,11 @@ export const processVolumeBotWalletRange = async (
           `[Worker] ${walletPk}: Slippage quote failed (sell): ${message}`
         );
       }
-      let baseSellTx = await sellTokensWithNewIdl(
+      let baseSellTx = await buildSellTransaction(
         walletKeypair,
         mintPublicKey,
-        new BN(tokenAmount.toString()),
-        minSolOutput
+        tokenAmount,
+        BigInt(minSolOutput.toString())
       );
       baseSellTx = addComputeBudget(baseSellTx, computeUnits, priorityFee);
 

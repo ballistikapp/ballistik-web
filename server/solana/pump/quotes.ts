@@ -1,7 +1,8 @@
 import { BN } from "@coral-xyz/anchor";
 import type { Keypair, PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { getGlobalSnapshot } from "@/server/solana/pump/global-account";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { cacheConfig } from "@/lib/config/cache.config";
 
 type PumpQuoteState = {
@@ -9,6 +10,7 @@ type PumpQuoteState = {
   virtualSolReserves: bigint;
   protocolFeeBps: bigint;
   creatorFeeBps: bigint;
+  buybackFeeBps: bigint;
 };
 
 const ZERO = BigInt(0);
@@ -73,28 +75,6 @@ const decodeBondingCurve = (data: Buffer) => {
   };
 };
 
-const decodeGlobal = (data: Buffer) => {
-  let offset = DISCRIMINATOR_SIZE;
-  offset += 1;
-  offset += 32;
-  offset += 32;
-  offset += 8;
-  offset += 8;
-  offset += 8;
-  offset += 8;
-  const feeBasisPoints = readU64(data, offset);
-  offset += 8;
-  offset += 32;
-  offset += 1;
-  offset += 8;
-  const creatorFeeBasisPoints = readU64(data, offset);
-
-  return {
-    feeBasisPoints,
-    creatorFeeBasisPoints,
-  };
-};
-
 export const fetchPumpQuoteState = async (
   mint: PublicKey,
   _payer: Keypair
@@ -106,27 +86,24 @@ export const fetchPumpQuoteState = async (
   }
 
   const connection = getSolanaConnection();
-  const { bondingCurve, global } = derivePumpAddresses(mint);
-  const [bondingInfo, globalInfo] = await connection.getMultipleAccountsInfo(
-    [bondingCurve, global],
-    "confirmed"
-  );
+  const { bondingCurve } = derivePumpAddresses(mint);
+  const [bondingInfo, globalSnapshot] = await Promise.all([
+    connection.getAccountInfo(bondingCurve, "confirmed"),
+    getGlobalSnapshot(),
+  ]);
 
   if (!bondingInfo) {
     throw new Error("Bonding curve account not found");
   }
-  if (!globalInfo) {
-    throw new Error("Global account not found");
-  }
 
   const bondingCurveData = decodeBondingCurve(bondingInfo.data as Buffer);
-  const globalData = decodeGlobal(globalInfo.data as Buffer);
 
   const state: PumpQuoteState = {
     virtualTokenReserves: bondingCurveData.virtualTokenReserves,
     virtualSolReserves: bondingCurveData.virtualSolReserves,
-    protocolFeeBps: globalData.feeBasisPoints,
-    creatorFeeBps: globalData.creatorFeeBasisPoints,
+    protocolFeeBps: globalSnapshot.feeBasisPoints,
+    creatorFeeBps: globalSnapshot.creatorFeeBasisPoints,
+    buybackFeeBps: globalSnapshot.buybackBasisPoints,
   };
 
   setCachedState(mintKey, state);
@@ -138,13 +115,17 @@ export const computeBuyQuote = (
   state: PumpQuoteState,
   spendableLamports: bigint
 ) => {
-  const totalFeeBps = state.protocolFeeBps + state.creatorFeeBps;
+  const totalFeeBps =
+    state.protocolFeeBps + state.creatorFeeBps + state.buybackFeeBps;
   let netSol = (spendableLamports * MAX_BPS) / (MAX_BPS + totalFeeBps);
   const protocolFees = ceilDiv(netSol * state.protocolFeeBps, MAX_BPS);
   const creatorFees = ceilDiv(netSol * state.creatorFeeBps, MAX_BPS);
+  const buybackFees = ceilDiv(netSol * state.buybackFeeBps, MAX_BPS);
 
-  if (netSol + protocolFees + creatorFees > spendableLamports) {
-    netSol = netSol - (netSol + protocolFees + creatorFees - spendableLamports);
+  if (netSol + protocolFees + creatorFees + buybackFees > spendableLamports) {
+    netSol =
+      netSol -
+      (netSol + protocolFees + creatorFees + buybackFees - spendableLamports);
   }
 
   const effectiveSol = netSol > ZERO ? netSol - ONE : ZERO;
@@ -159,6 +140,7 @@ export const computeBuyQuote = (
     tokensOut,
     protocolFees,
     creatorFees,
+    buybackFees,
   };
 };
 
@@ -172,7 +154,8 @@ export const computeSellQuote = (
   const solOut =
     (tokenAmount * state.virtualSolReserves) /
     (state.virtualTokenReserves + tokenAmount);
-  const totalFeeBps = state.protocolFeeBps + state.creatorFeeBps;
+  const totalFeeBps =
+    state.protocolFeeBps + state.creatorFeeBps + state.buybackFeeBps;
   const feeAmount = ceilDiv(solOut * totalFeeBps, MAX_BPS);
   const netSolOut = solOut > feeAmount ? solOut - feeAmount : ZERO;
 

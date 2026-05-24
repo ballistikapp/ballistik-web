@@ -5,7 +5,7 @@ import {
   type AccountUpdate,
   type TransactionUpdate,
 } from "@/server/solana/grpc-manager";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
 import { prisma } from "@/lib/prisma";

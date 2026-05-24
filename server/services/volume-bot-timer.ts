@@ -5,7 +5,7 @@ import { logger } from "@/lib/logger";
 import { prisma } from "@/lib/prisma";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { mapWithConcurrency } from "@/lib/utils/async";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { volumeBotGrpc } from "@/server/solana/volume-bot-grpc";
 import type { VolumeBotConfigInput } from "@/server/schemas/volume-bot.schema";
 import {

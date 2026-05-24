@@ -629,7 +629,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     bundleBuyEnabled: true,
     vanityMint: true,
     removeAttribution: false,
-    bundlerWalletCount: 10,
+    bundlerWalletCount: 8,
     bundlerBuyAmountSol: 0.1,
     bundlerBuyVariancePercent: 20,
     distributionWalletMultiplier: 1,

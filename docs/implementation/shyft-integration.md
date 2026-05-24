@@ -148,7 +148,7 @@ The token dashboard displays DeFi pool data for graduated tokens (when `isComple
 
 ## Caching
 
-### Bonding Curve Cache (`server/solana/pump-quotes.ts`)
+### Bonding Curve Cache (`server/solana/pump/quotes.ts`)
 
 In-memory TTL cache for `fetchPumpQuoteState()`:
 

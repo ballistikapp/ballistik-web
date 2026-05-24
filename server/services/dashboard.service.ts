@@ -8,7 +8,7 @@ import type {
 } from "@/server/schemas/dashboard.schema";
 import { priceService, type PriceResult } from "@/server/services/price.service";
 import { holdersService } from "@/server/services/holders.service";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { shyftDefiService } from "@/server/services/shyft-defi.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import { getEnv } from "@/lib/config/env";

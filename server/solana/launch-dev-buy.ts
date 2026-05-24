@@ -1,5 +1,5 @@
 import type { Keypair, PublicKey, Transaction } from "@solana/web3.js";
-import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
+import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 
 type BuildBuyTransaction = typeof buildBuyTokenTransaction;
 

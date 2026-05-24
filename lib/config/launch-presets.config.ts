@@ -14,7 +14,7 @@ export const launchPresets: Record<LaunchPresetName, LaunchPresetValues> = {
   regular: {
     devWalletOption: "generate",
     bundleBuyEnabled: true,
-    bundlerWalletCount: 10,
+    bundlerWalletCount: 8,
     vanityMint: true,
     removeAttribution: false,
   },

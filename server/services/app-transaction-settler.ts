@@ -58,8 +58,14 @@ export async function settleSignature(input: SettleSignatureInput): Promise<void
     return;
   }
 
-  const accountKeys = tx.transaction.message.getAccountKeys();
-  const staticKeys = accountKeys.staticAccountKeys.map((k) => k.toBase58());
+  // Read static keys directly. Calling getAccountKeys() without arguments
+  // throws on v0 messages that carry addressTableLookups (the launch tx now
+  // uses an ALT). Every wallet we track in AppTransaction is a signer or
+  // fee payer, so it's always in staticAccountKeys; ALT-loaded keys are not
+  // needed here. Both legacy Message and MessageV0 expose staticAccountKeys.
+  const staticKeys = tx.transaction.message.staticAccountKeys.map((k) =>
+    k.toBase58()
+  );
   const feePayerKey = staticKeys[0] ?? null;
   const feeLamports = tx.meta.fee ?? 0;
   const blockTime = tx.blockTime ? new Date(tx.blockTime * 1000) : null;

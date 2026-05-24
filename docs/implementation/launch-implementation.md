@@ -143,7 +143,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
-2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `10` bundler wallets).
+2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `8` bundler wallets).
 3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
 5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
@@ -159,7 +159,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - If media upload cannot produce a URL, launch queueing fails and no launch record is created.
    - `Token.imageUrl` stores the same normalized media URL.
 8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
-   - The non-bundled create-time dev buy uses the same raw `buy_exact_sol_in` transaction builder as the newer Pump flow, including the current volume accumulator accounts required by the on-chain program.
+   - The non-bundled create-time dev buy uses the same raw `buy_exact_sol_in` transaction builder as the newer Pump flow, including the volume accumulator accounts and the trailing `bonding_curve_v2` account required by the on-chain program after the Cashback upgrade.
    - In bundled launches, follow-up buyer ATA creation is hoisted into the first create transaction so later bundle transactions can submit buy-only instructions against the freshly created mint state.
    - Hoisted ATA instructions keep their original buyer payer/owner, and those buyer keypairs are added to the first transaction signer set so the reordered bundle remains signature-valid without shifting rent costs.
    - ATA hoisting is capped by an actual versioned-transaction size estimate; once the first bundle transaction would exceed Solana's raw `1232`-byte limit, remaining buyer ATA creation stays in later bundle transactions.
@@ -233,7 +233,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `server/schemas/launch.schema.ts`
 - `server/solana/bundle-create-and-buy.ts`
 - `server/solana/bundle-transaction-builder.ts`
-- `server/solana/pump-transaction-builders.ts`
+- `server/solana/pump/transactions.ts`
 - `app/(app)/launch/launch-progress-dialog.tsx`
 - `app/(app)/launch/launch-overview-dialog.tsx`
 - `app/(app)/launch/launch-form.tsx`
@@ -311,12 +311,16 @@ The server quote groups values into:
 
 When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito bundle. The path is:
 
-1. Build the token create transaction (via Anchor `program.methods.create`).
+1. Build the token create transaction as a raw `TransactionInstruction` with the `create` discriminator and Borsh-encoded args (name, symbol, uri, creator pubkey).
 2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
 3. Pack transactions into a bundle and submit through Jito.
 4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
 
-Note: Buy instructions are built as raw `TransactionInstruction` (not via Anchor) using the `buy_exact_sol_in` discriminator with 24-byte data (discriminator + sol_amount + min_tokens_out). The `track_volume` OptionBool parameter is omitted. Each buy instruction includes 17 accounts: the standard 16 accounts plus a trailing `bonding_curve_v2` PDA (derived from `["bonding-curve-v2", mint]`). The V2 trailing account is required by the current program version — without it, the program falls into a legacy code path that overflows at `buy.rs:181`.
+Note: All pump.fun instructions (`create`, `buy_exact_sol_in`, `sell`) are built as raw `TransactionInstruction` (not via Anchor) using hardcoded discriminators. The IDL at `data/pumpfun-idl.json` is statically imported by `server/solana/pump/idl.ts`, converted to Anchor format with strict schema validation, and used to decode the on-chain `Global` account (`server/solana/pump/global-account.ts`) and `TradeEvent` logs (`server/solana/pump/events.ts`, consumed by `transaction.service.ts`).
+
+Note: `buy_exact_sol_in` data is 24 bytes (discriminator + sol_amount + min_tokens_out); the `track_volume` OptionBool parameter is omitted. The on-chain account layout matches `@pump-fun/pump-sdk` 1.36.x: 16 fixed accounts followed by exactly two trailing remaining accounts in this order: `bonding_curve_v2` (PDA seeds `["bonding-curve-v2", mint]`, read-only) then a single writable `buyback_fee_recipient` chosen at random from the 8-recipient pool stored in `Global.buyback_fee_recipients` (or the `PUMP_BUYBACK_FEE_RECIPIENTS` env override). Total 18 keys per buy. Failure modes: passing zero buyback recipients throws `BuybackFeeRecipientMissing` 6062 / `0x17ae`; passing all 8 (or putting `bonding_curve_v2` after them) corrupts the program's account-index reads and surfaces as a misleading Anchor `Overflow` 6024 / `0x1788` thrown deep inside `buy.rs`. Reference: pump-fun/pump-public-docs#30.
+
+Note: The `sell` instruction layout is conditional on the `cashback_enabled` flag at byte 82 of the bonding curve account. Non-cashback tokens use 14 fixed + `[bonding_curve_v2, buyback_fee_recipient]` (16 keys); cashback tokens use 14 fixed + `[user_volume_accumulator, bonding_curve_v2, buyback_fee_recipient]` (17 keys). `buyback_fee_recipient` is ALWAYS the last account.
 
 Note: No off-chain token amount calculation is needed. The program determines tokens from the SOL input, deducts fees (currently 1.25% via the `pfee` program), and transfers the appropriate token amount. `min_tokens_out = 1` is safe inside an atomic Jito bundle where MEV is not a concern.
 
@@ -327,13 +331,13 @@ Note: No off-chain token amount calculation is needed. The program determines to
   - A compute budget instruction (800k units),
   - The token create instructions,
   - Up to 1 buy.
-- Subsequent transactions include up to 3 buys each.
-- With the max 10 bundler wallets + dev buy (11 total buys), the packing is:
+- Subsequent transactions include up to 2 buys each (capped to keep each tx under the 1232-byte versioned transaction limit with the current pump IDL; raise once launch ALT lands).
+- With the max 8 bundler wallets + dev buy (9 total buys), the packing is:
   - TX1: create + dev buy
-  - TX2: 3 buys
-  - TX3: 3 buys
-  - TX4: 3 buys
-  - TX5: 1 buy
+  - TX2: 2 buys
+  - TX3: 2 buys
+  - TX4: 2 buys
+  - TX5: 2 buys
 
 ### Buyer Amounts
 
@@ -410,7 +414,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 - Launch supports URL-driven presets via the `preset` query parameter.
 - `preset=free` initializes a free configuration (`devWalletOption = system`, bundle buy disabled, vanity disabled, attribution removal disabled).
-- Missing or unknown `preset` values default to the regular preset (`devWalletOption = system`, bundle buy enabled, `bundlerWalletCount = 10`, vanity enabled, attribution removal disabled).
+- Missing or unknown `preset` values default to the regular preset (`devWalletOption = system`, bundle buy enabled, `bundlerWalletCount = 8`, vanity enabled, attribution removal disabled).
 - Free-tier users are always normalized to `devWalletOption = system` on the server regardless of preset or client input.
 - Preset values are applied before clone values; cloning overrides preset initialization.
 - Unauthenticated visits preserve preset URLs through auth redirects using the `redirect` query param (for example `/launch?preset=free` -> `/auth?redirect=%2Flaunch%3Fpreset%3Dfree` -> back to `/launch?preset=free` after login/signup).

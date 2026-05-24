@@ -72,15 +72,16 @@ The Exit flow consolidates all token holdings across operational wallets, sells 
 
 ### Sell Instruction
 
-The sell instruction is built by `buildSellTransaction` in `pump-new-idl.ts`. It uses the same shared constants as the buy instruction (fee recipient, fee config, fee program) for consistency. The function:
+The sell instruction is built by `buildSellTransaction` in `server/solana/pump/instructions.ts`. It uses the same shared constants as the buy instruction (fee recipient, fee config, fee program) for consistency. The function:
 
 - Fetches the creator from the bonding curve on-chain
+- Reads the `cashback_enabled` flag from byte 82 of the bonding curve account
 - Derives all PDAs consistently with the buy instruction
 - Does not require an Anchor `Program` object (pure instruction building)
-- **Includes `bondingCurveV2`** as a trailing remaining account (V2 account layout). Without this account, the on-chain program falls back to a legacy code path with u64 arithmetic that overflows on the constant-product `k = virtualTokenReserves * virtualSolReserves` calculation, causing error 6024 (Overflow) for any sell amount
+- Appends trailing remaining accounts in the order `@pump-fun/pump-sdk` 1.36.x uses. Non-cashback tokens get `[bonding_curve_v2 (RO), buyback_fee_recipient (W)]` (16 keys total). Cashback-enabled tokens (byte 82 of the bonding curve account = 1) get `[user_volume_accumulator (W), bonding_curve_v2 (RO), buyback_fee_recipient (W)]` (17 keys total). `buyback_fee_recipient` is one address chosen at random from the 8-recipient pool stored in `Global.buyback_fee_recipients` (or the `PUMP_BUYBACK_FEE_RECIPIENTS` env override). Failure modes: passing zero recipients throws `BuybackFeeRecipientMissing` 6062 / `0x17ae`; passing the wrong order or count surfaces as Anchor `Overflow` 6024 / `0x1788`. Reference: pump-fun/pump-public-docs#30
 - Returns a single `Transaction`
 
-All three sell paths (holding sell, volume bot sell, exit bundle sell) use this function. The holding service and exit bundle use `buildSellTransaction` directly. The volume bot uses the `sellTokensWithNewIdl` wrapper which delegates to it.
+All three sell paths (holding sell, volume bot sell, exit bundle sell) use `buildSellTransaction` directly.
 
 ### Jito Bundle Resilience
 
@@ -139,7 +140,7 @@ Solana enforces strict transaction size limits:
 
 ### Why These Chunk Sizes?
 
-The pump.fun sell instruction is large (15 accounts including bondingCurveV2, ~750-950 bytes). Combining it with multiple transfers exceeded the 1232 byte limit.
+The pump.fun sell instruction is large (16 accounts for non-cashback or 17 for cashback, including `bonding_curve_v2` + `buyback_fee_recipient`, ~750-950 bytes). Combining it with multiple transfers exceeded the 1232 byte limit.
 
 **Key constants:**
 ```typescript

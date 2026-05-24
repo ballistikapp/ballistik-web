@@ -9,7 +9,7 @@ import {
 } from "@solana/web3.js";
 import { ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { logger } from "@/lib/logger";
-import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
+import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 
 const filterComputeBudget = (ixs: TransactionInstruction[]) =>
   ixs.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
@@ -119,7 +119,12 @@ export async function buildBundleTransactionsForCreateAndBuys(
   const bundleTransactions: Transaction[] = [];
   const bundleSigners: Keypair[][] = [];
   const firstTransactionBuyCount = Math.min(1, wallets.length);
-  const buysPerTransaction = 3;
+  // Capped at 2 buys per non-creator transaction because the new pump IDL's
+  // buy_exact_sol_in uses 18 accounts per buy, which overflows the 1232-byte
+  // versioned tx limit at 3 buys/tx without an address lookup table.
+  // Combined with Jito's 5-tx bundle limit, this allows up to 9 buyer wallets
+  // (1 creator + 4 follow-up txs × 2 buys). Revisit when launch ALT lands.
+  const buysPerTransaction = 2;
 
   const firstWallets = wallets.slice(0, firstTransactionBuyCount);
   const firstAmounts = buyAmountsLamport.slice(0, firstTransactionBuyCount);

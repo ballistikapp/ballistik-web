@@ -27,7 +27,7 @@ import { persistGeneratedPrivateKey } from "@/server/services/private-key-persis
 import {
   computeSellQuote,
   fetchPumpQuoteState,
-} from "@/server/solana/pump-quotes";
+} from "@/server/solana/pump/quotes";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import {
   calculateVolumeBotUsageFees,

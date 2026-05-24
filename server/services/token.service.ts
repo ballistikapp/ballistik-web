@@ -12,7 +12,7 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { getEnv } from "@/lib/config/env";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { logger } from "@/lib/logger";
 import { persistGeneratedPrivateKey } from "@/server/services/private-key-persistence.service";
 import type { TokenListPaginationInput } from "@/server/schemas/token.schema";

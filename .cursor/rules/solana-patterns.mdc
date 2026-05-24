@@ -24,9 +24,10 @@ All blockchain-specific code lives in `server/solana/` and `lib/solana/`. Keep S
 - `server/solana/bundle-create-and-buy.ts` — Bundle creation for token launch
 - `server/solana/bundle-transaction-builder.ts` — Transaction construction for bundles
 - `server/solana/launch-dev-buy.ts` — Dev wallet buy transaction
-- `server/solana/pump-transaction-builders.ts` — Pump.fun buy/sell transaction builders
-- `server/solana/pump-quotes.ts` — Bonding curve price quotes
-- `server/solana/pump-idl.ts` / `pump-new-idl.ts` — Pump.fun program IDL
+- `server/solana/pump/transactions.ts` — Pump.fun buy/sell transaction builders (metadata upload + versioned tx composition)
+- `server/solana/pump/instructions.ts` — Raw pump.fun create/buy/sell instruction builders
+- `server/solana/pump/quotes.ts` — Bonding curve price quotes
+- `server/solana/pump/` — Pump.fun IDL loader (`idl.ts`), Global account (`global-account.ts`), TradeEvent parser (`events.ts`), errors (`errors.ts`), launch ALT (`lookup-table.ts`)
 - `server/solana/grpc-manager.ts` — Yellowstone gRPC connection management
 - `server/solana/grpc-utils.ts` — gRPC helper utilities
 - `server/solana/shyft-grpc.ts` — Shyft gRPC integration

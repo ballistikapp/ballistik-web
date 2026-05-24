@@ -25,13 +25,13 @@ import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { settleSignature } from "@/server/services/app-transaction-settler";
-import { buildSellTransaction } from "@/server/solana/pump-new-idl";
-import { buildBuyTokenTransaction } from "@/server/solana/pump-transaction-builders";
+import { buildSellTransaction } from "@/server/solana/pump/instructions";
+import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 import {
   computeBuyQuote,
   computeMinTokensOutForBuy,
   fetchPumpQuoteState,
-} from "@/server/solana/pump-quotes";
+} from "@/server/solana/pump/quotes";
 import { testRunLogService } from "@/server/services/test-run-log.service";
 import {
   recoverWalletSolBalances,

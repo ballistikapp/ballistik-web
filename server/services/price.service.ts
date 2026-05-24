@@ -1,7 +1,7 @@
 import "server-only";
 import { PublicKey } from "@solana/web3.js";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { derivePumpAddresses } from "@/server/solana/pump-new-idl";
+import { derivePumpAddresses } from "@/server/solana/pump/instructions";
 import { shyftDefiService } from "@/server/services/shyft-defi.service";
 import { getEnv } from "@/lib/config/env";
 import { logger } from "@/lib/logger";

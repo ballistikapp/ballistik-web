@@ -8,8 +8,8 @@ import { retryRpc } from "@/lib/utils/rpc-retry";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { settleSignature } from "@/server/services/app-transaction-settler";
 import { invalidateStatsCache } from "@/server/services/dashboard.service";
-import { derivePumpAddresses, DISCRIMINATORS } from "@/server/solana/pump-new-idl";
-import { PUMP_PROGRAM_ID } from "@/server/solana/pump-idl";
+import { derivePumpAddresses, DISCRIMINATORS } from "@/server/solana/pump/instructions";
+import { PUMP_PROGRAM_ID } from "@/server/solana/pump/idl";
 import {
   Keypair,
   PublicKey,
