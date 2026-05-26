@@ -42,7 +42,7 @@
 ## Environment Mapping
 
 - Deployment platform is Railway with two environments: `staging` and `production`
-- Branch mapping is `staging` -> Railway `staging`, and `main` -> Railway `production`
+- Branch mapping is `uat` -> Railway `staging`, and `main` -> Railway `production`
 - Each environment has an independent PostgreSQL instance and therefore a different `DATABASE_URL`
 - Local development currently uses the staging PostgreSQL connection via `DATABASE_URL`
 - Local development can keep working without Pinata; token media falls back to existing inline data-URL storage when `PINATA_JWT` is unset

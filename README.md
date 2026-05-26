@@ -37,7 +37,7 @@ You can check out [the Next.js GitHub repository](https://github.com/vercel/next
 
 This app is deployed on Railway using GitHub repository deployment for the Next.js service.
 
-- `staging` branch deploys to Railway `staging`
+- `uat` branch deploys to Railway `staging`
 - `main` branch deploys to Railway `production`
 - Each environment has its own PostgreSQL database
 
