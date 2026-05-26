@@ -1,4 +1,4 @@
-# Token Launch Implementation (sollabs-web)
+# Token Launch Implementation (ballistik-web)
 
 ## Goals
 

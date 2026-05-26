@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Define the authentication model for `sollabs-web`, including access token verification, refresh-session lifecycle, cookie behavior, and trust boundaries across tRPC, server layouts, and proxy.
+Define the authentication model for `ballistik-web`, including access token verification, refresh-session lifecycle, cookie behavior, and trust boundaries across tRPC, server layouts, and proxy.
 
 ## Current Auth Baseline
 

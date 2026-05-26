@@ -1,6 +1,7 @@
 "use client";
 
 import { IconInfoCircle } from "@tabler/icons-react";
+import { SITE_BRAND_NAME } from "@/lib/config/site.config";
 import { formatSol } from "@/lib/utils/format";
 import {
   Dialog,
@@ -229,7 +230,7 @@ export function PnlDetailsDialog({
   const platformFeesItem: DeltaItem = {
     label: "Platform Fees",
     value: pnl.platformFees,
-    tooltip: "All sollabs platform usage fees, broken down by source",
+    tooltip: `All ${SITE_BRAND_NAME} platform usage fees, broken down by source`,
     children:
       pnl.launchFees < 0 || launchFeeChildren.length > 0
         ? [

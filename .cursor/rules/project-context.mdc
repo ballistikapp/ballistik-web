@@ -7,7 +7,7 @@ alwaysApply: true
 
 ## What This Is
 
-**sollabs-web** is a Solana token launch and operations platform. It lets users create pump.fun tokens, manage bundled launches with multiple buyer wallets, run volume bots, track holdings and transactions, and manage exits — all from a single dashboard.
+**ballistik-web** is the Ballistik web app — a Solana token launch and operations platform. It lets users create pump.fun tokens, manage bundled launches with multiple buyer wallets, run volume bots, track holdings and transactions, and manage exits — all from a single dashboard.
 
 ## Target Users
 

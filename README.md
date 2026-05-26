@@ -1,4 +1,8 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# ballistik-web
+
+Web app for [Ballistik](https://ballistik.app) — Solana token launch, Jito bundles, volume bot, and operational wallets on pump.fun.
+
+Built with [Next.js](https://nextjs.org) (App Router), tRPC, Prisma, and PostgreSQL.
 
 ## Getting Started
 

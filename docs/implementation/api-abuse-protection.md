@@ -2,7 +2,7 @@
 
 ## Purpose
 
-This document defines the abuse-protection model for API surfaces in `sollabs-web`, including tRPC, auth endpoints, and webhooks. The goal is to reduce brute-force, spam, replay, and high-cost request abuse while keeping router code thin.
+This document defines the abuse-protection model for API surfaces in `ballistik-web`, including tRPC, auth endpoints, and webhooks. The goal is to reduce brute-force, spam, replay, and high-cost request abuse while keeping router code thin.
 
 ## Protected Surfaces
 

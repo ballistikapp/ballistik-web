@@ -28,6 +28,7 @@ import {
   getSessionMaxTtlDays,
   hashRefreshToken,
 } from "@/lib/auth/refresh-token";
+import { SITE_BRAND_NAME } from "@/lib/config/site.config";
 import {
   resolveEffectiveUserPlan,
   syncUserPlanState,
@@ -226,7 +227,7 @@ export const authService = {
 
     if (managedWallet) {
       throw new AppError(
-        "This wallet is already managed by sollabs. Choose a different connected wallet for wallet login.",
+        `This wallet is already managed by ${SITE_BRAND_NAME}. Choose a different connected wallet for wallet login.`,
         409
       );
     }
@@ -345,7 +346,7 @@ export const authService = {
 
     if (managedWallet && authWalletPublicKey !== user.mainWalletPublicKey) {
       throw new AppError(
-        "This wallet is already managed by sollabs. Choose a different connected wallet.",
+        `This wallet is already managed by ${SITE_BRAND_NAME}. Choose a different connected wallet.`,
         409
       );
     }

@@ -1,6 +1,6 @@
 # Implementation Documentation
 
-This directory contains detailed implementation documentation for all features in sollabs-web.
+This directory contains detailed implementation documentation for all features in ballistik-web.
 
 ## Overview
 

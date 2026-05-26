@@ -1,6 +1,6 @@
 ## Bundle Launch Implementation
 
-This document describes the current Jito bundle launch flow used by `sollabs-web` and how it can be extended with Address Lookup Tables (ALT) in the future.
+This document describes the current Jito bundle launch flow used by `ballistik-web` and how it can be extended with Address Lookup Tables (ALT) in the future.
 
 ### Current Behavior (ALT Disabled)
 

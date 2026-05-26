@@ -2,7 +2,7 @@
 
 ## Clicky Analytics
 
-Clicky is integrated into sollabs-web for privacy-focused web analytics.
+Clicky is integrated into ballistik-web for privacy-focused web analytics.
 
 ### Setup
 

@@ -2,7 +2,7 @@
 
 ## Purpose
 
-sollabs-web is the modern successor to sollabv0. It reimplements core launch, wallet, and token workflows with clearer architecture, stronger type safety, and improved error handling.
+ballistik-web is the web application for [Ballistik](https://ballistik.app). It implements core launch, wallet, and token workflows with clearer architecture, stronger type safety, and improved error handling.
 
 ## Core Features
 

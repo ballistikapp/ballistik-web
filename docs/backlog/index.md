@@ -9,7 +9,7 @@
 ## Launch
 
 - Implement two-step launch flow: Create token first, then launch separately
-  - Add "Next Step" button with info text: "Token will be created in sollabs but won't be launched yet"
+  - Add "Next Step" button with info text: "Token will be created in Ballistik but won't be launched yet"
   - Support recovery and volume bot scheduling workflows
   - Add token statuses: `awaiting_launch`, `launched`, `graduated`, `dumped`
 - Fix bundle size: Change from 11 to 10
