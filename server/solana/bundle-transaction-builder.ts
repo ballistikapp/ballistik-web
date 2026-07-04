@@ -14,7 +14,10 @@ import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 const filterComputeBudget = (ixs: TransactionInstruction[]) =>
   ixs.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
 
-const BUNDLE_COMPUTE_UNITS = 800_000;
+// Sized from measured usage (max ~193k CU for create+dev-buy, ~13k for buy
+// txs) with generous margin. Lower requested CU improves Jito auction
+// priority: bundles are ranked by tip / requested CU.
+const BUNDLE_COMPUTE_UNITS = 400_000;
 const MAX_RAW_TRANSACTION_BYTES = 1232;
 const SIZE_ESTIMATE_BLOCKHASH = "11111111111111111111111111111111";
 
@@ -79,6 +82,49 @@ function splitAtaCreateInstructions(ixs: TransactionInstruction[]) {
 
 type BuildBuyTransaction = typeof buildBuyTokenTransaction;
 
+export type BundleBuyBuildFailure = {
+  walletPublicKey: string;
+  errorMessage: string;
+  batch: "first_tx" | "follow_up";
+};
+
+type BuildBuyTransactionResult = Awaited<ReturnType<BuildBuyTransaction>>;
+
+function collectRejectedBuyBuilds(
+  wallets: Keypair[],
+  results: PromiseSettledResult<BuildBuyTransactionResult>[],
+  batch: BundleBuyBuildFailure["batch"]
+): BundleBuyBuildFailure[] {
+  const failures: BundleBuyBuildFailure[] = [];
+  for (let index = 0; index < results.length; index += 1) {
+    const result = results[index];
+    if (result?.status === "rejected") {
+      failures.push({
+        walletPublicKey: wallets[index]!.publicKey.toBase58(),
+        errorMessage: formatError(result.reason),
+        batch,
+      });
+    }
+  }
+  return failures;
+}
+
+function logBuyBuildFailures(
+  logContext: Record<string, unknown>,
+  failures: BundleBuyBuildFailure[],
+  total: number
+) {
+  if (failures.length === 0) {
+    return;
+  }
+  logger.warn("Bundle buy instruction build failed", {
+    ...logContext,
+    failedCount: failures.length,
+    total,
+    failures,
+  });
+}
+
 export async function buildBundleTransactionsForCreateAndBuys(
   createTx: Transaction,
   createSigners: Keypair[],
@@ -88,12 +134,15 @@ export async function buildBundleTransactionsForCreateAndBuys(
   creator?: PublicKey,
   options?: {
     buildBuyTransaction?: BuildBuyTransaction;
+    launchId?: string;
   }
-): Promise<[Transaction[], Keypair[][]]> {
+): Promise<[Transaction[], Keypair[][], BundleBuyBuildFailure[]]> {
   const logContext = {
     mint: mint.toBase58(),
     ...(creator ? { creator: creator.toBase58() } : {}),
+    ...(options?.launchId ? { launchId: options.launchId } : {}),
   };
+  const buyBuildFailures: BundleBuyBuildFailure[] = [];
   const buildBuyTransaction =
     options?.buildBuyTransaction ?? buildBuyTokenTransaction;
   if (wallets.length !== buyAmountsLamport.length) {
@@ -113,7 +162,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
       instructionCount: createOnlyTx.instructions.length,
       feePayer: createOnlyTx.feePayer?.toBase58(),
     });
-    return [[createOnlyTx], [createSigners]];
+    return [[createOnlyTx], [createSigners], buyBuildFailures];
   }
 
   const bundleTransactions: Transaction[] = [];
@@ -133,17 +182,13 @@ export async function buildBundleTransactionsForCreateAndBuys(
       buildBuyTransaction(wallet, mint, firstAmounts[i], creator)
     )
   );
-  const firstRejected = firstBuyTxResults.filter(
-    (result): result is PromiseRejectedResult => result.status === "rejected"
+  const firstFailures = collectRejectedBuyBuilds(
+    firstWallets,
+    firstBuyTxResults,
+    "first_tx"
   );
-  if (firstRejected.length > 0) {
-    logger.warn("Bundle buy instruction build failed", {
-      ...logContext,
-      failedCount: firstRejected.length,
-      total: firstBuyTxResults.length,
-      errors: firstRejected.map((result) => formatError(result.reason)).slice(0, 3),
-    });
-  }
+  buyBuildFailures.push(...firstFailures);
+  logBuyBuildFailures(logContext, firstFailures, firstBuyTxResults.length);
 
   const hoistedAtaInstructions: TransactionInstruction[] = [];
   const hoistedAtaSigners: Keypair[] = [];
@@ -204,18 +249,21 @@ export async function buildBundleTransactionsForCreateAndBuys(
   ) {
     const walletsSlice = wallets.slice(i, i + buysPerTransaction);
     const buyAmountsSlice = buyAmountsLamport.slice(i, i + buysPerTransaction);
-    const tx = await buildBuyBundleTransaction(
-      walletsSlice,
-      mint,
-      buyAmountsSlice,
-      creator,
-      {
-        buildBuyTransaction,
-        hoistedAtaInstructions,
-        hoistedAtaSigners,
-        shouldHoistAtaInstructions: canHoistAtaInstructions,
-      }
-    );
+    const { transaction: tx, failures: followUpFailures } =
+      await buildBuyBundleTransaction(
+        walletsSlice,
+        mint,
+        buyAmountsSlice,
+        creator,
+        {
+          buildBuyTransaction,
+          hoistedAtaInstructions,
+          hoistedAtaSigners,
+          shouldHoistAtaInstructions: canHoistAtaInstructions,
+          logContext,
+        }
+      );
+    buyBuildFailures.push(...followUpFailures);
     deferredTransactions.push(tx);
     deferredSignerGroups.push(walletsSlice);
   }
@@ -254,7 +302,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
   bundleTransactions.push(...deferredTransactions);
   bundleSigners.push(...deferredSignerGroups);
 
-  return [bundleTransactions, bundleSigners];
+  return [bundleTransactions, bundleSigners, buyBuildFailures];
 }
 
 async function buildBuyBundleTransaction(
@@ -270,11 +318,13 @@ async function buildBuyBundleTransaction(
       wallet: Keypair,
       ataCreateInstructions: TransactionInstruction[]
     ) => boolean;
+    logContext?: Record<string, unknown>;
   }
-): Promise<Transaction> {
+): Promise<{ transaction: Transaction; failures: BundleBuyBuildFailure[] }> {
   const logContext = {
     mint: mint.toBase58(),
     ...(creator ? { creator: creator.toBase58() } : {}),
+    ...options?.logContext,
   };
   const buildBuyTransaction =
     options?.buildBuyTransaction ?? buildBuyTokenTransaction;
@@ -291,17 +341,12 @@ async function buildBuyBundleTransaction(
       buildBuyTransaction(wallet, mint, buyAmountsLamport[i], creator)
     )
   );
-  const rejected = buyTxResults.filter(
-    (result): result is PromiseRejectedResult => result.status === "rejected"
+  const failures = collectRejectedBuyBuilds(
+    wallets,
+    buyTxResults,
+    "follow_up"
   );
-  if (rejected.length > 0) {
-    logger.warn("Bundle buy instruction build failed", {
-      ...logContext,
-      failedCount: rejected.length,
-      total: buyTxResults.length,
-      errors: rejected.map((result) => formatError(result.reason)).slice(0, 3),
-    });
-  }
+  logBuyBuildFailures(logContext, failures, buyTxResults.length);
 
   const outputTx = new Transaction();
   addBundleComputeBudget(outputTx);
@@ -339,5 +384,5 @@ async function buildBuyBundleTransaction(
     instructionCount: outputTx.instructions.length,
     feePayer: outputTx.feePayer?.toBase58(),
   });
-  return outputTx;
+  return { transaction: outputTx, failures };
 }

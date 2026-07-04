@@ -315,8 +315,10 @@ When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito b
 2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
 3. Pack transactions into a bundle and submit through Jito.
 4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
+   - Each transaction is first simulated individually (`simulateTransaction`); only the first (create) transaction's result gates the launch, since buy transactions are expected to fail individual simulation before the mint exists.
+   - When `HELIUS_RPC_URL` is set, a sequential `simulateBundle` preflight (Jito-Solana RPC method, `server/solana/simulate-bundle.ts`) simulates all 5 transactions against a single bank so buys see the CREATE state. A sequential failure aborts the launch with per-transaction errors and logs. If the env var is unset or the RPC does not support the method, the preflight is skipped (logged as `bundle_sequential_simulation` with status `unsupported`/`error`). The preflight runs on the initial build only; rebuilds reuse the same instructions with a fresh blockhash.
 
-Note: All pump.fun instructions (`create`, `buy_exact_sol_in`, `sell`) are built as raw `TransactionInstruction` (not via Anchor) using hardcoded discriminators. The IDL at `data/pumpfun-idl.json` is statically imported by `server/solana/pump/idl.ts`, converted to Anchor format with strict schema validation, and used to decode the on-chain `Global` account (`server/solana/pump/global-account.ts`) and `TradeEvent` logs (`server/solana/pump/events.ts`, consumed by `transaction.service.ts`).
+Note: All pump.fun instructions (`create`, `buy_exact_sol_in`, `sell`) are built as raw `TransactionInstruction` (not via Anchor) using hardcoded discriminators. The canonical Anchor IDL at `data/pumpfun-idl.json` is statically imported by `server/solana/pump/idl.ts`, consumed directly by `BorshCoder`/`EventParser` with strict schema validation, and used to decode the on-chain `Global` account (`server/solana/pump/global-account.ts`) and `TradeEvent` logs (`server/solana/pump/events.ts`, consumed by `transaction.service.ts`). IDL field names are snake_case (e.g. `fee_basis_points`, `sol_amount`, `is_buy`) as decoded directly from the IDL, not camelCased.
 
 Note: `buy_exact_sol_in` data is 24 bytes (discriminator + sol_amount + min_tokens_out); the `track_volume` OptionBool parameter is omitted. The on-chain account layout matches `@pump-fun/pump-sdk` 1.36.x: 16 fixed accounts followed by exactly two trailing remaining accounts in this order: `bonding_curve_v2` (PDA seeds `["bonding-curve-v2", mint]`, read-only) then a single writable `buyback_fee_recipient` chosen at random from the 8-recipient pool stored in `Global.buyback_fee_recipients` (or the `PUMP_BUYBACK_FEE_RECIPIENTS` env override). Total 18 keys per buy. Failure modes: passing zero buyback recipients throws `BuybackFeeRecipientMissing` 6062 / `0x17ae`; passing all 8 (or putting `bonding_curve_v2` after them) corrupts the program's account-index reads and surfaces as a misleading Anchor `Overflow` 6024 / `0x1788` thrown deep inside `buy.rs`. Reference: pump-fun/pump-public-docs#30.
 
@@ -328,7 +330,7 @@ Note: No off-chain token amount calculation is needed. The program determines to
 
 - The bundle can contain up to 5 transactions.
 - The first transaction includes:
-  - A compute budget instruction (800k units),
+  - A compute budget instruction (400k units — sized from measured usage, ~193k max for create + dev buy; lower requested CU improves Jito auction priority since bundles are ranked by tip per requested CU),
   - The token create instructions,
   - Up to 1 buy.
 - Subsequent transactions include up to 2 buys each (capped to keep each tx under the 1232-byte versioned transaction limit with the current pump IDL; raise once launch ALT lands).
@@ -358,6 +360,12 @@ Note: No off-chain token amount calculation is needed. The program determines to
 
 - Bundle submission rotates through available Jito block engine endpoints based on RPC network.
 - Tip accounts are cached per endpoint to reduce rate limiting.
+- Per-endpoint send rejections are surfaced as `bundle_send_rejections` telemetry and persisted to the launch log.
+
+### Dropped-Bundle Detection
+
+- `getInflightBundleStatuses` is pinned to the endpoint that accepted the send and reports whether the responding endpoint matched (`matchedPreferred`). An `Invalid` status from any other region is inconclusive and ignored.
+- When the send endpoint itself reports `Invalid` on 2+ consecutive reads more than 10 seconds after the last send, the bundle is treated as dropped by the block engine (accepted but discarded before the auction): a `bundle_dropped_by_engine` WARN event is emitted, the preferred endpoint rotates to the next region, and a resend fires immediately instead of waiting out the normal resend interval.
 
 ### Signatures and Blockhash
 
@@ -372,6 +380,9 @@ Note: No off-chain token amount calculation is needed. The program determines to
 - Bundle transaction logs include instruction counts and fulfilled buy counts per tx.
 - Jito bundle send logs include RPC endpoint, tipper, tip account, blockhash, and signature preview.
 - Confirmation logs include summary counts, resend triggers, and gRPC confirmation.
+- `bundle_inflight_status` events (per-region block-engine status, including whether the reading came from the send endpoint) are persisted to the launch log.
+- Simulation logs for failing transactions are kept in full (up to 100 lines); passing transactions log head + tail (errors typically appear at the tail).
+- Sequential `simulateBundle` preflight results are logged as `bundle_sequential_simulation` with per-transaction errors, logs, and units consumed.
 
 ## Clone Token
 

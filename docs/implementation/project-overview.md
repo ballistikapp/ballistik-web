@@ -86,7 +86,7 @@ server/
 
 - Hosting platform: Railway
 - Environments: `staging` and `production`
-- Branch mapping: `staging` branch -> Railway `staging`, `main` branch -> Railway `production`
+- Branch mapping: `uat` branch -> Railway `staging`, `main` branch -> Railway `production`
 - Runtime deployment uses Railway GitHub repository integration for the Next.js app
 - Each environment has a separate PostgreSQL database and exposes its own `DATABASE_URL`
 - Local development currently points `DATABASE_URL` to the staging database

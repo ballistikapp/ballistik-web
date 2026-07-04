@@ -19,7 +19,7 @@ This document describes the current Jito bundle launch flow used by `ballistik-w
 ### Transaction Packing Rules
 - The bundle can contain up to 5 transactions.
 - Transaction 1 includes:
-  - Compute budget instruction (800k units)
+  - Compute budget instruction (400k units)
   - Token create instructions
   - Up to 1 buy
 - Subsequent transactions include up to 2 buys each.

@@ -8,7 +8,7 @@
 ## Environments
 
 - There are two Railway environments: `staging` and `production`
-- `staging` deploys from the `staging` branch
+- `staging` deploys from the `uat` branch
 - `production` deploys from the `main` branch
 
 ## Database

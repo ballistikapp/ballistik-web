@@ -42,6 +42,6 @@ Power users who launch and manage Solana tokens. They need speed, control, and r
 
 ## Deployment
 
-- Railway with two environments: `staging` branch → staging, `main` branch → production
+- Railway with two environments: `uat` branch → staging, `main` branch → production
 - Each environment has its own PostgreSQL instance
 - Local dev uses staging database

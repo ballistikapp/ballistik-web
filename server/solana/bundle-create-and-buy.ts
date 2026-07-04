@@ -5,7 +5,7 @@ import {
 } from "@solana/web3.js";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { buildBundleTransactionsForCreateAndBuys } from "@/server/solana/bundle-transaction-builder";
+import { buildBundleTransactionsForCreateAndBuys, type BundleBuyBuildFailure } from "@/server/solana/bundle-transaction-builder";
 import {
   sendJitoBundle,
   type BundleTelemetryEvent,
@@ -36,6 +36,9 @@ type BundleLaunchInput = {
     multiplier?: number;
     maxEscalations?: number;
   };
+  onBuyBuildFailures?: (
+    failures: BundleBuyBuildFailure[]
+  ) => void | Promise<void>;
 };
 
 function buildBundleBuyers(
@@ -148,14 +151,24 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     totalBuyLamports: totalBuyLamports.toString(),
   });
 
-  const [txs, signers] = await buildBundleTransactionsForCreateAndBuys(
+  const [txs, signers, buyBuildFailures] = await buildBundleTransactionsForCreateAndBuys(
     createTx,
     [input.creator, input.mint],
     buyerWallets,
     input.mint.publicKey,
     buyAmountsLamport,
-    input.creator.publicKey
+    input.creator.publicKey,
+    { launchId: input.launchId }
   );
+  if (buyBuildFailures.length > 0) {
+    logger.warn("Bundle buy build completed with failures", {
+      ...logContext,
+      configuredBuyers: buyerWallets.length,
+      failedCount: buyBuildFailures.length,
+      failures: buyBuildFailures,
+    });
+    await input.onBuyBuildFailures?.(buyBuildFailures);
+  }
   logger.info("Bundle transactions built", {
     ...logContext,
     transactionCount: txs.length,
@@ -253,6 +266,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
         enableGrpc: input.enableGrpc,
         onEvent: input.onBundleEvent,
         adaptiveTipEscalation: input.adaptiveTipEscalation,
+        launchId: input.launchId,
       }
     );
 
