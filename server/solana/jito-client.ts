@@ -103,6 +103,17 @@ function parseRetryAfterMs(message: string): number | null {
   return Math.min(parsed, RATE_LIMIT_MAX_COOLDOWN_MS);
 }
 
+type JitoClientLogOptions = {
+  launchId?: string;
+};
+
+function jitoClientLogContext(options?: JitoClientLogOptions) {
+  return {
+    subsystem: "jito-client" as const,
+    ...(options?.launchId ? { launchId: options.launchId } : {}),
+  };
+}
+
 function looksRateLimited(message: string): boolean {
   return /rate[ -]?limit|globally rate limited|network congested|too many requests/i.test(
     message
@@ -342,7 +353,8 @@ export function parseInflightBundleStatusesResponse(
   };
 }
 
-export async function getTipAccount() {
+export async function getTipAccount(options?: JitoClientLogOptions) {
+  const logContext = jitoClientLogContext(options);
   const now = Date.now();
   for (const entry of orderedClients()) {
     const cached = tipCache.get(entry.endpoint);
@@ -369,6 +381,7 @@ export async function getTipAccount() {
         const errorMessage = response.error || "Failed to fetch tip accounts";
         maybeRecordCooldown(entry.endpoint, errorMessage);
         logger.warn("Jito tip account fetch failed", {
+          ...logContext,
           endpoint: entry.endpoint,
           error: errorMessage,
         });
@@ -376,6 +389,7 @@ export async function getTipAccount() {
       }
       if (accounts.length === 0) {
         logger.warn("Jito tip account list empty", {
+          ...logContext,
           endpoint: entry.endpoint,
         });
         continue;
@@ -387,19 +401,22 @@ export async function getTipAccount() {
       const message = normalizeError(error);
       maybeRecordCooldown(entry.endpoint, message);
       logger.warn("Jito tip account request error", {
+        ...logContext,
         endpoint: entry.endpoint,
         error: message,
       });
     }
   }
 
-  logger.warn("Jito tip account fetch failed on all endpoints, using static fallback");
+  logger.warn("Jito tip account fetch failed on all endpoints, using static fallback", logContext);
   return pickStaticTipAccount();
 }
 
 export async function sendBundle(
-  bundleToSend: import("jito-ts").bundle.Bundle
+  bundleToSend: import("jito-ts").bundle.Bundle,
+  options?: JitoClientLogOptions
 ) {
+  const logContext = jitoClientLogContext(options);
   let lastError: JitoSendResult | null = null;
   for (const entry of orderedClients()) {
     try {
@@ -417,6 +434,7 @@ export async function sendBundle(
         error: message ? `endpoint=${entry.endpoint} ${message}` : message,
       };
       logger.warn("Jito bundle rejected", {
+        ...logContext,
         endpoint: entry.endpoint,
         error: message,
       });
@@ -428,6 +446,7 @@ export async function sendBundle(
         error: message ? `endpoint=${entry.endpoint} ${message}` : message,
       };
       logger.warn("Jito bundle send error", {
+        ...logContext,
         endpoint: entry.endpoint,
         error: message,
       });
@@ -438,8 +457,9 @@ export async function sendBundle(
 
 export async function getInflightBundleStatuses(
   bundleIds: string[],
-  options?: { preferEndpoint?: string | null }
+  options?: { preferEndpoint?: string | null; launchId?: string }
 ): Promise<JitoInflightBundleStatusesResult> {
+  const logContext = jitoClientLogContext(options);
   if (bundleIds.length === 0) {
     return { ok: false, error: "No bundle IDs provided" };
   }
@@ -470,6 +490,7 @@ export async function getInflightBundleStatuses(
       maybeRecordCooldown(entry.endpoint, message);
       lastError = message ? `endpoint=${entry.endpoint} ${message}` : message;
       logger.warn("Jito inflight bundle status error", {
+        ...logContext,
         endpoint: entry.endpoint,
         error: message,
       });
@@ -532,8 +553,9 @@ export function parseBundleStatusesResponse(
 // that originally accepted the bundle.
 export async function getBundleStatuses(
   bundleIds: string[],
-  options?: { preferEndpoint?: string | null }
+  options?: { preferEndpoint?: string | null; launchId?: string }
 ): Promise<JitoBundleStatusesResult> {
+  const logContext = jitoClientLogContext(options);
   if (bundleIds.length === 0) {
     return { ok: false, error: "No bundle IDs provided" };
   }
@@ -566,6 +588,7 @@ export async function getBundleStatuses(
       maybeRecordCooldown(entry.endpoint, message);
       lastError = message ? `endpoint=${entry.endpoint} ${message}` : message;
       logger.warn("Jito bundle status error", {
+        ...logContext,
         endpoint: entry.endpoint,
         error: message,
       });

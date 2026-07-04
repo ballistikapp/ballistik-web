@@ -1132,8 +1132,23 @@ async function fundWalletsFromMain(
   }
 
   const signatures: string[] = [];
+  const totalBatches = Math.ceil(fundingPlan.length / FUNDING_BATCH_SIZE);
   for (let i = 0; i < fundingPlan.length; i += FUNDING_BATCH_SIZE) {
     const batch = fundingPlan.slice(i, i + FUNDING_BATCH_SIZE);
+    const batchNumber = Math.floor(i / FUNDING_BATCH_SIZE) + 1;
+    const walletPublicKeys = batch.map((target) => target.publicKey.toBase58());
+    const batchLamports = batch
+      .reduce((sum, target) => sum + target.topUpLamports, BigInt(0))
+      .toString();
+
+    await appendLog(launchId, "INFO", "Funding batch started", "funding", {
+      batchNumber,
+      totalBatches,
+      walletCount: batch.length,
+      walletPublicKeys,
+      batchLamports,
+    });
+
     const transaction = new Transaction();
     batch.forEach((target) => {
       transaction.add(
@@ -1191,12 +1206,26 @@ async function fundWalletsFromMain(
           });
       }
     }
-    const signature = await sendAndConfirmTransaction(
-      connection,
-      transaction,
-      [mainWalletKeypair],
-      { commitment: "confirmed" }
-    );
+    let signature: string;
+    try {
+      signature = await sendAndConfirmTransaction(
+        connection,
+        transaction,
+        [mainWalletKeypair],
+        { commitment: "confirmed" }
+      );
+    } catch (error) {
+      await appendLog(launchId, "ERROR", "Funding batch failed", "funding", {
+        batchNumber,
+        totalBatches,
+        walletCount: batch.length,
+        walletPublicKeys,
+        batchLamports,
+        errorName: error instanceof Error ? error.name : "UnknownError",
+        errorMessage: getErrorMessage(error),
+      });
+      throw error;
+    }
     if (fundTrackRows.length > 0) {
       await appTransactionService
         .confirmMany(
@@ -1223,6 +1252,14 @@ async function fundWalletsFromMain(
           .reduce((sum, target) => sum + target.topUpLamports, BigInt(0))
           .toString(),
       },
+    });
+    await appendLog(launchId, "INFO", "Funding batch confirmed", "funding", {
+      batchNumber,
+      totalBatches,
+      walletCount: batch.length,
+      walletPublicKeys,
+      batchLamports,
+      signature,
     });
     signatures.push(signature);
   }
@@ -2746,6 +2783,9 @@ async function finalizeLaunchFailure(params: {
       errorMessage: error.message,
       statusCode: error.statusCode,
       durationMs,
+      ...(error instanceof Error && error.stack
+        ? { errorStack: error.stack }
+        : {}),
     });
   } else {
     const context: Record<string, unknown> = {
@@ -2755,6 +2795,9 @@ async function finalizeLaunchFailure(params: {
     };
     if (errorMessage) {
       context.errorMessage = errorMessage;
+    }
+    if (error instanceof Error && error.stack) {
+      context.errorStack = error.stack;
     }
     logger.error("Launch failed", context);
   }
@@ -4298,6 +4341,24 @@ export const launchService = {
           ).allowed,
           onBundleEvent: async (event) => {
             await appendBundleTelemetryLog(launchId, event);
+          },
+          onBuyBuildFailures: async (failures) => {
+            const configuredBuyers =
+              buyerWallets.length + (devBuyAmountSol > 0 ? 1 : 0);
+            const allFailed = failures.length >= configuredBuyers;
+            await appendLog(
+              launchId,
+              allFailed ? "ERROR" : "WARN",
+              allFailed
+                ? "All bundle buy instructions failed to build"
+                : `${failures.length} bundle buy instruction(s) failed to build`,
+              "create",
+              {
+                configuredBuyers,
+                failedCount: failures.length,
+                failures,
+              }
+            );
           },
         });
         createSignature = bundleResult.signatures[0] ?? null;

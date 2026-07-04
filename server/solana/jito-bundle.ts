@@ -72,6 +72,7 @@ type SendJitoBundleOptions = {
   onEvent?: BundleTelemetryHandler;
   adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
   enableGrpc?: boolean;
+  launchId?: string;
 };
 
 type SimulateTransactionResult = {
@@ -111,6 +112,11 @@ export async function sendJitoBundle(
 ) {
   const telemetry = options?.onEvent;
   const enableGrpc = options?.enableGrpc ?? true;
+  const launchId = options?.launchId;
+  const bundleLogger = launchId
+    ? logger.child({ launchId, subsystem: "jito-bundle" })
+    : logger.child({ subsystem: "jito-bundle" });
+  const jitoClientLogOptions = launchId ? { launchId } : undefined;
   const adaptiveTipEnabled = options?.adaptiveTipEscalation?.enabled ?? false;
   const tipEscalationMultiplier = Math.max(
     1,
@@ -135,7 +141,7 @@ export async function sendJitoBundle(
     );
   }
   const connection = getSolanaConnection();
-  logger.info("Jito bundle send start", {
+  bundleLogger.info("Jito bundle send start", {
     txCount: txs.length,
     signerGroupCount: signers.length,
     tipLamports,
@@ -155,8 +161,8 @@ export async function sendJitoBundle(
       maxTipEscalations,
     },
   });
-  const tipAccount = await getTipAccount();
-  logger.info("Jito tip account resolved", {
+  const tipAccount = await getTipAccount(jitoClientLogOptions);
+  bundleLogger.info("Jito tip account resolved", {
     tipAccount: tipAccount.toBase58(),
   });
   const baseBundleTxs = txs.map((tx) => {
@@ -197,7 +203,7 @@ export async function sendJitoBundle(
 
   let blockhashFetchedAt = Date.now();
   let { blockhash } = await connection.getLatestBlockhash("confirmed");
-  logger.info("Bundle blockhash fetched", { blockhash });
+  bundleLogger.info("Bundle blockhash fetched", { blockhash });
   let currentBundleTxs = withTipTransactions(currentTipLamports);
   let currentBuild = buildVersionedTransactions(
     currentBundleTxs,
@@ -206,7 +212,7 @@ export async function sendJitoBundle(
     currentTipLamports,
     blockhash
   );
-  logger.info("Bundle versioned transactions built", {
+  bundleLogger.info("Bundle versioned transactions built", {
     signatureCount: currentBuild.signatures.length,
     signaturesPreview: currentBuild.signatures.slice(0, 3),
     feePayers,
@@ -221,7 +227,7 @@ export async function sendJitoBundle(
         commitment: "processed",
       }),
   });
-  logger.info("Bundle transactions profiled", {
+  bundleLogger.info("Bundle transactions profiled", {
     blockhash,
     tipLamports: currentTipLamports,
     transactionCount: currentProfiles.length,
@@ -238,7 +244,7 @@ export async function sendJitoBundle(
     }),
   });
   if (currentProfiles[0]?.simulationError) {
-    logger.error("Bundle first transaction simulation failed", {
+    bundleLogger.error("Bundle first transaction simulation failed", {
       error: currentProfiles[0].simulationError,
       logs: currentProfiles[0].simulationLogs,
       txIndex: currentProfiles[0].txIndex,
@@ -250,7 +256,7 @@ export async function sendJitoBundle(
     throw new Error(`Transaction simulation failed: ${currentProfiles[0].simulationError}`);
   }
   if (currentProfiles[0]) {
-    logger.info("Bundle first transaction simulation succeeded", {
+    bundleLogger.info("Bundle first transaction simulation succeeded", {
       unitsConsumed: currentProfiles[0].unitsConsumed,
       serializedSizeBytes: currentProfiles[0].serializedSizeBytes,
       signature: currentProfiles[0].signature,
@@ -273,7 +279,7 @@ export async function sendJitoBundle(
       let lastError: Error | null = null;
       for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
         try {
-          const result = await sendBundle(bundleToSend);
+          const result = await sendBundle(bundleToSend, jitoClientLogOptions);
           const endpoint =
             typeof result === "object" && result && "endpoint" in result &&
             typeof result.endpoint === "string"
@@ -316,7 +322,7 @@ export async function sendJitoBundle(
   const initialSend = await sendBundleWithRetries();
   const initialBundleId = initialSend.bundleId;
   const initialEndpoint = initialSend.endpoint;
-  logger.info("Jito bundle sent", {
+  bundleLogger.info("Jito bundle sent", {
     bundleId: initialBundleId,
     signatureCount: currentBuild.signatures.length,
     endpoint: initialEndpoint,
@@ -355,7 +361,7 @@ export async function sendJitoBundle(
       const previousTipLamports = currentTipLamports;
       currentTipLamports = Math.floor(currentTipLamports * tipEscalationMultiplier);
       tipEscalationCount += 1;
-      logger.info("Adaptive tip escalation applied", {
+      bundleLogger.info("Adaptive tip escalation applied", {
         previousTipLamports,
         escalatedTipLamports: currentTipLamports,
         tipEscalationCount,
@@ -379,7 +385,7 @@ export async function sendJitoBundle(
     const fresh = await connection.getLatestBlockhash("confirmed");
     blockhash = fresh.blockhash;
 
-    logger.info("Rebuilding bundle with fresh blockhash", {
+    bundleLogger.info("Rebuilding bundle with fresh blockhash", {
       rebuild: rebuilds,
       maxRebuilds: MAX_BLOCKHASH_REBUILDS,
       newBlockhash: blockhash,
@@ -403,7 +409,7 @@ export async function sendJitoBundle(
           commitment: "processed",
         }),
     });
-    logger.info("Rebuilt bundle transactions profiled", {
+    bundleLogger.info("Rebuilt bundle transactions profiled", {
       rebuild: rebuilds,
       blockhash,
       tipLamports: currentTipLamports,
@@ -427,7 +433,7 @@ export async function sendJitoBundle(
     const newBundleId = rebuiltSend.bundleId;
     const newEndpoint = rebuiltSend.endpoint;
 
-    logger.info("Bundle rebuilt and resent", {
+    bundleLogger.info("Bundle rebuilt and resent", {
       rebuild: rebuilds,
       bundleId: newBundleId,
       endpoint: newEndpoint,
@@ -468,6 +474,8 @@ export async function sendJitoBundle(
     bundleId: initialBundleId,
     bundleEndpoint: initialEndpoint,
     rebuildAndResend,
+    bundleLogger,
+    jitoClientLogOptions,
   });
   return { bundleId: confirmedBundleId, signatures: currentBuild.signatures };
 }
@@ -627,6 +635,8 @@ async function confirmBundleOnChain({
   bundleId,
   bundleEndpoint,
   rebuildAndResend,
+  bundleLogger,
+  jitoClientLogOptions,
 }: {
   connection: ReturnType<typeof getSolanaConnection>;
   onEvent?: BundleTelemetryHandler;
@@ -646,6 +656,8 @@ async function confirmBundleOnChain({
     signatures: string[];
     blockhashFetchedAt: number;
   }>;
+  bundleLogger: typeof logger;
+  jitoClientLogOptions?: { launchId: string };
 }) {
   const startedAt = Date.now();
   let lastResendAt = startedAt;
@@ -662,7 +674,7 @@ async function confirmBundleOnChain({
   let lastLoggedInflightStatus: string | null = null;
   let lastLoggedInflightStatusError: string | null = null;
   const fallbackConnection = getFallbackConnection();
-  logger.info("Bundle confirmation start", {
+  bundleLogger.info("Bundle confirmation start", {
     bundleId,
     bundleEndpoint,
     signatureCount: currentSignatures.length,
@@ -717,7 +729,7 @@ async function confirmBundleOnChain({
   await sleep(50);
   grpcState.active = !grpcState.done || grpcState.result !== null;
 
-  logger.info("Bundle confirmation mode", {
+  bundleLogger.info("Bundle confirmation mode", {
     grpcActive: grpcState.active,
     bundleId,
   });
@@ -731,7 +743,7 @@ async function confirmBundleOnChain({
 
   while (Date.now() - startedAt < BUNDLE_CONFIRM_TIMEOUT_MS) {
     if (grpcState.result?.has(currentSignatures[0])) {
-      logger.info("Bundle confirmed via gRPC", {
+      bundleLogger.info("Bundle confirmed via gRPC", {
         bundleId: currentBundleId,
         signature: currentSignatures[0],
         elapsedMs: Date.now() - startedAt,
@@ -744,7 +756,9 @@ async function confirmBundleOnChain({
       BUNDLE_STATUS_CHECK_INTERVAL_MS
     ) {
       lastBundleStatusCheckAt = Date.now();
-      const bundleStatusResult = await getBundleStatuses([currentBundleId]);
+      const bundleStatusResult = await getBundleStatuses([currentBundleId], {
+        ...jitoClientLogOptions,
+      });
       if (bundleStatusResult.ok) {
         const match = bundleStatusResult.value.bundles.find(
           (entry) => entry.bundleId === currentBundleId
@@ -764,7 +778,7 @@ async function confirmBundleOnChain({
             data: eventData,
           });
           if (match.err) {
-            logger.warn("Bundle landed with on-chain error", eventData);
+            bundleLogger.warn("Bundle landed with on-chain error", eventData);
             throw new Error(
               `Bundle landed but failed on-chain: ${JSON.stringify(match.err)}`
             );
@@ -773,7 +787,7 @@ async function confirmBundleOnChain({
             match.confirmationStatus === "confirmed" ||
             match.confirmationStatus === "finalized"
           ) {
-            logger.info("Bundle landed via getBundleStatuses", eventData);
+            bundleLogger.info("Bundle landed via getBundleStatuses", eventData);
             return currentBundleId;
           }
         }
@@ -817,7 +831,10 @@ async function confirmBundleOnChain({
         lastStatusError = null;
         const inflightResult = await getInflightBundleStatuses(
           [currentBundleId],
-          { preferEndpoint: currentBundleEndpoint }
+          {
+            preferEndpoint: currentBundleEndpoint,
+            ...jitoClientLogOptions,
+          }
         );
         if (inflightResult.ok) {
           const matchedStatus =
@@ -838,7 +855,7 @@ async function confirmBundleOnChain({
             ? `${lastInflightStatus.status}:${lastInflightStatus.landedSlot}:${lastInflightStatus.endpoint}:${lastInflightStatus.contextSlot}`
             : "missing";
           if (inflightStatusKey !== lastLoggedInflightStatus) {
-            logger.info("Bundle inflight status", {
+            bundleLogger.info("Bundle inflight status", {
               bundleId: currentBundleId,
               bundleEndpoint: currentBundleEndpoint,
               elapsedMs: Date.now() - startedAt,
@@ -865,7 +882,7 @@ async function confirmBundleOnChain({
           lastInflightStatus = null;
           lastInflightStatusError = inflightResult.error;
           if (lastInflightStatusError !== lastLoggedInflightStatusError) {
-            logger.warn("Jito inflight status check error", {
+            bundleLogger.warn("Jito inflight status check error", {
               bundleId: currentBundleId,
               error: lastInflightStatusError,
               elapsedMs: Date.now() - startedAt,
@@ -892,7 +909,7 @@ async function confirmBundleOnChain({
 
         const summaryKey = `${summary.foundCount}:${summary.confirmedCount}:${summary.failedCount}:${summary.notFoundCount}:${summary.createStatus}:${lastInflightStatus?.status ?? "unknown"}:${lastInflightStatus?.landedSlot ?? "none"}`;
         if (summaryKey !== lastLoggedSummary) {
-          logger.info("Bundle confirmation summary", {
+          bundleLogger.info("Bundle confirmation summary", {
             bundleId: currentBundleId,
             bundleEndpoint: currentBundleEndpoint,
             elapsedMs: Date.now() - startedAt,
@@ -927,7 +944,7 @@ async function confirmBundleOnChain({
           );
         }
         if (lastInflightStatus?.status === "Landed") {
-          logger.info("Bundle landed via inflight status", {
+          bundleLogger.info("Bundle landed via inflight status", {
             bundleId: currentBundleId,
             landedSlot: lastInflightStatus.landedSlot,
             elapsedMs: Date.now() - startedAt,
@@ -935,7 +952,7 @@ async function confirmBundleOnChain({
           return currentBundleId;
         }
         if (summary.createError) {
-          logger.warn("Bundle create failed", {
+          bundleLogger.warn("Bundle create failed", {
             bundleId: currentBundleId,
             createError: summary.createError,
             elapsedMs: Date.now() - startedAt,
@@ -956,7 +973,7 @@ async function confirmBundleOnChain({
           rebuildAndResend &&
           !inflightPending
         ) {
-          logger.warn("Blockhash expired, rebuilding bundle", {
+          bundleLogger.warn("Blockhash expired, rebuilding bundle", {
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: blockhashAge,
@@ -989,7 +1006,7 @@ async function confirmBundleOnChain({
             continue;
           } catch (rebuildError) {
             const msg = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
-            logger.warn("Bundle rebuild failed", {
+            bundleLogger.warn("Bundle rebuild failed", {
               bundleId: currentBundleId,
               error: msg,
               elapsedMs: Date.now() - startedAt,
@@ -1003,7 +1020,7 @@ async function confirmBundleOnChain({
           !inflightPending &&
           Date.now() - lastResendAt > BUNDLE_RESEND_INTERVAL_MS
         ) {
-          logger.warn("Bundle resend triggered", {
+          bundleLogger.warn("Bundle resend triggered", {
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: blockhashAge,
@@ -1026,7 +1043,7 @@ async function confirmBundleOnChain({
           const resent = await sendBundleWithRetries();
           currentBundleId = resent.bundleId;
           currentBundleEndpoint = resent.endpoint;
-          logger.info("Bundle resent", {
+          bundleLogger.info("Bundle resent", {
             previousBundleId,
             previousEndpoint,
             bundleId: currentBundleId,
@@ -1054,7 +1071,7 @@ async function confirmBundleOnChain({
         }
         lastStatusError = `${primaryError}${fallbackErrorText}`;
         if (lastStatusError !== lastLoggedStatusError) {
-          logger.warn("Bundle status check error", {
+          bundleLogger.warn("Bundle status check error", {
             bundleId: currentBundleId,
             error: lastStatusError,
             elapsedMs: Date.now() - startedAt,
@@ -1076,7 +1093,7 @@ async function confirmBundleOnChain({
             BUNDLE_CONFIRM_INTERVAL_BACKOFF_MS * rateLimitCount,
             BUNDLE_CONFIRM_TIMEOUT_MS / 10
           );
-          logger.info("Rate limit detected, backing off", {
+          bundleLogger.info("Rate limit detected, backing off", {
             rateLimitCount,
             nextIntervalMs: currentInterval,
           });

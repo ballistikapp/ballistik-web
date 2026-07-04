@@ -29,6 +29,22 @@ Each log line is JSON with:
 - `service` or subsystem tag for non-request work
 - `durationMs` on operation completion/failure logs where timing is relevant
 - Entity identifiers (`launchId`, `exitId`, `sessionId`) for domain workflows
+- Launch background jobs and Solana bundle code should include `launchId` on stdout logs via `logger.child({ launchId, subsystem })`
+
+## Launch Debug File Logging
+
+Optional JSONL file logging for local test runs lives in `lib/test-run-log.ts`:
+
+- Enable with `TEST_RUN_LOG_ENABLED=true`
+- Optional `TEST_RUN_ID` and `TEST_RUN_LOG_PATH` override the default `logs/test-runs/<runId>.jsonl`
+- `persistLaunchLog()` and other domain log writers also append mirrored events when enabled
+
+Use this for reconstructing a full launch attempt from a single file during bundled-launch debugging. Production relies on stdout (Railway) plus `LaunchLog` rows.
+
+## Launch Failure Stack Traces
+
+- `LaunchLog` ERROR rows remain user-facing: message plus structured `data` without stack traces
+- Operational `logger.error("Launch failed", ...)` in `launch.service.ts` includes `errorStack` when the caught value is an `Error`
 
 ## Usage
 - Base logger: `import { logger } from "@/lib/logger"`
