@@ -626,6 +626,8 @@ async function appendBundleTelemetryLog(
 
   switch (event.type) {
     case "bundle_transactions_profiled":
+      // Single write via appendLog; the previous extra appendServerEvent
+      // duplicated this large payload in the run log.
       await appendLog(
         launchId,
         "INFO",
@@ -633,14 +635,51 @@ async function appendBundleTelemetryLog(
         "create",
         shared
       );
-      await testRunLogService.appendServerEvent({
-        eventType: "launch_step",
-        source: "jito-bundle",
-        action: "bundle.transactionsProfiled",
+      return;
+    case "bundle_sequential_simulation": {
+      const failed =
+        event.data.status === "ok" &&
+        (event.data.summaryError !== null ||
+          event.data.failingTxIndex !== null);
+      await appendLog(
         launchId,
-        status: "INFO",
-        actualValue: shared,
-      });
+        failed ? "ERROR" : "INFO",
+        failed
+          ? "Bundle sequential simulation failed"
+          : event.data.status === "ok"
+            ? "Bundle sequential simulation passed"
+            : "Bundle sequential simulation skipped",
+        "create",
+        shared
+      );
+      return;
+    }
+    case "bundle_inflight_status":
+      await appendLog(
+        launchId,
+        "INFO",
+        "Bundle inflight status",
+        "create",
+        shared
+      );
+      return;
+    case "bundle_dropped_by_engine":
+      await appendLog(
+        launchId,
+        "WARN",
+        "Bundle dropped by block engine, resending",
+        "create",
+        shared
+      );
+      return;
+    case "bundle_send_rejections":
+      await appendLog(
+        launchId,
+        "WARN",
+        "Jito bundle send rejected by one or more endpoints",
+        "create",
+        shared
+      );
       return;
     case "bundle_tip_escalated":
       await appendLog(

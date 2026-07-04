@@ -11,9 +11,9 @@ import { getPumpEventParser } from "@/server/solana/pump/idl";
 interface RawTradeEventData {
   mint: PublicKey;
   user: PublicKey;
-  solAmount: BN;
-  tokenAmount: BN;
-  isBuy: boolean;
+  sol_amount: BN;
+  token_amount: BN;
+  is_buy: boolean;
 }
 
 export interface PumpTradeEvent {
@@ -42,8 +42,8 @@ export function parsePumpTradeEvents(
       const data = event.data as RawTradeEventData;
       const mint = data.mint.toBase58();
       const user = data.user.toBase58();
-      const solRaw = BigInt(data.solAmount.toString());
-      const tokenRaw = BigInt(data.tokenAmount.toString());
+      const solRaw = BigInt(data.sol_amount.toString());
+      const tokenRaw = BigInt(data.token_amount.toString());
 
       if (mint !== tokenPublicKey) {
         continue;
@@ -52,7 +52,7 @@ export function parsePumpTradeEvents(
       events.push({
         mint,
         user,
-        isBuy: data.isBuy,
+        isBuy: data.is_buy,
         solAmount: Number(solRaw) / LAMPORTS_PER_SOL,
         tokenAmount: Number(tokenRaw) / tokenDivisor,
       });

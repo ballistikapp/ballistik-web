@@ -14,7 +14,10 @@ import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 const filterComputeBudget = (ixs: TransactionInstruction[]) =>
   ixs.filter((ix) => !ix.programId.equals(ComputeBudgetProgram.programId));
 
-const BUNDLE_COMPUTE_UNITS = 800_000;
+// Sized from measured usage (max ~193k CU for create+dev-buy, ~13k for buy
+// txs) with generous margin. Lower requested CU improves Jito auction
+// priority: bundles are ranked by tip / requested CU.
+const BUNDLE_COMPUTE_UNITS = 400_000;
 const MAX_RAW_TRANSACTION_BYTES = 1232;
 const SIZE_ESTIMATE_BLOCKHASH = "11111111111111111111111111111111";
 

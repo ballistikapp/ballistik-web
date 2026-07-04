@@ -55,6 +55,10 @@ type JitoInflightBundleStatusesResult =
       ok: true;
       value: JitoInflightBundleStatuses;
       endpoint: string;
+      // True when the responding endpoint is the requested preferEndpoint.
+      // An "Invalid" status from another region is inconclusive — only the
+      // block engine that accepted the bundle tracks it while in-flight.
+      matchedPreferred: boolean;
     }
   | { ok: false; error: string };
 
@@ -261,6 +265,21 @@ function setPreferredEndpoint(endpoint: string) {
   state.preferredEndpoint = endpoint;
 }
 
+// Move the preferred endpoint to the next region so the following sendBundle
+// starts elsewhere. Used when a block engine accepted a bundle but dropped it
+// (sustained "Invalid" inflight status from the receiving endpoint).
+export function rotatePreferredEndpointAwayFrom(endpoint: string) {
+  const state = getJitoState();
+  const clients = state.clients;
+  if (clients.length <= 1) {
+    return state.preferredEndpoint;
+  }
+  const index = clients.findIndex((entry) => entry.endpoint === endpoint);
+  const nextIndex = index < 0 ? 0 : (index + 1) % clients.length;
+  state.preferredEndpoint = clients[nextIndex].endpoint;
+  return state.preferredEndpoint;
+}
+
 function getBundleRpcUrl(baseUrl: string) {
   return `${baseUrl}/api/v1/bundles`;
 }
@@ -412,12 +431,15 @@ export async function getTipAccount(options?: JitoClientLogOptions) {
   return pickStaticTipAccount();
 }
 
+export type JitoSendRejection = { endpoint: string; error: string };
+
 export async function sendBundle(
   bundleToSend: import("jito-ts").bundle.Bundle,
   options?: JitoClientLogOptions
 ) {
   const logContext = jitoClientLogContext(options);
   let lastError: JitoSendResult | null = null;
+  const rejections: JitoSendRejection[] = [];
   for (const entry of orderedClients()) {
     try {
       const response = (await entry.client.sendBundle(
@@ -425,10 +447,11 @@ export async function sendBundle(
       )) as JitoSendResult;
       if (response.ok) {
         setPreferredEndpoint(entry.endpoint);
-        return { ...response, endpoint: entry.endpoint };
+        return { ...response, endpoint: entry.endpoint, rejections };
       }
       const message = normalizeError(response.error);
       maybeRecordCooldown(entry.endpoint, message);
+      rejections.push({ endpoint: entry.endpoint, error: message });
       lastError = {
         ok: false,
         error: message ? `endpoint=${entry.endpoint} ${message}` : message,
@@ -441,6 +464,7 @@ export async function sendBundle(
     } catch (error) {
       const message = normalizeError(error);
       maybeRecordCooldown(entry.endpoint, message);
+      rejections.push({ endpoint: entry.endpoint, error: message });
       lastError = {
         ok: false,
         error: message ? `endpoint=${entry.endpoint} ${message}` : message,
@@ -452,7 +476,9 @@ export async function sendBundle(
       });
     }
   }
-  return lastError ?? { ok: false, error: "Jito bundle send failed" };
+  return lastError
+    ? { ...lastError, rejections }
+    : { ok: false as const, error: "Jito bundle send failed", rejections };
 }
 
 export async function getInflightBundleStatuses(
@@ -484,6 +510,8 @@ export async function getInflightBundleStatuses(
         ok: true,
         value: parsed,
         endpoint: entry.endpoint,
+        matchedPreferred:
+          preferEndpoint === null || entry.endpoint === preferEndpoint,
       };
     } catch (error) {
       const message = normalizeError(error);

@@ -20,10 +20,10 @@ export type GlobalSnapshot = {
 };
 
 interface GlobalAccountData {
-  feeBasisPoints: BN;
-  creatorFeeBasisPoints: BN;
-  buybackBasisPoints: BN;
-  buybackFeeRecipients: PublicKey[];
+  fee_basis_points: BN;
+  creator_fee_basis_points: BN;
+  buyback_basis_points: BN;
+  buyback_fee_recipients: PublicKey[];
 }
 
 const GLOBAL_TTL_MS = 5 * 60 * 1000;
@@ -47,10 +47,10 @@ async function fetchGlobalSnapshot(): Promise<GlobalSnapshot> {
   );
 
   return {
-    feeBasisPoints: BigInt(decoded.feeBasisPoints.toString()),
-    creatorFeeBasisPoints: BigInt(decoded.creatorFeeBasisPoints.toString()),
-    buybackBasisPoints: BigInt(decoded.buybackBasisPoints.toString()),
-    buybackFeeRecipients: decoded.buybackFeeRecipients.map(
+    feeBasisPoints: BigInt(decoded.fee_basis_points.toString()),
+    creatorFeeBasisPoints: BigInt(decoded.creator_fee_basis_points.toString()),
+    buybackBasisPoints: BigInt(decoded.buyback_basis_points.toString()),
+    buybackFeeRecipients: decoded.buyback_fee_recipients.map(
       (p) => new PublicKey(p)
     ),
   };

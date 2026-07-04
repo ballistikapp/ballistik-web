@@ -4,6 +4,7 @@ import { z } from "zod";
 const envSchema = z.object({
   DATABASE_URL: z.string().min(1),
   SOLANA_RPC_URL: z.string().min(1),
+  HELIUS_RPC_URL: z.string().url().optional(),
   SHYFT_API_KEY: z.string().min(1),
   SHYFT_GRPC_TOKEN: z.string().min(1).optional(),
   GRPC_ACCESS_MODE: z.enum(["off", "pro", "all"]).default("pro"),
@@ -62,6 +63,7 @@ export const getEnv = (): Env => {
   cachedEnv = envSchema.parse({
     DATABASE_URL: process.env.DATABASE_URL,
     SOLANA_RPC_URL: process.env.SOLANA_RPC_URL,
+    HELIUS_RPC_URL: process.env.HELIUS_RPC_URL,
     SHYFT_API_KEY: process.env.SHYFT_API_KEY,
     SHYFT_GRPC_TOKEN: process.env.SHYFT_GRPC_TOKEN,
     GRPC_ACCESS_MODE: process.env.GRPC_ACCESS_MODE,
