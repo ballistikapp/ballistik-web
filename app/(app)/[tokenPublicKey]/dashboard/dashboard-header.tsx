@@ -21,6 +21,7 @@ interface TokenData {
   twitterUrl: string | null;
   telegramUrl: string | null;
   websiteUrl: string | null;
+  isMayhemMode?: boolean;
 }
 
 interface DashboardHeaderProps {
@@ -86,6 +87,11 @@ export function DashboardHeader({
               <Badge variant="secondary" className="text-xs font-mono">
                 ${token.symbol}
               </Badge>
+              {token.isMayhemMode && (
+                <Badge className="text-xs bg-amber-500/15 text-amber-500 hover:bg-amber-500/15">
+                  Mayhem
+                </Badge>
+              )}
             </div>
             <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
               <span className="font-mono">

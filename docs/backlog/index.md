@@ -72,7 +72,15 @@
 
 ### Bundle ALT Expansion
 
-- Add ALT support to expand bundle capacity: build transactions to collect accounts, create the lookup table, wait for propagation, compile v0 messages, then increase per-transaction buys after size validation.
+- ~~Add ALT support to expand bundle capacity~~ — **Done** for Mayhem-mode launches: `server/solana/pump/launch-alt.ts` builds a per-launch dynamic ALT, threaded through `bundle-transaction-builder.ts` and `jito-bundle.ts`, raising follow-up-transaction buys per tx from 2 to 4 (validated against real serialized size). See `docs/implementation/bundle-implementation.md`.
+- **Remaining**: `bundle-create-and-buy.ts` only builds this ALT when `isMayhemMode` is set. Extending it to all bundle launches (not just Mayhem ones) is a small follow-up — same code path, just build the ALT unconditionally.
+
+### Mayhem Mode Fast-Follows
+
+- Volume bot support for Mayhem-mode (Token-2022) tokens: `volume-bot-worker.ts` and `volume-bot.service.ts` trade loops are not yet Token-2022-aware. Currently blocked server-side (`AppError` in `startSession`) and hidden/disabled in the UI.
+- `holding-sol-recovery.ts` is not yet Token-2022-aware for Mayhem mints.
+- Buying more tokens into holdings for an existing Mayhem token (beyond the dev/creator buy at launch) is not covered.
+- See `docs/implementation/launch-implementation.md` "Mayhem Mode" section for the full current scope.
 
 ### Logging External Transport
 

@@ -2,6 +2,7 @@ import {
   Keypair,
   TransactionMessage,
   VersionedTransaction,
+  type AddressLookupTableAccount,
 } from "@solana/web3.js";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
@@ -12,8 +13,13 @@ import {
 } from "@/server/solana/jito-bundle";
 import {
   buildCreateTokenTransaction,
+  buildBuyTokenTransaction,
   type PumpMetadataUpload,
 } from "@/server/solana/pump/transactions";
+import {
+  createDynamicLaunchAlt,
+  computeLaunchAltAddresses,
+} from "@/server/solana/pump/launch-alt";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { settleSignature } from "@/server/services/app-transaction-settler";
 import { mapPumpError } from "@/server/solana/pump/errors";
@@ -30,6 +36,7 @@ type BundleLaunchInput = {
   tipper: Keypair;
   tipLamports: number;
   enableGrpc?: boolean;
+  isMayhemMode?: boolean;
   onBundleEvent?: (event: BundleTelemetryEvent) => void | Promise<void>;
   adaptiveTipEscalation?: {
     enabled?: boolean;
@@ -85,10 +92,28 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     creatorBuyLamports: input.creatorBuyAmountLamport.toString(),
     tipLamports: input.tipLamports,
   });
+  const isMayhemMode = input.isMayhemMode ?? false;
+  let altAccounts: AddressLookupTableAccount[] = [];
+  if (isMayhemMode) {
+    const altAddresses = await computeLaunchAltAddresses(
+      input.mint.publicKey,
+      input.creator.publicKey,
+      { isMayhemMode: true }
+    );
+    const alt = await createDynamicLaunchAlt(input.creator, altAddresses, logContext);
+    altAccounts = [alt];
+    logger.info("Mayhem launch ALT ready for bundle", {
+      ...logContext,
+      altAddress: alt.key.toBase58(),
+      addressCount: alt.state.addresses.length,
+    });
+  }
+
   const { createTx, metadataUri } = await buildCreateTokenTransaction(
     input.creator,
     input.mint,
-    input.metadata
+    input.metadata,
+    { isMayhemMode }
   );
   logger.info("Create transaction prepared", {
     ...logContext,
@@ -158,7 +183,23 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     input.mint.publicKey,
     buyAmountsLamport,
     input.creator.publicKey,
-    { launchId: input.launchId }
+    {
+      launchId: input.launchId,
+      altAccounts,
+      ...(isMayhemMode
+        ? {
+            buildBuyTransaction: (buyer, mint, amount, creator) =>
+              buildBuyTokenTransaction(
+                buyer,
+                mint,
+                amount,
+                creator,
+                undefined,
+                { isMayhemMode: true }
+              ),
+          }
+        : {}),
+    }
   );
   if (buyBuildFailures.length > 0) {
     logger.warn("Bundle buy build completed with failures", {
@@ -267,6 +308,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
         onEvent: input.onBundleEvent,
         adaptiveTipEscalation: input.adaptiveTipEscalation,
         launchId: input.launchId,
+        altAccounts,
       }
     );
 

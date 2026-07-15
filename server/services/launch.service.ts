@@ -45,6 +45,7 @@ import {
   buildCreateAndDevBuyVersionedTransaction,
   type PumpMetadataUpload,
 } from "@/server/solana/pump/transactions";
+import { assertMayhemCreateAllowed } from "@/server/solana/pump/global-account";
 import { grpcManager } from "@/server/solana/grpc-manager";
 import { shyftCallbackService } from "@/server/services/shyft-callback.service";
 import { testRunLogService } from "@/server/services/test-run-log.service";
@@ -2326,6 +2327,7 @@ async function persistTokenPending(
           publicKey: mintPublicKey,
           privateKey: mintPrivateKey,
           status: "PENDING",
+          isMayhemMode: input.mayhemMode ?? false,
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
           description: composeTokenDescription(input) || null,
@@ -4086,8 +4088,14 @@ export const launchService = {
         bundlerBuyAmountSol,
         bundlerBuyVariancePercent,
         distributionWalletMultiplier,
+        mayhemMode: input.mayhemMode ?? false,
         durationMs: Date.now() - validationStartedAt,
       });
+
+      if (input.mayhemMode) {
+        await assertMayhemCreateAllowed(true);
+        await appendLog(launchId, "INFO", "Mayhem mode preflight passed", "validate");
+      }
 
       await setStep(launchId, 6, "wallets", "Loading wallets");
 
@@ -4369,6 +4377,7 @@ export const launchService = {
           buyAmountsLamport,
           tipper: mainWalletKeypair,
           tipLamports: baseTipLamports,
+          isMayhemMode: input.mayhemMode ?? false,
           adaptiveTipEscalation: {
             enabled: baseTipLamports > 0,
             multiplier: 2,
@@ -4452,7 +4461,8 @@ export const launchService = {
               mintKeypair,
               metadata,
               toLamports(devBuyAmountSol),
-              BigInt(1)
+              BigInt(1),
+              { isMayhemMode: input.mayhemMode ?? false }
             );
           createSignature = await connection.sendRawTransaction(
             versionedTx.serialize(),
@@ -4466,7 +4476,8 @@ export const launchService = {
           const { createTx } = await buildCreateTokenTransaction(
             devWalletKeypair,
             mintKeypair,
-            metadata
+            metadata,
+            { isMayhemMode: input.mayhemMode ?? false }
           );
           if (!createTx.feePayer) {
             createTx.feePayer = devWalletKeypair.publicKey;

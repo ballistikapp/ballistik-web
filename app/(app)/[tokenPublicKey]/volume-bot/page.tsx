@@ -59,12 +59,24 @@ export default function VolumeBotPage() {
         title="Volume Bot Sessions"
         rightContent={
           <div className="flex w-full flex-col items-start gap-3 text-left text-muted-foreground md:items-end md:text-right">
-            <Button asChild size="lg">
-              <Link href={newRunHref}>
-                <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
-                <span className="font-semibold">New Session</span>
-              </Link>
+            <Button asChild size="lg" disabled={tokenData.isMayhemMode}>
+              {tokenData.isMayhemMode ? (
+                <span>
+                  <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
+                  <span className="font-semibold">New Session</span>
+                </span>
+              ) : (
+                <Link href={newRunHref}>
+                  <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
+                  <span className="font-semibold">New Session</span>
+                </Link>
+              )}
             </Button>
+            {tokenData.isMayhemMode && (
+              <p className="text-xs text-amber-500">
+                Not yet supported for Mayhem-mode tokens.
+              </p>
+            )}
           </div>
         }
       />

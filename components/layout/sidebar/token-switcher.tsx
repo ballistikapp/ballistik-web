@@ -137,9 +137,16 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
             <span className="font-semibold text-sm truncate">
               {selectedToken?.name}
             </span>
-            <Badge variant="secondary" className="text-xs font-mono w-fit">
-              ${selectedToken?.symbol}
-            </Badge>
+            <div className="flex items-center gap-1">
+              <Badge variant="secondary" className="text-xs font-mono w-fit">
+                ${selectedToken?.symbol}
+              </Badge>
+              {selectedToken?.isMayhemMode && (
+                <Badge className="text-xs bg-amber-500/15 text-amber-500 hover:bg-amber-500/15 w-fit">
+                  Mayhem
+                </Badge>
+              )}
+            </div>
           </div>
           <ChevronsUpDown className="ml-auto shrink-0 opacity-50" />
         </SidebarMenuButton>
@@ -181,6 +188,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                     <span className="font-medium truncate">{token.name}</span>
                     <span className="text-muted-foreground text-xs font-mono truncate">
                       ${token.symbol}
+                      {token.isMayhemMode && " · Mayhem"}
                     </span>
                   </div>
                   <Check

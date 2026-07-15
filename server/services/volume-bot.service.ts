@@ -354,7 +354,7 @@ const resolveEligibleWallets = async (
 ) => {
   const token = await prisma.token.findFirst({
     where: { publicKey: tokenPublicKey, userId },
-    select: { publicKey: true, symbol: true },
+    select: { publicKey: true, symbol: true, isMayhemMode: true },
   });
 
   if (!token) {
@@ -403,6 +403,12 @@ export const volumeBotService = {
       input.tokenPublicKey,
       user.id
     );
+    if (token.isMayhemMode) {
+      throw new AppError(
+        "Volume bot is not yet supported for Mayhem-mode tokens (Token-2022). This is a known gap, coming in a fast-follow.",
+        400
+      );
+    }
     const realtimeAccess = grpcAccessService.getFeatureAccess(
       user,
       "volume-bot-realtime"

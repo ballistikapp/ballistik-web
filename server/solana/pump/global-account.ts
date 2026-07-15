@@ -5,6 +5,7 @@ import { PublicKey } from "@solana/web3.js";
 import { getEnv } from "@/lib/config/env";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
+import { AppError } from "@/server/errors";
 import {
   getPumpAccountsCoder,
   PUMP_PROGRAM_ID,
@@ -17,6 +18,10 @@ export type GlobalSnapshot = {
   creatorFeeBasisPoints: bigint;
   buybackBasisPoints: bigint;
   buybackFeeRecipients: PublicKey[];
+  createV2Enabled: boolean;
+  mayhemModeEnabled: boolean;
+  reservedFeeRecipient: PublicKey;
+  reservedFeeRecipients: PublicKey[];
 };
 
 interface GlobalAccountData {
@@ -24,6 +29,35 @@ interface GlobalAccountData {
   creator_fee_basis_points: BN;
   buyback_basis_points: BN;
   buyback_fee_recipients: PublicKey[];
+  create_v2_enabled: boolean;
+  mayhem_mode_enabled: boolean;
+  reserved_fee_recipient: PublicKey;
+  reserved_fee_recipients: PublicKey[];
+}
+
+export type BondingCurveSnapshot = {
+  creator: PublicKey;
+  isMayhemMode: boolean;
+  complete: boolean;
+};
+
+interface BondingCurveAccountData {
+  creator: PublicKey;
+  is_mayhem_mode: boolean;
+  complete: boolean;
+}
+
+/** Decodes a `BondingCurve` account. Used to decide token-program / fee-recipient routing for buy/sell. */
+export function decodeBondingCurve(data: Buffer): BondingCurveSnapshot {
+  const decoded = getPumpAccountsCoder().decode<BondingCurveAccountData>(
+    "BondingCurve",
+    data
+  );
+  return {
+    creator: new PublicKey(decoded.creator),
+    isMayhemMode: decoded.is_mayhem_mode,
+    complete: decoded.complete,
+  };
 }
 
 const GLOBAL_TTL_MS = 5 * 60 * 1000;
@@ -51,6 +85,12 @@ async function fetchGlobalSnapshot(): Promise<GlobalSnapshot> {
     creatorFeeBasisPoints: BigInt(decoded.creator_fee_basis_points.toString()),
     buybackBasisPoints: BigInt(decoded.buyback_basis_points.toString()),
     buybackFeeRecipients: decoded.buyback_fee_recipients.map(
+      (p) => new PublicKey(p)
+    ),
+    createV2Enabled: decoded.create_v2_enabled,
+    mayhemModeEnabled: decoded.mayhem_mode_enabled,
+    reservedFeeRecipient: new PublicKey(decoded.reserved_fee_recipient),
+    reservedFeeRecipients: decoded.reserved_fee_recipients.map(
       (p) => new PublicKey(p)
     ),
   };
@@ -110,6 +150,30 @@ export async function getBuybackFeeRecipients(): Promise<PublicKey[]> {
   if (fromEnv) return fromEnv;
   const snapshot = await getGlobalSnapshot();
   return snapshot.buybackFeeRecipients;
+}
+
+/** Mayhem-mode trades route protocol fees to the reserved pool instead of the standard buyback pool. */
+export async function getReservedFeeRecipients(): Promise<PublicKey[]> {
+  const snapshot = await getGlobalSnapshot();
+  return snapshot.reservedFeeRecipients;
+}
+
+export async function assertMayhemCreateAllowed(
+  isMayhemMode: boolean
+): Promise<void> {
+  const snapshot = await getGlobalSnapshot();
+  if (!snapshot.createV2Enabled) {
+    throw new AppError(
+      "Token creation is temporarily unavailable: create v2 is disabled on pump.fun.",
+      503
+    );
+  }
+  if (isMayhemMode && !snapshot.mayhemModeEnabled) {
+    throw new AppError(
+      "Mayhem mode is currently disabled on pump.fun for new coins. Please try again later or launch without Mayhem mode.",
+      400
+    );
+  }
 }
 
 export function invalidateGlobalCache(): void {

@@ -11,6 +11,7 @@ import { logger } from "@/lib/logger";
 import {
   buildBuyTokenTransactionRaw,
   buildCreateTokenTransactionRaw,
+  buildCreateTokenV2TransactionRaw,
 } from "@/server/solana/pump/instructions";
 import { getLaunchLookupTable } from "@/server/solana/pump/lookup-table";
 
@@ -69,16 +70,16 @@ async function uploadPumpMetadata(metadata: PumpMetadataUpload) {
 export async function buildCreateTokenTransaction(
   creator: Keypair,
   mint: Keypair,
-  metadata: PumpMetadataUpload
+  metadata: PumpMetadataUpload,
+  options?: { isMayhemMode?: boolean }
 ) {
   const metadataResult = await uploadPumpMetadata(metadata);
   const metadataUri = metadataResult.metadataUri as string;
-  const createTx = await buildCreateTokenTransactionRaw(
-    creator,
-    mint,
-    metadata,
-    metadataUri
-  );
+  const createTx = options?.isMayhemMode
+    ? await buildCreateTokenV2TransactionRaw(creator, mint, metadata, metadataUri, {
+        isMayhemMode: true,
+      })
+    : await buildCreateTokenTransactionRaw(creator, mint, metadata, metadataUri);
   if (!createTx.feePayer) {
     createTx.feePayer = creator.publicKey;
   }
@@ -90,14 +91,16 @@ export async function buildBuyTokenTransaction(
   mint: PublicKey,
   buyAmountLamport: bigint,
   creator?: PublicKey,
-  minTokensOut?: bigint
+  minTokensOut?: bigint,
+  options?: { isMayhemMode?: boolean }
 ): Promise<Transaction> {
   const tx = await buildBuyTokenTransactionRaw(
     buyer,
     mint,
     buyAmountLamport,
     creator,
-    minTokensOut
+    minTokensOut,
+    options
   );
   tx.feePayer = buyer.publicKey;
   return tx;
@@ -114,20 +117,27 @@ export async function buildCreateAndDevBuyVersionedTransaction(
   mint: Keypair,
   metadata: PumpMetadataUpload,
   devBuyAmountLamports: bigint,
-  minTokensOut: bigint = BigInt(1)
+  minTokensOut: bigint = BigInt(1),
+  options?: { isMayhemMode?: boolean }
 ): Promise<CreateAndDevBuyVersionedResult> {
+  const isMayhemMode = options?.isMayhemMode ?? false;
   const metadataResult = await uploadPumpMetadata(metadata);
   const metadataUri = metadataResult.metadataUri as string;
 
   const [createTx, buyTx, alt, { blockhash, lastValidBlockHeight }] =
     await Promise.all([
-      buildCreateTokenTransactionRaw(creator, mint, metadata, metadataUri),
+      isMayhemMode
+        ? buildCreateTokenV2TransactionRaw(creator, mint, metadata, metadataUri, {
+            isMayhemMode: true,
+          })
+        : buildCreateTokenTransactionRaw(creator, mint, metadata, metadataUri),
       buildBuyTokenTransactionRaw(
         creator,
         mint.publicKey,
         devBuyAmountLamports,
         creator.publicKey,
-        minTokensOut
+        minTokensOut,
+        { isMayhemMode }
       ),
       getLaunchLookupTable(),
       getSolanaConnection().getLatestBlockhash("confirmed"),

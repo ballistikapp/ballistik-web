@@ -160,6 +160,7 @@ model Token {
   publicKey String @id @unique
   privateKey String @unique
   status TokenStatus @default(PENDING)
+  isMayhemMode Boolean @default(false)
   name String
   symbol String
   description String?
