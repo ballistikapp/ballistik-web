@@ -44,6 +44,7 @@ interface LaunchOverviewDialogProps {
     bundleBuyEnabled: boolean;
     vanityMint: boolean;
     removeAttribution: boolean;
+    mayhemMode: boolean;
     bundlerWalletCount: number;
     bundlerBuyAmountSol: number;
     bundlerBuyVariancePercent: number;
@@ -323,6 +324,14 @@ export function LaunchOverviewDialog({
                       : "Included by default"}
                   </span>
                 </div>
+                {launchInput.mayhemMode && (
+                  <div className="grid grid-cols-[140px_1fr] gap-2">
+                    <span className="text-muted-foreground">Mayhem Mode</span>
+                    <span className="font-medium text-amber-500">
+                      Enabled (beta) — immutable once launched
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
           </div>

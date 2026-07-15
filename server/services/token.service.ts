@@ -24,6 +24,7 @@ const MAX_TOKEN_PAGE_SIZE = 100;
 const tokenPublicSelect = {
   publicKey: true,
   status: true,
+  isMayhemMode: true,
   name: true,
   symbol: true,
   description: true,

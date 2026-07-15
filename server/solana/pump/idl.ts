@@ -73,6 +73,22 @@ function validateIdlSchema(idl: Idl): void {
   assertStructField("TradeEvent", tradeEventFields, "sol_amount", "u64");
   assertStructField("TradeEvent", tradeEventFields, "token_amount", "u64");
   assertStructField("TradeEvent", tradeEventFields, "is_buy", "bool");
+
+  assertStructField("Global", globalFields, "create_v2_enabled", "bool");
+  assertStructField("Global", globalFields, "mayhem_mode_enabled", "bool");
+  assertStructField("Global", globalFields, "reserved_fee_recipient", "pubkey");
+  assertStructField("Global", globalFields, "reserved_fee_recipients", {
+    array: ["pubkey", 7],
+  });
+
+  const bondingCurveFields = findStructFields(idl, "BondingCurve");
+  assertStructField("BondingCurve", bondingCurveFields, "creator", "pubkey");
+  assertStructField(
+    "BondingCurve",
+    bondingCurveFields,
+    "is_mayhem_mode",
+    "bool"
+  );
 }
 
 function loadIdl(): Idl {

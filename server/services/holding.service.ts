@@ -19,13 +19,17 @@ import {
   createCloseAccountInstruction,
   getAccount,
   getAssociatedTokenAddress,
+  TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import bs58 from "bs58";
 import { type WalletType } from "@/lib/generated/prisma/enums";
 import { mapWithConcurrency } from "@/lib/utils/async";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { settleSignature } from "@/server/services/app-transaction-settler";
-import { buildSellTransaction } from "@/server/solana/pump/instructions";
+import {
+  buildSellTransaction,
+  getTokenProgramIdForPumpMint,
+} from "@/server/solana/pump/instructions";
 import { buildBuyTokenTransaction } from "@/server/solana/pump/transactions";
 import {
   computeBuyQuote,
@@ -333,12 +337,18 @@ async function getAllowedWalletsWithKeys(
 async function getTokenBalanceForWallet(
   connection: Connection,
   walletPublicKey: string,
-  mintPublicKey: PublicKey
+  mintPublicKey: PublicKey,
+  tokenProgramId: PublicKey = TOKEN_PROGRAM_ID
 ) {
   try {
     const owner = new PublicKey(walletPublicKey);
-    const ata = await getAssociatedTokenAddress(mintPublicKey, owner);
-    const account = await getAccount(connection, ata);
+    const ata = await getAssociatedTokenAddress(
+      mintPublicKey,
+      owner,
+      false,
+      tokenProgramId
+    );
+    const account = await getAccount(connection, ata, "confirmed", tokenProgramId);
     return account.amount;
   } catch (error) {
     if (
@@ -356,12 +366,18 @@ async function getTokenBalanceForWallet(
 async function tokenAccountExists(
   connection: Connection,
   walletPublicKey: string,
-  mintPublicKey: PublicKey
+  mintPublicKey: PublicKey,
+  tokenProgramId: PublicKey = TOKEN_PROGRAM_ID
 ) {
   try {
     const owner = new PublicKey(walletPublicKey);
-    const ata = await getAssociatedTokenAddress(mintPublicKey, owner);
-    await getAccount(connection, ata);
+    const ata = await getAssociatedTokenAddress(
+      mintPublicKey,
+      owner,
+      false,
+      tokenProgramId
+    );
+    await getAccount(connection, ata, "confirmed", tokenProgramId);
     return true;
   } catch (error) {
     if (
@@ -424,11 +440,17 @@ async function fetchBalancesViaRpc(
         parsed?: { info?: { decimals?: number } };
       }
     )?.parsed?.info?.decimals ?? 9;
+  const tokenProgramId = mintInfo.value?.owner ?? TOKEN_PROGRAM_ID;
 
   const atas = await Promise.all(
     wallets.map(async (wallet) => ({
       wallet,
-      ata: await getAssociatedTokenAddress(mintPubkey, new PublicKey(wallet.publicKey)),
+      ata: await getAssociatedTokenAddress(
+        mintPubkey,
+        new PublicKey(wallet.publicKey),
+        false,
+        tokenProgramId
+      ),
     }))
   );
 
@@ -1325,6 +1347,7 @@ export const holdingService = {
 
     const connection = getSolanaConnection();
     const mintPublicKey = new PublicKey(token.publicKey);
+    const tokenProgramId = await getTokenProgramIdForPumpMint(mintPublicKey);
     const sellPercentage = Math.floor(input.sellPercentage);
     const shouldCloseAta = Boolean(input.closeAta);
     const shouldReturnSolToMainWallet = resolveReturnSolToMainWallet(
@@ -1354,7 +1377,8 @@ export const holdingService = {
           const balance = await getTokenBalanceForWallet(
             connection,
             wallet.publicKey,
-            mintPublicKey
+            mintPublicKey,
+            tokenProgramId
           );
           if (balance <= BigInt(0)) {
             return {
@@ -1557,7 +1581,9 @@ export const holdingService = {
             const owner = Keypair.fromSecretKey(bs58.decode(wallet.privateKey));
             const ata = await getAssociatedTokenAddress(
               mintPublicKey,
-              owner.publicKey
+              owner.publicKey,
+              false,
+              tokenProgramId
             );
             const feePayer =
               mainWalletKeypair &&
@@ -1568,7 +1594,7 @@ export const holdingService = {
             const destination = mainWalletKeypair?.publicKey ?? owner.publicKey;
             let account;
             try {
-              account = await getAccount(connection, ata);
+              account = await getAccount(connection, ata, "confirmed", tokenProgramId);
             } catch (error) {
               if (
                 error instanceof Error &&
@@ -1594,7 +1620,13 @@ export const holdingService = {
             }
 
             const closeTx = new Transaction().add(
-              createCloseAccountInstruction(ata, destination, owner.publicKey)
+              createCloseAccountInstruction(
+                ata,
+                destination,
+                owner.publicKey,
+                [],
+                tokenProgramId
+              )
             );
             const { blockhash, lastValidBlockHeight } =
               await connection.getLatestBlockhash("confirmed");

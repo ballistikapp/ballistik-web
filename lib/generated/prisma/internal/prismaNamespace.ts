@@ -2643,6 +2643,7 @@ export const TokenScalarFieldEnum = {
   publicKey: 'publicKey',
   privateKey: 'privateKey',
   status: 'status',
+  isMayhemMode: 'isMayhemMode',
   name: 'name',
   symbol: 'symbol',
   description: 'description',

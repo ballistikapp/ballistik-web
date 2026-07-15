@@ -6,6 +6,7 @@ import {
   Transaction,
   TransactionMessage,
   VersionedTransaction,
+  type AddressLookupTableAccount,
   type SignatureStatus,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -45,11 +46,31 @@ const MAX_BLOCKHASH_REBUILDS = 2;
 // `{ Ok: null }` on success, `{ Err: {...} }` on failure. It is never a bare
 // `null`/`undefined` for a landed bundle, but callers can pass those through
 // too, so treat anything that isn't an explicit `Err` as success.
+//
+// `{ Err: { Retryable: "..." } }` is a Jito status-API infrastructure failure
+// (e.g. "Failed to retrieve information from solana cluster"), not a landed
+// transaction InstructionError. Do not treat it as on-chain failure — keep
+// polling until confirmationStatus/RPC/gRPC resolve the outcome.
+function isJitoBundleStatusRetryable(err: unknown): boolean {
+  if (err === null || err === undefined || typeof err !== "object") {
+    return false;
+  }
+  const record = err as Record<string, unknown>;
+  if (!("Err" in record)) return false;
+  const inner = record.Err;
+  return (
+    inner !== null &&
+    typeof inner === "object" &&
+    "Retryable" in (inner as Record<string, unknown>)
+  );
+}
+
 function isJitoBundleStatusError(err: unknown): boolean {
   if (err === null || err === undefined) return false;
   if (typeof err === "object" && "Ok" in (err as Record<string, unknown>)) {
     return false;
   }
+  if (isJitoBundleStatusRetryable(err)) return false;
   return true;
 }
 
@@ -90,6 +111,7 @@ type SendJitoBundleOptions = {
   adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
   enableGrpc?: boolean;
   launchId?: string;
+  altAccounts?: AddressLookupTableAccount[];
 };
 
 type SimulateTransactionResult = {
@@ -233,12 +255,14 @@ export async function sendJitoBundle(
   let { blockhash } = await connection.getLatestBlockhash("confirmed");
   bundleLogger.info("Bundle blockhash fetched", { blockhash });
   let currentBundleTxs = withTipTransactions(currentTipLamports);
+  const altAccounts = options?.altAccounts ?? [];
   let currentBuild = buildVersionedTransactions(
     currentBundleTxs,
     signers,
     tipper,
     currentTipLamports,
-    blockhash
+    blockhash,
+    altAccounts
   );
   bundleLogger.info("Bundle versioned transactions built", {
     signatureCount: currentBuild.signatures.length,
@@ -499,7 +523,8 @@ export async function sendJitoBundle(
       signers,
       tipper,
       currentTipLamports,
-      blockhash
+      blockhash,
+      altAccounts
     );
     currentProfiles = await profileVersionedTransactions({
       versionedTxs: currentBuild.versionedTxs,
@@ -596,7 +621,8 @@ function buildVersionedTransactions(
   signers: Keypair[][],
   tipper: Keypair,
   tipLamports: number,
-  blockhash: string
+  blockhash: string,
+  altAccounts: AddressLookupTableAccount[] = []
 ) {
   const versionedTxs: VersionedTransaction[] = [];
   const signatures: string[] = [];
@@ -616,7 +642,7 @@ function buildVersionedTransactions(
       payerKey: tx.feePayer,
       recentBlockhash: blockhash,
       instructions: tx.instructions,
-    }).compileToV0Message();
+    }).compileToV0Message(altAccounts);
 
     const vTx = new VersionedTransaction(messageV0);
     vTx.sign(allSigners);
@@ -898,13 +924,17 @@ async function confirmBundleOnChain({
             type: "bundle_status_check",
             data: eventData,
           });
-          if (isJitoBundleStatusError(match.err)) {
+          if (isJitoBundleStatusRetryable(match.err)) {
+            bundleLogger.warn(
+              "Bundle status check retryable; continuing poll",
+              eventData
+            );
+          } else if (isJitoBundleStatusError(match.err)) {
             bundleLogger.warn("Bundle landed with on-chain error", eventData);
             throw new Error(
               `Bundle landed but failed on-chain: ${JSON.stringify(match.err)}`
             );
-          }
-          if (
+          } else if (
             match.confirmationStatus === "confirmed" ||
             match.confirmationStatus === "finalized"
           ) {

@@ -453,6 +453,35 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - The sticky footer shows the total reclaimable SOL amount on the left.
 - Successful reclaim invalidates `launch.getUserLaunches` so the My Tokens table refreshes immediately.
 
+## Mayhem Mode
+
+Optional, beta pump.fun feature that adds an AI trading agent that autonomously trades the token for its first 24 hours. Toggled via `mayhemMode` on `launchTokenSchema`; persisted as `Token.isMayhemMode` for display/filtering only — the on-chain `BondingCurve.is_mayhem_mode` field decoded via `decodeBondingCurve()` (`server/solana/pump/global-account.ts`) is always the source of truth for transaction-building and fee-routing decisions, never the DB flag.
+
+### Create Flow
+
+- When `mayhemMode` is true, `runLaunchJob` preflight-checks `Global.create_v2_enabled` / `Global.mayhem_mode_enabled` (`assertMayhemCreateAllowed` in `server/solana/pump/global-account.ts`) right after input validation, before wallets/funding — fails fast with a clear `AppError` if pump.fun has disabled create_v2 or Mayhem mode server-side, since pump.fun frames this as experimental beta with no dedicated toggle and can disable it at any time.
+- Token creation uses `create_v2` (`buildCreateTokenV2TransactionRaw` in `server/solana/pump/instructions.ts`) instead of `create`: Token-2022 mint, plus 5 extra fixed accounts (Mayhem program, global params, sol vault, mayhem state, mayhem token vault — PDAs derived in `deriveMayhemCreateV2Accounts`).
+- Cashback is passed as `false` by default for Mayhem creates; not exposed as a separate toggle in this pass.
+- Both the bundle path (`bundle-create-and-buy.ts`) and the non-bundle combined create+dev-buy versioned transaction path (`buildCreateAndDevBuyVersionedTransaction` in `server/solana/pump/transactions.ts`) support `isMayhemMode`.
+- The bundle path additionally builds a per-launch dynamic Address Lookup Table for Mayhem launches (see `docs/implementation/bundle-implementation.md`) because `create_v2`'s extra accounts would otherwise overflow the already-tight bundle transaction size budget.
+
+### Buy/Sell
+
+- `buildBuyTokenTransactionRaw` / `buildSellTransaction` resolve the token program (Token vs Token-2022) per-mint — via the on-chain mint account owner when it exists, or `isMayhemMode`/bonding-curve `is_mayhem_mode` as a fallback when the mint doesn't exist yet (bundle create+buy).
+- Mayhem-mode trades route the primary protocol fee recipient to a random pick from `Global.reserved_fee_recipient`/`reserved_fee_recipients` instead of the standard fixed recipient. The trailing `buyback_fee_recipient` remaining account is unaffected (buyback is a separate mechanism from the Mayhem reserved pool).
+
+### Known Gaps (Fast-Follow)
+
+- **Volume bot**: blocked server-side (`volumeBotService.startSession` throws `AppError` for `Token.isMayhemMode` tokens) and the UI hides/disables the "Start"/"New Session" entry points. `volume-bot-worker.ts`, `volume-bot.service.ts` trade loops, and `holding-sol-recovery.ts` are not yet Token-2022-aware.
+- Buying more tokens into holdings for an existing Mayhem token (as opposed to the dev/creator buy at launch time) is not covered by this pass.
+
+### Key Files (Mayhem-specific)
+
+- `server/solana/pump/instructions.ts` (`buildCreateTokenV2TransactionRaw`, `deriveMayhemCreateV2Accounts`, `getTokenProgramIdForPumpMint`)
+- `server/solana/pump/global-account.ts` (`decodeBondingCurve`, `assertMayhemCreateAllowed`, `getReservedFeeRecipients`)
+- `server/solana/pump/launch-alt.ts`
+- `lib/config/pump-mayhem.config.ts`
+
 ## Test Run Logging
 
 The production-readiness run logging design is documented in `docs/implementation/test-run-logging.md`.

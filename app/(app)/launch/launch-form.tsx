@@ -160,6 +160,7 @@ const formSchema = z
     bundleBuyEnabled: z.boolean(),
     vanityMint: z.boolean(),
     removeAttribution: z.boolean(),
+    mayhemMode: z.boolean(),
     bundlerWalletCount: z
       .number()
       .int()
@@ -629,6 +630,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     bundleBuyEnabled: true,
     vanityMint: true,
     removeAttribution: false,
+    mayhemMode: false,
     bundlerWalletCount: 8,
     bundlerBuyAmountSol: 0.1,
     bundlerBuyVariancePercent: 20,
@@ -709,6 +711,7 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       bundleBuyEnabled: values.bundleBuyEnabled,
       vanityMint: values.vanityMint,
       removeAttribution: values.removeAttribution,
+      mayhemMode: values.mayhemMode,
       bundlerWalletCount: values.bundlerWalletCount,
       bundlerBuyAmountSol: values.bundlerBuyAmountSol,
       bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
@@ -967,6 +970,37 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                           By default, token descriptions include &quot;Launched
                           with ballistik.app&quot; at the end. Enable this to
                           remove that attribution for +0.1 SOL.
+                        </TooltipContent>
+                      </Tooltip>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-3 pt-1">
+                    <form.Field name="mayhemMode">
+                      {(field) => (
+                        <Switch
+                          id="mayhem-mode"
+                          checked={field.state.value}
+                          onCheckedChange={field.handleChange}
+                        />
+                      )}
+                    </form.Field>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="mayhem-mode">Mayhem Mode</Label>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-xs">
+                          Adds a pump.fun AI trading agent that autonomously
+                          trades your token for its first 24 hours to boost
+                          visibility and price discovery. Mints an additional
+                          2B tokens for the agent and uses Token-2022.
+                          Immutable once launched.{" "}
+                          <span className="font-medium text-amber-500">
+                            Beta feature from pump.fun — no guarantees, and
+                            pump.fun may disable it at any time.
+                          </span>{" "}
+                          Volume bot is not yet supported for Mayhem tokens.
                         </TooltipContent>
                       </Tooltip>
                     </div>
@@ -1940,6 +1974,22 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                 {values.removeAttribution
                                   ? "Removed"
                                   : "Included by default"}
+                              </span>
+                            </div>
+                            <div className="grid grid-cols-[140px_1fr] gap-2">
+                              <span className="text-muted-foreground">
+                                Mayhem Mode
+                              </span>
+                              <span
+                                className={
+                                  values.mayhemMode
+                                    ? "font-medium text-amber-500"
+                                    : undefined
+                                }
+                              >
+                                {values.mayhemMode
+                                  ? "Enabled (beta)"
+                                  : "Disabled"}
                               </span>
                             </div>
                           </div>

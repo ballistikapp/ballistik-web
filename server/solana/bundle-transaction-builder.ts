@@ -1,5 +1,6 @@
 import {
   ComputeBudgetProgram,
+  type AddressLookupTableAccount,
   type Keypair,
   type PublicKey,
   Transaction,
@@ -39,7 +40,8 @@ function dedupeSigners(signers: Keypair[]) {
 
 function estimateVersionedTransactionSize(
   tx: Transaction,
-  signers: Keypair[]
+  signers: Keypair[],
+  altAccounts: AddressLookupTableAccount[] = []
 ) {
   if (!tx.feePayer) {
     throw new Error("Cannot estimate size for transaction without fee payer");
@@ -49,7 +51,7 @@ function estimateVersionedTransactionSize(
     payerKey: tx.feePayer,
     recentBlockhash: SIZE_ESTIMATE_BLOCKHASH,
     instructions: tx.instructions,
-  }).compileToV0Message();
+  }).compileToV0Message(altAccounts);
   const versionedTx = new VersionedTransaction(message);
   versionedTx.sign(dedupeSigners(signers));
   return versionedTx.serialize().length;
@@ -135,6 +137,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
   options?: {
     buildBuyTransaction?: BuildBuyTransaction;
     launchId?: string;
+    altAccounts?: AddressLookupTableAccount[];
   }
 ): Promise<[Transaction[], Keypair[][], BundleBuyBuildFailure[]]> {
   const logContext = {
@@ -145,6 +148,7 @@ export async function buildBundleTransactionsForCreateAndBuys(
   const buyBuildFailures: BundleBuyBuildFailure[] = [];
   const buildBuyTransaction =
     options?.buildBuyTransaction ?? buildBuyTokenTransaction;
+  const altAccounts = options?.altAccounts ?? [];
   if (wallets.length !== buyAmountsLamport.length) {
     throw new Error(
       `Bundle buy mismatch: wallets=${wallets.length}, amounts=${buyAmountsLamport.length}`
@@ -172,8 +176,13 @@ export async function buildBundleTransactionsForCreateAndBuys(
   // buy_exact_sol_in uses 18 accounts per buy, which overflows the 1232-byte
   // versioned tx limit at 3 buys/tx without an address lookup table.
   // Combined with Jito's 5-tx bundle limit, this allows up to 9 buyer wallets
-  // (1 creator + 4 follow-up txs × 2 buys). Revisit when launch ALT lands.
-  const buysPerTransaction = 2;
+  // (1 creator + 4 follow-up txs × 2 buys).
+  // When a launch-specific ALT is supplied (see server/solana/pump/launch-alt.ts),
+  // most of the 18 accounts per buy are shared/static and become 1-byte table
+  // lookups instead of 32-byte inline keys, so more buys fit per transaction.
+  // The real serialized size is still validated below before committing to
+  // this grouping.
+  const buysPerTransaction = altAccounts.length > 0 ? 4 : 2;
 
   const firstWallets = wallets.slice(0, firstTransactionBuyCount);
   const firstAmounts = buyAmountsLamport.slice(0, firstTransactionBuyCount);
@@ -230,12 +239,11 @@ export async function buildBundleTransactionsForCreateAndBuys(
     candidateTx.feePayer = firstWallets[0]?.publicKey;
 
     try {
-      const estimatedSize = estimateVersionedTransactionSize(candidateTx, [
-        ...createSigners,
-        ...firstWallets,
-        ...hoistedAtaSigners,
-        wallet,
-      ]);
+      const estimatedSize = estimateVersionedTransactionSize(
+        candidateTx,
+        [...createSigners, ...firstWallets, ...hoistedAtaSigners, wallet],
+        altAccounts
+      );
       return estimatedSize <= MAX_RAW_TRANSACTION_BYTES;
     } catch {
       return false;
@@ -263,6 +271,20 @@ export async function buildBundleTransactionsForCreateAndBuys(
           logContext,
         }
       );
+    if (!tx.feePayer) {
+      tx.feePayer = walletsSlice[0]?.publicKey;
+    }
+    const estimatedSize = estimateVersionedTransactionSize(
+      tx,
+      walletsSlice,
+      altAccounts
+    );
+    if (estimatedSize > MAX_RAW_TRANSACTION_BYTES) {
+      throw new Error(
+        `Bundle follow-up transaction exceeds ${MAX_RAW_TRANSACTION_BYTES} bytes ` +
+          `(${estimatedSize} bytes, ${walletsSlice.length} buys/tx). Lower bundlerWalletCount.`
+      );
+    }
     buyBuildFailures.push(...followUpFailures);
     deferredTransactions.push(tx);
     deferredSignerGroups.push(walletsSlice);

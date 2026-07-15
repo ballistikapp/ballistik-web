@@ -2104,11 +2104,22 @@ export default function VolumeBotStartPage() {
             <Button
               size="lg"
               onClick={handleStart}
-              disabled={startMutation.isPending || !tokenPublicKey || isRunning}
+              disabled={
+                startMutation.isPending ||
+                !tokenPublicKey ||
+                isRunning ||
+                tokenData?.isMayhemMode
+              }
               className="h-12 w-full border border-black px-4 text-xl font-black tracking-tight text-black/90 shadow-lg shadow-lime-400/10 hover:text-black hover:shadow-xl hover:shadow-lime-300/20 sm:w-auto md:text-2xl"
             >
               {startMutation.isPending ? "STARTING..." : "START VOLUME BOT"}
             </Button>
+            {tokenData?.isMayhemMode && (
+              <p className="text-sm text-amber-500">
+                Volume bot is not yet supported for Mayhem-mode tokens
+                (Token-2022). Support is coming in a fast-follow.
+              </p>
+            )}
           </div>
         </div>
       </section>

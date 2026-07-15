@@ -28,6 +28,8 @@ const launchFieldsBase = {
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
+  /** Pump.fun Mayhem mode: create_v2 (Token-2022), AI-agent trading for 24h. Beta, immutable once launched. */
+  mayhemMode: z.boolean().optional().default(false),
   bundlerWalletCount: z
     .number()
     .int()
@@ -77,6 +79,7 @@ const launchPreviewFields = {
   bundleBuyEnabled: z.boolean(),
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
+  mayhemMode: z.boolean().optional().default(false),
   bundlerWalletCount: z
     .number()
     .int()
