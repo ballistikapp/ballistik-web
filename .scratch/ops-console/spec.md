@@ -1,6 +1,6 @@
 # Ops Console v1
 
-Status: ready-for-agent
+Status: implemented
 
 ## Problem Statement
 
