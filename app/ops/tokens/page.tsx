@@ -1,10 +1,5 @@
-import { OpsStubPage } from "@/components/ops/ops-stub-page";
+import { OpsTokensTable } from "@/components/ops/ops-tokens-table";
 
 export default function OpsTokensPage() {
-  return (
-    <OpsStubPage
-      title="Tokens"
-      description="Token browse table ships in a later Ops Console ticket."
-    />
-  );
+  return <OpsTokensTable />;
 }

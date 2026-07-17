@@ -19,6 +19,35 @@ export const opsListLaunchesSchema = opsListBaseSchema.extend({
   sortBy: z.enum(["createdAt", "startedAt", "status"]).default("createdAt"),
 });
 
+export const opsListTokensSchema = opsListBaseSchema.extend({
+  sortBy: z
+    .enum(["createdAt", "name", "symbol", "status"])
+    .default("createdAt"),
+});
+
+export const opsListWalletsSchema = opsListBaseSchema.extend({
+  sortBy: z.enum(["createdAt", "type", "balanceSol"]).default("createdAt"),
+  type: z
+    .enum([
+      "MAIN_WALLET",
+      "DEV",
+      "BUNDLER",
+      "VOLUME",
+      "BUYER",
+      "DISTRIBUTION",
+    ])
+    .optional(),
+  isSystemWallet: z.boolean().optional(),
+});
+
+export const opsGetTokenSchema = z.object({
+  publicKey: publicKeySchema,
+});
+
+export const opsGetWalletSchema = z.object({
+  publicKey: publicKeySchema,
+});
+
 export const opsLookupSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("mainWallet"),
@@ -54,6 +83,12 @@ export type OpsGetOverviewInput = z.infer<typeof opsGetOverviewSchema>;
 export type OpsListUsersInput = z.input<typeof opsListUsersSchema>;
 /** Input shape before Zod defaults (`page`/`pageSize`/`sort*`). */
 export type OpsListLaunchesInput = z.input<typeof opsListLaunchesSchema>;
+/** Input shape before Zod defaults (`page`/`pageSize`/`sort*`). */
+export type OpsListTokensInput = z.input<typeof opsListTokensSchema>;
+/** Input shape before Zod defaults (`page`/`pageSize`/`sort*`). */
+export type OpsListWalletsInput = z.input<typeof opsListWalletsSchema>;
+export type OpsGetTokenInput = z.infer<typeof opsGetTokenSchema>;
+export type OpsGetWalletInput = z.infer<typeof opsGetWalletSchema>;
 export type OpsLookupInput = z.infer<typeof opsLookupSchema>;
 export type OpsGetUserSpineInput = z.infer<typeof opsGetUserSpineSchema>;
 export type OpsGetLaunchAutopsyInput = z.infer<typeof opsGetLaunchAutopsySchema>;

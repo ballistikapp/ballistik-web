@@ -15,6 +15,8 @@ const MAIN_WALLET =
 const MINT = "MintToken111111111111111111111111111111111";
 const DEV_WALLET =
   "DevWallet1111111111111111111111111111111111";
+const SYSTEM_WALLET =
+  "SystemWallet111111111111111111111111111111";
 const LAUNCH_ID = "launch-1";
 
 function restore<T extends object, K extends keyof T>(
@@ -113,12 +115,19 @@ async function setupOpsTest(t: TestContext) {
         publicKey: MAIN_WALLET,
         privateKey: "main-secret",
         type: "MAIN_WALLET" as const,
-        userId: TARGET_USER_ID,
+        // MAIN is owned via mainWalletUser, not Wallet.userId (matches auth create).
+        userId: null as string | null,
         tokenPublicKey: null as string | null,
         balanceSol: 1.5,
         balanceRefreshedAt: new Date("2026-07-01T00:00:00.000Z"),
+        isImported: false,
+        isSystemWallet: false,
         createdAt: new Date("2026-06-01T00:00:00.000Z"),
-        mainWalletUser: { id: TARGET_USER_ID },
+        updatedAt: new Date("2026-06-01T00:00:00.000Z"),
+        mainWalletUser: {
+          id: TARGET_USER_ID,
+          name: "Target User",
+        } as { id: string; name: string } | null,
       },
     ],
     [
@@ -127,11 +136,31 @@ async function setupOpsTest(t: TestContext) {
         publicKey: DEV_WALLET,
         privateKey: "dev-secret",
         type: "DEV" as const,
-        userId: TARGET_USER_ID,
-        tokenPublicKey: MINT,
+        userId: TARGET_USER_ID as string | null,
+        tokenPublicKey: MINT as string | null,
         balanceSol: 0.25,
         balanceRefreshedAt: null as Date | null,
+        isImported: false,
+        isSystemWallet: false,
         createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-02T00:00:00.000Z"),
+        mainWalletUser: null as { id: string } | null,
+      },
+    ],
+    [
+      SYSTEM_WALLET,
+      {
+        publicKey: SYSTEM_WALLET,
+        privateKey: "system-secret",
+        type: "DISTRIBUTION" as const,
+        userId: null as string | null,
+        tokenPublicKey: null as string | null,
+        balanceSol: 10,
+        balanceRefreshedAt: new Date("2026-07-10T00:00:00.000Z"),
+        isImported: false,
+        isSystemWallet: true,
+        createdAt: new Date("2026-05-01T00:00:00.000Z"),
+        updatedAt: new Date("2026-05-01T00:00:00.000Z"),
         mainWalletUser: null as { id: string } | null,
       },
     ],
@@ -145,9 +174,16 @@ async function setupOpsTest(t: TestContext) {
         privateKey: "mint-secret",
         name: "Target Coin",
         symbol: "TGT",
+        description: "A target token",
+        imageUrl: "https://example.com/tgt.png",
+        websiteUrl: "https://example.com",
+        twitterUrl: null as string | null,
+        telegramUrl: null as string | null,
         status: "ACTIVE" as const,
+        isMayhemMode: false,
         userId: TARGET_USER_ID,
         createdAt: new Date("2026-06-02T00:00:00.000Z"),
+        updatedAt: new Date("2026-06-03T00:00:00.000Z"),
         user: {
           id: TARGET_USER_ID,
           name: "Target User",
@@ -279,8 +315,27 @@ async function setupOpsTest(t: TestContext) {
   }) => {
     const token = tokens.get(args.where.publicKey);
     if (!token) return null;
-    if (args.select && "user" in args.select) {
+    if (args.select && "user" in args.select && !("name" in (args.select ?? {}))) {
       return { user: token.user };
+    }
+    if (args.select && "name" in args.select) {
+      return {
+        publicKey: token.publicKey,
+        name: token.name,
+        symbol: token.symbol,
+        description: token.description,
+        imageUrl: token.imageUrl,
+        websiteUrl: token.websiteUrl,
+        twitterUrl: token.twitterUrl,
+        telegramUrl: token.telegramUrl,
+        status: token.status,
+        isMayhemMode: token.isMayhemMode,
+        userId: token.userId,
+        createdAt: token.createdAt,
+        updatedAt: token.updatedAt,
+        user: token.user,
+        privateKey: token.privateKey,
+      };
     }
     return {
       publicKey: token.publicKey,
@@ -291,14 +346,50 @@ async function setupOpsTest(t: TestContext) {
 
   restore(t, prisma.wallet, "findUnique", (async (args: {
     where: { publicKey: string };
+    select?: Record<string, unknown>;
   }) => {
     const wallet = wallets.get(args.where.publicKey);
     if (!wallet) return null;
+    if (args.select && "type" in args.select) {
+      const owner = wallet.userId ? users.get(wallet.userId) : null;
+      const token = wallet.tokenPublicKey
+        ? tokens.get(wallet.tokenPublicKey)
+        : null;
+      return {
+        publicKey: wallet.publicKey,
+        type: wallet.type,
+        userId: wallet.userId,
+        tokenPublicKey: wallet.tokenPublicKey,
+        balanceSol: wallet.balanceSol,
+        balanceRefreshedAt: wallet.balanceRefreshedAt,
+        isImported: wallet.isImported,
+        isSystemWallet: wallet.isSystemWallet,
+        createdAt: wallet.createdAt,
+        updatedAt: wallet.updatedAt,
+        user: owner
+          ? {
+              id: owner.id,
+              name: owner.name,
+            }
+          : null,
+        mainWalletUser: wallet.mainWalletUser,
+        token: token
+          ? {
+              publicKey: token.publicKey,
+              name: token.name,
+              symbol: token.symbol,
+            }
+          : null,
+        privateKey: wallet.privateKey,
+      };
+    }
     return {
       publicKey: wallet.publicKey,
       privateKey: wallet.privateKey,
       userId: wallet.userId,
-      mainWalletUser: wallet.mainWalletUser,
+      mainWalletUser: wallet.mainWalletUser
+        ? { id: wallet.mainWalletUser.id }
+        : null,
     };
   }) as unknown as typeof prisma.wallet.findUnique);
 
@@ -450,9 +541,209 @@ async function setupOpsTest(t: TestContext) {
     }));
   }) as unknown as typeof prisma.user.findMany);
 
-  restore(t, prisma.token, "count", (async () => {
-    return tokens.size;
+  function filterTokens(where?: {
+    OR?: Array<
+      | { publicKey: { contains: string; mode?: string } }
+      | { name: { contains: string; mode?: string } }
+      | { symbol: { contains: string; mode?: string } }
+      | { userId: { contains: string; mode?: string } }
+      | { status: string }
+    >;
+  }) {
+    const or = where?.OR;
+    return [...tokens.values()].filter((token) => {
+      if (!or || or.length === 0) return true;
+      return or.some((clause) => {
+        if ("publicKey" in clause) {
+          return matchesContains(token.publicKey, clause.publicKey.contains);
+        }
+        if ("name" in clause) {
+          return matchesContains(token.name, clause.name.contains);
+        }
+        if ("symbol" in clause) {
+          return matchesContains(token.symbol, clause.symbol.contains);
+        }
+        if ("userId" in clause) {
+          return matchesContains(token.userId, clause.userId.contains);
+        }
+        if ("status" in clause) {
+          return token.status === clause.status;
+        }
+        return false;
+      });
+    });
+  }
+
+  function filterWallets(where?: {
+    type?: string;
+    isSystemWallet?: boolean;
+    OR?: Array<
+      | { publicKey: { contains: string; mode?: string } }
+      | { userId: { contains: string; mode?: string } }
+      | { tokenPublicKey: { contains: string; mode?: string } }
+      | { type: string }
+    >;
+  }) {
+    const or = where?.OR;
+    return [...wallets.values()].filter((wallet) => {
+      if (where?.type && wallet.type !== where.type) return false;
+      if (
+        where?.isSystemWallet !== undefined &&
+        wallet.isSystemWallet !== where.isSystemWallet
+      ) {
+        return false;
+      }
+      if (!or || or.length === 0) return true;
+      return or.some((clause) => {
+        if ("publicKey" in clause) {
+          return matchesContains(wallet.publicKey, clause.publicKey.contains);
+        }
+        if ("userId" in clause) {
+          return matchesContains(wallet.userId, clause.userId.contains);
+        }
+        if ("tokenPublicKey" in clause) {
+          return matchesContains(
+            wallet.tokenPublicKey,
+            clause.tokenPublicKey.contains
+          );
+        }
+        if ("type" in clause) {
+          return wallet.type === clause.type;
+        }
+        return false;
+      });
+    });
+  }
+
+  restore(t, prisma.token, "count", (async (args?: {
+    where?: {
+      OR?: Array<
+        | { publicKey: { contains: string; mode?: string } }
+        | { name: { contains: string; mode?: string } }
+        | { symbol: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { status: string }
+      >;
+    };
+  }) => {
+    if (!args?.where) return tokens.size;
+    return filterTokens(args.where).length;
   }) as unknown as typeof prisma.token.count);
+
+  restore(t, prisma.token, "findMany", (async (args?: {
+    where?: {
+      OR?: Array<
+        | { publicKey: { contains: string; mode?: string } }
+        | { name: { contains: string; mode?: string } }
+        | { symbol: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { status: string }
+      >;
+    };
+    orderBy?: Record<string, "asc" | "desc">;
+    skip?: number;
+    take?: number;
+    select?: Record<string, unknown>;
+  }) => {
+    let rows = filterTokens(args?.where);
+    const orderBy = args?.orderBy ?? {};
+    const [sortKey, sortDir] = Object.entries(orderBy)[0] ?? ["createdAt", "desc"];
+    rows = [...rows].sort((a, b) => {
+      const left = a[sortKey as keyof typeof a];
+      const right = b[sortKey as keyof typeof b];
+      if (left == null && right == null) return 0;
+      if (left == null) return sortDir === "asc" ? -1 : 1;
+      if (right == null) return sortDir === "asc" ? 1 : -1;
+      if (left < right) return sortDir === "asc" ? -1 : 1;
+      if (left > right) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    const skip = args?.skip ?? 0;
+    const take = args?.take ?? rows.length;
+    return rows.slice(skip, skip + take).map((token) => ({
+      publicKey: token.publicKey,
+      name: token.name,
+      symbol: token.symbol,
+      status: token.status,
+      userId: token.userId,
+      createdAt: token.createdAt,
+      user: {
+        id: token.user.id,
+        name: token.user.name,
+      },
+      privateKey: token.privateKey,
+    }));
+  }) as unknown as typeof prisma.token.findMany);
+
+  restore(t, prisma.wallet, "count", (async (args?: {
+    where?: {
+      type?: string;
+      isSystemWallet?: boolean;
+      OR?: Array<
+        | { publicKey: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { tokenPublicKey: { contains: string; mode?: string } }
+        | { type: string }
+      >;
+    };
+  }) => {
+    return filterWallets(args?.where).length;
+  }) as unknown as typeof prisma.wallet.count);
+
+  restore(t, prisma.wallet, "findMany", (async (args?: {
+    where?: {
+      type?: string;
+      isSystemWallet?: boolean;
+      OR?: Array<
+        | { publicKey: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { tokenPublicKey: { contains: string; mode?: string } }
+        | { type: string }
+      >;
+    };
+    orderBy?: Record<string, "asc" | "desc">;
+    skip?: number;
+    take?: number;
+    select?: Record<string, unknown>;
+  }) => {
+    let rows = filterWallets(args?.where);
+    const orderBy = args?.orderBy ?? {};
+    const [sortKey, sortDir] = Object.entries(orderBy)[0] ?? ["createdAt", "desc"];
+    rows = [...rows].sort((a, b) => {
+      const left = a[sortKey as keyof typeof a];
+      const right = b[sortKey as keyof typeof b];
+      if (left == null && right == null) return 0;
+      if (left == null) return sortDir === "asc" ? -1 : 1;
+      if (right == null) return sortDir === "asc" ? 1 : -1;
+      if (left < right) return sortDir === "asc" ? -1 : 1;
+      if (left > right) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    const skip = args?.skip ?? 0;
+    const take = args?.take ?? rows.length;
+    return rows.slice(skip, skip + take).map((wallet) => {
+      const owner = wallet.userId ? users.get(wallet.userId) : null;
+      return {
+        publicKey: wallet.publicKey,
+        type: wallet.type,
+        userId: wallet.userId,
+        tokenPublicKey: wallet.tokenPublicKey,
+        isSystemWallet: wallet.isSystemWallet,
+        isImported: wallet.isImported,
+        balanceSol: wallet.balanceSol,
+        balanceRefreshedAt: wallet.balanceRefreshedAt,
+        createdAt: wallet.createdAt,
+        user: owner
+          ? {
+              id: owner.id,
+              name: owner.name,
+            }
+          : null,
+        mainWalletUser: wallet.mainWalletUser,
+        privateKey: wallet.privateKey,
+      };
+    });
+  }) as unknown as typeof prisma.wallet.findMany);
 
   restore(t, prisma.launch, "count", (async (args?: {
     where?: {
@@ -545,6 +836,7 @@ function assertNoPrivateKeyFields(value: unknown) {
   assert.equal(json.includes("main-secret"), false);
   assert.equal(json.includes("dev-secret"), false);
   assert.equal(json.includes("mint-secret"), false);
+  assert.equal(json.includes("system-secret"), false);
 }
 
 test("non-Operator cannot read Ops Overview", async (t) => {
@@ -813,4 +1105,216 @@ test("Operator listLaunches sorts by allowed columns", async (t) => {
 
   assert.equal(page.items[0]?.id, LAUNCH_ID);
   assert.equal(page.items[0]?.status, "FAILED");
+});
+
+test("non-Operator cannot list Tokens", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.listTokens("regular-user", { page: 1, pageSize: 25 })
+  );
+});
+
+test("non-Operator cannot list Wallets", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.listWallets("regular-user", { page: 1, pageSize: 25 })
+  );
+});
+
+test("non-Operator cannot read Token detail", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(opsService.getToken("regular-user", MINT));
+});
+
+test("non-Operator cannot read Wallet detail", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(opsService.getWallet("regular-user", DEV_WALLET));
+});
+
+test("Operator listTokens paginates, includes owner, omits private keys", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listTokens(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+  });
+
+  assert.equal(page.totalCount, 1);
+  assert.equal(page.items[0]?.publicKey, MINT);
+  assert.equal(page.items[0]?.name, "Target Coin");
+  assert.equal(page.items[0]?.symbol, "TGT");
+  assert.equal(page.items[0]?.status, "ACTIVE");
+  assert.equal(page.items[0]?.userId, TARGET_USER_ID);
+  assert.equal(page.items[0]?.userName, "Target User");
+  assertNoPrivateKeyFields(page);
+});
+
+test("Operator listTokens searches mint, name, symbol, user, and status", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const byName = await opsService.listTokens(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "target coin",
+  });
+  assert.equal(byName.totalCount, 1);
+  assert.equal(byName.items[0]?.publicKey, MINT);
+
+  const byStatus = await opsService.listTokens(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "active",
+  });
+  assert.equal(byStatus.totalCount, 1);
+
+  const miss = await opsService.listTokens(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "no-such-token",
+  });
+  assert.equal(miss.totalCount, 0);
+});
+
+test("Operator listTokens sorts by allowed columns", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listTokens(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    sortBy: "name",
+    sortDir: "asc",
+  });
+
+  assert.equal(page.items[0]?.publicKey, MINT);
+  assert.equal(page.items[0]?.name, "Target Coin");
+});
+
+test("Operator listWallets includes system wallets and omits private keys", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+  });
+
+  assert.equal(page.totalCount, 3);
+  const system = page.items.find((wallet) => wallet.publicKey === SYSTEM_WALLET);
+  assert.ok(system);
+  assert.equal(system.isSystemWallet, true);
+  assert.equal(system.userId, null);
+  assert.equal(system.userName, null);
+
+  const main = page.items.find((wallet) => wallet.publicKey === MAIN_WALLET);
+  assert.ok(main);
+  assert.equal(main.userId, TARGET_USER_ID);
+  assert.equal(main.userName, "Target User");
+  assertNoPrivateKeyFields(page);
+});
+
+test("Operator listWallets filters by type and system flag", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const byType = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    type: "DEV",
+  });
+  assert.equal(byType.totalCount, 1);
+  assert.equal(byType.items[0]?.publicKey, DEV_WALLET);
+
+  const systemOnly = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    isSystemWallet: true,
+  });
+  assert.equal(systemOnly.totalCount, 1);
+  assert.equal(systemOnly.items[0]?.publicKey, SYSTEM_WALLET);
+
+  const nonSystem = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    isSystemWallet: false,
+  });
+  assert.equal(nonSystem.totalCount, 2);
+});
+
+test("Operator listWallets searches pubkey, user, token, and type", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const byPubkey = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: DEV_WALLET.slice(0, 10),
+  });
+  assert.equal(byPubkey.totalCount, 1);
+  assert.equal(byPubkey.items[0]?.publicKey, DEV_WALLET);
+
+  const byType = await opsService.listWallets(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "main",
+  });
+  assert.equal(byType.totalCount, 1);
+  assert.equal(byType.items[0]?.publicKey, MAIN_WALLET);
+});
+
+test("Operator getToken returns identity, owner, and omits private key", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const token = await opsService.getToken(OPERATOR_ID, MINT);
+
+  assert.equal(token.publicKey, MINT);
+  assert.equal(token.name, "Target Coin");
+  assert.equal(token.symbol, "TGT");
+  assert.equal(token.status, "ACTIVE");
+  assert.equal(token.description, "A target token");
+  assert.equal(token.userId, TARGET_USER_ID);
+  assert.equal(token.userName, "Target User");
+  assert.equal(token.userMainWalletPublicKey, MAIN_WALLET);
+  assertNoPrivateKeyFields(token);
+});
+
+test("Operator getToken unknown mint fails closed", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.getToken(
+      OPERATOR_ID,
+      "UnknownMint1111111111111111111111111111111"
+    )
+  );
+});
+
+test("Operator getWallet returns type, owner, stored balance, omits private key", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const wallet = await opsService.getWallet(OPERATOR_ID, DEV_WALLET);
+
+  assert.equal(wallet.publicKey, DEV_WALLET);
+  assert.equal(wallet.type, "DEV");
+  assert.equal(wallet.userId, TARGET_USER_ID);
+  assert.equal(wallet.userName, "Target User");
+  assert.equal(wallet.tokenPublicKey, MINT);
+  assert.equal(wallet.tokenName, "Target Coin");
+  assert.equal(wallet.tokenSymbol, "TGT");
+  assert.equal(wallet.balanceSol, 0.25);
+  assert.equal(wallet.isSystemWallet, false);
+  assertNoPrivateKeyFields(wallet);
+});
+
+test("Operator getWallet resolves MAIN owner via mainWalletUser", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const wallet = await opsService.getWallet(OPERATOR_ID, MAIN_WALLET);
+
+  assert.equal(wallet.publicKey, MAIN_WALLET);
+  assert.equal(wallet.type, "MAIN_WALLET");
+  assert.equal(wallet.userId, TARGET_USER_ID);
+  assert.equal(wallet.userName, "Target User");
+  assertNoPrivateKeyFields(wallet);
+});
+
+test("Operator getWallet includes system wallets with null owner", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const wallet = await opsService.getWallet(OPERATOR_ID, SYSTEM_WALLET);
+
+  assert.equal(wallet.publicKey, SYSTEM_WALLET);
+  assert.equal(wallet.isSystemWallet, true);
+  assert.equal(wallet.userId, null);
+  assert.equal(wallet.userName, null);
+  assert.equal(wallet.balanceSol, 10);
+  assertNoPrivateKeyFields(wallet);
 });

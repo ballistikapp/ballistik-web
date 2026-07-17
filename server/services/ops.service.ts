@@ -5,7 +5,9 @@ import { logger as defaultLogger, type LogContext } from "@/lib/logger";
 import { AppError } from "@/server/errors";
 import type {
   OpsListLaunchesInput,
+  OpsListTokensInput,
   OpsListUsersInput,
+  OpsListWalletsInput,
   OpsLookupInput,
   OpsRevealPrivateKeyInput,
 } from "@/server/schemas/ops.schema";
@@ -33,6 +35,17 @@ const LAUNCH_STATUSES = [
   "CANCELED",
   "FAILED",
   "SUCCEEDED",
+] as const;
+
+const TOKEN_STATUSES = ["PENDING", "ACTIVE", "FAILED"] as const;
+
+const WALLET_TYPES = [
+  "MAIN_WALLET",
+  "DEV",
+  "BUNDLER",
+  "VOLUME",
+  "BUYER",
+  "DISTRIBUTION",
 ] as const;
 
 function throwNotFound(): never {
@@ -92,6 +105,49 @@ function buildLaunchSearchWhere(
   for (const status of LAUNCH_STATUSES) {
     if (status.toLowerCase().includes(needle)) {
       or.push({ status });
+    }
+  }
+
+  return { OR: or };
+}
+
+function buildTokenSearchWhere(
+  search: string | undefined
+): Prisma.TokenWhereInput | undefined {
+  if (!search) return undefined;
+
+  const or: Prisma.TokenWhereInput[] = [
+    { publicKey: { contains: search, mode: "insensitive" } },
+    { name: { contains: search, mode: "insensitive" } },
+    { symbol: { contains: search, mode: "insensitive" } },
+    { userId: { contains: search, mode: "insensitive" } },
+  ];
+
+  const needle = search.trim().toLowerCase();
+  for (const status of TOKEN_STATUSES) {
+    if (status.toLowerCase().includes(needle)) {
+      or.push({ status });
+    }
+  }
+
+  return { OR: or };
+}
+
+function buildWalletSearchWhere(
+  search: string | undefined
+): Prisma.WalletWhereInput | undefined {
+  if (!search) return undefined;
+
+  const or: Prisma.WalletWhereInput[] = [
+    { publicKey: { contains: search, mode: "insensitive" } },
+    { userId: { contains: search, mode: "insensitive" } },
+    { tokenPublicKey: { contains: search, mode: "insensitive" } },
+  ];
+
+  const needle = search.trim().toLowerCase();
+  for (const type of WALLET_TYPES) {
+    if (type.toLowerCase().includes(needle)) {
+      or.push({ type });
     }
   }
 
@@ -221,6 +277,260 @@ export const opsService = {
         createdAt: launch.createdAt,
       })),
       totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async listTokens(callerUserId: string, input: OpsListTokensInput) {
+    await requireOperator(callerUserId);
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const sortBy = input.sortBy ?? "createdAt";
+    const sortDir = input.sortDir ?? "desc";
+    const where = buildTokenSearchWhere(input.search);
+    const skip = (page - 1) * pageSize;
+
+    const [totalCount, rows] = await Promise.all([
+      prisma.token.count({ where }),
+      prisma.token.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take: pageSize,
+        select: {
+          publicKey: true,
+          name: true,
+          symbol: true,
+          status: true,
+          userId: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const result = {
+      items: rows.map((token) => ({
+        publicKey: token.publicKey,
+        name: token.name,
+        symbol: token.symbol,
+        status: token.status,
+        userId: token.userId,
+        userName: token.user.name,
+        createdAt: token.createdAt,
+      })),
+      totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async listWallets(callerUserId: string, input: OpsListWalletsInput) {
+    await requireOperator(callerUserId);
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const sortBy = input.sortBy ?? "createdAt";
+    const sortDir = input.sortDir ?? "desc";
+    const searchWhere = buildWalletSearchWhere(input.search);
+    const where: Prisma.WalletWhereInput = {
+      ...(input.type ? { type: input.type } : {}),
+      ...(input.isSystemWallet !== undefined
+        ? { isSystemWallet: input.isSystemWallet }
+        : {}),
+      ...(searchWhere ?? {}),
+    };
+    const skip = (page - 1) * pageSize;
+
+    const [totalCount, rows] = await Promise.all([
+      prisma.wallet.count({ where }),
+      prisma.wallet.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take: pageSize,
+        select: {
+          publicKey: true,
+          type: true,
+          userId: true,
+          tokenPublicKey: true,
+          isSystemWallet: true,
+          isImported: true,
+          balanceSol: true,
+          balanceRefreshedAt: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+          mainWalletUser: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const result = {
+      items: rows.map((wallet) => {
+        const owner = wallet.user ?? wallet.mainWalletUser;
+        return {
+          publicKey: wallet.publicKey,
+          type: wallet.type,
+          userId: wallet.userId ?? owner?.id ?? null,
+          userName: owner?.name ?? null,
+          tokenPublicKey: wallet.tokenPublicKey,
+          isSystemWallet: wallet.isSystemWallet,
+          isImported: wallet.isImported,
+          balanceSol: Number(wallet.balanceSol ?? 0),
+          balanceRefreshedAt: wallet.balanceRefreshedAt,
+          createdAt: wallet.createdAt,
+        };
+      }),
+      totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async getToken(callerUserId: string, publicKey: string) {
+    await requireOperator(callerUserId);
+
+    const token = await prisma.token.findUnique({
+      where: { publicKey },
+      select: {
+        publicKey: true,
+        name: true,
+        symbol: true,
+        description: true,
+        imageUrl: true,
+        websiteUrl: true,
+        twitterUrl: true,
+        telegramUrl: true,
+        status: true,
+        isMayhemMode: true,
+        userId: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mainWalletPublicKey: true,
+          },
+        },
+      },
+    });
+
+    if (!token) {
+      throwNotFound();
+    }
+
+    const result = {
+      publicKey: token.publicKey,
+      name: token.name,
+      symbol: token.symbol,
+      description: token.description,
+      imageUrl: token.imageUrl,
+      websiteUrl: token.websiteUrl,
+      twitterUrl: token.twitterUrl,
+      telegramUrl: token.telegramUrl,
+      status: token.status,
+      isMayhemMode: token.isMayhemMode,
+      userId: token.userId,
+      userName: token.user.name,
+      userMainWalletPublicKey: token.user.mainWalletPublicKey,
+      createdAt: token.createdAt,
+      updatedAt: token.updatedAt,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async getWallet(callerUserId: string, publicKey: string) {
+    await requireOperator(callerUserId);
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { publicKey },
+      select: {
+        publicKey: true,
+        type: true,
+        userId: true,
+        tokenPublicKey: true,
+        balanceSol: true,
+        balanceRefreshedAt: true,
+        isImported: true,
+        isSystemWallet: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        mainWalletUser: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        token: {
+          select: {
+            publicKey: true,
+            name: true,
+            symbol: true,
+          },
+        },
+      },
+    });
+
+    if (!wallet) {
+      throwNotFound();
+    }
+
+    const owner = wallet.user ?? wallet.mainWalletUser;
+    const result = {
+      publicKey: wallet.publicKey,
+      type: wallet.type,
+      userId: wallet.userId ?? owner?.id ?? null,
+      userName: owner?.name ?? null,
+      tokenPublicKey: wallet.tokenPublicKey,
+      tokenName: wallet.token?.name ?? null,
+      tokenSymbol: wallet.token?.symbol ?? null,
+      balanceSol: Number(wallet.balanceSol ?? 0),
+      balanceRefreshedAt: wallet.balanceRefreshedAt,
+      isImported: wallet.isImported,
+      isSystemWallet: wallet.isSystemWallet,
+      createdAt: wallet.createdAt,
+      updatedAt: wallet.updatedAt,
     };
 
     if (containsPrivateKeyField(result)) {

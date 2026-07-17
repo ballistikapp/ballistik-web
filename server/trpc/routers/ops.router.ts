@@ -7,9 +7,13 @@ import { opsService } from "@/server/services/ops.service";
 import {
   opsGetLaunchAutopsySchema,
   opsGetOverviewSchema,
+  opsGetTokenSchema,
   opsGetUserSpineSchema,
+  opsGetWalletSchema,
   opsListLaunchesSchema,
+  opsListTokensSchema,
   opsListUsersSchema,
+  opsListWalletsSchema,
   opsLookupSchema,
   opsRevealPrivateKeySchema,
 } from "@/server/schemas/ops.schema";
@@ -33,6 +37,18 @@ export const opsRouter = router({
       return await opsService.listLaunches(ctx.user.id, input);
     }),
 
+  listTokens: operatorProcedure
+    .input(opsListTokensSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listTokens(ctx.user.id, input);
+    }),
+
+  listWallets: operatorProcedure
+    .input(opsListWalletsSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listWallets(ctx.user.id, input);
+    }),
+
   lookupUser: operatorProcedure
     .input(opsLookupSchema)
     .query(async ({ input, ctx }) => {
@@ -43,6 +59,18 @@ export const opsRouter = router({
     .input(opsGetUserSpineSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.getUserSpine(ctx.user.id, input.userId);
+    }),
+
+  getToken: operatorProcedure
+    .input(opsGetTokenSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.getToken(ctx.user.id, input.publicKey);
+    }),
+
+  getWallet: operatorProcedure
+    .input(opsGetWalletSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.getWallet(ctx.user.id, input.publicKey);
     }),
 
   getLaunchAutopsy: operatorProcedure

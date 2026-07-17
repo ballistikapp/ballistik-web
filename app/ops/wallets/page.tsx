@@ -1,10 +1,5 @@
-import { OpsStubPage } from "@/components/ops/ops-stub-page";
+import { OpsWalletsTable } from "@/components/ops/ops-wallets-table";
 
 export default function OpsWalletsPage() {
-  return (
-    <OpsStubPage
-      title="Wallets"
-      description="Wallet browse table ships in a later Ops Console ticket."
-    />
-  );
+  return <OpsWalletsTable />;
 }
