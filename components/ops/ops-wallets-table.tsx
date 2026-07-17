@@ -476,7 +476,6 @@ export function OpsWalletsTable({
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancel</AlertDialogCancel>
                     <AlertDialogAction
-                      variant="destructive"
                       disabled={refreshMatchesMutation.isPending}
                       onClick={() =>
                         refreshMatchesMutation.mutate(matchFilter)
