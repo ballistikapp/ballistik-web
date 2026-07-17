@@ -7,12 +7,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-type LookupType = "mainWallet" | "mint";
-
 export function OpsLookupForm() {
   const router = useRouter();
   const utils = trpc.useUtils();
-  const [type, setType] = useState<LookupType>("mainWallet");
   const [publicKey, setPublicKey] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [isLookingUp, setIsLookingUp] = useState(false);
@@ -28,11 +25,18 @@ export function OpsLookupForm() {
 
     setIsLookingUp(true);
     try {
-      const data = await utils.client.ops.lookupUser.query({
-        type,
+      const data = await utils.client.ops.jump.query({
         publicKey: trimmed,
       });
-      router.push(`/ops/users/${data.id}`);
+      if (data.kind === "user") {
+        router.push(`/ops/users/${data.userId}`);
+        return;
+      }
+      if (data.kind === "wallet") {
+        router.push(`/ops/wallets/${encodeURIComponent(data.publicKey)}`);
+        return;
+      }
+      router.push(`/ops/tokens/${encodeURIComponent(data.publicKey)}`);
     } catch (err) {
       const message =
         err instanceof Error && err.message ? err.message : "Not found";
@@ -45,24 +49,12 @@ export function OpsLookupForm() {
   return (
     <form onSubmit={onSubmit} className="flex max-w-xl flex-col gap-4">
       <div className="flex flex-col gap-2">
-        <Label htmlFor="ops-lookup-type">Lookup by</Label>
-        <select
-          id="ops-lookup-type"
-          className="border-input bg-background h-8 rounded-lg border px-2.5 text-sm"
-          value={type}
-          onChange={(event) => setType(event.target.value as LookupType)}
-        >
-          <option value="mainWallet">User main wallet public key</option>
-          <option value="mint">Token mint public key</option>
-        </select>
-      </div>
-      <div className="flex flex-col gap-2">
-        <Label htmlFor="ops-lookup-key">Public key</Label>
+        <Label htmlFor="ops-jump-key">Public key</Label>
         <Input
-          id="ops-lookup-key"
+          id="ops-jump-key"
           value={publicKey}
           onChange={(event) => setPublicKey(event.target.value)}
-          placeholder="Paste a public key"
+          placeholder="Paste a main wallet, Wallet, or Token mint pubkey"
           autoComplete="off"
           spellCheck={false}
         />
@@ -70,7 +62,7 @@ export function OpsLookupForm() {
       {error ? <p className="text-destructive text-sm">{error}</p> : null}
       <div>
         <Button type="submit" disabled={isLookingUp}>
-          {isLookingUp ? "Looking up…" : "Look up User"}
+          {isLookingUp ? "Jumping…" : "Jump"}
         </Button>
       </div>
     </form>

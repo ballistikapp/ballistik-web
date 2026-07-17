@@ -13,6 +13,7 @@ import {
   opsListLaunchesSchema,
   opsListTokensSchema,
   opsListUsersSchema,
+  opsJumpSchema,
   opsListWalletsSchema,
   opsLookupSchema,
   opsRevealPrivateKeySchema,
@@ -53,6 +54,12 @@ export const opsRouter = router({
     .input(opsLookupSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.lookupUser(ctx.user.id, input);
+    }),
+
+  jump: operatorProcedure
+    .input(opsJumpSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.jump(ctx.user.id, input);
     }),
 
   getUserSpine: operatorProcedure

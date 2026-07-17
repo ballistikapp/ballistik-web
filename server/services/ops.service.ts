@@ -4,6 +4,8 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { logger as defaultLogger, type LogContext } from "@/lib/logger";
 import { AppError } from "@/server/errors";
 import type {
+  OpsJumpInput,
+  OpsJumpResult,
   OpsListLaunchesInput,
   OpsListTokensInput,
   OpsListUsersInput,
@@ -235,7 +237,11 @@ export const opsService = {
     const pageSize = input.pageSize ?? 25;
     const sortBy = input.sortBy ?? "createdAt";
     const sortDir = input.sortDir ?? "desc";
-    const where = buildLaunchSearchWhere(input.search);
+    const searchWhere = buildLaunchSearchWhere(input.search);
+    const where: Prisma.LaunchWhereInput = {
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(searchWhere ?? {}),
+    };
     const skip = (page - 1) * pageSize;
 
     const [totalCount, rows] = await Promise.all([
@@ -293,7 +299,11 @@ export const opsService = {
     const pageSize = input.pageSize ?? 25;
     const sortBy = input.sortBy ?? "createdAt";
     const sortDir = input.sortDir ?? "desc";
-    const where = buildTokenSearchWhere(input.search);
+    const searchWhere = buildTokenSearchWhere(input.search);
+    const where: Prisma.TokenWhereInput = {
+      ...(input.userId ? { userId: input.userId } : {}),
+      ...(searchWhere ?? {}),
+    };
     const skip = (page - 1) * pageSize;
 
     const [totalCount, rows] = await Promise.all([
@@ -348,12 +358,22 @@ export const opsService = {
     const sortBy = input.sortBy ?? "createdAt";
     const sortDir = input.sortDir ?? "desc";
     const searchWhere = buildWalletSearchWhere(input.search);
+    const ownerWhere: Prisma.WalletWhereInput | undefined = input.userId
+      ? {
+          OR: [
+            { userId: input.userId },
+            { mainWalletUser: { id: input.userId } },
+          ],
+        }
+      : undefined;
     const where: Prisma.WalletWhereInput = {
       ...(input.type ? { type: input.type } : {}),
       ...(input.isSystemWallet !== undefined
         ? { isSystemWallet: input.isSystemWallet }
         : {}),
-      ...(searchWhere ?? {}),
+      ...(ownerWhere && searchWhere
+        ? { AND: [ownerWhere, searchWhere] }
+        : (ownerWhere ?? searchWhere ?? {})),
     };
     const skip = (page - 1) * pageSize;
 
@@ -574,6 +594,43 @@ export const opsService = {
       throwNotFound();
     }
     return token.user;
+  },
+
+  /**
+   * Resolve a pasted pubkey to the right Ops detail.
+   * Order: User main wallet → Wallet → Token mint. Unknown → not-found.
+   */
+  async jump(
+    callerUserId: string,
+    input: OpsJumpInput
+  ): Promise<OpsJumpResult> {
+    await requireOperator(callerUserId);
+
+    const user = await prisma.user.findUnique({
+      where: { mainWalletPublicKey: input.publicKey },
+      select: { id: true },
+    });
+    if (user) {
+      return { kind: "user", userId: user.id };
+    }
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { publicKey: input.publicKey },
+      select: { publicKey: true },
+    });
+    if (wallet) {
+      return { kind: "wallet", publicKey: wallet.publicKey };
+    }
+
+    const token = await prisma.token.findUnique({
+      where: { publicKey: input.publicKey },
+      select: { publicKey: true },
+    });
+    if (token) {
+      return { kind: "token", publicKey: token.publicKey };
+    }
+
+    throwNotFound();
   },
 
   async getUserSpine(callerUserId: string, userId: string) {

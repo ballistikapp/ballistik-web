@@ -16,78 +16,95 @@ import type { AppRouter } from "@/server/trpc/routers/_app";
 type OpsTokenRow =
   inferRouterOutputs<AppRouter>["ops"]["listTokens"]["items"][number];
 
+type OpsTokensTableProps = {
+  userId?: string;
+  embedded?: boolean;
+};
+
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "—";
   return new Date(value).toLocaleString();
 }
 
-const columns: ColumnDef<OpsTokenRow>[] = [
-  {
-    accessorKey: "publicKey",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="mint" />
-    ),
-    enableSorting: false,
-    cell: ({ row }) => (
-      <span className="font-mono text-xs break-all">
-        {row.original.publicKey}
-      </span>
-    ),
-  },
-  {
-    accessorKey: "name",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="name" />
-    ),
-    cell: ({ row }) => row.original.name,
-  },
-  {
-    accessorKey: "symbol",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="symbol" />
-    ),
-    cell: ({ row }) => row.original.symbol,
-  },
-  {
-    accessorKey: "status",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="status" />
-    ),
-    cell: ({ row }) => row.original.status,
-  },
-  {
-    id: "user",
-    accessorKey: "userName",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="user" />
-    ),
-    enableSorting: false,
-    cell: ({ row }) => (
-      <div className="flex flex-col gap-0.5">
-        <span>{row.original.userName}</span>
-        <span className="text-muted-foreground font-mono text-xs break-all">
-          {row.original.userId}
+function buildColumns(hideUserColumn: boolean): ColumnDef<OpsTokenRow>[] {
+  const columns: ColumnDef<OpsTokenRow>[] = [
+    {
+      accessorKey: "publicKey",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="mint" />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <span className="font-mono text-xs break-all">
+          {row.original.publicKey}
         </span>
-      </div>
-    ),
-  },
-  {
+      ),
+    },
+    {
+      accessorKey: "name",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="name" />
+      ),
+      cell: ({ row }) => row.original.name,
+    },
+    {
+      accessorKey: "symbol",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="symbol" />
+      ),
+      cell: ({ row }) => row.original.symbol,
+    },
+    {
+      accessorKey: "status",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="status" />
+      ),
+      cell: ({ row }) => row.original.status,
+    },
+  ];
+
+  if (!hideUserColumn) {
+    columns.push({
+      id: "user",
+      accessorKey: "userName",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="user" />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => (
+        <div className="flex flex-col gap-0.5">
+          <span>{row.original.userName}</span>
+          <span className="text-muted-foreground font-mono text-xs break-all">
+            {row.original.userId}
+          </span>
+        </div>
+      ),
+    });
+  }
+
+  columns.push({
     accessorKey: "createdAt",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="created" />
     ),
     cell: ({ row }) => formatDate(row.original.createdAt),
-  },
-];
+  });
+
+  return columns;
+}
 
 const SORTABLE = new Set(["createdAt", "name", "symbol", "status"]);
 
-export function OpsTokensTable() {
+export function OpsTokensTable({
+  userId,
+  embedded = false,
+}: OpsTokensTableProps) {
   const router = useRouter();
+  const urlPrefix = userId ? "spine_tokens" : "tokens";
   const { pagination, sorting, globalFilter } = useDataTableParams({
     defaultPageSize: 25,
     defaultSort: "createdAt:desc",
-    prefix: "tokens",
+    prefix: urlPrefix,
   });
 
   const sortId = sorting[0]?.id;
@@ -104,6 +121,7 @@ export function OpsTokensTable() {
       search: globalFilter.trim() || undefined,
       sortBy,
       sortDir,
+      userId,
     },
     {
       placeholderData: (previous) => previous,
@@ -114,15 +132,18 @@ export function OpsTokensTable() {
   const items = data?.items ?? [];
   const totalCount = data?.totalCount ?? 0;
   const pageCount = Math.max(1, Math.ceil(totalCount / pagination.pageSize));
+  const columns = buildColumns(Boolean(userId));
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex flex-col gap-1">
-        <h1 className="text-xl font-semibold tracking-tight">Tokens</h1>
-        <p className="text-muted-foreground text-sm">
-          Browse Tokens. Open a row for Token detail.
-        </p>
-      </div>
+      {embedded ? null : (
+        <div className="flex flex-col gap-1">
+          <h1 className="text-xl font-semibold tracking-tight">Tokens</h1>
+          <p className="text-muted-foreground text-sm">
+            Browse Tokens. Open a row for Token detail.
+          </p>
+        </div>
+      )}
 
       {error ? (
         <p className="text-destructive text-sm">{error.message}</p>
@@ -140,7 +161,7 @@ export function OpsTokensTable() {
         pageCount={pageCount}
         rowCount={totalCount}
         enableUrlState
-        urlStatePrefix="tokens"
+        urlStatePrefix={urlPrefix}
         initialSorting={[{ id: "createdAt", desc: true }]}
         onRowClick={(row) =>
           router.push(`/ops/tokens/${encodeURIComponent(row.publicKey)}`)

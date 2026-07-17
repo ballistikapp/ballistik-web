@@ -17,12 +17,14 @@ export const opsListUsersSchema = opsListBaseSchema.extend({
 
 export const opsListLaunchesSchema = opsListBaseSchema.extend({
   sortBy: z.enum(["createdAt", "startedAt", "status"]).default("createdAt"),
+  userId: z.string().min(1).optional(),
 });
 
 export const opsListTokensSchema = opsListBaseSchema.extend({
   sortBy: z
     .enum(["createdAt", "name", "symbol", "status"])
     .default("createdAt"),
+  userId: z.string().min(1).optional(),
 });
 
 export const opsListWalletsSchema = opsListBaseSchema.extend({
@@ -38,6 +40,7 @@ export const opsListWalletsSchema = opsListBaseSchema.extend({
     ])
     .optional(),
   isSystemWallet: z.boolean().optional(),
+  userId: z.string().min(1).optional(),
 });
 
 export const opsGetTokenSchema = z.object({
@@ -58,6 +61,10 @@ export const opsLookupSchema = z.discriminatedUnion("type", [
     publicKey: publicKeySchema,
   }),
 ]);
+
+export const opsJumpSchema = z.object({
+  publicKey: publicKeySchema,
+});
 
 export const opsGetUserSpineSchema = z.object({
   userId: z.string().min(1),
@@ -90,6 +97,12 @@ export type OpsListWalletsInput = z.input<typeof opsListWalletsSchema>;
 export type OpsGetTokenInput = z.infer<typeof opsGetTokenSchema>;
 export type OpsGetWalletInput = z.infer<typeof opsGetWalletSchema>;
 export type OpsLookupInput = z.infer<typeof opsLookupSchema>;
+export type OpsJumpInput = z.infer<typeof opsJumpSchema>;
 export type OpsGetUserSpineInput = z.infer<typeof opsGetUserSpineSchema>;
 export type OpsGetLaunchAutopsyInput = z.infer<typeof opsGetLaunchAutopsySchema>;
 export type OpsRevealPrivateKeyInput = z.infer<typeof opsRevealPrivateKeySchema>;
+
+export type OpsJumpResult =
+  | { kind: "user"; userId: string }
+  | { kind: "wallet"; publicKey: string }
+  | { kind: "token"; publicKey: string };

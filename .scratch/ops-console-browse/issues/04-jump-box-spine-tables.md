@@ -4,11 +4,11 @@
 
 **Blocked by:** 02 — Browse Users & Launches; 03 — Browse Tokens & Wallets + detail pages
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Jump box resolves main-wallet pubkey → User spine
-- [ ] Jump box resolves Wallet pubkey → Wallet detail
-- [ ] Jump box resolves Token mint → Token detail
-- [ ] Unknown identifier yields a clear empty/not-found style result (no privilege leak)
-- [ ] User spine Tokens, Wallets, and Launches sections use the dense Ops table pattern (user-scoped)
-- [ ] Nested spine tables still omit private keys and keep reveal on the appropriate detail surfaces
+- [x] Jump box resolves main-wallet pubkey → User spine
+- [x] Jump box resolves Wallet pubkey → Wallet detail
+- [x] Jump box resolves Token mint → Token detail
+- [x] Unknown identifier yields a clear empty/not-found style result (no privilege leak)
+- [x] User spine Tokens, Wallets, and Launches sections use the dense Ops table pattern (user-scoped)
+- [x] Nested spine tables still omit private keys and keep reveal on the appropriate detail surfaces

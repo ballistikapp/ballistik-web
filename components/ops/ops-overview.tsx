@@ -48,9 +48,10 @@ export function OpsOverview() {
 
       <div className="flex flex-col gap-3">
         <div>
-          <h2 className="text-sm font-medium">User lookup</h2>
+          <h2 className="text-sm font-medium">Jump</h2>
           <p className="text-muted-foreground mt-1 text-xs">
-            Look up a User by main wallet or token mint.
+            Paste a main-wallet pubkey, Wallet pubkey, or Token mint to open the
+            matching Ops detail.
           </p>
         </div>
         <OpsLookupForm />
