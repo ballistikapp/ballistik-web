@@ -16,6 +16,8 @@ import {
   opsJumpSchema,
   opsListWalletsSchema,
   opsLookupSchema,
+  opsRefreshMatchingWalletBalancesSchema,
+  opsRefreshWalletBalancesSchema,
   opsRevealPrivateKeySchema,
 } from "@/server/schemas/ops.schema";
 
@@ -78,6 +80,18 @@ export const opsRouter = router({
     .input(opsGetWalletSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.getWallet(ctx.user.id, input.publicKey);
+    }),
+
+  refreshWalletBalances: operatorProcedure
+    .input(opsRefreshWalletBalancesSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await opsService.refreshWalletBalances(ctx.user.id, input);
+    }),
+
+  refreshMatchingWalletBalances: operatorProcedure
+    .input(opsRefreshMatchingWalletBalancesSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await opsService.refreshMatchingWalletBalances(ctx.user.id, input);
     }),
 
   getLaunchAutopsy: operatorProcedure

@@ -4,12 +4,12 @@
 
 **Blocked by:** 03 — Browse Tokens & Wallets + detail pages
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] Wallet detail has an explicit single-Wallet balance refresh that updates stored balance + refreshed-at
-- [ ] Wallets table supports selected-row refresh with a sane selection cap
-- [ ] Separate “refresh matches” action refreshes all Wallets in the current filter/search result
-- [ ] Empty filter is allowed (all Wallets); confirm dialog shows the exact count before running
-- [ ] Filter-wide refresh is chunked and does not require a hard max refuse (dialog + chunking is the safety)
-- [ ] Non-Operator cannot refresh (not-found)
-- [ ] Refresh does not return or expose private keys
+- [x] Wallet detail has an explicit single-Wallet balance refresh that updates stored balance + refreshed-at
+- [x] Wallets table supports selected-row refresh with a sane selection cap
+- [x] Separate “refresh matches” action refreshes all Wallets in the current filter/search result
+- [x] Empty filter is allowed (all Wallets); confirm dialog shows the exact count before running
+- [x] Filter-wide refresh is chunked and does not require a hard max refuse (dialog + chunking is the safety)
+- [x] Non-Operator cannot refresh (not-found)
+- [x] Refresh does not return or expose private keys

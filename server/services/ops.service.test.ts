@@ -18,6 +18,8 @@ const DEV_WALLET =
 const SYSTEM_WALLET =
   "SystemWallet111111111111111111111111111111";
 const LAUNCH_ID = "launch-1";
+const REFRESHED_BALANCE_SOL = 2.5;
+const REFRESHED_AT = new Date("2026-07-17T15:00:00.000Z");
 
 function restore<T extends object, K extends keyof T>(
   t: TestContext,
@@ -870,6 +872,38 @@ async function setupOpsTest(t: TestContext) {
     });
   }) as unknown as typeof prisma.launch.findMany);
 
+  const { walletService } = await import("./wallet.service");
+  restore(
+    t,
+    walletService,
+    "refreshBalancesByPublicKeys",
+    (async (publicKeys: string[]) => {
+      const uniqueKeys = [...new Set(publicKeys)];
+      const refreshed: Array<{
+        publicKey: string;
+        balanceSol: number;
+        balanceRefreshedAt: Date;
+      }> = [];
+      for (const publicKey of uniqueKeys) {
+        const wallet = wallets.get(publicKey);
+        if (!wallet) continue;
+        wallet.balanceSol = REFRESHED_BALANCE_SOL;
+        wallet.balanceRefreshedAt = REFRESHED_AT;
+        refreshed.push({
+          publicKey,
+          balanceSol: REFRESHED_BALANCE_SOL,
+          balanceRefreshedAt: REFRESHED_AT,
+        });
+      }
+      return {
+        refreshed,
+        requestedCount: uniqueKeys.length,
+        refreshedCount: refreshed.length,
+        missingCount: uniqueKeys.length - refreshed.length,
+      };
+    }) as unknown as typeof walletService.refreshBalancesByPublicKeys
+  );
+
   return { opsService, NOW };
 }
 
@@ -1465,4 +1499,100 @@ test("Operator getWallet includes system wallets with null owner", async (t) => 
   assert.equal(wallet.userName, null);
   assert.equal(wallet.balanceSol, 10);
   assertNoPrivateKeyFields(wallet);
+});
+
+test("non-Operator cannot refresh Wallet balances", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.refreshWalletBalances("regular-user", {
+      publicKeys: [DEV_WALLET],
+    })
+  );
+  await expectNotFound(
+    opsService.refreshMatchingWalletBalances("regular-user", {})
+  );
+});
+
+test("Operator refreshWalletBalances updates stored balance and refreshed-at", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const before = await opsService.getWallet(OPERATOR_ID, DEV_WALLET);
+  assert.equal(before.balanceSol, 0.25);
+  assert.equal(before.balanceRefreshedAt, null);
+
+  const result = await opsService.refreshWalletBalances(OPERATOR_ID, {
+    publicKeys: [DEV_WALLET],
+  });
+
+  assert.equal(result.requestedCount, 1);
+  assert.equal(result.refreshedCount, 1);
+  assert.equal(result.missingCount, 0);
+  assert.equal(result.refreshed[0]?.publicKey, DEV_WALLET);
+  assert.equal(result.refreshed[0]?.balanceSol, REFRESHED_BALANCE_SOL);
+  assert.equal(
+    result.refreshed[0]?.balanceRefreshedAt.toISOString(),
+    REFRESHED_AT.toISOString()
+  );
+  assertNoPrivateKeyFields(result);
+
+  const after = await opsService.getWallet(OPERATOR_ID, DEV_WALLET);
+  assert.equal(after.balanceSol, REFRESHED_BALANCE_SOL);
+  assert.equal(after.balanceRefreshedAt?.toISOString(), REFRESHED_AT.toISOString());
+  assertNoPrivateKeyFields(after);
+});
+
+test("Operator refreshWalletBalances refuses above selection cap", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const publicKeys = Array.from({ length: 101 }, (_, index) =>
+    `${DEV_WALLET.slice(0, -3)}${String(index).padStart(3, "0")}`
+  );
+
+  await assert.rejects(
+    opsService.refreshWalletBalances(OPERATOR_ID, { publicKeys }),
+    (error: unknown) => {
+      assert.equal(isAppError(error), true);
+      if (isAppError(error)) {
+        assert.equal(error.statusCode, 400);
+        assert.match(error.message, /100/);
+      }
+      return true;
+    }
+  );
+});
+
+test("Operator refreshMatchingWalletBalances refreshes current filter result", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const result = await opsService.refreshMatchingWalletBalances(OPERATOR_ID, {
+    type: "DEV",
+  });
+
+  assert.equal(result.requestedCount, 1);
+  assert.equal(result.refreshedCount, 1);
+  assertNoPrivateKeyFields(result);
+
+  const refreshed = await opsService.getWallet(OPERATOR_ID, DEV_WALLET);
+  assert.equal(refreshed.balanceSol, REFRESHED_BALANCE_SOL);
+
+  const untouched = await opsService.getWallet(OPERATOR_ID, MAIN_WALLET);
+  assert.equal(untouched.balanceSol, 1.5);
+});
+
+test("Operator refreshMatchingWalletBalances with empty filter refreshes all Wallets", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const result = await opsService.refreshMatchingWalletBalances(OPERATOR_ID, {});
+
+  assert.equal(result.requestedCount, 3);
+  assert.equal(result.refreshedCount, 3);
+  assertNoPrivateKeyFields(result);
+
+  for (const publicKey of [MAIN_WALLET, DEV_WALLET, SYSTEM_WALLET]) {
+    const wallet = await opsService.getWallet(OPERATOR_ID, publicKey);
+    assert.equal(wallet.balanceSol, REFRESHED_BALANCE_SOL);
+    assert.equal(
+      wallet.balanceRefreshedAt?.toISOString(),
+      REFRESHED_AT.toISOString()
+    );
+  }
 });

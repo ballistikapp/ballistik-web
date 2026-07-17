@@ -3,6 +3,7 @@ import "server-only";
 import { prisma, Prisma } from "@/lib/prisma";
 import { logger as defaultLogger, type LogContext } from "@/lib/logger";
 import { AppError } from "@/server/errors";
+import { OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP } from "@/lib/config/ops.config";
 import type {
   OpsJumpInput,
   OpsJumpResult,
@@ -11,8 +12,11 @@ import type {
   OpsListUsersInput,
   OpsListWalletsInput,
   OpsLookupInput,
+  OpsRefreshMatchingWalletBalancesInput,
+  OpsRefreshWalletBalancesInput,
   OpsRevealPrivateKeyInput,
 } from "@/server/schemas/ops.schema";
+import { walletService } from "@/server/services/wallet.service";
 
 const NOT_FOUND = "Not found";
 
@@ -154,6 +158,63 @@ function buildWalletSearchWhere(
   }
 
   return { OR: or };
+}
+
+function buildWalletListWhere(input: {
+  search?: string;
+  type?: (typeof WALLET_TYPES)[number];
+  isSystemWallet?: boolean;
+  userId?: string;
+}): Prisma.WalletWhereInput {
+  const searchWhere = buildWalletSearchWhere(input.search);
+  const ownerWhere: Prisma.WalletWhereInput | undefined = input.userId
+    ? {
+        OR: [
+          { userId: input.userId },
+          { mainWalletUser: { id: input.userId } },
+        ],
+      }
+    : undefined;
+
+  return {
+    ...(input.type ? { type: input.type } : {}),
+    ...(input.isSystemWallet !== undefined
+      ? { isSystemWallet: input.isSystemWallet }
+      : {}),
+    ...(ownerWhere && searchWhere
+      ? { AND: [ownerWhere, searchWhere] }
+      : (ownerWhere ?? searchWhere ?? {})),
+  };
+}
+
+const OPS_WALLET_REFRESH_CHUNK_SIZE = 100;
+
+function projectWalletBalanceRefreshResult(result: {
+  refreshed: Array<{
+    publicKey: string;
+    balanceSol: number;
+    balanceRefreshedAt: Date;
+  }>;
+  requestedCount: number;
+  refreshedCount: number;
+  missingCount: number;
+}) {
+  const projected = {
+    refreshed: result.refreshed.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      balanceSol: wallet.balanceSol,
+      balanceRefreshedAt: wallet.balanceRefreshedAt,
+    })),
+    requestedCount: result.requestedCount,
+    refreshedCount: result.refreshedCount,
+    missingCount: result.missingCount,
+  };
+
+  if (containsPrivateKeyField(projected)) {
+    throw new Error("Ops projection leaked private key fields");
+  }
+
+  return projected;
 }
 
 export const opsService = {
@@ -357,24 +418,7 @@ export const opsService = {
     const pageSize = input.pageSize ?? 25;
     const sortBy = input.sortBy ?? "createdAt";
     const sortDir = input.sortDir ?? "desc";
-    const searchWhere = buildWalletSearchWhere(input.search);
-    const ownerWhere: Prisma.WalletWhereInput | undefined = input.userId
-      ? {
-          OR: [
-            { userId: input.userId },
-            { mainWalletUser: { id: input.userId } },
-          ],
-        }
-      : undefined;
-    const where: Prisma.WalletWhereInput = {
-      ...(input.type ? { type: input.type } : {}),
-      ...(input.isSystemWallet !== undefined
-        ? { isSystemWallet: input.isSystemWallet }
-        : {}),
-      ...(ownerWhere && searchWhere
-        ? { AND: [ownerWhere, searchWhere] }
-        : (ownerWhere ?? searchWhere ?? {})),
-    };
+    const where = buildWalletListWhere(input);
     const skip = (page - 1) * pageSize;
 
     const [totalCount, rows] = await Promise.all([
@@ -558,6 +602,68 @@ export const opsService = {
     }
 
     return result;
+  },
+
+  async refreshWalletBalances(
+    callerUserId: string,
+    input: OpsRefreshWalletBalancesInput
+  ) {
+    await requireOperator(callerUserId);
+
+    if (input.publicKeys.length > OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP) {
+      throw new AppError(
+        `Cannot refresh more than ${OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP} selected Wallets at once`,
+        400
+      );
+    }
+
+    const result = await walletService.refreshBalancesByPublicKeys(
+      input.publicKeys
+    );
+    return projectWalletBalanceRefreshResult(result);
+  },
+
+  async refreshMatchingWalletBalances(
+    callerUserId: string,
+    input: OpsRefreshMatchingWalletBalancesInput
+  ) {
+    await requireOperator(callerUserId);
+
+    const where = buildWalletListWhere(input);
+    let skip = 0;
+    let requestedCount = 0;
+    let refreshedCount = 0;
+    let missingCount = 0;
+
+    for (;;) {
+      const chunk = await prisma.wallet.findMany({
+        where,
+        orderBy: { publicKey: "asc" },
+        skip,
+        take: OPS_WALLET_REFRESH_CHUNK_SIZE,
+        select: { publicKey: true },
+      });
+
+      if (chunk.length === 0) break;
+
+      const chunkResult = await walletService.refreshBalancesByPublicKeys(
+        chunk.map((wallet) => wallet.publicKey)
+      );
+      requestedCount += chunkResult.requestedCount;
+      refreshedCount += chunkResult.refreshedCount;
+      missingCount += chunkResult.missingCount;
+
+      if (chunk.length < OPS_WALLET_REFRESH_CHUNK_SIZE) break;
+      skip += chunk.length;
+    }
+
+    // Filter-wide responses stay summary-only (avoid huge payloads).
+    return projectWalletBalanceRefreshResult({
+      refreshed: [],
+      requestedCount,
+      refreshedCount,
+      missingCount,
+    });
   },
 
   async lookupUser(callerUserId: string, input: OpsLookupInput) {

@@ -1,4 +1,7 @@
 import { z } from "zod";
+import { OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP } from "@/lib/config/ops.config";
+
+export { OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP };
 
 const publicKeySchema = z.string().min(32, "Invalid public key");
 
@@ -51,6 +54,30 @@ export const opsGetWalletSchema = z.object({
   publicKey: publicKeySchema,
 });
 
+export const opsRefreshWalletBalancesSchema = z.object({
+  publicKeys: z
+    .array(publicKeySchema)
+    .min(1)
+    .max(OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP),
+});
+
+/** Same filters as listWallets, without pagination/sort (filter-wide refresh). */
+export const opsRefreshMatchingWalletBalancesSchema = z.object({
+  search: z.string().trim().min(1).max(200).optional(),
+  type: z
+    .enum([
+      "MAIN_WALLET",
+      "DEV",
+      "BUNDLER",
+      "VOLUME",
+      "BUYER",
+      "DISTRIBUTION",
+    ])
+    .optional(),
+  isSystemWallet: z.boolean().optional(),
+  userId: z.string().min(1).optional(),
+});
+
 export const opsLookupSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("mainWallet"),
@@ -96,6 +123,12 @@ export type OpsListTokensInput = z.input<typeof opsListTokensSchema>;
 export type OpsListWalletsInput = z.input<typeof opsListWalletsSchema>;
 export type OpsGetTokenInput = z.infer<typeof opsGetTokenSchema>;
 export type OpsGetWalletInput = z.infer<typeof opsGetWalletSchema>;
+export type OpsRefreshWalletBalancesInput = z.infer<
+  typeof opsRefreshWalletBalancesSchema
+>;
+export type OpsRefreshMatchingWalletBalancesInput = z.infer<
+  typeof opsRefreshMatchingWalletBalancesSchema
+>;
 export type OpsLookupInput = z.infer<typeof opsLookupSchema>;
 export type OpsJumpInput = z.infer<typeof opsJumpSchema>;
 export type OpsGetUserSpineInput = z.infer<typeof opsGetUserSpineSchema>;

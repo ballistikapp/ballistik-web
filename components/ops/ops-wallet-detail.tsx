@@ -1,7 +1,11 @@
 "use client";
 
 import Link from "next/link";
+import { IconRefresh } from "@tabler/icons-react";
+import { toast } from "sonner";
 import { OpsRevealButton } from "@/components/ops/ops-reveal-button";
+import { Button } from "@/components/ui/button";
+import { Spinner } from "@/components/ui/spinner";
 import { trpc } from "@/lib/trpc/client";
 
 type OpsWalletDetailProps = {
@@ -14,10 +18,28 @@ function formatDate(value: Date | string | null | undefined) {
 }
 
 export function OpsWalletDetail({ publicKey }: OpsWalletDetailProps) {
+  const utils = trpc.useUtils();
   const { data, isLoading, error } = trpc.ops.getWallet.useQuery(
     { publicKey },
     { retry: false }
   );
+
+  const refreshMutation = trpc.ops.refreshWalletBalances.useMutation({
+    onSuccess: async (result) => {
+      await Promise.all([
+        utils.ops.getWallet.invalidate({ publicKey }),
+        utils.ops.listWallets.invalidate(),
+      ]);
+      toast.success(
+        result.refreshedCount === 1
+          ? "Wallet balance refreshed"
+          : `${result.refreshedCount} Wallet balances refreshed`
+      );
+    },
+    onError: (refreshError) => {
+      toast.error(refreshError.message || "Failed to refresh Wallet balance");
+    },
+  });
 
   if (isLoading) {
     return <p className="text-muted-foreground text-sm">Loading Wallet…</p>;
@@ -32,7 +54,25 @@ export function OpsWalletDetail({ publicKey }: OpsWalletDetailProps) {
   return (
     <div className="flex flex-col gap-8">
       <section className="flex flex-col gap-2">
-        <h1 className="text-xl font-semibold tracking-tight">Wallet</h1>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h1 className="text-xl font-semibold tracking-tight">Wallet</h1>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            disabled={refreshMutation.isPending}
+            onClick={() =>
+              refreshMutation.mutate({ publicKeys: [data.publicKey] })
+            }
+          >
+            {refreshMutation.isPending ? (
+              <Spinner className="size-4" />
+            ) : (
+              <IconRefresh className="size-4" />
+            )}
+            Refresh balance
+          </Button>
+        </div>
         <dl className="grid gap-2 text-sm sm:grid-cols-2">
           <div>
             <dt className="text-muted-foreground">pubkey</dt>
