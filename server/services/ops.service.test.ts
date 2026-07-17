@@ -48,6 +48,7 @@ async function setupOpsTest(t: TestContext) {
   const { opsService } = await import("./ops.service");
   const { prisma } = await import("@/lib/prisma");
 
+  const NOW = new Date("2026-07-17T12:00:00.000Z");
   const users = new Map<
     string,
     {
@@ -58,6 +59,7 @@ async function setupOpsTest(t: TestContext) {
       plan: "FREE" | "PRO";
       paidPlanStartedAt: Date | null;
       paidPlanExpiresAt: Date | null;
+      createdAt: Date;
     }
   >([
     [
@@ -70,6 +72,8 @@ async function setupOpsTest(t: TestContext) {
         plan: "PRO",
         paidPlanStartedAt: null,
         paidPlanExpiresAt: null,
+        // Outside the 7d window
+        createdAt: new Date("2026-06-01T00:00:00.000Z"),
       },
     ],
     [
@@ -82,6 +86,8 @@ async function setupOpsTest(t: TestContext) {
         plan: "PRO",
         paidPlanStartedAt: new Date("2026-01-01T00:00:00.000Z"),
         paidPlanExpiresAt: new Date("2026-02-01T00:00:00.000Z"),
+        // Inside the 7d window
+        createdAt: new Date("2026-07-15T00:00:00.000Z"),
       },
     ],
     [
@@ -94,6 +100,8 @@ async function setupOpsTest(t: TestContext) {
         plan: "FREE",
         paidPlanStartedAt: null,
         paidPlanExpiresAt: null,
+        // Outside the 7d window
+        createdAt: new Date("2026-01-01T00:00:00.000Z"),
       },
     ],
   ]);
@@ -158,13 +166,14 @@ async function setupOpsTest(t: TestContext) {
         status: "FAILED" as const,
         progress: 40,
         currentStep: "bundle_submit",
-        startedAt: new Date("2026-06-03T00:00:00.000Z"),
-        completedAt: new Date("2026-06-03T00:05:00.000Z"),
+        startedAt: new Date("2026-07-14T00:00:00.000Z"),
+        completedAt: new Date("2026-07-14T00:05:00.000Z"),
         cancelRequestedAt: null as Date | null,
         errorMessage: "bundle timed out",
         tokenPublicKey: MINT,
-        createdAt: new Date("2026-06-03T00:00:00.000Z"),
-        updatedAt: new Date("2026-06-03T00:05:00.000Z"),
+        // Inside the 7d window (relative to NOW in setupOpsTest)
+        createdAt: new Date("2026-07-14T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-14T00:05:00.000Z"),
         logs: [
           {
             id: "log-1",
@@ -172,7 +181,7 @@ async function setupOpsTest(t: TestContext) {
             message: "started",
             step: "init",
             data: { ok: true },
-            createdAt: new Date("2026-06-03T00:00:01.000Z"),
+            createdAt: new Date("2026-07-14T00:00:01.000Z"),
           },
         ],
       },
@@ -315,7 +324,35 @@ async function setupOpsTest(t: TestContext) {
     };
   }) as unknown as typeof prisma.launch.findUnique);
 
-  return { opsService };
+  restore(t, prisma.user, "count", (async (args?: {
+    where?: { createdAt?: { gte?: Date } };
+  }) => {
+    const since = args?.where?.createdAt?.gte;
+    return [...users.values()].filter((user) =>
+      since ? user.createdAt >= since : true
+    ).length;
+  }) as unknown as typeof prisma.user.count);
+
+  restore(t, prisma.token, "count", (async () => {
+    return tokens.size;
+  }) as unknown as typeof prisma.token.count);
+
+  restore(t, prisma.launch, "count", (async (args?: {
+    where?: {
+      createdAt?: { gte?: Date };
+      status?: string;
+    };
+  }) => {
+    const since = args?.where?.createdAt?.gte;
+    const status = args?.where?.status;
+    return [...launches.values()].filter((launch) => {
+      if (since && launch.createdAt < since) return false;
+      if (status && launch.status !== status) return false;
+      return true;
+    }).length;
+  }) as unknown as typeof prisma.launch.count);
+
+  return { opsService, NOW };
 }
 
 async function expectNotFound(promise: Promise<unknown>) {
@@ -336,6 +373,23 @@ function assertNoPrivateKeyFields(value: unknown) {
   assert.equal(json.includes("dev-secret"), false);
   assert.equal(json.includes("mint-secret"), false);
 }
+
+test("non-Operator cannot read Ops Overview", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(opsService.getOverview("regular-user"));
+});
+
+test("Operator Ops Overview returns the five summary tiles", async (t) => {
+  const { opsService, NOW } = await setupOpsTest(t);
+  const overview = await opsService.getOverview(OPERATOR_ID, { now: NOW });
+  assert.deepEqual(overview, {
+    newUsers7d: 1,
+    launches7d: 1,
+    failedLaunches7d: 1,
+    totalUsers: 3,
+    totalTokens: 1,
+  });
+});
 
 test("non-Operator cannot read User spine", async (t) => {
   const { opsService } = await setupOpsTest(t);

@@ -30,6 +30,7 @@ See ADRs:
 
 ## Procedures
 
+- `ops.getOverview` — `operatorProcedure`; Ops Overview tiles (new Users 7d, Launches 7d, Failed Launches 7d, total Users, total Tokens)
 - `ops.lookupUser` — `operatorProcedure`; main-wallet or mint → User id
 - `ops.getUserSpine` — `operatorProcedure`; User identity + tokens + launches + wallets including MAIN (no private keys)
 - `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs (no raw `input`/`result`)
@@ -39,11 +40,15 @@ See ADRs:
 
 ## UI routes
 
-- `/ops` — lookup
+- `/ops` — Ops Overview (summary tiles) + User lookup
+- `/ops/users` — Users browse (stub until browse ticket)
+- `/ops/wallets` — Wallets browse (stub until browse ticket)
+- `/ops/tokens` — Tokens browse (stub until browse ticket)
+- `/ops/launches` — Launches browse (stub until browse ticket)
 - `/ops/users/[userId]` — User spine + reveal controls
 - `/ops/launches/[launchId]` — Launch autopsy
 
-Ops uses a minimal dedicated layout (no product token sidebar). No Ops entry in normal app navigation.
+Ops uses a minimal dedicated layout with an Ops sidebar (Overview, Users, Wallets, Tokens, Launches) and no product token sidebar. No Ops entry in normal app navigation.
 
 ## Migration note
 
@@ -51,4 +56,4 @@ Agents edit the Prisma schema only. Humans run the migration that adds `User.isO
 
 ## Tests
 
-`server/services/ops.service.test.ts` covers Operator vs non-Operator denial, lookup hits/misses, private-key omission, and reveal + audit log behavior at the ops service seam.
+`server/services/ops.service.test.ts` covers Operator vs non-Operator denial, Ops Overview tile counts, lookup hits/misses, private-key omission, and reveal + audit log behavior at the ops service seam.

@@ -4,6 +4,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getServerUser } from "@/lib/utils/auth";
 import { buildAuthRedirectPath } from "@/lib/utils/auth-redirect";
+import { OpsSidebar } from "@/components/ops/ops-sidebar";
 
 export const dynamic = "force-dynamic";
 
@@ -54,9 +55,12 @@ export default async function OpsLayout({
           </Link>
         </div>
       </header>
-      <main className="mx-auto w-full max-w-6xl px-4 py-6 md:px-6 md:py-8">
-        {children}
-      </main>
+      <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6 md:gap-8 md:px-6 md:py-8">
+        <aside className="border-border w-44 shrink-0 border-r pr-4 md:w-52 md:pr-6">
+          <OpsSidebar />
+        </aside>
+        <main className="min-w-0 flex-1">{children}</main>
+      </div>
     </div>
   );
 }

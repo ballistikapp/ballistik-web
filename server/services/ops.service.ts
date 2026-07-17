@@ -19,6 +19,12 @@ export type OpsRevealOptions = {
   logger?: OpsLogger;
 };
 
+export type OpsOverviewOptions = {
+  now?: Date;
+};
+
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
 function throwNotFound(): never {
   throw new AppError(NOT_FOUND, 404);
 }
@@ -48,6 +54,32 @@ function containsPrivateKeyField(value: unknown): boolean {
 }
 
 export const opsService = {
+  async getOverview(callerUserId: string, options: OpsOverviewOptions = {}) {
+    await requireOperator(callerUserId);
+
+    const now = options.now ?? new Date();
+    const since = new Date(now.getTime() - SEVEN_DAYS_MS);
+
+    const [newUsers7d, launches7d, failedLaunches7d, totalUsers, totalTokens] =
+      await Promise.all([
+        prisma.user.count({ where: { createdAt: { gte: since } } }),
+        prisma.launch.count({ where: { createdAt: { gte: since } } }),
+        prisma.launch.count({
+          where: { status: "FAILED", createdAt: { gte: since } },
+        }),
+        prisma.user.count(),
+        prisma.token.count(),
+      ]);
+
+    return {
+      newUsers7d,
+      launches7d,
+      failedLaunches7d,
+      totalUsers,
+      totalTokens,
+    };
+  },
+
   async lookupUser(callerUserId: string, input: OpsLookupInput) {
     await requireOperator(callerUserId);
 

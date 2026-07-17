@@ -2,6 +2,8 @@ import { z } from "zod";
 
 const publicKeySchema = z.string().min(32, "Invalid public key");
 
+export const opsGetOverviewSchema = z.object({});
+
 export const opsLookupSchema = z.discriminatedUnion("type", [
   z.object({
     type: z.literal("mainWallet"),
@@ -32,6 +34,7 @@ export const opsRevealPrivateKeySchema = z.discriminatedUnion("targetType", [
   }),
 ]);
 
+export type OpsGetOverviewInput = z.infer<typeof opsGetOverviewSchema>;
 export type OpsLookupInput = z.infer<typeof opsLookupSchema>;
 export type OpsGetUserSpineInput = z.infer<typeof opsGetUserSpineSchema>;
 export type OpsGetLaunchAutopsyInput = z.infer<typeof opsGetLaunchAutopsySchema>;

@@ -6,12 +6,19 @@ import {
 import { opsService } from "@/server/services/ops.service";
 import {
   opsGetLaunchAutopsySchema,
+  opsGetOverviewSchema,
   opsGetUserSpineSchema,
   opsLookupSchema,
   opsRevealPrivateKeySchema,
 } from "@/server/schemas/ops.schema";
 
 export const opsRouter = router({
+  getOverview: operatorProcedure
+    .input(opsGetOverviewSchema)
+    .query(async ({ ctx }) => {
+      return await opsService.getOverview(ctx.user.id);
+    }),
+
   lookupUser: operatorProcedure
     .input(opsLookupSchema)
     .query(async ({ input, ctx }) => {
