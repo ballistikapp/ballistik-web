@@ -1,7 +1,7 @@
 import {
-  protectedProcedure,
+  operatorProcedure,
+  operatorSensitiveProcedure,
   router,
-  sensitiveProcedure,
 } from "../trpc";
 import { opsService } from "@/server/services/ops.service";
 import {
@@ -12,25 +12,25 @@ import {
 } from "@/server/schemas/ops.schema";
 
 export const opsRouter = router({
-  lookupUser: protectedProcedure
+  lookupUser: operatorProcedure
     .input(opsLookupSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.lookupUser(ctx.user.id, input);
     }),
 
-  getUserSpine: protectedProcedure
+  getUserSpine: operatorProcedure
     .input(opsGetUserSpineSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.getUserSpine(ctx.user.id, input.userId);
     }),
 
-  getLaunchAutopsy: protectedProcedure
+  getLaunchAutopsy: operatorProcedure
     .input(opsGetLaunchAutopsySchema)
     .query(async ({ input, ctx }) => {
       return await opsService.getLaunchAutopsy(ctx.user.id, input.launchId);
     }),
 
-  revealPrivateKey: sensitiveProcedure
+  revealPrivateKey: operatorSensitiveProcedure
     .input(opsRevealPrivateKeySchema)
     .mutation(async ({ input, ctx }) => {
       return await opsService.revealPrivateKey(ctx.user.id, input, {

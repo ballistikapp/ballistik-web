@@ -30,10 +30,12 @@ See ADRs:
 
 ## Procedures
 
-- `ops.lookupUser` — protected; main-wallet or mint → User id
-- `ops.getUserSpine` — protected; User identity + tokens + launches + wallets (no private keys)
-- `ops.getLaunchAutopsy` — protected; Launch status/timeline logs (no raw `input`/`result`)
-- `ops.revealPrivateKey` — sensitive (8/min); wallet or mint key; logs Operator + target via request logger
+- `ops.lookupUser` — `operatorProcedure`; main-wallet or mint → User id
+- `ops.getUserSpine` — `operatorProcedure`; User identity + tokens + launches + wallets including MAIN (no private keys)
+- `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs (no raw `input`/`result`)
+- `ops.revealPrivateKey` — `operatorSensitiveProcedure` (8/min); wallet or mint key; logs Operator + target via request logger
+
+`operatorProcedure` / `operatorSensitiveProcedure` are the ops-facing procedure names (auth + rate limit). Operator authorization remains in `opsService` via a DB `isOperator` check so denials stay not-found and stay testable at the service seam.
 
 ## UI routes
 

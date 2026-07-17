@@ -123,7 +123,8 @@ export function OpsUserSpine({ userId }: OpsUserSpineProps) {
                   <th className="py-2 pr-3 font-medium">progress</th>
                   <th className="py-2 pr-3 font-medium">step</th>
                   <th className="py-2 pr-3 font-medium">token</th>
-                  <th className="py-2 font-medium">started</th>
+                  <th className="py-2 pr-3 font-medium">started</th>
+                  <th className="py-2 font-medium">completed</th>
                 </tr>
               </thead>
               <tbody>
@@ -143,7 +144,8 @@ export function OpsUserSpine({ userId }: OpsUserSpineProps) {
                     <td className="py-2 pr-3 font-mono text-xs break-all">
                       {launch.tokenPublicKey ?? "—"}
                     </td>
-                    <td className="py-2">{formatDate(launch.startedAt)}</td>
+                    <td className="py-2 pr-3">{formatDate(launch.startedAt)}</td>
+                    <td className="py-2">{formatDate(launch.completedAt)}</td>
                   </tr>
                 ))}
               </tbody>

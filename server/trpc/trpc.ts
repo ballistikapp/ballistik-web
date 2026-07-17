@@ -156,6 +156,13 @@ export const sensitiveProcedure = t.procedure
   .use(errorMapperMiddleware);
 
 /**
+ * Authenticated ops procedures. Operator authorization is enforced in opsService
+ * (DB `User.isOperator` check) so denial stays not-found and is testable at the service seam.
+ */
+export const operatorProcedure = protectedProcedure;
+export const operatorSensitiveProcedure = sensitiveProcedure;
+
+/**
  * Middleware example - logging
  */
 export const loggedProcedure = t.procedure.use(async ({ path, next, ctx }) => {

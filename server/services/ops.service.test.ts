@@ -190,6 +190,7 @@ async function setupOpsTest(t: TestContext) {
         return { isOperator: user.isOperator };
       }
       if (args.select && "tokens" in args.select) {
+        const mainWallet = wallets.get(user.mainWalletPublicKey);
         return {
           id: user.id,
           name: user.name,
@@ -197,6 +198,15 @@ async function setupOpsTest(t: TestContext) {
           plan: user.plan,
           paidPlanStartedAt: user.paidPlanStartedAt,
           paidPlanExpiresAt: user.paidPlanExpiresAt,
+          mainWallet: mainWallet
+            ? {
+                publicKey: mainWallet.publicKey,
+                type: mainWallet.type,
+                balanceSol: mainWallet.balanceSol,
+                balanceRefreshedAt: mainWallet.balanceRefreshedAt,
+                tokenPublicKey: mainWallet.tokenPublicKey,
+              }
+            : null,
           tokens: [...tokens.values()]
             .filter((token) => token.userId === user.id)
             .map((token) => ({
@@ -220,8 +230,13 @@ async function setupOpsTest(t: TestContext) {
               createdAt: launch.createdAt,
               updatedAt: launch.updatedAt,
             })),
+          // MAIN is linked via mainWalletUser, not Wallet.userId — omit it here.
           wallets: [...wallets.values()]
-            .filter((wallet) => wallet.userId === user.id)
+            .filter(
+              (wallet) =>
+                wallet.userId === user.id &&
+                wallet.publicKey !== user.mainWalletPublicKey
+            )
             .map((wallet) => ({
               publicKey: wallet.publicKey,
               type: wallet.type,
@@ -371,13 +386,14 @@ test("Operator lookup unknown identifier fails closed", async (t) => {
   );
 });
 
-test("User spine omits private keys", async (t) => {
+test("User spine omits private keys and includes MAIN balance", async (t) => {
   const { opsService } = await setupOpsTest(t);
   const spine = await opsService.getUserSpine(OPERATOR_ID, TARGET_USER_ID);
   assert.equal(spine.id, TARGET_USER_ID);
   assert.equal(spine.tokens.length, 1);
   assert.equal(spine.launches.length, 1);
   assert.equal(spine.wallets.length, 2);
+  assert.equal(spine.wallets[0]?.publicKey, MAIN_WALLET);
   assert.equal(spine.wallets[0]?.balanceSol, 1.5);
   assertNoPrivateKeyFields(spine);
 });

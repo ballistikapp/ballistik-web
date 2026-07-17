@@ -96,6 +96,15 @@ export const opsService = {
         plan: true,
         paidPlanStartedAt: true,
         paidPlanExpiresAt: true,
+        mainWallet: {
+          select: {
+            publicKey: true,
+            type: true,
+            balanceSol: true,
+            balanceRefreshedAt: true,
+            tokenPublicKey: true,
+          },
+        },
         tokens: {
           orderBy: { createdAt: "desc" },
           select: {
@@ -137,6 +146,26 @@ export const opsService = {
       throwNotFound();
     }
 
+    const operationalWallets = user.wallets.map((wallet) => ({
+      publicKey: wallet.publicKey,
+      type: wallet.type,
+      balanceSol: Number(wallet.balanceSol ?? 0),
+      balanceRefreshedAt: wallet.balanceRefreshedAt,
+      tokenPublicKey: wallet.tokenPublicKey,
+    }));
+    const wallets = [
+      {
+        publicKey: user.mainWallet.publicKey,
+        type: user.mainWallet.type,
+        balanceSol: Number(user.mainWallet.balanceSol ?? 0),
+        balanceRefreshedAt: user.mainWallet.balanceRefreshedAt,
+        tokenPublicKey: user.mainWallet.tokenPublicKey,
+      },
+      ...operationalWallets.filter(
+        (wallet) => wallet.publicKey !== user.mainWallet.publicKey
+      ),
+    ];
+
     const spine = {
       id: user.id,
       name: user.name,
@@ -162,17 +191,11 @@ export const opsService = {
         createdAt: launch.createdAt,
         updatedAt: launch.updatedAt,
       })),
-      wallets: user.wallets.map((wallet) => ({
-        publicKey: wallet.publicKey,
-        type: wallet.type,
-        balanceSol: Number(wallet.balanceSol ?? 0),
-        balanceRefreshedAt: wallet.balanceRefreshedAt,
-        tokenPublicKey: wallet.tokenPublicKey,
-      })),
+      wallets,
     };
 
     if (containsPrivateKeyField(spine)) {
-      throw new AppError("Ops projection leaked private key fields", 500);
+      throw new Error("Ops projection leaked private key fields");
     }
 
     return spine;
@@ -234,7 +257,7 @@ export const opsService = {
     };
 
     if (containsPrivateKeyField(autopsy)) {
-      throw new AppError("Ops projection leaked private key fields", 500);
+      throw new Error("Ops projection leaked private key fields");
     }
 
     return autopsy;
