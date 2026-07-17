@@ -97,6 +97,8 @@ interface DataTableProps<TData, TValue> {
   urlStatePrefix?: string;
   onPaginationStateChange?: (pagination: PaginationState) => void;
   manualPagination?: boolean;
+  manualSorting?: boolean;
+  manualFiltering?: boolean;
   pageCount?: number;
   rowCount?: number;
   isRefreshing?: boolean;
@@ -121,15 +123,22 @@ export function DataTable<TData, TValue>({
   urlStatePrefix,
   onPaginationStateChange,
   manualPagination = false,
+  manualSorting = false,
+  manualFiltering = false,
   pageCount,
   rowCount,
   isRefreshing = false,
   onRowClick,
   rowClassName,
 }: DataTableProps<TData, TValue>) {
+  const defaultSort = initialSorting[0]
+    ? `${initialSorting[0].id}:${initialSorting[0].desc ? "desc" : "asc"}`
+    : undefined;
+
   const urlState = useDataTableParams({
     defaultPageSize: initialPagination.pageSize,
     prefix: urlStatePrefix,
+    defaultSort,
   });
 
   const [rowSelection, setRowSelection] = React.useState({});
@@ -199,6 +208,8 @@ export function DataTable<TData, TValue>({
     onGlobalFilterChange: setGlobalFilter,
     globalFilterFn,
     manualPagination,
+    manualSorting,
+    manualFiltering,
     ...(manualPagination
       ? {
           pageCount,

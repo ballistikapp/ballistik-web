@@ -1,10 +1,5 @@
-import { OpsStubPage } from "@/components/ops/ops-stub-page";
+import { OpsLaunchesTable } from "@/components/ops/ops-launches-table";
 
 export default function OpsLaunchesPage() {
-  return (
-    <OpsStubPage
-      title="Launches"
-      description="Launch browse table ships in a later Ops Console ticket."
-    />
-  );
+  return <OpsLaunchesTable />;
 }

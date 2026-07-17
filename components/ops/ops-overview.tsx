@@ -13,7 +13,7 @@ const TILES = [
 ] as const;
 
 export function OpsOverview() {
-  const overviewQuery = trpc.ops.getOverview.useQuery();
+  const overviewQuery = trpc.ops.getOverview.useQuery({});
 
   return (
     <div className="flex flex-col gap-8">

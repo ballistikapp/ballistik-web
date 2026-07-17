@@ -1,9 +1,11 @@
 import "server-only";
 
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { logger as defaultLogger, type LogContext } from "@/lib/logger";
 import { AppError } from "@/server/errors";
 import type {
+  OpsListLaunchesInput,
+  OpsListUsersInput,
   OpsLookupInput,
   OpsRevealPrivateKeyInput,
 } from "@/server/schemas/ops.schema";
@@ -24,6 +26,14 @@ export type OpsOverviewOptions = {
 };
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+const LAUNCH_STATUSES = [
+  "PENDING",
+  "RUNNING",
+  "CANCELED",
+  "FAILED",
+  "SUCCEEDED",
+] as const;
 
 function throwNotFound(): never {
   throw new AppError(NOT_FOUND, 404);
@@ -53,6 +63,41 @@ function containsPrivateKeyField(value: unknown): boolean {
   );
 }
 
+function buildUserSearchWhere(
+  search: string | undefined
+): Prisma.UserWhereInput | undefined {
+  if (!search) return undefined;
+  return {
+    OR: [
+      { id: { contains: search, mode: "insensitive" } },
+      { name: { contains: search, mode: "insensitive" } },
+      { mainWalletPublicKey: { contains: search, mode: "insensitive" } },
+    ],
+  };
+}
+
+function buildLaunchSearchWhere(
+  search: string | undefined
+): Prisma.LaunchWhereInput | undefined {
+  if (!search) return undefined;
+
+  const or: Prisma.LaunchWhereInput[] = [
+    { id: { contains: search, mode: "insensitive" } },
+    { tokenPublicKey: { contains: search, mode: "insensitive" } },
+    { userId: { contains: search, mode: "insensitive" } },
+    { currentStep: { contains: search, mode: "insensitive" } },
+  ];
+
+  const needle = search.trim().toLowerCase();
+  for (const status of LAUNCH_STATUSES) {
+    if (status.toLowerCase().includes(needle)) {
+      or.push({ status });
+    }
+  }
+
+  return { OR: or };
+}
+
 export const opsService = {
   async getOverview(callerUserId: string, options: OpsOverviewOptions = {}) {
     await requireOperator(callerUserId);
@@ -78,6 +123,111 @@ export const opsService = {
       totalUsers,
       totalTokens,
     };
+  },
+
+  async listUsers(callerUserId: string, input: OpsListUsersInput) {
+    await requireOperator(callerUserId);
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const sortBy = input.sortBy ?? "createdAt";
+    const sortDir = input.sortDir ?? "desc";
+    const where = buildUserSearchWhere(input.search);
+    const skip = (page - 1) * pageSize;
+
+    const [totalCount, rows] = await Promise.all([
+      prisma.user.count({ where }),
+      prisma.user.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          name: true,
+          mainWalletPublicKey: true,
+          plan: true,
+          paidPlanExpiresAt: true,
+          createdAt: true,
+        },
+      }),
+    ]);
+
+    const result = {
+      items: rows.map((user) => ({
+        id: user.id,
+        name: user.name,
+        mainWalletPublicKey: user.mainWalletPublicKey,
+        plan: user.plan,
+        paidPlanExpiresAt: user.paidPlanExpiresAt,
+        createdAt: user.createdAt,
+      })),
+      totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async listLaunches(callerUserId: string, input: OpsListLaunchesInput) {
+    await requireOperator(callerUserId);
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const sortBy = input.sortBy ?? "createdAt";
+    const sortDir = input.sortDir ?? "desc";
+    const where = buildLaunchSearchWhere(input.search);
+    const skip = (page - 1) * pageSize;
+
+    const [totalCount, rows] = await Promise.all([
+      prisma.launch.count({ where }),
+      prisma.launch.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          status: true,
+          progress: true,
+          currentStep: true,
+          tokenPublicKey: true,
+          userId: true,
+          startedAt: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const result = {
+      items: rows.map((launch) => ({
+        id: launch.id,
+        status: launch.status,
+        progress: launch.progress,
+        currentStep: launch.currentStep,
+        tokenPublicKey: launch.tokenPublicKey,
+        userId: launch.userId,
+        userName: launch.user.name,
+        startedAt: launch.startedAt,
+        createdAt: launch.createdAt,
+      })),
+      totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
   },
 
   async lookupUser(callerUserId: string, input: OpsLookupInput) {

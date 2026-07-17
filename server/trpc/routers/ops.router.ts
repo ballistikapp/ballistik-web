@@ -8,6 +8,8 @@ import {
   opsGetLaunchAutopsySchema,
   opsGetOverviewSchema,
   opsGetUserSpineSchema,
+  opsListLaunchesSchema,
+  opsListUsersSchema,
   opsLookupSchema,
   opsRevealPrivateKeySchema,
 } from "@/server/schemas/ops.schema";
@@ -17,6 +19,18 @@ export const opsRouter = router({
     .input(opsGetOverviewSchema)
     .query(async ({ ctx }) => {
       return await opsService.getOverview(ctx.user.id);
+    }),
+
+  listUsers: operatorProcedure
+    .input(opsListUsersSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listUsers(ctx.user.id, input);
+    }),
+
+  listLaunches: operatorProcedure
+    .input(opsListLaunchesSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listLaunches(ctx.user.id, input);
     }),
 
   lookupUser: operatorProcedure

@@ -4,11 +4,11 @@
 
 **Blocked by:** 01 — Ops shell: sidebar + Ops Overview
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] `/ops/users` lists Users in a dense table with pagination, search, and limited sort
-- [ ] User row navigates to the existing User spine
-- [ ] `/ops/launches` lists Launches in a dense table with pagination, search, and limited sort
-- [ ] Launch row navigates to the existing Launch autopsy
-- [ ] List/read payloads omit private keys
-- [ ] Non-Operator access remains not-found at page and procedure level
+- [x] `/ops/users` lists Users in a dense table with pagination, search, and limited sort
+- [x] User row navigates to the existing User spine
+- [x] `/ops/launches` lists Launches in a dense table with pagination, search, and limited sort
+- [x] Launch row navigates to the existing Launch autopsy
+- [x] List/read payloads omit private keys
+- [x] Non-Operator access remains not-found at page and procedure level

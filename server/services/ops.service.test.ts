@@ -324,14 +324,131 @@ async function setupOpsTest(t: TestContext) {
     };
   }) as unknown as typeof prisma.launch.findUnique);
 
+  function matchesContains(
+    value: string | null | undefined,
+    search: string
+  ): boolean {
+    return (value ?? "").toLowerCase().includes(search.toLowerCase());
+  }
+
+  function filterUsers(where?: {
+    createdAt?: { gte?: Date };
+    OR?: Array<Record<string, { contains?: string; mode?: string } | string>>;
+  }) {
+    const since = where?.createdAt?.gte;
+    const or = where?.OR;
+    return [...users.values()].filter((user) => {
+      if (since && user.createdAt < since) return false;
+      if (!or || or.length === 0) return true;
+      return or.some((clause) => {
+        if ("id" in clause && typeof clause.id === "object") {
+          return matchesContains(user.id, clause.id.contains ?? "");
+        }
+        if ("name" in clause && typeof clause.name === "object") {
+          return matchesContains(user.name, clause.name.contains ?? "");
+        }
+        if (
+          "mainWalletPublicKey" in clause &&
+          typeof clause.mainWalletPublicKey === "object"
+        ) {
+          return matchesContains(
+            user.mainWalletPublicKey,
+            clause.mainWalletPublicKey.contains ?? ""
+          );
+        }
+        return false;
+      });
+    });
+  }
+
+  function filterLaunches(where?: {
+    createdAt?: { gte?: Date };
+    status?: string;
+    OR?: Array<
+      | { id: { contains: string; mode?: string } }
+      | { tokenPublicKey: { contains: string; mode?: string } }
+      | { userId: { contains: string; mode?: string } }
+      | { currentStep: { contains: string; mode?: string } }
+      | { status: string }
+    >;
+  }) {
+    const since = where?.createdAt?.gte;
+    const status = where?.status;
+    const or = where?.OR;
+    return [...launches.values()].filter((launch) => {
+      if (since && launch.createdAt < since) return false;
+      if (status && launch.status !== status) return false;
+      if (!or || or.length === 0) return true;
+      return or.some((clause) => {
+        if ("id" in clause) {
+          return matchesContains(launch.id, clause.id.contains);
+        }
+        if ("tokenPublicKey" in clause) {
+          return matchesContains(
+            launch.tokenPublicKey,
+            clause.tokenPublicKey.contains
+          );
+        }
+        if ("userId" in clause) {
+          return matchesContains(launch.userId, clause.userId.contains);
+        }
+        if ("currentStep" in clause) {
+          return matchesContains(
+            launch.currentStep,
+            clause.currentStep.contains
+          );
+        }
+        if ("status" in clause) {
+          return launch.status === clause.status;
+        }
+        return false;
+      });
+    });
+  }
+
   restore(t, prisma.user, "count", (async (args?: {
-    where?: { createdAt?: { gte?: Date } };
+    where?: {
+      createdAt?: { gte?: Date };
+      OR?: Array<Record<string, { contains?: string; mode?: string } | string>>;
+    };
   }) => {
-    const since = args?.where?.createdAt?.gte;
-    return [...users.values()].filter((user) =>
-      since ? user.createdAt >= since : true
-    ).length;
+    return filterUsers(args?.where).length;
   }) as unknown as typeof prisma.user.count);
+
+  restore(t, prisma.user, "findMany", (async (args?: {
+    where?: {
+      createdAt?: { gte?: Date };
+      OR?: Array<Record<string, { contains?: string; mode?: string } | string>>;
+    };
+    orderBy?: Record<string, "asc" | "desc">;
+    skip?: number;
+    take?: number;
+    select?: Record<string, unknown>;
+  }) => {
+    let rows = filterUsers(args?.where);
+    const orderBy = args?.orderBy ?? {};
+    const [sortKey, sortDir] = Object.entries(orderBy)[0] ?? ["createdAt", "desc"];
+    rows = [...rows].sort((a, b) => {
+      const left = a[sortKey as keyof typeof a];
+      const right = b[sortKey as keyof typeof b];
+      if (left == null && right == null) return 0;
+      if (left == null) return sortDir === "asc" ? -1 : 1;
+      if (right == null) return sortDir === "asc" ? 1 : -1;
+      if (left < right) return sortDir === "asc" ? -1 : 1;
+      if (left > right) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    const skip = args?.skip ?? 0;
+    const take = args?.take ?? rows.length;
+    return rows.slice(skip, skip + take).map((user) => ({
+      id: user.id,
+      name: user.name,
+      mainWalletPublicKey: user.mainWalletPublicKey,
+      plan: user.plan,
+      paidPlanExpiresAt: user.paidPlanExpiresAt,
+      createdAt: user.createdAt,
+    }));
+  }) as unknown as typeof prisma.user.findMany);
 
   restore(t, prisma.token, "count", (async () => {
     return tokens.size;
@@ -341,16 +458,72 @@ async function setupOpsTest(t: TestContext) {
     where?: {
       createdAt?: { gte?: Date };
       status?: string;
+      OR?: Array<
+        | { id: { contains: string; mode?: string } }
+        | { tokenPublicKey: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { currentStep: { contains: string; mode?: string } }
+        | { status: string }
+      >;
     };
   }) => {
-    const since = args?.where?.createdAt?.gte;
-    const status = args?.where?.status;
-    return [...launches.values()].filter((launch) => {
-      if (since && launch.createdAt < since) return false;
-      if (status && launch.status !== status) return false;
-      return true;
-    }).length;
+    return filterLaunches(args?.where).length;
   }) as unknown as typeof prisma.launch.count);
+
+  restore(t, prisma.launch, "findMany", (async (args?: {
+    where?: {
+      createdAt?: { gte?: Date };
+      status?: string;
+      OR?: Array<
+        | { id: { contains: string; mode?: string } }
+        | { tokenPublicKey: { contains: string; mode?: string } }
+        | { userId: { contains: string; mode?: string } }
+        | { currentStep: { contains: string; mode?: string } }
+        | { status: string }
+      >;
+    };
+    orderBy?: Record<string, "asc" | "desc">;
+    skip?: number;
+    take?: number;
+    select?: Record<string, unknown>;
+  }) => {
+    let rows = filterLaunches(args?.where);
+    const orderBy = args?.orderBy ?? {};
+    const [sortKey, sortDir] = Object.entries(orderBy)[0] ?? ["createdAt", "desc"];
+    rows = [...rows].sort((a, b) => {
+      const left = a[sortKey as keyof typeof a];
+      const right = b[sortKey as keyof typeof b];
+      if (left == null && right == null) return 0;
+      if (left == null) return sortDir === "asc" ? -1 : 1;
+      if (right == null) return sortDir === "asc" ? 1 : -1;
+      if (left < right) return sortDir === "asc" ? -1 : 1;
+      if (left > right) return sortDir === "asc" ? 1 : -1;
+      return 0;
+    });
+    const skip = args?.skip ?? 0;
+    const take = args?.take ?? rows.length;
+    return rows.slice(skip, skip + take).map((launch) => {
+      const user = users.get(launch.userId);
+      return {
+        id: launch.id,
+        status: launch.status,
+        progress: launch.progress,
+        currentStep: launch.currentStep,
+        tokenPublicKey: launch.tokenPublicKey,
+        userId: launch.userId,
+        startedAt: launch.startedAt,
+        createdAt: launch.createdAt,
+        user: user
+          ? {
+              id: user.id,
+              name: user.name,
+            }
+          : null,
+        // Intentionally present in DB row shape; list projection must strip it.
+        input: { privateKey: "should-not-appear" },
+      };
+    });
+  }) as unknown as typeof prisma.launch.findMany);
 
   return { opsService, NOW };
 }
@@ -510,4 +683,134 @@ test("reveal returns mint secret and logs Operator + target", async (t) => {
   assert.equal(result.privateKey, "mint-secret");
   assert.equal(auditLines[0]?.context?.targetType, "mint");
   assert.equal(auditLines[0]?.context?.targetPublicKey, MINT);
+});
+
+test("non-Operator cannot list Users", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.listUsers("regular-user", { page: 1, pageSize: 25 })
+  );
+});
+
+test("non-Operator cannot list Launches", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  await expectNotFound(
+    opsService.listLaunches("regular-user", { page: 1, pageSize: 25 })
+  );
+});
+
+test("Operator listUsers paginates, defaults createdAt desc, omits private keys", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listUsers(OPERATOR_ID, {
+    page: 1,
+    pageSize: 2,
+  });
+
+  assert.equal(page.totalCount, 3);
+  assert.equal(page.items.length, 2);
+  assert.equal(page.items[0]?.id, TARGET_USER_ID);
+  assert.equal(page.items[1]?.id, OPERATOR_ID);
+  assert.equal(page.items[0]?.mainWalletPublicKey, MAIN_WALLET);
+  assert.equal(page.items[0]?.plan, "PRO");
+  assertNoPrivateKeyFields(page);
+});
+
+test("Operator listUsers searches name, main wallet, and id", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const byName = await opsService.listUsers(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "target",
+  });
+  assert.equal(byName.totalCount, 1);
+  assert.equal(byName.items[0]?.id, TARGET_USER_ID);
+
+  const byWallet = await opsService.listUsers(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: MAIN_WALLET.slice(0, 12),
+  });
+  assert.equal(byWallet.totalCount, 1);
+  assert.equal(byWallet.items[0]?.id, TARGET_USER_ID);
+
+  const byId = await opsService.listUsers(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "regular-user",
+  });
+  assert.equal(byId.totalCount, 1);
+  assert.equal(byId.items[0]?.id, "regular-user");
+});
+
+test("Operator listUsers sorts by allowed columns", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listUsers(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    sortBy: "name",
+    sortDir: "asc",
+  });
+
+  assert.deepEqual(
+    page.items.map((user) => user.name),
+    ["Operator", "Regular", "Target User"]
+  );
+});
+
+test("Operator listLaunches includes owner and omits private keys", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+  });
+
+  assert.equal(page.totalCount, 1);
+  assert.equal(page.items[0]?.id, LAUNCH_ID);
+  assert.equal(page.items[0]?.userId, TARGET_USER_ID);
+  assert.equal(page.items[0]?.userName, "Target User");
+  assert.equal(page.items[0]?.status, "FAILED");
+  assert.equal(page.items[0]?.tokenPublicKey, MINT);
+  assert.equal("input" in (page.items[0] as object), false);
+  assertNoPrivateKeyFields(page);
+});
+
+test("Operator listLaunches searches id, mint, user, status, and step", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+
+  const byStatus = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "fail",
+  });
+  assert.equal(byStatus.totalCount, 1);
+  assert.equal(byStatus.items[0]?.id, LAUNCH_ID);
+
+  const byStep = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "bundle_submit",
+  });
+  assert.equal(byStep.totalCount, 1);
+
+  const miss = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    search: "no-such-launch",
+  });
+  assert.equal(miss.totalCount, 0);
+  assert.equal(miss.items.length, 0);
+});
+
+test("Operator listLaunches sorts by allowed columns", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+    sortBy: "status",
+    sortDir: "asc",
+  });
+
+  assert.equal(page.items[0]?.id, LAUNCH_ID);
+  assert.equal(page.items[0]?.status, "FAILED");
 });

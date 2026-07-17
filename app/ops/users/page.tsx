@@ -1,10 +1,5 @@
-import { OpsStubPage } from "@/components/ops/ops-stub-page";
+import { OpsUsersTable } from "@/components/ops/ops-users-table";
 
 export default function OpsUsersPage() {
-  return (
-    <OpsStubPage
-      title="Users"
-      description="User browse table ships in a later Ops Console ticket."
-    />
-  );
+  return <OpsUsersTable />;
 }
