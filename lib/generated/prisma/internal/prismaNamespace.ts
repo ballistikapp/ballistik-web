@@ -2557,6 +2557,7 @@ export const UserScalarFieldEnum = {
   plan: 'plan',
   paidPlanStartedAt: 'paidPlanStartedAt',
   paidPlanExpiresAt: 'paidPlanExpiresAt',
+  isOperator: 'isOperator',
   mainWalletPublicKey: 'mainWalletPublicKey',
   authWalletPublicKey: 'authWalletPublicKey',
   createdAt: 'createdAt',
@@ -3103,6 +3104,13 @@ export type ListEnumUserPlanFieldRefInput<$PrismaModel> = FieldRefInputType<$Pri
 
 
 /**
+ * Reference to a field of type 'Boolean'
+ */
+export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
+    
+
+
+/**
  * Reference to a field of type 'Decimal'
  */
 export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
@@ -3141,13 +3149,6 @@ export type EnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$Prism
  * Reference to a field of type 'WalletType[]'
  */
 export type ListEnumWalletTypeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'WalletType[]'>
-    
-
-
-/**
- * Reference to a field of type 'Boolean'
- */
-export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Boolean'>
     
 
 

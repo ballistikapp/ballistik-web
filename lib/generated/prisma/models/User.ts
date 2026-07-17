@@ -30,6 +30,7 @@ export type UserMinAggregateOutputType = {
   plan: $Enums.UserPlan | null
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean | null
   mainWalletPublicKey: string | null
   authWalletPublicKey: string | null
   createdAt: Date | null
@@ -42,6 +43,7 @@ export type UserMaxAggregateOutputType = {
   plan: $Enums.UserPlan | null
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean | null
   mainWalletPublicKey: string | null
   authWalletPublicKey: string | null
   createdAt: Date | null
@@ -54,6 +56,7 @@ export type UserCountAggregateOutputType = {
   plan: number
   paidPlanStartedAt: number
   paidPlanExpiresAt: number
+  isOperator: number
   mainWalletPublicKey: number
   authWalletPublicKey: number
   createdAt: number
@@ -68,6 +71,7 @@ export type UserMinAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -80,6 +84,7 @@ export type UserMaxAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -92,6 +97,7 @@ export type UserCountAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -177,6 +183,7 @@ export type UserGroupByOutputType = {
   plan: $Enums.UserPlan
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean
   mainWalletPublicKey: string
   authWalletPublicKey: string | null
   createdAt: Date
@@ -210,6 +217,7 @@ export type UserWhereInput = {
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolFilter<"User"> | boolean
   mainWalletPublicKey?: Prisma.StringFilter<"User"> | string
   authWalletPublicKey?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
@@ -234,6 +242,7 @@ export type UserOrderByWithRelationInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -263,6 +272,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolFilter<"User"> | boolean
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
@@ -285,6 +295,7 @@ export type UserOrderByWithAggregationInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -303,6 +314,7 @@ export type UserScalarWhereWithAggregatesInput = {
   plan?: Prisma.EnumUserPlanWithAggregatesFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
   mainWalletPublicKey?: Prisma.StringWithAggregatesFilter<"User"> | string
   authWalletPublicKey?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -315,6 +327,7 @@ export type UserCreateInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -338,6 +351,7 @@ export type UserUncheckedCreateInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -361,6 +375,7 @@ export type UserUpdateInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -384,6 +399,7 @@ export type UserUncheckedUpdateInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -407,6 +423,7 @@ export type UserCreateManyInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -419,6 +436,7 @@ export type UserUpdateManyMutationInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -430,6 +448,7 @@ export type UserUncheckedUpdateManyInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -442,6 +461,7 @@ export type UserCountOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -454,6 +474,7 @@ export type UserMaxOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -466,6 +487,7 @@ export type UserMinOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -488,6 +510,10 @@ export type EnumUserPlanFieldUpdateOperationsInput = {
 
 export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
+}
+
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
 }
 
 export type NullableStringFieldUpdateOperationsInput = {
@@ -690,6 +716,7 @@ export type UserCreateWithoutSubscriptionPaymentsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -712,6 +739,7 @@ export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -750,6 +778,7 @@ export type UserUpdateWithoutSubscriptionPaymentsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -772,6 +801,7 @@ export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -794,6 +824,7 @@ export type UserCreateWithoutAuthSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -816,6 +847,7 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -854,6 +886,7 @@ export type UserUpdateWithoutAuthSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -876,6 +909,7 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -898,6 +932,7 @@ export type UserCreateWithoutWalletsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -920,6 +955,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -947,6 +983,7 @@ export type UserCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -969,6 +1006,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1007,6 +1045,7 @@ export type UserUpdateWithoutWalletsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1029,6 +1068,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1062,6 +1102,7 @@ export type UserUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1084,6 +1125,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1106,6 +1148,7 @@ export type UserCreateWithoutTokensInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1128,6 +1171,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1166,6 +1210,7 @@ export type UserUpdateWithoutTokensInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1188,6 +1233,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1210,6 +1256,7 @@ export type UserCreateWithoutLaunchesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1232,6 +1279,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1270,6 +1318,7 @@ export type UserUpdateWithoutLaunchesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1292,6 +1341,7 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1314,6 +1364,7 @@ export type UserCreateWithoutHoldingExitsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1336,6 +1387,7 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1374,6 +1426,7 @@ export type UserUpdateWithoutHoldingExitsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1396,6 +1449,7 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1418,6 +1472,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1440,6 +1495,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1478,6 +1534,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1500,6 +1557,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1522,6 +1580,7 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1544,6 +1603,7 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1582,6 +1642,7 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1604,6 +1665,7 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1626,6 +1688,7 @@ export type UserCreateWithoutVanityMintsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1648,6 +1711,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1686,6 +1750,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1708,6 +1773,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1730,6 +1796,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1752,6 +1819,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1790,6 +1858,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1812,6 +1881,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1834,6 +1904,7 @@ export type UserCreateWithoutAppTransactionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1856,6 +1927,7 @@ export type UserUncheckedCreateWithoutAppTransactionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1894,6 +1966,7 @@ export type UserUpdateWithoutAppTransactionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1916,6 +1989,7 @@ export type UserUncheckedUpdateWithoutAppTransactionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -2059,6 +2133,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2084,6 +2159,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2097,6 +2173,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2110,13 +2187,14 @@ export type UserSelectScalar = {
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "mainWalletPublicKey" | "authWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "isOperator" | "mainWalletPublicKey" | "authWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
@@ -2161,6 +2239,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     plan: $Enums.UserPlan
     paidPlanStartedAt: Date | null
     paidPlanExpiresAt: Date | null
+    isOperator: boolean
     mainWalletPublicKey: string
     authWalletPublicKey: string | null
     createdAt: Date
@@ -2605,6 +2684,7 @@ export interface UserFieldRefs {
   readonly plan: Prisma.FieldRef<"User", 'UserPlan'>
   readonly paidPlanStartedAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly paidPlanExpiresAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly isOperator: Prisma.FieldRef<"User", 'Boolean'>
   readonly mainWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly authWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>

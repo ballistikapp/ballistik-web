@@ -112,6 +112,7 @@ export const UserScalarFieldEnum = {
   plan: 'plan',
   paidPlanStartedAt: 'paidPlanStartedAt',
   paidPlanExpiresAt: 'paidPlanExpiresAt',
+  isOperator: 'isOperator',
   mainWalletPublicKey: 'mainWalletPublicKey',
   authWalletPublicKey: 'authWalletPublicKey',
   createdAt: 'createdAt',

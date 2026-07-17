@@ -13,3 +13,4 @@ export * from "./transaction.service";
 export * from "./storage.service";
 export * from "./test-run-log.service";
 export * from "./creator-rewards.service";
+export * from "./ops.service";

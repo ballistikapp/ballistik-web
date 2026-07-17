@@ -13,6 +13,7 @@ Define the authentication model for `ballistik-web`, including access token veri
 - Server route protection in layouts uses `lib/utils/auth.ts`.
 - `proxy.ts` is optimistic and checks cookie presence only.
 - The access token carries the user's current `plan` claim for request-time feature gating.
+- Ops Console Operator access uses `User.isOperator` loaded from the database on each ops page/API call (not a JWT claim), so grant/revoke takes effect without re-login. See [Ops Console](./ops-console-implementation.md).
 
 ## Identified Gaps Addressed
 

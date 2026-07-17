@@ -32,6 +32,7 @@ model User {
   plan UserPlan @default(FREE)
   paidPlanStartedAt DateTime? @map("proStartedAt")
   paidPlanExpiresAt DateTime? @map("proExpiresAt")
+  isOperator Boolean @default(false)
   mainWalletPublicKey String @unique
   mainWallet Wallet @relation("UserMainWallet", fields: [mainWalletPublicKey], references: [publicKey])
   authWalletPublicKey String? @unique
