@@ -47,9 +47,65 @@ model User {
   vanityMints VanityMint[] @relation("VanityMintUser")
   refreshCaches RefreshCache[]
   appTransactions AppTransaction[] @relation("AppTransactionUser")
+  marketer Marketer? @relation("MarketerUser")
+  referral Referral? @relation("ReferralUser")
+  referralPayoutsAsReferred ReferralPayout[] @relation("ReferralPayoutReferredUser")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
+}
+
+model Marketer {
+  id                    String           @id @default(cuid())
+  userId                String           @unique
+  user                  User             @relation("MarketerUser", fields: [userId], references: [id])
+  nickname              String           @unique
+  feeShareRate          Decimal          @db.Decimal(5, 4)
+  isEnabled             Boolean          @default(true)
+  referralCode          String?          @unique
+  feeCollectorPublicKey String?
+  referrals             Referral[]
+  referralPayouts       ReferralPayout[]
+  createdAt             DateTime         @default(now())
+  updatedAt             DateTime         @updatedAt
+
+  @@index([isEnabled])
+  @@map("Marketer")
+}
+
+model Referral {
+  id          String           @id @default(cuid())
+  marketerId  String
+  marketer    Marketer         @relation(fields: [marketerId], references: [id])
+  userId      String           @unique
+  user        User             @relation("ReferralUser", fields: [userId], references: [id])
+  payouts     ReferralPayout[]
+  createdAt   DateTime         @default(now())
+
+  @@index([marketerId, createdAt])
+  @@map("Referral")
+}
+
+model ReferralPayout {
+  id                     String   @id @default(cuid())
+  marketerId             String
+  marketer               Marketer @relation(fields: [marketerId], references: [id])
+  referralId             String
+  referral               Referral @relation(fields: [referralId], references: [id])
+  referredUserId         String
+  referredUser           User     @relation("ReferralPayoutReferredUser", fields: [referredUserId], references: [id])
+  marketerAmountLamports BigInt
+  platformAmountLamports BigInt
+  totalFeeLamports       BigInt
+  feeShareRate           Decimal  @db.Decimal(5, 4)
+  reason                 String
+  txSignature            String   @unique
+  createdAt              DateTime @default(now())
+
+  @@index([marketerId, createdAt])
+  @@index([referredUserId, createdAt])
+  @@index([referralId])
+  @@map("ReferralPayout")
 }
 
 model SubscriptionPayment {

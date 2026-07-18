@@ -10,6 +10,9 @@
  */
 export type * from './models/TestTable'
 export type * from './models/User'
+export type * from './models/Marketer'
+export type * from './models/Referral'
+export type * from './models/ReferralPayout'
 export type * from './models/SubscriptionPayment'
 export type * from './models/AuthSession'
 export type * from './models/RefreshToken'

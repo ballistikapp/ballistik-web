@@ -50,6 +50,21 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model Marketer
+ * 
+ */
+export type Marketer = Prisma.MarketerModel
+/**
+ * Model Referral
+ * 
+ */
+export type Referral = Prisma.ReferralModel
+/**
+ * Model ReferralPayout
+ * 
+ */
+export type ReferralPayout = Prisma.ReferralPayoutModel
+/**
  * Model SubscriptionPayment
  * 
  */

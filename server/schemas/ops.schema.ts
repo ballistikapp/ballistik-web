@@ -112,6 +112,44 @@ export const opsRevealPrivateKeySchema = z.discriminatedUnion("targetType", [
   }),
 ]);
 
+const feeShareRateSchema = z
+  .number()
+  .min(0, "Fee-share rate must be between 0 and 1")
+  .max(1, "Fee-share rate must be between 0 and 1");
+
+export const opsListMarketersSchema = opsListBaseSchema.extend({
+  sortBy: z
+    .enum(["createdAt", "nickname", "feeShareRate", "isEnabled"])
+    .default("createdAt"),
+  isEnabled: z.boolean().optional(),
+});
+
+export const opsGetMarketerSchema = z.object({
+  marketerId: z.string().min(1),
+});
+
+export const opsCreateMarketerSchema = z.object({
+  userId: z.string().min(1),
+  nickname: z.string().trim().min(1).max(80),
+  feeShareRate: feeShareRateSchema,
+  isEnabled: z.boolean().default(true),
+});
+
+export const opsUpdateMarketerSchema = z
+  .object({
+    marketerId: z.string().min(1),
+    nickname: z.string().trim().min(1).max(80).optional(),
+    feeShareRate: feeShareRateSchema.optional(),
+    isEnabled: z.boolean().optional(),
+  })
+  .refine(
+    (value) =>
+      value.nickname !== undefined ||
+      value.feeShareRate !== undefined ||
+      value.isEnabled !== undefined,
+    { message: "Provide at least one field to update" }
+  );
+
 export type OpsGetOverviewInput = z.infer<typeof opsGetOverviewSchema>;
 /** Input shape before Zod defaults (`page`/`pageSize`/`sort*`). */
 export type OpsListUsersInput = z.input<typeof opsListUsersSchema>;
@@ -134,6 +172,12 @@ export type OpsJumpInput = z.infer<typeof opsJumpSchema>;
 export type OpsGetUserSpineInput = z.infer<typeof opsGetUserSpineSchema>;
 export type OpsGetLaunchAutopsyInput = z.infer<typeof opsGetLaunchAutopsySchema>;
 export type OpsRevealPrivateKeyInput = z.infer<typeof opsRevealPrivateKeySchema>;
+/** Input shape before Zod defaults (`page`/`pageSize`/`sort*`). */
+export type OpsListMarketersInput = z.input<typeof opsListMarketersSchema>;
+export type OpsGetMarketerInput = z.infer<typeof opsGetMarketerSchema>;
+/** Input shape before Zod defaults (`isEnabled`). */
+export type OpsCreateMarketerInput = z.input<typeof opsCreateMarketerSchema>;
+export type OpsUpdateMarketerInput = z.infer<typeof opsUpdateMarketerSchema>;
 
 export type OpsJumpResult =
   | { kind: "user"; userId: string }

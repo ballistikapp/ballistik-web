@@ -31,4 +31,16 @@ _Avoid_: Coin, asset, mint (when referring to the owned record, not the on-chain
 **Wallet**:
 A Solana keypair record in the platform — main wallet, operational wallet, or system wallet — with a public key and stored balance.
 _Avoid_: Account, address (when referring to the Wallet record, not the pubkey string)
-)
+
+**Marketer**:
+A User designated by an Operator in the Ops Console with a fee-share rate (0–1) that applies to every User they refer. The live rate at each fee collection is what matters — not the rate at signup. The Marketer chooses and may change their referral code; a code change invalidates prior share links, but existing Referrals stay attached. An Operator-only nickname labels the Marketer for Ops memory; it is not the referral code. When an Operator disables a Marketer, their code stops attributing new Users and existing Referrals stop producing Referral Payouts; past payouts remain.
+_Avoid_: Referrer, affiliate, partner (when referring to the designated User role)
+
+**Referral**:
+The lasting attribution of a User to a Marketer, created only when that User first registers with a valid referral code. Later logins with a code do not create or change a Referral.
+_Avoid_: Invite, affiliate link, signup attribution
+
+**Referral Payout**:
+The Marketer's share of a referred User's platform payment — usage fees and subscription charges — sent to the Marketer's fee-collector wallet; the remainder goes to the platform fee collector. If the Marketer has no fee-collector wallet set at collection time, there is no Referral Payout and the platform keeps 100%.
+_Avoid_: Commission, affiliate earnings, rebate
+

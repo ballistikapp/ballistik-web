@@ -386,6 +386,9 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  Marketer: 'Marketer',
+  Referral: 'Referral',
+  ReferralPayout: 'ReferralPayout',
   SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
@@ -427,7 +430,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
+    modelProps: "testTable" | "user" | "marketer" | "referral" | "referralPayout" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -576,6 +579,228 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    Marketer: {
+      payload: Prisma.$MarketerPayload<ExtArgs>
+      fields: Prisma.MarketerFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MarketerFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MarketerFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        findFirst: {
+          args: Prisma.MarketerFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MarketerFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        findMany: {
+          args: Prisma.MarketerFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>[]
+        }
+        create: {
+          args: Prisma.MarketerCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        createMany: {
+          args: Prisma.MarketerCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MarketerCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>[]
+        }
+        delete: {
+          args: Prisma.MarketerDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        update: {
+          args: Prisma.MarketerUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        deleteMany: {
+          args: Prisma.MarketerDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MarketerUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MarketerUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>[]
+        }
+        upsert: {
+          args: Prisma.MarketerUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerPayload>
+        }
+        aggregate: {
+          args: Prisma.MarketerAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketer>
+        }
+        groupBy: {
+          args: Prisma.MarketerGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketerGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MarketerCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketerCountAggregateOutputType> | number
+        }
+      }
+    }
+    Referral: {
+      payload: Prisma.$ReferralPayload<ExtArgs>
+      fields: Prisma.ReferralFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ReferralFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ReferralFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        findFirst: {
+          args: Prisma.ReferralFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ReferralFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        findMany: {
+          args: Prisma.ReferralFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>[]
+        }
+        create: {
+          args: Prisma.ReferralCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        createMany: {
+          args: Prisma.ReferralCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ReferralCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>[]
+        }
+        delete: {
+          args: Prisma.ReferralDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        update: {
+          args: Prisma.ReferralUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        deleteMany: {
+          args: Prisma.ReferralDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ReferralUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ReferralUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>[]
+        }
+        upsert: {
+          args: Prisma.ReferralUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayload>
+        }
+        aggregate: {
+          args: Prisma.ReferralAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateReferral>
+        }
+        groupBy: {
+          args: Prisma.ReferralGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReferralGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ReferralCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReferralCountAggregateOutputType> | number
+        }
+      }
+    }
+    ReferralPayout: {
+      payload: Prisma.$ReferralPayoutPayload<ExtArgs>
+      fields: Prisma.ReferralPayoutFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.ReferralPayoutFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.ReferralPayoutFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        findFirst: {
+          args: Prisma.ReferralPayoutFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.ReferralPayoutFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        findMany: {
+          args: Prisma.ReferralPayoutFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>[]
+        }
+        create: {
+          args: Prisma.ReferralPayoutCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        createMany: {
+          args: Prisma.ReferralPayoutCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.ReferralPayoutCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>[]
+        }
+        delete: {
+          args: Prisma.ReferralPayoutDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        update: {
+          args: Prisma.ReferralPayoutUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        deleteMany: {
+          args: Prisma.ReferralPayoutDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.ReferralPayoutUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.ReferralPayoutUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>[]
+        }
+        upsert: {
+          args: Prisma.ReferralPayoutUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$ReferralPayoutPayload>
+        }
+        aggregate: {
+          args: Prisma.ReferralPayoutAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateReferralPayout>
+        }
+        groupBy: {
+          args: Prisma.ReferralPayoutGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReferralPayoutGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.ReferralPayoutCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.ReferralPayoutCountAggregateOutputType> | number
         }
       }
     }
@@ -2567,6 +2792,48 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const MarketerScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  nickname: 'nickname',
+  feeShareRate: 'feeShareRate',
+  isEnabled: 'isEnabled',
+  referralCode: 'referralCode',
+  feeCollectorPublicKey: 'feeCollectorPublicKey',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketerScalarFieldEnum = (typeof MarketerScalarFieldEnum)[keyof typeof MarketerScalarFieldEnum]
+
+
+export const ReferralScalarFieldEnum = {
+  id: 'id',
+  marketerId: 'marketerId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type ReferralScalarFieldEnum = (typeof ReferralScalarFieldEnum)[keyof typeof ReferralScalarFieldEnum]
+
+
+export const ReferralPayoutScalarFieldEnum = {
+  id: 'id',
+  marketerId: 'marketerId',
+  referralId: 'referralId',
+  referredUserId: 'referredUserId',
+  marketerAmountLamports: 'marketerAmountLamports',
+  platformAmountLamports: 'platformAmountLamports',
+  totalFeeLamports: 'totalFeeLamports',
+  feeShareRate: 'feeShareRate',
+  reason: 'reason',
+  txSignature: 'txSignature',
+  createdAt: 'createdAt'
+} as const
+
+export type ReferralPayoutScalarFieldEnum = (typeof ReferralPayoutScalarFieldEnum)[keyof typeof ReferralPayoutScalarFieldEnum]
+
+
 export const SubscriptionPaymentScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -3125,6 +3392,20 @@ export type ListDecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaMo
 
 
 /**
+ * Reference to a field of type 'BigInt'
+ */
+export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
+    
+
+
+/**
+ * Reference to a field of type 'BigInt[]'
+ */
+export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
+    
+
+
+/**
  * Reference to a field of type 'AuthChallengePurpose'
  */
 export type EnumAuthChallengePurposeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'AuthChallengePurpose'>
@@ -3363,20 +3644,6 @@ export type ListEnumTransactionStatusFieldRefInput<$PrismaModel> = FieldRefInput
 
 
 /**
- * Reference to a field of type 'BigInt'
- */
-export type BigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt'>
-    
-
-
-/**
- * Reference to a field of type 'BigInt[]'
- */
-export type ListBigIntFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'BigInt[]'>
-    
-
-
-/**
  * Reference to a field of type 'RefreshScope'
  */
 export type EnumRefreshScopeFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'RefreshScope'>
@@ -3528,6 +3795,9 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   testTable?: Prisma.TestTableOmit
   user?: Prisma.UserOmit
+  marketer?: Prisma.MarketerOmit
+  referral?: Prisma.ReferralOmit
+  referralPayout?: Prisma.ReferralPayoutOmit
   subscriptionPayment?: Prisma.SubscriptionPaymentOmit
   authSession?: Prisma.AuthSessionOmit
   refreshToken?: Prisma.RefreshTokenOmit

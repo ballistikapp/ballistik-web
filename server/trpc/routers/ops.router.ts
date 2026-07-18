@@ -5,12 +5,15 @@ import {
 } from "../trpc";
 import { opsService } from "@/server/services/ops.service";
 import {
+  opsCreateMarketerSchema,
   opsGetLaunchAutopsySchema,
+  opsGetMarketerSchema,
   opsGetOverviewSchema,
   opsGetTokenSchema,
   opsGetUserSpineSchema,
   opsGetWalletSchema,
   opsListLaunchesSchema,
+  opsListMarketersSchema,
   opsListTokensSchema,
   opsListUsersSchema,
   opsJumpSchema,
@@ -19,6 +22,7 @@ import {
   opsRefreshMatchingWalletBalancesSchema,
   opsRefreshWalletBalancesSchema,
   opsRevealPrivateKeySchema,
+  opsUpdateMarketerSchema,
 } from "@/server/schemas/ops.schema";
 
 export const opsRouter = router({
@@ -107,5 +111,29 @@ export const opsRouter = router({
         requestId: ctx.requestId,
         logger: ctx.logger,
       });
+    }),
+
+  listMarketers: operatorProcedure
+    .input(opsListMarketersSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listMarketers(ctx.user.id, input);
+    }),
+
+  getMarketer: operatorProcedure
+    .input(opsGetMarketerSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.getMarketer(ctx.user.id, input);
+    }),
+
+  createMarketer: operatorProcedure
+    .input(opsCreateMarketerSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await opsService.createMarketer(ctx.user.id, input);
+    }),
+
+  updateMarketer: operatorProcedure
+    .input(opsUpdateMarketerSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await opsService.updateMarketer(ctx.user.id, input);
     }),
 });

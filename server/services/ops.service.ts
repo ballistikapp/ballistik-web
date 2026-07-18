@@ -5,9 +5,12 @@ import { logger as defaultLogger, type LogContext } from "@/lib/logger";
 import { AppError } from "@/server/errors";
 import { OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP } from "@/lib/config/ops.config";
 import type {
+  OpsCreateMarketerInput,
+  OpsGetMarketerInput,
   OpsJumpInput,
   OpsJumpResult,
   OpsListLaunchesInput,
+  OpsListMarketersInput,
   OpsListTokensInput,
   OpsListUsersInput,
   OpsListWalletsInput,
@@ -15,6 +18,7 @@ import type {
   OpsRefreshMatchingWalletBalancesInput,
   OpsRefreshWalletBalancesInput,
   OpsRevealPrivateKeyInput,
+  OpsUpdateMarketerInput,
 } from "@/server/schemas/ops.schema";
 import { walletService } from "@/server/services/wallet.service";
 
@@ -93,6 +97,95 @@ function buildUserSearchWhere(
       { mainWalletPublicKey: { contains: search, mode: "insensitive" } },
     ],
   };
+}
+
+function buildMarketerSearchWhere(
+  search: string | undefined
+): Prisma.MarketerWhereInput | undefined {
+  if (!search) return undefined;
+  return {
+    OR: [
+      { id: { contains: search, mode: "insensitive" } },
+      { nickname: { contains: search, mode: "insensitive" } },
+      { userId: { contains: search, mode: "insensitive" } },
+      { referralCode: { contains: search, mode: "insensitive" } },
+      {
+        user: {
+          OR: [
+            { name: { contains: search, mode: "insensitive" } },
+            {
+              mainWalletPublicKey: {
+                contains: search,
+                mode: "insensitive",
+              },
+            },
+          ],
+        },
+      },
+    ],
+  };
+}
+
+function projectMarketer(marketer: {
+  id: string;
+  userId: string;
+  nickname: string;
+  feeShareRate: Prisma.Decimal | number | string;
+  isEnabled: boolean;
+  referralCode: string | null;
+  feeCollectorPublicKey: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  user: {
+    id: string;
+    name: string;
+    mainWalletPublicKey: string;
+  };
+}) {
+  return {
+    id: marketer.id,
+    userId: marketer.userId,
+    userName: marketer.user.name,
+    mainWalletPublicKey: marketer.user.mainWalletPublicKey,
+    nickname: marketer.nickname,
+    feeShareRate: Number(marketer.feeShareRate),
+    isEnabled: marketer.isEnabled,
+    hasReferralCode: Boolean(marketer.referralCode),
+    hasFeeCollector: Boolean(marketer.feeCollectorPublicKey),
+    referralCode: marketer.referralCode,
+    feeCollectorPublicKey: marketer.feeCollectorPublicKey,
+    createdAt: marketer.createdAt,
+    updatedAt: marketer.updatedAt,
+  };
+}
+
+function uniqueConstraintTargets(error: unknown): string[] {
+  if (
+    !(error instanceof Prisma.PrismaClientKnownRequestError) ||
+    error.code !== "P2002"
+  ) {
+    return [];
+  }
+  const target = error.meta?.target;
+  if (Array.isArray(target)) {
+    return target.filter((value): value is string => typeof value === "string");
+  }
+  if (typeof target === "string") {
+    return [target];
+  }
+  return [];
+}
+
+function marketerUniqueConstraintMessage(error: unknown): string | null {
+  const targets = uniqueConstraintTargets(error);
+  if (targets.length === 0) return null;
+  if (targets.includes("userId")) {
+    return "User is already a Marketer";
+  }
+  if (targets.includes("nickname")) {
+    return "Nickname already in use";
+  }
+  return "Marketer already exists";
 }
 
 function buildLaunchSearchWhere(
@@ -970,5 +1063,237 @@ export const opsService = {
     });
 
     return { privateKey };
+  },
+
+  async listMarketers(callerUserId: string, input: OpsListMarketersInput) {
+    await requireOperator(callerUserId);
+
+    const page = input.page ?? 1;
+    const pageSize = input.pageSize ?? 25;
+    const sortBy = input.sortBy ?? "createdAt";
+    const sortDir = input.sortDir ?? "desc";
+    const searchWhere = buildMarketerSearchWhere(input.search);
+    const where: Prisma.MarketerWhereInput = {
+      ...(input.isEnabled === undefined ? {} : { isEnabled: input.isEnabled }),
+      ...(searchWhere ?? {}),
+    };
+    const skip = (page - 1) * pageSize;
+
+    const [totalCount, rows] = await Promise.all([
+      prisma.marketer.count({ where }),
+      prisma.marketer.findMany({
+        where,
+        orderBy: { [sortBy]: sortDir },
+        skip,
+        take: pageSize,
+        select: {
+          id: true,
+          userId: true,
+          nickname: true,
+          feeShareRate: true,
+          isEnabled: true,
+          referralCode: true,
+          feeCollectorPublicKey: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mainWalletPublicKey: true,
+            },
+          },
+        },
+      }),
+    ]);
+
+    const result = {
+      items: rows.map((marketer) => {
+        const projected = projectMarketer(marketer);
+        return {
+          id: projected.id,
+          userId: projected.userId,
+          userName: projected.userName,
+          mainWalletPublicKey: projected.mainWalletPublicKey,
+          nickname: projected.nickname,
+          feeShareRate: projected.feeShareRate,
+          isEnabled: projected.isEnabled,
+          hasReferralCode: projected.hasReferralCode,
+          hasFeeCollector: projected.hasFeeCollector,
+          createdAt: projected.createdAt,
+          updatedAt: projected.updatedAt,
+        };
+      }),
+      totalCount,
+    };
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async getMarketer(callerUserId: string, input: OpsGetMarketerInput) {
+    await requireOperator(callerUserId);
+
+    const marketer = await prisma.marketer.findUnique({
+      where: { id: input.marketerId },
+      select: {
+        id: true,
+        userId: true,
+        nickname: true,
+        feeShareRate: true,
+        isEnabled: true,
+        referralCode: true,
+        feeCollectorPublicKey: true,
+        createdAt: true,
+        updatedAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mainWalletPublicKey: true,
+          },
+        },
+      },
+    });
+
+    if (!marketer) {
+      throwNotFound();
+    }
+
+    const result = projectMarketer(marketer);
+
+    if (containsPrivateKeyField(result)) {
+      throw new Error("Ops projection leaked private key fields");
+    }
+
+    return result;
+  },
+
+  async createMarketer(callerUserId: string, input: OpsCreateMarketerInput) {
+    await requireOperator(callerUserId);
+
+    const user = await prisma.user.findUnique({
+      where: { id: input.userId },
+      select: {
+        id: true,
+        name: true,
+        mainWalletPublicKey: true,
+        marketer: { select: { id: true } },
+      },
+    });
+
+    if (!user) {
+      throw new AppError("User not found", 404);
+    }
+
+    if (user.marketer) {
+      throw new AppError("User is already a Marketer", 400);
+    }
+
+    try {
+      const created = await prisma.marketer.create({
+        data: {
+          userId: input.userId,
+          nickname: input.nickname,
+          feeShareRate: input.feeShareRate,
+          isEnabled: input.isEnabled ?? true,
+        },
+        select: {
+          id: true,
+          userId: true,
+          nickname: true,
+          feeShareRate: true,
+          isEnabled: true,
+          referralCode: true,
+          feeCollectorPublicKey: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mainWalletPublicKey: true,
+            },
+          },
+        },
+      });
+
+      const result = projectMarketer(created);
+
+      if (containsPrivateKeyField(result)) {
+        throw new Error("Ops projection leaked private key fields");
+      }
+
+      return result;
+    } catch (error) {
+      const message = marketerUniqueConstraintMessage(error);
+      if (message) {
+        throw new AppError(message, 400);
+      }
+      throw error;
+    }
+  },
+
+  async updateMarketer(callerUserId: string, input: OpsUpdateMarketerInput) {
+    await requireOperator(callerUserId);
+
+    const existing = await prisma.marketer.findUnique({
+      where: { id: input.marketerId },
+      select: { id: true },
+    });
+
+    if (!existing) {
+      throwNotFound();
+    }
+
+    try {
+      const updated = await prisma.marketer.update({
+        where: { id: input.marketerId },
+        data: {
+          ...(input.nickname !== undefined ? { nickname: input.nickname } : {}),
+          ...(input.feeShareRate !== undefined
+            ? { feeShareRate: input.feeShareRate }
+            : {}),
+          ...(input.isEnabled !== undefined
+            ? { isEnabled: input.isEnabled }
+            : {}),
+        },
+        select: {
+          id: true,
+          userId: true,
+          nickname: true,
+          feeShareRate: true,
+          isEnabled: true,
+          referralCode: true,
+          feeCollectorPublicKey: true,
+          createdAt: true,
+          updatedAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mainWalletPublicKey: true,
+            },
+          },
+        },
+      });
+
+      const result = projectMarketer(updated);
+
+      if (containsPrivateKeyField(result)) {
+        throw new Error("Ops projection leaked private key fields");
+      }
+
+      return result;
+    } catch (error) {
+      const message = marketerUniqueConstraintMessage(error);
+      if (message) {
+        throw new AppError(message, 400);
+      }
+      throw error;
+    }
   },
 };

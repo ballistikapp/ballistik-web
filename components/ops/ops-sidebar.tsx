@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 const OPS_NAV = [
   { title: "Overview", href: "/ops" },
   { title: "Users", href: "/ops/users" },
+  { title: "Marketers", href: "/ops/marketers" },
   { title: "Wallets", href: "/ops/wallets" },
   { title: "Tokens", href: "/ops/tokens" },
   { title: "Launches", href: "/ops/launches" },

@@ -34,7 +34,7 @@ This directory contains detailed implementation documentation for all features i
 
 ### Internal tools
 
-- [Ops Console](./ops-console-implementation.md) — Operator-only User lookup, Launch autopsy, and key reveal
+- [Ops Console](./ops-console-implementation.md) — Operator-only User lookup, Marketer designation, Launch autopsy, and key reveal
 
 ### Billing
 

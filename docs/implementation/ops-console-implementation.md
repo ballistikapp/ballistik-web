@@ -2,7 +2,7 @@
 
 ## Purpose
 
-Internal, Operator-only surface for looking up Users, inspecting Launch pipelines, and revealing custody keys during incidents. Bookmark-only at `/ops`; non-Operators receive not-found behavior.
+Internal, Operator-only surface for looking up Users, designating Marketers, inspecting Launch pipelines, and revealing custody keys during incidents. Bookmark-only at `/ops`; non-Operators receive not-found behavior.
 
 ## Auth model
 
@@ -22,7 +22,7 @@ See ADRs:
 
 | Layer | Path |
 | --- | --- |
-| Schema | `prisma/schema.prisma` (`User.isOperator`) |
+| Schema | `prisma/schema.prisma` (`User.isOperator`, `Marketer`, `Referral`, `ReferralPayout`) |
 | Zod | `server/schemas/ops.schema.ts` |
 | Service | `server/services/ops.service.ts` |
 | Router | `server/trpc/routers/ops.router.ts` (`ops` on app router) |
@@ -44,8 +44,14 @@ See ADRs:
 - `ops.refreshMatchingWalletBalances` — `operatorProcedure`; refresh all Wallets matching current search/type/system/`userId` filters (empty filter = all); server-chunked (100); confirm count in UI; no hard max refuse; no private keys
 - `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs (no raw `input`/`result`)
 - `ops.revealPrivateKey` — `operatorSensitiveProcedure` (8/min); wallet or mint key; logs Operator + target via request logger
+- `ops.listMarketers` — `operatorProcedure`; paginated Marketers browse (`page`/`pageSize`/`search`/`sortBy`/`sortDir`/`isEnabled`); shows nickname, rate, enabled, and whether referral code / fee-collector are configured (not the values); no private keys
+- `ops.getMarketer` — `operatorProcedure`; Marketer detail including read-only referral code and fee-collector public key when set
+- `ops.createMarketer` — `operatorProcedure`; designate an existing User as Marketer (`userId`, Ops `nickname`, `feeShareRate` in `[0, 1]`, optional `isEnabled`); nickname unique; User must not already be a Marketer
+- `ops.updateMarketer` — `operatorProcedure`; edit nickname, fee-share rate, and/or enabled; Ops never writes referral code or fee-collector
 
-List search is case-insensitive contains. Users search: `id`, `name`, `mainWalletPublicKey`. Launches search: `id`, `tokenPublicKey`, `userId`, `currentStep`, and any `LaunchStatus` whose name contains the query (enum fields cannot use SQL `contains`). Tokens search: `publicKey`, `name`, `symbol`, `userId`, and any `TokenStatus` whose name contains the query. Wallets search: `publicKey`, `userId`, `tokenPublicKey`, and any `WalletType` whose name contains the query. Allowed sorts — Users: `createdAt`/`name`/`plan`; Launches: `createdAt`/`startedAt`/`status`; Tokens: `createdAt`/`name`/`symbol`/`status`; Wallets: `createdAt`/`type`/`balanceSol`. Default sort: `createdAt desc`. Default page size 25 (max 100).
+List search is case-insensitive contains. Users search: `id`, `name`, `mainWalletPublicKey`. Marketers search: `id`, `nickname`, `userId`, `referralCode`, User `name`, User `mainWalletPublicKey`. Launches search: `id`, `tokenPublicKey`, `userId`, `currentStep`, and any `LaunchStatus` whose name contains the query (enum fields cannot use SQL `contains`). Tokens search: `publicKey`, `name`, `symbol`, `userId`, and any `TokenStatus` whose name contains the query. Wallets search: `publicKey`, `userId`, `tokenPublicKey`, and any `WalletType` whose name contains the query. Allowed sorts — Users: `createdAt`/`name`/`plan`; Marketers: `createdAt`/`nickname`/`feeShareRate`/`isEnabled`; Launches: `createdAt`/`startedAt`/`status`; Tokens: `createdAt`/`name`/`symbol`/`status`; Wallets: `createdAt`/`type`/`balanceSol`. Default sort: `createdAt desc`. Default page size 25 (max 100).
+
+Marketer management is Ops-only. A Marketer is a 1:1 designation on an existing User (`Marketer.userId` unique). Ops owns `nickname`, `feeShareRate`, and `isEnabled`. The Marketer later sets `referralCode` and `feeCollectorPublicKey` from the product surface; Ops shows those as read-only. `Referral` and `ReferralPayout` models exist in schema for later attribution and payout slices. See `CONTEXT.md` and ADRs `0004` / `0005`.
 
 Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol` + `balanceRefreshedAt` only). Selection cap is `OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP` in `lib/config/ops.config.ts` (100). Filter-wide refresh safety is confirm-dialog count + server chunking, not a hard refuse.
 
@@ -55,6 +61,9 @@ Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol
 
 - `/ops` — Ops Overview (summary tiles) + jump box
 - `/ops/users` — Users browse (dense table; row → User spine)
+- `/ops/marketers` — Marketers browse (dense table + enabled filter; row → Marketer detail)
+- `/ops/marketers/new` — Designate Marketer (User id + nickname + fee-share rate)
+- `/ops/marketers/[marketerId]` — Marketer detail/edit (Ops fields) + read-only code/collector
 - `/ops/wallets` — Wallets browse (dense table + type/system filters; selected-row + filter-wide balance refresh; row → Wallet detail)
 - `/ops/tokens` — Tokens browse (dense table; row → Token detail)
 - `/ops/launches` — Launches browse (dense table; row → Launch autopsy)
@@ -63,11 +72,11 @@ Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol
 - `/ops/wallets/[publicKey]` — Wallet detail + single-Wallet balance refresh + wallet-key reveal
 - `/ops/launches/[launchId]` — Launch autopsy
 
-Ops uses a minimal dedicated layout with an Ops sidebar (Overview, Users, Wallets, Tokens, Launches) and no product token sidebar. No Ops entry in normal app navigation.
+Ops uses a minimal dedicated layout with an Ops sidebar (Overview, Users, Marketers, Wallets, Tokens, Launches) and no product token sidebar. No Ops entry in normal app navigation.
 
 ## Migration note
 
-Agents edit the Prisma schema only. Humans run the migration that adds `User.isOperator`. After migrate, set flags for the tiny Operator set in staging/production.
+Agents edit the Prisma schema only. Humans run migrations. Relevant schema additions: `User.isOperator`, and referral tables `Marketer` / `Referral` / `ReferralPayout`. After migrate, set Operator flags for the tiny Operator set in staging/production.
 
 ## Tests
 

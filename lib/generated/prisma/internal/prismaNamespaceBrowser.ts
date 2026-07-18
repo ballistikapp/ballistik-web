@@ -53,6 +53,9 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  Marketer: 'Marketer',
+  Referral: 'Referral',
+  ReferralPayout: 'ReferralPayout',
   SubscriptionPayment: 'SubscriptionPayment',
   AuthSession: 'AuthSession',
   RefreshToken: 'RefreshToken',
@@ -120,6 +123,48 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const MarketerScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  nickname: 'nickname',
+  feeShareRate: 'feeShareRate',
+  isEnabled: 'isEnabled',
+  referralCode: 'referralCode',
+  feeCollectorPublicKey: 'feeCollectorPublicKey',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketerScalarFieldEnum = (typeof MarketerScalarFieldEnum)[keyof typeof MarketerScalarFieldEnum]
+
+
+export const ReferralScalarFieldEnum = {
+  id: 'id',
+  marketerId: 'marketerId',
+  userId: 'userId',
+  createdAt: 'createdAt'
+} as const
+
+export type ReferralScalarFieldEnum = (typeof ReferralScalarFieldEnum)[keyof typeof ReferralScalarFieldEnum]
+
+
+export const ReferralPayoutScalarFieldEnum = {
+  id: 'id',
+  marketerId: 'marketerId',
+  referralId: 'referralId',
+  referredUserId: 'referredUserId',
+  marketerAmountLamports: 'marketerAmountLamports',
+  platformAmountLamports: 'platformAmountLamports',
+  totalFeeLamports: 'totalFeeLamports',
+  feeShareRate: 'feeShareRate',
+  reason: 'reason',
+  txSignature: 'txSignature',
+  createdAt: 'createdAt'
+} as const
+
+export type ReferralPayoutScalarFieldEnum = (typeof ReferralPayoutScalarFieldEnum)[keyof typeof ReferralPayoutScalarFieldEnum]
 
 
 export const SubscriptionPaymentScalarFieldEnum = {
