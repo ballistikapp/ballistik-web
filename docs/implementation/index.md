@@ -32,10 +32,18 @@ This directory contains detailed implementation documentation for all features i
 - [Volume Bot Implementation](./volume-bot-implementation.md) — volume bot sessions and wallet management
 - [Dashboard Monitoring](./dashboard-monitoring.md) — dashboard monitoring mode, subscriptions, and polling behavior
 
+### Internal tools
+
+- [Ops Console](./ops-console-implementation.md) — Operator-only User lookup, Marketer designation, Launch autopsy, and key reveal
+
 ### Billing
 
 - [Subscription Implementation](./subscription-implementation.md) — Pro subscription purchase and entitlement
 - [Pricing Implementation](./pricing-implementation.md) — usage-fee schedule, scope rules, and enforcement model
+
+### Referrals
+
+- [Referral Implementation](./referral-implementation.md) — Marketer product setup, shareable `ref` auth link, and (follow-on) attribution / payouts
 
 ## Infrastructure
 

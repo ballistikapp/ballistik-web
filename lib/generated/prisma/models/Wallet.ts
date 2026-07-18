@@ -614,10 +614,6 @@ export type EnumWalletTypeFieldUpdateOperationsInput = {
   set?: $Enums.WalletType
 }
 
-export type BoolFieldUpdateOperationsInput = {
-  set?: boolean
-}
-
 export type WalletCreateNestedManyWithoutTokenInput = {
   create?: Prisma.XOR<Prisma.WalletCreateWithoutTokenInput, Prisma.WalletUncheckedCreateWithoutTokenInput> | Prisma.WalletCreateWithoutTokenInput[] | Prisma.WalletUncheckedCreateWithoutTokenInput[]
   connectOrCreate?: Prisma.WalletCreateOrConnectWithoutTokenInput | Prisma.WalletCreateOrConnectWithoutTokenInput[]

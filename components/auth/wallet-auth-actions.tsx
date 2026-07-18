@@ -12,6 +12,8 @@ type WalletAuthActionsProps = {
   mode: "login" | "link";
   intent?: "login" | "register";
   accountName?: string;
+  /** From `/auth?ref=` — only applied on brand-new register (server-side). */
+  referralCode?: string;
   onLoginSuccess?: (data: {
     user: {
       generatedWallet?: {
@@ -27,6 +29,7 @@ export function WalletAuthActions({
   mode,
   intent = "login",
   accountName,
+  referralCode,
   onLoginSuccess,
   onLinkSuccess,
 }: WalletAuthActionsProps) {
@@ -80,6 +83,7 @@ export function WalletAuthActions({
         signature: signatureBase58,
         intent,
         accountName,
+        ...(referralCode ? { referralCode } : {}),
       });
       toast.success("Signed in successfully!");
       onLoginSuccess?.(result);

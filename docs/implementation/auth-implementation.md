@@ -13,6 +13,7 @@ Define the authentication model for `ballistik-web`, including access token veri
 - Server route protection in layouts uses `lib/utils/auth.ts`.
 - `proxy.ts` is optimistic and checks cookie presence only.
 - The access token carries the user's current `plan` claim for request-time feature gating.
+- Ops Console Operator access uses `User.isOperator` loaded from the database on each ops page/API call (not a JWT claim), so grant/revoke takes effect without re-login. See [Ops Console](./ops-console-implementation.md).
 
 ## Identified Gaps Addressed
 
@@ -138,8 +139,8 @@ Server persistence:
 - Re-linking the same wallet to the same current account is idempotent and succeeds.
 - App-managed wallets in the `Wallet` table cannot be used as external wallet-adapter identities unless the wallet is the current user's own Main Wallet during an authenticated link.
 - Wallet login carries an intent:
-  - `register`: unknown external wallets can create a new account with a generated server-held Main Wallet. This is the public `/auth` default because wallet auth is both sign-in and signup.
-  - `login`: unknown external wallets are rejected with guidance to create an account or use private-key login.
+  - `register`: unknown external wallets can create a new account with a generated server-held Main Wallet. This is the public `/auth` default because wallet auth is both sign-in and signup. Optional `referralCode` (from `?ref=`) may create a sticky Referral in the same transaction when it matches an enabled Marketer.
+  - `login`: unknown external wallets are rejected with guidance to create an account or use private-key login. `referralCode` is ignored for existing Users.
 
 ## Client Auth Entry
 
@@ -162,6 +163,7 @@ On `auth.logout` success, the client calls the wallet adapter's `disconnect()` b
 ## Return-Target Redirects
 
 - Protected-route auth redirects preserve the original in-app destination via `redirect` query param (for example `/auth?redirect=%2Flaunch%3Fpreset%3Dfree`).
+- Marketer share links use `/auth?ref=<referralCode>` (see [Referral Implementation](./referral-implementation.md)). The auth page reads `ref` and passes it to wallet register. A sticky Referral is created only for brand-new Users when the code resolves to an enabled Marketer; missing/unknown/disabled codes are ignored. Existing-User login ignores `ref` (ADR 0005).
 - Post-auth client navigation resolves destination from `redirect` and falls back to `/` when missing.
 - Redirect validation only allows same-origin relative paths beginning with `/`.
 - External URLs, protocol-relative values, and malformed targets are rejected to prevent open redirects.

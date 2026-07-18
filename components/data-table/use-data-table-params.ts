@@ -26,10 +26,12 @@ const parseAsColumnFilters = createParser<ColumnFiltersState>({
 export interface UseDataTableParamsOptions {
   defaultPageSize?: number;
   prefix?: string;
+  /** URL sort default as `columnId:asc|desc` (e.g. `createdAt:desc`). */
+  defaultSort?: string;
 }
 
 export function useDataTableParams(options: UseDataTableParamsOptions = {}) {
-  const { defaultPageSize = 25, prefix } = options;
+  const { defaultPageSize = 25, prefix, defaultSort } = options;
 
   const pageKey = prefix ? `${prefix}_page` : "page";
   const pageSizeKey = prefix ? `${prefix}_pageSize` : "pageSize";
@@ -49,7 +51,11 @@ export function useDataTableParams(options: UseDataTableParamsOptions = {}) {
 
   const [sort, setSort] = useQueryState(
     sortKey,
-    parseAsString.withOptions({ history: "replace", shallow: true })
+    defaultSort
+      ? parseAsString
+          .withDefault(defaultSort)
+          .withOptions({ history: "replace", shallow: true })
+      : parseAsString.withOptions({ history: "replace", shallow: true })
   );
 
   const [filters, setFilters] = useQueryState(

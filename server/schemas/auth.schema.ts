@@ -21,6 +21,16 @@ export const loginWithWalletSignatureSchema = z.object({
   signature: z.string().min(32, "Invalid wallet signature"),
   intent: walletAuthIntentSchema.default("login"),
   accountName: z.string().max(100, "Account name is too long").optional(),
+  /**
+   * From `?ref=` on auth links. Fail-open at the boundary: overlong / non-string
+   * values become undefined so a broken marketing link never blocks signup.
+   * Slug validity is checked in the register path (ignored if invalid).
+   */
+  referralCode: z.preprocess((value) => {
+    if (typeof value !== "string") return undefined;
+    if (value.length > 64) return undefined;
+    return value;
+  }, z.string().optional()),
 });
 
 export const linkWalletAdapterSchema = z.object({

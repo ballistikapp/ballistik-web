@@ -307,6 +307,106 @@ export const walletService = {
     };
   },
 
+  /**
+   * Fetch on-chain SOL balances for arbitrary Wallet public keys and persist them.
+   * No ownership/token scoping and no cooldown — callers enforce authz.
+   */
+  async refreshBalancesByPublicKeys(publicKeys: string[]) {
+    const uniqueKeys = [...new Set(publicKeys)];
+    if (uniqueKeys.length === 0) {
+      return {
+        refreshed: [] as Array<{
+          publicKey: string;
+          balanceSol: number;
+          balanceRefreshedAt: Date;
+        }>,
+        requestedCount: 0,
+        refreshedCount: 0,
+        missingCount: 0,
+      };
+    }
+
+    const existing = await prisma.wallet.findMany({
+      where: { publicKey: { in: uniqueKeys } },
+      select: { publicKey: true },
+    });
+    const existingSet = new Set(existing.map((wallet) => wallet.publicKey));
+    const targetKeys = uniqueKeys.filter((key) => existingSet.has(key));
+    const missingCount = uniqueKeys.length - targetKeys.length;
+
+    if (targetKeys.length === 0) {
+      return {
+        refreshed: [],
+        requestedCount: uniqueKeys.length,
+        refreshedCount: 0,
+        missingCount,
+      };
+    }
+
+    const now = new Date();
+    const solBalanceMap = new Map<string, number>();
+    const connection = getSolanaConnection();
+    const validWallets: { publicKey: string; key: PublicKey }[] = [];
+
+    for (const publicKey of targetKeys) {
+      try {
+        validWallets.push({ publicKey, key: new PublicKey(publicKey) });
+      } catch {
+        solBalanceMap.set(publicKey, 0);
+      }
+    }
+
+    const batchSize = Math.max(1, rpcConfig.tuning.solBalanceBatchSize);
+    for (let i = 0; i < validWallets.length; i += batchSize) {
+      const batch = validWallets.slice(i, i + batchSize);
+      const infos = await retryRpc(() =>
+        connection.getMultipleAccountsInfo(
+          batch.map((item) => item.key),
+          "confirmed"
+        )
+      );
+      infos.forEach((info, index) => {
+        const walletKey = batch[index]?.publicKey;
+        if (!walletKey) return;
+        solBalanceMap.set(walletKey, info ? info.lamports : 0);
+      });
+    }
+
+    const balances = targetKeys.map((publicKey) => ({
+      publicKey,
+      balanceSol: (solBalanceMap.get(publicKey) ?? 0) / 1_000_000_000,
+    }));
+
+    const updateBatchSize = 50;
+    for (let i = 0; i < balances.length; i += updateBatchSize) {
+      const batch = balances.slice(i, i + updateBatchSize);
+      await prisma.$transaction(
+        batch.map((balance) =>
+          prisma.wallet.update({
+            where: { publicKey: balance.publicKey },
+            data: {
+              balanceSol: balance.balanceSol,
+              balanceRefreshedAt: now,
+            },
+          })
+        )
+      );
+    }
+
+    const refreshed = balances.map((balance) => ({
+      publicKey: balance.publicKey,
+      balanceSol: balance.balanceSol,
+      balanceRefreshedAt: now,
+    }));
+
+    return {
+      refreshed,
+      requestedCount: uniqueKeys.length,
+      refreshedCount: refreshed.length,
+      missingCount,
+    };
+  },
+
   async withdrawMainSol(
     userId: string,
     destinationPublicKey: string,
@@ -816,65 +916,17 @@ export const walletService = {
       };
     }
 
-    const solBalanceMap = new Map<string, number>();
-    const connection = getSolanaConnection();
-    const validWallets: {
-      wallet: (typeof targetWallets)[number];
-      key: PublicKey;
-    }[] = [];
-    for (const wallet of targetWallets) {
-      try {
-        validWallets.push({
-          wallet,
-          key: new PublicKey(wallet.publicKey),
-        });
-      } catch {
-        solBalanceMap.set(wallet.publicKey, 0);
-      }
-    }
-
-    const batchSize = Math.max(1, rpcConfig.tuning.solBalanceBatchSize);
-    for (let i = 0; i < validWallets.length; i += batchSize) {
-      const batch = validWallets.slice(i, i + batchSize);
-      const infos = await retryRpc(() =>
-        connection.getMultipleAccountsInfo(
-          batch.map((item) => item.key),
-          "confirmed"
-        )
-      );
-      infos.forEach((info, index) => {
-        const walletKey = batch[index]?.wallet.publicKey;
-        if (!walletKey) return;
-        solBalanceMap.set(walletKey, info ? info.lamports : 0);
-      });
-    }
-
-    const balances = targetWallets.map((wallet) => ({
-      publicKey: wallet.publicKey,
-      balanceSol: (solBalanceMap.get(wallet.publicKey) ?? 0) / 1_000_000_000,
-    }));
-
-    const updateBatchSize = 50;
-    for (let i = 0; i < balances.length; i += updateBatchSize) {
-      const batch = balances.slice(i, i + updateBatchSize);
-      await prisma.$transaction(
-        batch.map((balance) =>
-          prisma.wallet.update({
-            where: { publicKey: balance.publicKey },
-            data: {
-              balanceSol: balance.balanceSol,
-              balanceRefreshedAt: now,
-            },
-          })
-        )
-      );
-    }
+    const { refreshed } = await walletService.refreshBalancesByPublicKeys(
+      targetWallets.map((wallet) => wallet.publicKey)
+    );
+    const refreshedAt =
+      refreshed[0]?.balanceRefreshedAt ?? now;
 
     await refreshCacheService.touch({
       userId,
       tokenPublicKey: token.publicKey,
       scope: "WALLETS",
-      refreshedAt: now,
+      refreshedAt,
     });
 
     await testRunLogService.appendServerEvent({
@@ -886,13 +938,14 @@ export const walletService = {
       dataSource: "rpc",
       wallets: requestedKeys,
       balancesBefore: beforeSnapshot,
-      balancesAfter: balances.map((balance) => ({
-        ...balance,
-        balanceRefreshedAt: now.toISOString(),
+      balancesAfter: refreshed.map((balance) => ({
+        publicKey: balance.publicKey,
+        balanceSol: balance.balanceSol,
+        balanceRefreshedAt: balance.balanceRefreshedAt.toISOString(),
         dataSource: "rpc",
       })),
       summary: {
-        refreshedCount: balances.length,
+        refreshedCount: refreshed.length,
         skippedCooldownCount: skippedCooldown.length,
         skippedNotAllowedCount: skippedNotAllowed.length,
         requestedCount: requestedKeys.length,
@@ -902,11 +955,7 @@ export const walletService = {
     });
 
     return {
-      refreshed: balances.map((balance) => ({
-        publicKey: balance.publicKey,
-        balanceSol: balance.balanceSol,
-        balanceRefreshedAt: now,
-      })),
+      refreshed,
       skippedCooldown,
       skippedNotAllowed,
       requestedCount: requestedKeys.length,

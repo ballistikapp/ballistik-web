@@ -30,6 +30,7 @@ export type UserMinAggregateOutputType = {
   plan: $Enums.UserPlan | null
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean | null
   mainWalletPublicKey: string | null
   authWalletPublicKey: string | null
   createdAt: Date | null
@@ -42,6 +43,7 @@ export type UserMaxAggregateOutputType = {
   plan: $Enums.UserPlan | null
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean | null
   mainWalletPublicKey: string | null
   authWalletPublicKey: string | null
   createdAt: Date | null
@@ -54,6 +56,7 @@ export type UserCountAggregateOutputType = {
   plan: number
   paidPlanStartedAt: number
   paidPlanExpiresAt: number
+  isOperator: number
   mainWalletPublicKey: number
   authWalletPublicKey: number
   createdAt: number
@@ -68,6 +71,7 @@ export type UserMinAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -80,6 +84,7 @@ export type UserMaxAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -92,6 +97,7 @@ export type UserCountAggregateInputType = {
   plan?: true
   paidPlanStartedAt?: true
   paidPlanExpiresAt?: true
+  isOperator?: true
   mainWalletPublicKey?: true
   authWalletPublicKey?: true
   createdAt?: true
@@ -177,6 +183,7 @@ export type UserGroupByOutputType = {
   plan: $Enums.UserPlan
   paidPlanStartedAt: Date | null
   paidPlanExpiresAt: Date | null
+  isOperator: boolean
   mainWalletPublicKey: string
   authWalletPublicKey: string | null
   createdAt: Date
@@ -210,6 +217,7 @@ export type UserWhereInput = {
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolFilter<"User"> | boolean
   mainWalletPublicKey?: Prisma.StringFilter<"User"> | string
   authWalletPublicKey?: Prisma.StringNullableFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
@@ -226,6 +234,9 @@ export type UserWhereInput = {
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   appTransactions?: Prisma.AppTransactionListRelationFilter
+  marketer?: Prisma.XOR<Prisma.MarketerNullableScalarRelationFilter, Prisma.MarketerWhereInput> | null
+  referral?: Prisma.XOR<Prisma.ReferralNullableScalarRelationFilter, Prisma.ReferralWhereInput> | null
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutListRelationFilter
 }
 
 export type UserOrderByWithRelationInput = {
@@ -234,6 +245,7 @@ export type UserOrderByWithRelationInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -250,6 +262,9 @@ export type UserOrderByWithRelationInput = {
   vanityMints?: Prisma.VanityMintOrderByRelationAggregateInput
   refreshCaches?: Prisma.RefreshCacheOrderByRelationAggregateInput
   appTransactions?: Prisma.AppTransactionOrderByRelationAggregateInput
+  marketer?: Prisma.MarketerOrderByWithRelationInput
+  referral?: Prisma.ReferralOrderByWithRelationInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutOrderByRelationAggregateInput
 }
 
 export type UserWhereUniqueInput = Prisma.AtLeast<{
@@ -263,6 +278,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   plan?: Prisma.EnumUserPlanFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolFilter<"User"> | boolean
   createdAt?: Prisma.DateTimeFilter<"User"> | Date | string
   updatedAt?: Prisma.DateTimeFilter<"User"> | Date | string
   mainWallet?: Prisma.XOR<Prisma.WalletScalarRelationFilter, Prisma.WalletWhereInput>
@@ -277,6 +293,9 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   vanityMints?: Prisma.VanityMintListRelationFilter
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   appTransactions?: Prisma.AppTransactionListRelationFilter
+  marketer?: Prisma.XOR<Prisma.MarketerNullableScalarRelationFilter, Prisma.MarketerWhereInput> | null
+  referral?: Prisma.XOR<Prisma.ReferralNullableScalarRelationFilter, Prisma.ReferralWhereInput> | null
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutListRelationFilter
 }, "id" | "mainWalletPublicKey" | "authWalletPublicKey">
 
 export type UserOrderByWithAggregationInput = {
@@ -285,6 +304,7 @@ export type UserOrderByWithAggregationInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrderInput | Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrderInput | Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrderInput | Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -303,6 +323,7 @@ export type UserScalarWhereWithAggregatesInput = {
   plan?: Prisma.EnumUserPlanWithAggregatesFilter<"User"> | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
   paidPlanExpiresAt?: Prisma.DateTimeNullableWithAggregatesFilter<"User"> | Date | string | null
+  isOperator?: Prisma.BoolWithAggregatesFilter<"User"> | boolean
   mainWalletPublicKey?: Prisma.StringWithAggregatesFilter<"User"> | string
   authWalletPublicKey?: Prisma.StringNullableWithAggregatesFilter<"User"> | string | null
   createdAt?: Prisma.DateTimeWithAggregatesFilter<"User"> | Date | string
@@ -315,6 +336,7 @@ export type UserCreateInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -330,6 +352,9 @@ export type UserCreateInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateInput = {
@@ -338,6 +363,7 @@ export type UserUncheckedCreateInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -353,6 +379,9 @@ export type UserUncheckedCreateInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUpdateInput = {
@@ -361,6 +390,7 @@ export type UserUpdateInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -376,6 +406,9 @@ export type UserUpdateInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateInput = {
@@ -384,6 +417,7 @@ export type UserUncheckedUpdateInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -399,6 +433,9 @@ export type UserUncheckedUpdateInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateManyInput = {
@@ -407,6 +444,7 @@ export type UserCreateManyInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -419,6 +457,7 @@ export type UserUpdateManyMutationInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -430,6 +469,7 @@ export type UserUncheckedUpdateManyInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -442,6 +482,7 @@ export type UserCountOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -454,6 +495,7 @@ export type UserMaxOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -466,6 +508,7 @@ export type UserMinOrderByAggregateInput = {
   plan?: Prisma.SortOrder
   paidPlanStartedAt?: Prisma.SortOrder
   paidPlanExpiresAt?: Prisma.SortOrder
+  isOperator?: Prisma.SortOrder
   mainWalletPublicKey?: Prisma.SortOrder
   authWalletPublicKey?: Prisma.SortOrder
   createdAt?: Prisma.SortOrder
@@ -490,8 +533,54 @@ export type NullableDateTimeFieldUpdateOperationsInput = {
   set?: Date | string | null
 }
 
+export type BoolFieldUpdateOperationsInput = {
+  set?: boolean
+}
+
 export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
+}
+
+export type UserCreateNestedOneWithoutMarketerInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMarketerInput, Prisma.UserUncheckedCreateWithoutMarketerInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMarketerInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutMarketerNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMarketerInput, Prisma.UserUncheckedCreateWithoutMarketerInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMarketerInput
+  upsert?: Prisma.UserUpsertWithoutMarketerInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMarketerInput, Prisma.UserUpdateWithoutMarketerInput>, Prisma.UserUncheckedUpdateWithoutMarketerInput>
+}
+
+export type UserCreateNestedOneWithoutReferralInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutReferralInput, Prisma.UserUncheckedCreateWithoutReferralInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReferralInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutReferralNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutReferralInput, Prisma.UserUncheckedCreateWithoutReferralInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReferralInput
+  upsert?: Prisma.UserUpsertWithoutReferralInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutReferralInput, Prisma.UserUpdateWithoutReferralInput>, Prisma.UserUncheckedUpdateWithoutReferralInput>
+}
+
+export type UserCreateNestedOneWithoutReferralPayoutsAsReferredInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedCreateWithoutReferralPayoutsAsReferredInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReferralPayoutsAsReferredInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutReferralPayoutsAsReferredNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedCreateWithoutReferralPayoutsAsReferredInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutReferralPayoutsAsReferredInput
+  upsert?: Prisma.UserUpsertWithoutReferralPayoutsAsReferredInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutReferralPayoutsAsReferredInput, Prisma.UserUpdateWithoutReferralPayoutsAsReferredInput>, Prisma.UserUncheckedUpdateWithoutReferralPayoutsAsReferredInput>
 }
 
 export type UserCreateNestedOneWithoutSubscriptionPaymentsInput = {
@@ -684,12 +773,373 @@ export type UserUpdateOneRequiredWithoutAppTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAppTransactionsInput, Prisma.UserUpdateWithoutAppTransactionsInput>, Prisma.UserUncheckedUpdateWithoutAppTransactionsInput>
 }
 
+export type UserCreateWithoutMarketerInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserUncheckedCreateWithoutMarketerInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserCreateOrConnectWithoutMarketerInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutMarketerInput, Prisma.UserUncheckedCreateWithoutMarketerInput>
+}
+
+export type UserUpsertWithoutMarketerInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutMarketerInput, Prisma.UserUncheckedUpdateWithoutMarketerInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutMarketerInput, Prisma.UserUncheckedCreateWithoutMarketerInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutMarketerInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutMarketerInput, Prisma.UserUncheckedUpdateWithoutMarketerInput>
+}
+
+export type UserUpdateWithoutMarketerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutMarketerInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
+}
+
+export type UserCreateWithoutReferralInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserUncheckedCreateWithoutReferralInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserCreateOrConnectWithoutReferralInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutReferralInput, Prisma.UserUncheckedCreateWithoutReferralInput>
+}
+
+export type UserUpsertWithoutReferralInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutReferralInput, Prisma.UserUncheckedUpdateWithoutReferralInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutReferralInput, Prisma.UserUncheckedCreateWithoutReferralInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutReferralInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutReferralInput, Prisma.UserUncheckedUpdateWithoutReferralInput>
+}
+
+export type UserUpdateWithoutReferralInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutReferralInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
+}
+
+export type UserCreateWithoutReferralPayoutsAsReferredInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+}
+
+export type UserUncheckedCreateWithoutReferralPayoutsAsReferredInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+}
+
+export type UserCreateOrConnectWithoutReferralPayoutsAsReferredInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedCreateWithoutReferralPayoutsAsReferredInput>
+}
+
+export type UserUpsertWithoutReferralPayoutsAsReferredInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedUpdateWithoutReferralPayoutsAsReferredInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedCreateWithoutReferralPayoutsAsReferredInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutReferralPayoutsAsReferredInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutReferralPayoutsAsReferredInput, Prisma.UserUncheckedUpdateWithoutReferralPayoutsAsReferredInput>
+}
+
+export type UserUpdateWithoutReferralPayoutsAsReferredInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutReferralPayoutsAsReferredInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+}
+
 export type UserCreateWithoutSubscriptionPaymentsInput = {
   id?: string
   name: string
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -704,6 +1154,9 @@ export type UserCreateWithoutSubscriptionPaymentsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
@@ -712,6 +1165,7 @@ export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -726,6 +1180,9 @@ export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutSubscriptionPaymentsInput = {
@@ -750,6 +1207,7 @@ export type UserUpdateWithoutSubscriptionPaymentsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -764,6 +1222,9 @@ export type UserUpdateWithoutSubscriptionPaymentsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
@@ -772,6 +1233,7 @@ export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -786,6 +1248,9 @@ export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutAuthSessionsInput = {
@@ -794,6 +1259,7 @@ export type UserCreateWithoutAuthSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -808,6 +1274,9 @@ export type UserCreateWithoutAuthSessionsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutAuthSessionsInput = {
@@ -816,6 +1285,7 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -830,6 +1300,9 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutAuthSessionsInput = {
@@ -854,6 +1327,7 @@ export type UserUpdateWithoutAuthSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -868,6 +1342,9 @@ export type UserUpdateWithoutAuthSessionsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAuthSessionsInput = {
@@ -876,6 +1353,7 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -890,6 +1368,9 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutWalletsInput = {
@@ -898,6 +1379,7 @@ export type UserCreateWithoutWalletsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -912,6 +1394,9 @@ export type UserCreateWithoutWalletsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutWalletsInput = {
@@ -920,6 +1405,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -934,6 +1420,9 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutWalletsInput = {
@@ -947,6 +1436,7 @@ export type UserCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -961,6 +1451,9 @@ export type UserCreateWithoutMainWalletInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutMainWalletInput = {
@@ -969,6 +1462,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -983,6 +1477,9 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutMainWalletInput = {
@@ -1007,6 +1504,7 @@ export type UserUpdateWithoutWalletsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1021,6 +1519,9 @@ export type UserUpdateWithoutWalletsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutWalletsInput = {
@@ -1029,6 +1530,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1043,6 +1545,9 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUpsertWithoutMainWalletInput = {
@@ -1062,6 +1567,7 @@ export type UserUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1076,6 +1582,9 @@ export type UserUpdateWithoutMainWalletInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutMainWalletInput = {
@@ -1084,6 +1593,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1098,6 +1608,9 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutTokensInput = {
@@ -1106,6 +1619,7 @@ export type UserCreateWithoutTokensInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1120,6 +1634,9 @@ export type UserCreateWithoutTokensInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutTokensInput = {
@@ -1128,6 +1645,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1142,6 +1660,9 @@ export type UserUncheckedCreateWithoutTokensInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutTokensInput = {
@@ -1166,6 +1687,7 @@ export type UserUpdateWithoutTokensInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1180,6 +1702,9 @@ export type UserUpdateWithoutTokensInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutTokensInput = {
@@ -1188,6 +1713,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1202,6 +1728,9 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutLaunchesInput = {
@@ -1210,6 +1739,7 @@ export type UserCreateWithoutLaunchesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1224,6 +1754,9 @@ export type UserCreateWithoutLaunchesInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutLaunchesInput = {
@@ -1232,6 +1765,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1246,6 +1780,9 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutLaunchesInput = {
@@ -1270,6 +1807,7 @@ export type UserUpdateWithoutLaunchesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1284,6 +1822,9 @@ export type UserUpdateWithoutLaunchesInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutLaunchesInput = {
@@ -1292,6 +1833,7 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1306,6 +1848,9 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutHoldingExitsInput = {
@@ -1314,6 +1859,7 @@ export type UserCreateWithoutHoldingExitsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1328,6 +1874,9 @@ export type UserCreateWithoutHoldingExitsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutHoldingExitsInput = {
@@ -1336,6 +1885,7 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1350,6 +1900,9 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutHoldingExitsInput = {
@@ -1374,6 +1927,7 @@ export type UserUpdateWithoutHoldingExitsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1388,6 +1942,9 @@ export type UserUpdateWithoutHoldingExitsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutHoldingExitsInput = {
@@ -1396,6 +1953,7 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1410,6 +1968,9 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutVolumeBotSessionsInput = {
@@ -1418,6 +1979,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1432,6 +1994,9 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
@@ -1440,6 +2005,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1454,6 +2020,9 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutVolumeBotSessionsInput = {
@@ -1478,6 +2047,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1492,6 +2062,9 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
@@ -1500,6 +2073,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1514,6 +2088,9 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutVolumeBotPresetsInput = {
@@ -1522,6 +2099,7 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1536,6 +2114,9 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
@@ -1544,6 +2125,7 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1558,6 +2140,9 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutVolumeBotPresetsInput = {
@@ -1582,6 +2167,7 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1596,6 +2182,9 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
@@ -1604,6 +2193,7 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1618,6 +2208,9 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutVanityMintsInput = {
@@ -1626,6 +2219,7 @@ export type UserCreateWithoutVanityMintsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1640,6 +2234,9 @@ export type UserCreateWithoutVanityMintsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutVanityMintsInput = {
@@ -1648,6 +2245,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1662,6 +2260,9 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutVanityMintsInput = {
@@ -1686,6 +2287,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1700,6 +2302,9 @@ export type UserUpdateWithoutVanityMintsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutVanityMintsInput = {
@@ -1708,6 +2313,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1722,6 +2328,9 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutRefreshCachesInput = {
@@ -1730,6 +2339,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1744,6 +2354,9 @@ export type UserCreateWithoutRefreshCachesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutRefreshCachesInput = {
@@ -1752,6 +2365,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1766,6 +2380,9 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutRefreshCachesInput = {
@@ -1790,6 +2407,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1804,6 +2422,9 @@ export type UserUpdateWithoutRefreshCachesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutRefreshCachesInput = {
@@ -1812,6 +2433,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1826,6 +2448,9 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserCreateWithoutAppTransactionsInput = {
@@ -1834,6 +2459,7 @@ export type UserCreateWithoutAppTransactionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   authWalletPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
@@ -1848,6 +2474,9 @@ export type UserCreateWithoutAppTransactionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserUncheckedCreateWithoutAppTransactionsInput = {
@@ -1856,6 +2485,7 @@ export type UserUncheckedCreateWithoutAppTransactionsInput = {
   plan?: $Enums.UserPlan
   paidPlanStartedAt?: Date | string | null
   paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
   mainWalletPublicKey: string
   authWalletPublicKey?: string | null
   createdAt?: Date | string
@@ -1870,6 +2500,9 @@ export type UserUncheckedCreateWithoutAppTransactionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
 export type UserCreateOrConnectWithoutAppTransactionsInput = {
@@ -1894,6 +2527,7 @@ export type UserUpdateWithoutAppTransactionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1908,6 +2542,9 @@ export type UserUpdateWithoutAppTransactionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
 export type UserUncheckedUpdateWithoutAppTransactionsInput = {
@@ -1916,6 +2553,7 @@ export type UserUncheckedUpdateWithoutAppTransactionsInput = {
   plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
   paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
   paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
   mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
@@ -1930,6 +2568,9 @@ export type UserUncheckedUpdateWithoutAppTransactionsInput = {
   volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
 
@@ -1949,6 +2590,7 @@ export type UserCountOutputType = {
   vanityMints: number
   refreshCaches: number
   appTransactions: number
+  referralPayoutsAsReferred: number
 }
 
 export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -1963,6 +2605,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   vanityMints?: boolean | UserCountOutputTypeCountVanityMintsArgs
   refreshCaches?: boolean | UserCountOutputTypeCountRefreshCachesArgs
   appTransactions?: boolean | UserCountOutputTypeCountAppTransactionsArgs
+  referralPayoutsAsReferred?: boolean | UserCountOutputTypeCountReferralPayoutsAsReferredArgs
 }
 
 /**
@@ -2052,6 +2695,13 @@ export type UserCountOutputTypeCountAppTransactionsArgs<ExtArgs extends runtime.
   where?: Prisma.AppTransactionWhereInput
 }
 
+/**
+ * UserCountOutputType without action
+ */
+export type UserCountOutputTypeCountReferralPayoutsAsReferredArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.ReferralPayoutWhereInput
+}
+
 
 export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -2059,6 +2709,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2075,6 +2726,9 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
   appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
+  marketer?: boolean | Prisma.User$marketerArgs<ExtArgs>
+  referral?: boolean | Prisma.User$referralArgs<ExtArgs>
+  referralPayoutsAsReferred?: boolean | Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["user"]>
 
@@ -2084,6 +2738,7 @@ export type UserSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2097,6 +2752,7 @@ export type UserSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensio
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
@@ -2110,13 +2766,14 @@ export type UserSelectScalar = {
   plan?: boolean
   paidPlanStartedAt?: boolean
   paidPlanExpiresAt?: boolean
+  isOperator?: boolean
   mainWalletPublicKey?: boolean
   authWalletPublicKey?: boolean
   createdAt?: boolean
   updatedAt?: boolean
 }
 
-export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "mainWalletPublicKey" | "authWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
+export type UserOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "name" | "plan" | "paidPlanStartedAt" | "paidPlanExpiresAt" | "isOperator" | "mainWalletPublicKey" | "authWalletPublicKey" | "createdAt" | "updatedAt", ExtArgs["result"]["user"]>
 export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   mainWallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
   wallets?: boolean | Prisma.User$walletsArgs<ExtArgs>
@@ -2130,6 +2787,9 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   vanityMints?: boolean | Prisma.User$vanityMintsArgs<ExtArgs>
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
   appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
+  marketer?: boolean | Prisma.User$marketerArgs<ExtArgs>
+  referral?: boolean | Prisma.User$referralArgs<ExtArgs>
+  referralPayoutsAsReferred?: boolean | Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type UserIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2154,6 +2814,9 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     vanityMints: Prisma.$VanityMintPayload<ExtArgs>[]
     refreshCaches: Prisma.$RefreshCachePayload<ExtArgs>[]
     appTransactions: Prisma.$AppTransactionPayload<ExtArgs>[]
+    marketer: Prisma.$MarketerPayload<ExtArgs> | null
+    referral: Prisma.$ReferralPayload<ExtArgs> | null
+    referralPayoutsAsReferred: Prisma.$ReferralPayoutPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2161,6 +2824,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     plan: $Enums.UserPlan
     paidPlanStartedAt: Date | null
     paidPlanExpiresAt: Date | null
+    isOperator: boolean
     mainWalletPublicKey: string
     authWalletPublicKey: string | null
     createdAt: Date
@@ -2571,6 +3235,9 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   vanityMints<T extends Prisma.User$vanityMintsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$vanityMintsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$VanityMintPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   refreshCaches<T extends Prisma.User$refreshCachesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshCachesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshCachePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   appTransactions<T extends Prisma.User$appTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$appTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AppTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  marketer<T extends Prisma.User$marketerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketerArgs<ExtArgs>>): Prisma.Prisma__MarketerClient<runtime.Types.Result.GetResult<Prisma.$MarketerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  referral<T extends Prisma.User$referralArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$referralArgs<ExtArgs>>): Prisma.Prisma__ReferralClient<runtime.Types.Result.GetResult<Prisma.$ReferralPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  referralPayoutsAsReferred<T extends Prisma.User$referralPayoutsAsReferredArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReferralPayoutPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -2605,6 +3272,7 @@ export interface UserFieldRefs {
   readonly plan: Prisma.FieldRef<"User", 'UserPlan'>
   readonly paidPlanStartedAt: Prisma.FieldRef<"User", 'DateTime'>
   readonly paidPlanExpiresAt: Prisma.FieldRef<"User", 'DateTime'>
+  readonly isOperator: Prisma.FieldRef<"User", 'Boolean'>
   readonly mainWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly authWalletPublicKey: Prisma.FieldRef<"User", 'String'>
   readonly createdAt: Prisma.FieldRef<"User", 'DateTime'>
@@ -3266,6 +3934,68 @@ export type User$appTransactionsArgs<ExtArgs extends runtime.Types.Extensions.In
   take?: number
   skip?: number
   distinct?: Prisma.AppTransactionScalarFieldEnum | Prisma.AppTransactionScalarFieldEnum[]
+}
+
+/**
+ * User.marketer
+ */
+export type User$marketerArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Marketer
+   */
+  select?: Prisma.MarketerSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Marketer
+   */
+  omit?: Prisma.MarketerOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketerInclude<ExtArgs> | null
+  where?: Prisma.MarketerWhereInput
+}
+
+/**
+ * User.referral
+ */
+export type User$referralArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the Referral
+   */
+  select?: Prisma.ReferralSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the Referral
+   */
+  omit?: Prisma.ReferralOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ReferralInclude<ExtArgs> | null
+  where?: Prisma.ReferralWhereInput
+}
+
+/**
+ * User.referralPayoutsAsReferred
+ */
+export type User$referralPayoutsAsReferredArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the ReferralPayout
+   */
+  select?: Prisma.ReferralPayoutSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the ReferralPayout
+   */
+  omit?: Prisma.ReferralPayoutOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.ReferralPayoutInclude<ExtArgs> | null
+  where?: Prisma.ReferralPayoutWhereInput
+  orderBy?: Prisma.ReferralPayoutOrderByWithRelationInput | Prisma.ReferralPayoutOrderByWithRelationInput[]
+  cursor?: Prisma.ReferralPayoutWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.ReferralPayoutScalarFieldEnum | Prisma.ReferralPayoutScalarFieldEnum[]
 }
 
 /**
