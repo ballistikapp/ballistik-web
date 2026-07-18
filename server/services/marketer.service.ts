@@ -2,7 +2,10 @@ import "server-only";
 
 import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
-import type { MarketerUpdateSetupInput } from "@/server/schemas/marketer.schema";
+import type {
+  MarketerReferredUser,
+  MarketerUpdateSetupInput,
+} from "@/server/schemas/marketer.schema";
 
 const marketerSetupSelect = {
   id: true,
@@ -103,5 +106,39 @@ export const marketerService = {
       }
       throw error;
     }
+  },
+
+  /**
+   * Users attributed to this Marketer (sticky Referrals), newest first.
+   */
+  async listReferredUsers(userId: string): Promise<MarketerReferredUser[]> {
+    const marketer = await requireEnabledMarketer(userId);
+    if (!marketer) {
+      throw new AppError("Not found", 404);
+    }
+
+    const referrals = await prisma.referral.findMany({
+      where: { marketerId: marketer.id },
+      orderBy: { createdAt: "desc" },
+      select: {
+        id: true,
+        createdAt: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            mainWalletPublicKey: true,
+          },
+        },
+      },
+    });
+
+    return referrals.map((referral) => ({
+      referralId: referral.id,
+      userId: referral.user.id,
+      name: referral.user.name,
+      mainWalletPublicKey: referral.user.mainWalletPublicKey,
+      joinedAt: referral.createdAt,
+    }));
   },
 };

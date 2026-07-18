@@ -21,6 +21,8 @@ export const loginWithWalletSignatureSchema = z.object({
   signature: z.string().min(32, "Invalid wallet signature"),
   intent: walletAuthIntentSchema.default("login"),
   accountName: z.string().max(100, "Account name is too long").optional(),
+  /** From `?ref=` on auth links. Fail-open: ignored unless register creates a User. */
+  referralCode: z.string().max(64).optional(),
 });
 
 export const linkWalletAdapterSchema = z.object({

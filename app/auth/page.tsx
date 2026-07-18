@@ -31,6 +31,7 @@ const signinFormSchema = z.object({
 export default function AuthPage() {
   const searchParams = useSearchParams();
   const initialMethod = searchParams.get("method") === "private-key";
+  const referralCode = searchParams.get("ref")?.trim() || undefined;
   const postAuthRedirect = React.useMemo(
     () => getSafeRedirectPath(searchParams.get("redirect")),
     [searchParams]
@@ -115,6 +116,7 @@ export default function AuthPage() {
               <WalletAuthActions
                 mode="login"
                 intent="register"
+                referralCode={referralCode}
                 onLoginSuccess={handleWalletAuthSuccess}
               />
 

@@ -40,3 +40,11 @@ export const marketerUpdateSetupSchema = z
   );
 
 export type MarketerUpdateSetupInput = z.infer<typeof marketerUpdateSetupSchema>;
+
+export type MarketerReferredUser = {
+  referralId: string;
+  userId: string;
+  name: string;
+  mainWalletPublicKey: string;
+  joinedAt: Date;
+};

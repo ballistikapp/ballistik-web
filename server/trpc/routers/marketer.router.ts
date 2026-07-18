@@ -11,4 +11,7 @@ export const marketerRouter = router({
     .mutation(async ({ input, ctx }) => {
       return await marketerService.updateSetup(ctx.user.id, input);
     }),
+  listReferredUsers: protectedRateLimitedProcedure.query(async ({ ctx }) => {
+    return await marketerService.listReferredUsers(ctx.user.id);
+  }),
 });

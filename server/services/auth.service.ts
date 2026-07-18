@@ -3,13 +3,14 @@ import { prisma } from "@/lib/prisma";
 import { Keypair, PublicKey } from "@solana/web3.js";
 import bs58 from "bs58";
 import { AppError } from "@/server/errors";
-import type {
-  LoginWithPrivateKeyInput,
-  AuthUserOutput,
-  UpdateNameInput,
-  CreateWalletChallengeInput,
-  LoginWithWalletSignatureInput,
-  LinkWalletAdapterInput,
+import {
+  referralCodeSchema,
+  type LoginWithPrivateKeyInput,
+  type AuthUserOutput,
+  type UpdateNameInput,
+  type CreateWalletChallengeInput,
+  type LoginWithWalletSignatureInput,
+  type LinkWalletAdapterInput,
 } from "@/server/schemas";
 import {
   AuthChallengePurpose,
@@ -251,6 +252,13 @@ export const authService = {
       input.accountName?.trim() ||
       `${authWalletPublicKey.slice(0, 4)}-${authWalletPublicKey.slice(-4)}`;
 
+    const referralCodeParse = referralCodeSchema.safeParse(
+      input.referralCode ?? ""
+    );
+    const referralCode = referralCodeParse.success
+      ? referralCodeParse.data
+      : undefined;
+
     const user = await prisma.$transaction(async (tx) => {
       await tx.wallet.create({
         data: {
@@ -261,7 +269,7 @@ export const authService = {
         },
       });
 
-      return await tx.user.create({
+      const createdUser = await tx.user.create({
         data: {
           name: accountName,
           plan: UserPlan.FREE,
@@ -269,6 +277,25 @@ export const authService = {
           authWalletPublicKey,
         },
       });
+
+      // Register-only sticky Referral (ADR 0005). Missing / unknown / disabled
+      // codes are ignored so signup is never blocked by a marketing link.
+      if (referralCode) {
+        const marketer = await tx.marketer.findUnique({
+          where: { referralCode },
+          select: { id: true, isEnabled: true },
+        });
+        if (marketer?.isEnabled) {
+          await tx.referral.create({
+            data: {
+              marketerId: marketer.id,
+              userId: createdUser.id,
+            },
+          });
+        }
+      }
+
+      return createdUser;
     });
 
     return {
