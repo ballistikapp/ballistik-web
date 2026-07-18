@@ -14,4 +14,10 @@ export const marketerRouter = router({
   listReferredUsers: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await marketerService.listReferredUsers(ctx.user.id);
   }),
+  listPayouts: protectedRateLimitedProcedure.query(async ({ ctx }) => {
+    return await marketerService.listPayouts(ctx.user.id);
+  }),
+  getAggregates: protectedRateLimitedProcedure.query(async ({ ctx }) => {
+    return await marketerService.getAggregates(ctx.user.id);
+  }),
 });

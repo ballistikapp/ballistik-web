@@ -87,12 +87,13 @@ Total usage fee is:
 
 ## Enforcement
 
-- Usage fees are computed server-side and transferred from the user's main wallet to the configured collector wallet.
+- Usage fees are computed server-side and transferred from the user's main wallet to the configured collector wallet via `usageFeeService.collectFromMainWallet`.
 - Fee collection is part of protected server workflows and is never trusted to client-side calculations.
 - Fee collection validates collector wallet configuration before transfer.
 - Fee exemption/discount is decided from the authenticated user's JWT `plan` claim during the request path.
 - `User.plan` in the database is the source of truth for newly issued access tokens, but active access tokens continue to honor their embedded plan claim until refresh/expiry.
 - Subscription charges reuse the same collector-wallet payment rail; no external billing provider is involved in v1.
+- When the paying User has a qualifying Referral, the same seam sends an atomic dual-transfer (Marketer fee-collector share + platform remainder) and records a Referral Payout. See [Referral Implementation](./referral-implementation.md) and ADRs `0004` / `0005`.
 
 ## UI Visibility Requirements
 

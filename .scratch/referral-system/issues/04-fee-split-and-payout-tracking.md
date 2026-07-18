@@ -4,12 +4,20 @@
 
 **Blocked by:** 03 — Register-time Referral attribution
 
-**Status:** ready-for-agent
+**Status:** resolved
 
-- [ ] Qualifying collection splits Marketer share + platform remainder in one transaction
-- [ ] Usage fees and subscription charges both go through the split
-- [ ] Missing collector / disabled Marketer / zero share → 100% platform, no Referral Payout
-- [ ] Live Marketer rate applies at each collection
-- [ ] Referral Payout recorded with amounts, rate, reason, signature, referred User
-- [ ] Marketer UI shows payouts plus aggregates (total earned, referral count, last payout)
-- [ ] Fee-collection seam tests cover the minimum behaviors from the spec
+- [x] Qualifying collection splits Marketer share + platform remainder in one transaction
+- [x] Usage fees and subscription charges both go through the split
+- [x] Missing collector / disabled Marketer / zero share → 100% platform, no Referral Payout
+- [x] Live Marketer rate applies at each collection
+- [x] Referral Payout recorded with amounts, rate, reason, signature, referred User
+- [x] Marketer UI shows payouts plus aggregates (total earned, referral count, last payout)
+- [x] Fee-collection seam tests cover the minimum behaviors from the spec
+
+## Answer
+
+Fee split lives in `usageFeeService.collectFromMainWallet`: qualifying Referrals get one Solana tx with Marketer share then platform remainder; `ReferralPayout` is written after confirm. Marketer surface: `marketer.listPayouts` + `marketer.getAggregates` power `/referrals` payouts UI. Seam tests in `server/services/usage-fee.service.test.ts`.
+
+## Comments
+
+- Ledger write failures after a confirmed on-chain split are logged and do not fail the payer (avoids double-charge on retry).

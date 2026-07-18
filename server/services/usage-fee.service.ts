@@ -6,9 +6,10 @@ import {
   Transaction,
   TransactionExpiredBlockheightExceededError,
   sendAndConfirmTransaction,
+  type Connection,
 } from "@solana/web3.js";
 import bs58 from "bs58";
-import { prisma } from "@/lib/prisma";
+import { prisma, Prisma } from "@/lib/prisma";
 import { getEnv } from "@/lib/config/env";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
@@ -29,6 +30,17 @@ type CollectUsageFeeInput = {
   referenceId?: string;
 };
 
+type FeeTransferLeg = {
+  toPublicKey: string;
+  amountLamports: number;
+};
+
+type ReferralPayoutSummary = {
+  marketerAmountLamports: number;
+  platformAmountLamports: number;
+  feeShareRate: number;
+};
+
 type CollectUsageFeeResult = {
   skipped: boolean;
   signature: string | null;
@@ -37,6 +49,24 @@ type CollectUsageFeeResult = {
   amountSol: number;
   amountLamports: number;
   reason: string;
+  transfers: FeeTransferLeg[];
+  referralPayout: ReferralPayoutSummary | null;
+};
+
+/** Solana boundary — replaceable in seam tests. */
+export const usageFeeSolana = {
+  getConnection(): Connection {
+    return getSolanaConnection();
+  },
+  async sendAndConfirm(
+    connection: Connection,
+    transaction: Transaction,
+    signers: Keypair[]
+  ): Promise<string> {
+    return await sendAndConfirmTransaction(connection, transaction, signers, {
+      commitment: "confirmed",
+    });
+  },
 };
 
 const log = logger.child({ service: "usage-fee" });
@@ -88,6 +118,105 @@ function resolveCollectorWalletPublicKey() {
   }
 }
 
+function parseFeeCollectorPublicKey(value: string | null | undefined) {
+  if (!value?.trim()) {
+    return null;
+  }
+  try {
+    return new PublicKey(value.trim());
+  } catch {
+    return null;
+  }
+}
+
+type ReferralForSplit = {
+  id: string;
+  marketerId: string;
+  marketer: {
+    isEnabled: boolean;
+    feeShareRate: { toString(): string } | number | string;
+    feeCollectorPublicKey: string | null;
+  };
+} | null;
+
+/** feeShareRate is Decimal(5,4) — scale by 10_000 for exact floor math. */
+function floorMarketerShareLamports(totalLamports: number, rate: number) {
+  const rateScaled = Math.round(rate * 10_000);
+  if (rateScaled <= 0) {
+    return 0;
+  }
+  return Math.floor((totalLamports * rateScaled) / 10_000);
+}
+
+function resolveReferralFeeSplit(input: {
+  totalLamports: number;
+  referral: ReferralForSplit;
+}): {
+  transfers: FeeTransferLeg[];
+  payout: (ReferralPayoutSummary & {
+    referralId: string;
+    marketerId: string;
+  }) | null;
+} {
+  const platformPublicKey = resolveCollectorWalletPublicKey().toBase58();
+  const platformOnly = {
+    transfers: [
+      {
+        toPublicKey: platformPublicKey,
+        amountLamports: input.totalLamports,
+      },
+    ],
+    payout: null,
+  };
+
+  const referral = input.referral;
+  const marketer = referral?.marketer;
+  const rate = marketer ? Number(marketer.feeShareRate) : 0;
+  const marketerCollector = parseFeeCollectorPublicKey(
+    marketer?.feeCollectorPublicKey
+  );
+
+  const qualifies =
+    Boolean(referral) &&
+    Boolean(marketer?.isEnabled) &&
+    Number.isFinite(rate) &&
+    rate > 0 &&
+    marketerCollector !== null;
+
+  if (!qualifies || !referral || !marketerCollector) {
+    return platformOnly;
+  }
+
+  const marketerAmountLamports = floorMarketerShareLamports(
+    input.totalLamports,
+    rate
+  );
+  if (marketerAmountLamports <= 0) {
+    return platformOnly;
+  }
+
+  const platformAmountLamports = input.totalLamports - marketerAmountLamports;
+  return {
+    transfers: [
+      {
+        toPublicKey: marketerCollector.toBase58(),
+        amountLamports: marketerAmountLamports,
+      },
+      {
+        toPublicKey: platformPublicKey,
+        amountLamports: platformAmountLamports,
+      },
+    ],
+    payout: {
+      referralId: referral.id,
+      marketerId: referral.marketerId,
+      marketerAmountLamports,
+      platformAmountLamports,
+      feeShareRate: rate,
+    },
+  };
+}
+
 export const usageFeeService = {
   async collectFromMainWallet(
     input: CollectUsageFeeInput
@@ -102,6 +231,8 @@ export const usageFeeService = {
         amountSol: 0,
         amountLamports: 0,
         reason: input.reason,
+        transfers: [],
+        referralPayout: null,
       };
     }
 
@@ -123,7 +254,7 @@ export const usageFeeService = {
 
     const collectorPublicKey = resolveCollectorWalletPublicKey();
     const sender = Keypair.fromSecretKey(bs58.decode(mainWallet.privateKey));
-    const connection = getSolanaConnection();
+    const connection = usageFeeSolana.getConnection();
 
     if (sender.publicKey.equals(collectorPublicKey)) {
       return {
@@ -134,29 +265,51 @@ export const usageFeeService = {
         amountSol: input.totalFeeSol,
         amountLamports,
         reason: input.reason,
+        transfers: [],
+        referralPayout: null,
       };
     }
+
+    const referral = await prisma.referral.findUnique({
+      where: { userId: input.userId },
+      select: {
+        id: true,
+        marketerId: true,
+        marketer: {
+          select: {
+            isEnabled: true,
+            feeShareRate: true,
+            feeCollectorPublicKey: true,
+          },
+        },
+      },
+    });
+
+    const split = resolveReferralFeeSplit({
+      totalLamports: amountLamports,
+      referral,
+    });
 
     const sendTransfer = async () => {
       const { blockhash, lastValidBlockHeight } = await retryRpcWithTimeout(
         () => connection.getLatestBlockhash("confirmed"),
         rpcConfig.tuning.rpcTimeoutMs
       );
-      const transaction = new Transaction().add(
-        SystemProgram.transfer({
-          fromPubkey: sender.publicKey,
-          toPubkey: collectorPublicKey,
-          lamports: amountLamports,
-        })
-      );
+      const transaction = new Transaction();
+      for (const leg of split.transfers) {
+        transaction.add(
+          SystemProgram.transfer({
+            fromPubkey: sender.publicKey,
+            toPubkey: new PublicKey(leg.toPublicKey),
+            lamports: leg.amountLamports,
+          })
+        );
+      }
       transaction.recentBlockhash = blockhash;
       transaction.lastValidBlockHeight = lastValidBlockHeight;
       transaction.feePayer = sender.publicKey;
       return await retryRpcWithTimeout(
-        () =>
-          sendAndConfirmTransaction(connection, transaction, [sender], {
-            commitment: "confirmed",
-          }),
+        () => usageFeeSolana.sendAndConfirm(connection, transaction, [sender]),
         rpcConfig.tuning.confirmTimeoutMs
       );
     };
@@ -209,6 +362,40 @@ export const usageFeeService = {
       throw error;
     }
 
+    let referralPayout: ReferralPayoutSummary | null = null;
+    if (split.payout) {
+      try {
+        await prisma.referralPayout.create({
+          data: {
+            marketerId: split.payout.marketerId,
+            referralId: split.payout.referralId,
+            referredUserId: input.userId,
+            marketerAmountLamports: BigInt(split.payout.marketerAmountLamports),
+            platformAmountLamports: BigInt(split.payout.platformAmountLamports),
+            totalFeeLamports: BigInt(amountLamports),
+            feeShareRate: new Prisma.Decimal(split.payout.feeShareRate),
+            reason: input.reason,
+            txSignature: signature,
+          },
+        });
+        referralPayout = {
+          marketerAmountLamports: split.payout.marketerAmountLamports,
+          platformAmountLamports: split.payout.platformAmountLamports,
+          feeShareRate: split.payout.feeShareRate,
+        };
+      } catch (error) {
+        // On-chain split already confirmed; do not fail the payer. Ops can
+        // reconcile from the dual-transfer signature if the ledger write misses.
+        log.error("Failed to record Referral Payout after successful fee split", {
+          userId: input.userId,
+          marketerId: split.payout.marketerId,
+          referralId: split.payout.referralId,
+          signature,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
     log.info("Usage fee collected", {
       userId: input.userId,
       fromPublicKey: sender.publicKey.toBase58(),
@@ -217,13 +404,18 @@ export const usageFeeService = {
       amountLamports,
       signature,
       reason: input.reason,
+      transferCount: split.transfers.length,
+      referralPayout: Boolean(referralPayout),
     });
     await testRunLogService.appendServerEvent({
       eventType: "wallet_transaction",
       source: "usage-fee.service",
       action: "usage-fee.collect",
       userId: input.userId,
-      wallets: [sender.publicKey.toBase58(), collectorPublicKey.toBase58()],
+      wallets: [
+        sender.publicKey.toBase58(),
+        ...split.transfers.map((leg) => leg.toPublicKey),
+      ],
       signature,
       status: "submitted",
       expectedValue: {
@@ -236,6 +428,7 @@ export const usageFeeService = {
         toPublicKey: collectorPublicKey.toBase58(),
         amountSol: input.totalFeeSol,
         amountLamports,
+        transfers: split.transfers,
       },
     });
 
@@ -247,6 +440,8 @@ export const usageFeeService = {
       amountSol: input.totalFeeSol,
       amountLamports,
       reason: input.reason,
+      transfers: split.transfers,
+      referralPayout,
     };
   },
 };

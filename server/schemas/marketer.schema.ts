@@ -48,3 +48,25 @@ export type MarketerReferredUser = {
   mainWalletPublicKey: string;
   joinedAt: Date;
 };
+
+export type MarketerReferralPayout = {
+  id: string;
+  marketerAmountLamports: bigint;
+  platformAmountLamports: bigint;
+  totalFeeLamports: bigint;
+  feeShareRate: number;
+  reason: string;
+  txSignature: string;
+  createdAt: Date;
+  referredUser: {
+    id: string;
+    name: string;
+    mainWalletPublicKey: string;
+  };
+};
+
+export type MarketerAggregates = {
+  totalEarnedLamports: bigint;
+  referralCount: number;
+  lastPayoutAt: Date | null;
+};
