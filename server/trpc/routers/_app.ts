@@ -16,6 +16,7 @@ import { appTransactionRouter } from "./app-transaction.router";
 import { creatorRewardRouter } from "./creator-rewards.router";
 import { activeProcessRouter } from "./active-process.router";
 import { opsRouter } from "./ops.router";
+import { marketerRouter } from "./marketer.router";
 
 const baseRouters = {
   auth: authRouter,
@@ -34,6 +35,7 @@ const baseRouters = {
   activeProcess: activeProcessRouter,
   testRunLog: testRunLogRouter,
   ops: opsRouter,
+  marketer: marketerRouter,
 };
 
 export const appRouter =

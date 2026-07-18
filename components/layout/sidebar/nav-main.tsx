@@ -13,6 +13,7 @@ import {
   IconList,
   IconPlus,
   IconRobot,
+  IconShare,
   IconUserCircle,
   IconWallet,
 } from "@tabler/icons-react";
@@ -109,6 +110,14 @@ export const accountRoutes: NavMainItem[] = [
     scope: "global",
   },
 ];
+
+/** Shown in Account nav only for enabled Marketers (gated in AppSidebar). */
+export const marketerRoute: NavMainItem = {
+  title: "Referrals",
+  url: "/referrals",
+  icon: IconShare,
+  scope: "global",
+};
 
 export const helpRoutes: NavMainItem[] = [
   {

@@ -163,6 +163,7 @@ On `auth.logout` success, the client calls the wallet adapter's `disconnect()` b
 ## Return-Target Redirects
 
 - Protected-route auth redirects preserve the original in-app destination via `redirect` query param (for example `/auth?redirect=%2Flaunch%3Fpreset%3Dfree`).
+- Marketer share links use `/auth?ref=<referralCode>` (see [Referral Implementation](./referral-implementation.md)). Register-time attribution from `ref` is a follow-on slice; the auth page does not consume `ref` yet.
 - Post-auth client navigation resolves destination from `redirect` and falls back to `/` when missing.
 - Redirect validation only allows same-origin relative paths beginning with `/`.
 - External URLs, protocol-relative values, and malformed targets are rejected to prevent open redirects.

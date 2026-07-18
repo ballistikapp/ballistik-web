@@ -41,6 +41,10 @@ This directory contains detailed implementation documentation for all features i
 - [Subscription Implementation](./subscription-implementation.md) — Pro subscription purchase and entitlement
 - [Pricing Implementation](./pricing-implementation.md) — usage-fee schedule, scope rules, and enforcement model
 
+### Referrals
+
+- [Referral Implementation](./referral-implementation.md) — Marketer product setup, shareable `ref` auth link, and (follow-on) attribution / payouts
+
 ## Infrastructure
 
 ### External Services

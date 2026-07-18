@@ -5,6 +5,7 @@ import { trpc } from "@/lib/trpc/client";
 import {
   accountRoutes,
   helpRoutes,
+  marketerRoute,
   NavMain,
   tokenWorkspaceRoutes,
 } from "@/components/layout/sidebar/nav-main";
@@ -32,6 +33,10 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
     }
   );
   const { data: currentUser } = trpc.auth.me.useQuery();
+  const marketerMeQuery = trpc.marketer.getMe.useQuery(undefined, {
+    enabled: Boolean(currentUser),
+    retry: false,
+  });
   const subscriptionOverviewQuery = trpc.billing.getSubscriptionOverview.useQuery(
     {},
     {
@@ -49,15 +54,16 @@ export const AppSidebar = React.memo(function AppSidebar({ ...props }: Props) {
         : resolvedPlan === "FREE"
           ? "Free"
           : undefined;
-  const accountItems = React.useMemo(
-    () =>
-      accountRoutes.map((item) =>
-        item.url === "/account"
-          ? { ...item, badge: accountPlanBadge }
-          : item
-      ),
-    [accountPlanBadge]
-  );
+  const isEnabledMarketer = Boolean(marketerMeQuery.data);
+  const accountItems = React.useMemo(() => {
+    const items = accountRoutes.map((item) =>
+      item.url === "/account" ? { ...item, badge: accountPlanBadge } : item
+    );
+    if (isEnabledMarketer) {
+      items.splice(1, 0, marketerRoute);
+    }
+    return items;
+  }, [accountPlanBadge, isEnabledMarketer]);
   const tokenWorkspaceItems = React.useMemo(
     () =>
       tokenWorkspaceRoutes.map((item) => {
