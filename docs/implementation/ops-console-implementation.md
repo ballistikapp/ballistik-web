@@ -40,6 +40,7 @@ See ADRs:
 - `ops.getUserSpine` — `operatorProcedure`; User identity + nested lists for tests/legacy (UI spine tables use scoped list procedures); no private keys
 - `ops.getToken` — `operatorProcedure`; Token identity/metadata/status/owner (no private key)
 - `ops.getWallet` — `operatorProcedure`; Wallet type/pubkey/owner/token/stored balance (no private key)
+- `ops.listWalletAppTransactions` — `operatorProcedure`; paginated AppTransaction ledger for a Wallet (exact `walletPublicKey` actor match; `page`/`pageSize`; 404 if Wallet missing); no private keys
 - `ops.refreshWalletBalances` — `operatorProcedure`; refresh stored SOL balances for explicit Wallet public keys (max 100); force refresh via `walletService.refreshBalancesByPublicKeys`; no private keys
 - `ops.refreshMatchingWalletBalances` — `operatorProcedure`; refresh all Wallets matching current search/type/system/`userId` filters (empty filter = all); server-chunked (100); confirm count in UI; no hard max refuse; no private keys
 - `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs (no raw `input`/`result`)
@@ -69,7 +70,7 @@ Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol
 - `/ops/launches` — Launches browse (dense table; row → Launch autopsy)
 - `/ops/users/[userId]` — User spine (identity + MAIN reveal; nested Tokens/Wallets/Launches dense tables scoped by `userId`; row → detail; no nested-table key reveal)
 - `/ops/tokens/[publicKey]` — Token detail + mint-key reveal
-- `/ops/wallets/[publicKey]` — Wallet detail + single-Wallet balance refresh + wallet-key reveal
+- `/ops/wallets/[publicKey]` — Wallet detail + single-Wallet balance refresh + wallet-key reveal + AppTransaction history table
 - `/ops/launches/[launchId]` — Launch autopsy
 
 Ops uses a minimal dedicated layout with an Ops sidebar (Overview, Users, Marketers, Wallets, Tokens, Launches) and no product token sidebar. No Ops entry in normal app navigation.

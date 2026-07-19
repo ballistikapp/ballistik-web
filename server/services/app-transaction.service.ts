@@ -55,6 +55,12 @@ type ListFilters = {
   pageSize?: number;
 };
 
+type ListByWalletFilters = {
+  walletPublicKey: string;
+  page?: number;
+  pageSize?: number;
+};
+
 function truncateAddress(address: string): string {
   if (address.length <= 8) return address;
   return `${address.slice(0, 4)}...${address.slice(-4)}`;
@@ -299,6 +305,50 @@ export const appTransactionService = {
       }),
       prisma.appTransaction.count({ where }),
     ]);
+
+    return { items, totalCount };
+  },
+
+  /**
+   * Exact actor-wallet match (`walletPublicKey`). Used by Ops wallet detail;
+   * not scoped to a user.
+   */
+  async listByWallet(filters: ListByWalletFilters) {
+    const page = filters.page ?? 1;
+    const pageSize = Math.min(filters.pageSize ?? 25, 100);
+
+    const where: Prisma.AppTransactionWhereInput = {
+      walletPublicKey: filters.walletPublicKey,
+    };
+
+    const [rows, totalCount] = await Promise.all([
+      prisma.appTransaction.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        skip: (page - 1) * pageSize,
+        take: pageSize,
+        select: {
+          id: true,
+          type: true,
+          status: true,
+          solAmount: true,
+          transactionSignature: true,
+          description: true,
+          createdAt: true,
+        },
+      }),
+      prisma.appTransaction.count({ where }),
+    ]);
+
+    const items = rows.map((row) => ({
+      id: row.id,
+      type: row.type,
+      status: row.status,
+      solAmount: row.solAmount == null ? null : Number(row.solAmount),
+      transactionSignature: row.transactionSignature,
+      description: row.description,
+      createdAt: row.createdAt,
+    }));
 
     return { items, totalCount };
   },

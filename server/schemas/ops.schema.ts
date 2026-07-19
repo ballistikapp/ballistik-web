@@ -54,6 +54,12 @@ export const opsGetWalletSchema = z.object({
   publicKey: publicKeySchema,
 });
 
+export const opsListWalletAppTransactionsSchema = z.object({
+  walletPublicKey: publicKeySchema,
+  page: z.number().int().min(1).default(1),
+  pageSize: z.number().int().min(1).max(100).default(25),
+});
+
 export const opsRefreshWalletBalancesSchema = z.object({
   publicKeys: z
     .array(publicKeySchema)
@@ -161,6 +167,10 @@ export type OpsListTokensInput = z.input<typeof opsListTokensSchema>;
 export type OpsListWalletsInput = z.input<typeof opsListWalletsSchema>;
 export type OpsGetTokenInput = z.infer<typeof opsGetTokenSchema>;
 export type OpsGetWalletInput = z.infer<typeof opsGetWalletSchema>;
+/** Input shape before Zod defaults (`page`/`pageSize`). */
+export type OpsListWalletAppTransactionsInput = z.input<
+  typeof opsListWalletAppTransactionsSchema
+>;
 export type OpsRefreshWalletBalancesInput = z.infer<
   typeof opsRefreshWalletBalancesSchema
 >;

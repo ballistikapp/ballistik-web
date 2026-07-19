@@ -13,6 +13,7 @@ import type {
   OpsListMarketersInput,
   OpsListTokensInput,
   OpsListUsersInput,
+  OpsListWalletAppTransactionsInput,
   OpsListWalletsInput,
   OpsLookupInput,
   OpsRefreshMatchingWalletBalancesInput,
@@ -20,6 +21,7 @@ import type {
   OpsRevealPrivateKeyInput,
   OpsUpdateMarketerInput,
 } from "@/server/schemas/ops.schema";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 import { walletService } from "@/server/services/wallet.service";
 
 const NOT_FOUND = "Not found";
@@ -695,6 +697,28 @@ export const opsService = {
     }
 
     return result;
+  },
+
+  async listWalletAppTransactions(
+    callerUserId: string,
+    input: OpsListWalletAppTransactionsInput
+  ) {
+    await requireOperator(callerUserId);
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { publicKey: input.walletPublicKey },
+      select: { publicKey: true },
+    });
+
+    if (!wallet) {
+      throwNotFound();
+    }
+
+    return await appTransactionService.listByWallet({
+      walletPublicKey: input.walletPublicKey,
+      page: input.page,
+      pageSize: input.pageSize,
+    });
   },
 
   async refreshWalletBalances(

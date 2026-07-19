@@ -16,6 +16,7 @@ import {
   opsListMarketersSchema,
   opsListTokensSchema,
   opsListUsersSchema,
+  opsListWalletAppTransactionsSchema,
   opsJumpSchema,
   opsListWalletsSchema,
   opsLookupSchema,
@@ -84,6 +85,12 @@ export const opsRouter = router({
     .input(opsGetWalletSchema)
     .query(async ({ input, ctx }) => {
       return await opsService.getWallet(ctx.user.id, input.publicKey);
+    }),
+
+  listWalletAppTransactions: operatorProcedure
+    .input(opsListWalletAppTransactionsSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listWalletAppTransactions(ctx.user.id, input);
     }),
 
   refreshWalletBalances: operatorProcedure

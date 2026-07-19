@@ -696,6 +696,7 @@ model AppTransaction {
   @@index([userId, tokenPublicKey, createdAt])
   @@index([userId, source, createdAt])
   @@index([userId, type, createdAt])
+  @@index([walletPublicKey, createdAt])
   @@unique([transactionSignature, walletPublicKey])
   @@index([transactionSignature])
   @@index([bundleId])

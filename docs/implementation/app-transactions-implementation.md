@@ -135,6 +135,16 @@ Protected procedure. Returns offset-based paginated results ordered by `createdA
 
 **Returns**: `{ items: AppTransaction[], totalCount: number }`
 
+### Ops: `ops.listWalletAppTransactions`
+
+Operator procedure. Returns offset-based paginated AppTransaction rows for a Wallet, ordered by `createdAt DESC`. Filters by exact actor `walletPublicKey` (not `fromAddress`/`toAddress`). Returns 404 if the Wallet does not exist.
+
+**Input**: `{ walletPublicKey, page?, pageSize? }` (defaults 1 / 25, max 100)
+
+**Returns**: `{ items: { id, type, status, solAmount, transactionSignature, description, createdAt }[], totalCount }`
+
+Service path: `opsService.listWalletAppTransactions` → `appTransactionService.listByWallet`.
+
 ### `appTransaction.costBreakdown`
 
 Protected procedure. Aggregates confirmed `AppTransaction` data for a token, grouped by `type` and `source`. Used by the P&L details dialog.
@@ -149,6 +159,7 @@ Protected procedure. Aggregates confirmed `AppTransaction` data for a token, gro
 - `[userId, tokenPublicKey, createdAt]` — per-token filtered view
 - `[userId, source, createdAt]` — feature-scoped queries
 - `[userId, type, createdAt]` — type-filtered queries
+- `[walletPublicKey, createdAt]` — Ops / actor-wallet history
 - `[transactionSignature]` — signature lookup and multi-instruction grouping
 - `[bundleId]` — Jito bundle grouping
 - `[referenceId]` — join to related records
