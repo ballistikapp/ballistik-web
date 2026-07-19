@@ -38,7 +38,7 @@ export default async function OpsLayout({
   return (
     <div className="bg-background text-foreground min-h-screen">
       <header className="border-border border-b">
-        <div className="mx-auto flex w-full max-w-6xl items-center justify-between gap-4 px-4 py-3 md:px-6">
+        <div className="mx-auto flex w-full max-w-[1800px] items-center justify-between gap-4 px-4 py-3 md:px-6">
           <div className="flex items-center gap-4">
             <Link href="/ops" className="text-sm font-semibold tracking-tight">
               Ops Console
@@ -55,7 +55,7 @@ export default async function OpsLayout({
           </Link>
         </div>
       </header>
-      <div className="mx-auto flex w-full max-w-6xl gap-6 px-4 py-6 md:gap-8 md:px-6 md:py-8">
+      <div className="mx-auto flex w-full max-w-[1800px] gap-6 px-4 py-6 md:gap-8 md:px-6 md:py-8">
         <aside className="border-border w-44 shrink-0 border-r pr-4 md:w-52 md:pr-6">
           <OpsSidebar />
         </aside>
