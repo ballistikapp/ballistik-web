@@ -36,6 +36,11 @@ import {
   assemblePumpfunLaunchPlan,
   type PumpfunPlanWalletDraft,
 } from "@/server/services/launch-platform-pumpfun-plan";
+import {
+  buildFundingTargetsFromPumpfunPlan,
+  buildManagedLaunchWalletRowsFromPumpfunPlan,
+  launchUsesPlanFundedCapRecovery,
+} from "@/server/services/launch-platform-pumpfun-funding";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -446,6 +451,17 @@ async function persistLaunchRecoveryWallets(
     bundlerWalletKeypairs,
     distributionWallets
   );
+  await prisma.launchRecoveryWallet.deleteMany({ where: { launchId } });
+  if (rows.length > 0) {
+    await prisma.launchRecoveryWallet.createMany({ data: rows });
+  }
+}
+
+async function persistManagedLaunchWalletsFromPlan(
+  launchId: string,
+  plan: ReturnType<typeof pumpfunLaunchPlanV1Schema.parse>
+) {
+  const rows = buildManagedLaunchWalletRowsFromPumpfunPlan(launchId, plan);
   await prisma.launchRecoveryWallet.deleteMany({ where: { launchId } });
   if (rows.length > 0) {
     await prisma.launchRecoveryWallet.createMany({ data: rows });
@@ -3247,6 +3263,7 @@ async function loadLaunchRecoveryInfo(launchId: string, userId: string) {
       walletPublicKey: true,
       walletType: true,
       isManaged: true,
+      fundedLamports: true,
       reclaimStatus: true,
       reclaimTxSignature: true,
       reclaimError: true,
@@ -4122,12 +4139,27 @@ export const launchService = {
           const attemptedAt = new Date();
           const walletPublicKey = new PublicKey(wallet.publicKey);
           const balanceLamports = await connection.getBalance(walletPublicKey);
-          if (balanceLamports <= 0) {
+          const fundedLamports = BigInt(
+            recoveryRow?.fundedLamports?.toString() ?? "0"
+          );
+          const usePlanFundedCap =
+            fundedLamports > BigInt(0) ||
+            launchUsesPlanFundedCapRecovery(launch.plan);
+          const lamportsToSend = usePlanFundedCap
+            ? computeFailedLaunchDrainLamports(balanceLamports, fundedLamports)
+            : balanceLamports;
+          if (lamportsToSend <= 0) {
+            const reclaimError =
+              balanceLamports <= 0
+                ? "Zero balance"
+                : fundedLamports <= BigInt(0)
+                  ? "No launch-funded balance recorded"
+                  : "No launch-funded balance remaining";
             await prisma.launchRecoveryWallet.updateMany({
               where: { launchId, walletPublicKey: wallet.publicKey },
               data: {
                 reclaimStatus: "SKIPPED",
-                reclaimError: "Zero balance",
+                reclaimError,
                 reclaimTxSignature: null,
                 lastAttemptAt: attemptedAt,
               },
@@ -4135,7 +4167,7 @@ export const launchService = {
             return {
               publicKey: wallet.publicKey,
               status: "skipped" as const,
-              error: "Zero balance",
+              error: reclaimError,
             };
           }
 
@@ -4149,7 +4181,7 @@ export const launchService = {
               SystemProgram.transfer({
                 fromPubkey: sender.publicKey,
                 toPubkey: mainPublicKey,
-                lamports: balanceLamports,
+                lamports: lamportsToSend,
               })
             );
             const recoverTrackId = await appTransactionService
@@ -4160,7 +4192,7 @@ export const launchService = {
                 walletPublicKey: wallet.publicKey,
                 fromAddress: wallet.publicKey,
                 toAddress: mainPublicKey.toBase58(),
-                intentSolAmount: -balanceLamports / 1_000_000_000,
+                intentSolAmount: -lamportsToSend / 1_000_000_000,
                 referenceId: launchId,
               })
               .then((r) => r.id)
@@ -4189,7 +4221,7 @@ export const launchService = {
               signature,
               status: "submitted",
               actualValue: {
-                amountSol: lamportsToSol(BigInt(balanceLamports)),
+                amountSol: lamportsToSol(BigInt(lamportsToSend)),
                 walletPublicKey: wallet.publicKey,
               },
             });
@@ -4207,7 +4239,7 @@ export const launchService = {
               publicKey: wallet.publicKey,
               status: "returned" as const,
               signature,
-              amountSol: lamportsToSol(BigInt(balanceLamports)),
+              amountSol: lamportsToSol(BigInt(lamportsToSend)),
             };
           } catch (error) {
             const errorMessage =
@@ -4569,22 +4601,44 @@ export const launchService = {
         distributionWallets
       );
       await setLaunchRecovery(launchId, recoveryData);
-      await persistLaunchRecoveryWallets(
-        launchId,
-        input,
-        user.mainWallet.publicKey,
-        devWalletPublicKey,
-        bundlerWalletKeypairs,
-        distributionWallets
-      );
-      managedLaunchWallets = [
-        ...((input.devWalletOption === "generate" || input.devWalletOption === "system") &&
-        devWalletPublicKey !== user.mainWallet.publicKey
-          ? [devWalletKeypair]
-          : []),
-        ...bundlerWalletKeypairs,
-        ...distributionWallets.map((wallet) => wallet.wallet),
-      ];
+      if (authoritativePlan) {
+        await persistManagedLaunchWalletsFromPlan(launchId, authoritativePlan);
+      } else {
+        await persistLaunchRecoveryWallets(
+          launchId,
+          input,
+          user.mainWallet.publicKey,
+          devWalletPublicKey,
+          bundlerWalletKeypairs,
+          distributionWallets
+        );
+      }
+      if (authoritativePlan) {
+        const managedPublicKeys = new Set(
+          authoritativePlan.wallets.managedWallets
+            .filter((wallet) => wallet.isManaged)
+            .map((wallet) => wallet.publicKey)
+        );
+        managedLaunchWallets = [
+          ...(devWalletPublicKey !== user.mainWallet.publicKey
+            ? [devWalletKeypair]
+            : []),
+          ...bundlerWalletKeypairs,
+          ...distributionWallets.map((wallet) => wallet.wallet),
+        ].filter((wallet) =>
+          managedPublicKeys.has(wallet.publicKey.toBase58())
+        );
+      } else {
+        managedLaunchWallets = [
+          ...((input.devWalletOption === "generate" ||
+            input.devWalletOption === "system") &&
+          devWalletPublicKey !== user.mainWallet.publicKey
+            ? [devWalletKeypair]
+            : []),
+          ...bundlerWalletKeypairs,
+          ...distributionWallets.map((wallet) => wallet.wallet),
+        ];
+      }
 
       const { SHYFT_API_KEY, APP_URL } = getEnv();
       if (SHYFT_API_KEY && APP_URL) {
@@ -4614,57 +4668,93 @@ export const launchService = {
       }
 
       await setStep(launchId, 12, "funding", "Funding wallets");
-      const {
-        ataRentLamports,
-        userVolumeAccumulatorRentLamports,
-        buyRentLamports,
-        distributionAtaLamports,
-        creatorTargetLamports,
-        devFundingLamports,
-        bundlerFundingTargetLamports,
-        totalBundlerFundingLamports,
-        totalBundleBuyLamports,
-        mainReserveLamports,
-        tipLamports,
-        fundingTargets,
-      } = await buildLaunchFundingPlan({
-        input,
-        bundlerWalletCount,
-        bundlerBuyAmountSol,
-        bundlerBuyVariancePercent,
-        distributionWalletMultiplier,
-        devBuyAmountSol,
-        jitoTipAmountSol,
-        mainWalletPublicKey: user.mainWallet.publicKey,
-        devWalletPublicKey,
-        bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
-          (wallet) => wallet.publicKey
-        ),
-        bundlerBuyAmountLamportsByWallet:
-          bundlerBuyAllocation.amountLamportsByWallet,
-        allocationSeed: launchId,
-        createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
-        minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
-      });
-      await appendLog(launchId, "INFO", "Funding plan prepared", "funding", {
-        targetsCount: fundingTargets.length,
-        devFundingLamports: devFundingLamports.toString(),
-        creatorMinLamports: MIN_CREATOR_BALANCE_LAMPORTS.toString(),
-        creatorTargetLamports: creatorTargetLamports.toString(),
-        bundlerFundingTargetLamports: bundlerFundingTargetLamports.map(
-          (lamports) => lamports.toString()
-        ),
-        totalBundlerFundingLamports: totalBundlerFundingLamports.toString(),
-        totalBundleBuyLamports: totalBundleBuyLamports.toString(),
-        ataRentLamports: ataRentLamports.toString(),
-        userVolumeAccumulatorRentLamports:
-          userVolumeAccumulatorRentLamports.toString(),
-        buyRentLamports: buyRentLamports.toString(),
-        distributionAtaLamports: distributionAtaLamports.toString(),
-        mainReserveLamports: mainReserveLamports.toString(),
-        tipLamports: tipLamports.toString(),
-        bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
-      });
+      let fundingTargets: { publicKey: PublicKey; requiredLamports: bigint }[];
+      let mainReserveLamports: bigint;
+      let tipLamports: bigint;
+      if (authoritativePlan) {
+        const planFunding =
+          buildFundingTargetsFromPumpfunPlan(authoritativePlan);
+        fundingTargets = planFunding.fundingTargets.map((target) => ({
+          publicKey: new PublicKey(target.publicKey),
+          requiredLamports: target.requiredLamports,
+        }));
+        mainReserveLamports = planFunding.mainReserveLamports;
+        tipLamports = planFunding.tipLamports;
+        await appendLog(
+          launchId,
+          "INFO",
+          "Funding plan loaded from authoritative plan",
+          "funding",
+          {
+            targetsCount: fundingTargets.length,
+            fundingTargets: planFunding.fundingTargets.map((target) => ({
+              publicKey: target.publicKey,
+              requiredLamports: target.requiredLamports.toString(),
+            })),
+            mainReserveLamports: mainReserveLamports.toString(),
+            tipLamports: tipLamports.toString(),
+            bundlerBuyAllocationUsedFallback:
+              bundlerBuyAllocation.usedFallback,
+            source: "authoritative_plan",
+          }
+        );
+      } else {
+        const {
+          ataRentLamports,
+          userVolumeAccumulatorRentLamports,
+          buyRentLamports,
+          distributionAtaLamports,
+          creatorTargetLamports,
+          devFundingLamports,
+          bundlerFundingTargetLamports,
+          totalBundlerFundingLamports,
+          totalBundleBuyLamports,
+          mainReserveLamports: recomputedMainReserveLamports,
+          tipLamports: recomputedTipLamports,
+          fundingTargets: recomputedFundingTargets,
+        } = await buildLaunchFundingPlan({
+          input,
+          bundlerWalletCount,
+          bundlerBuyAmountSol,
+          bundlerBuyVariancePercent,
+          distributionWalletMultiplier,
+          devBuyAmountSol,
+          jitoTipAmountSol,
+          mainWalletPublicKey: user.mainWallet.publicKey,
+          devWalletPublicKey,
+          bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
+            (wallet) => wallet.publicKey
+          ),
+          bundlerBuyAmountLamportsByWallet:
+            bundlerBuyAllocation.amountLamportsByWallet,
+          allocationSeed: launchId,
+          createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+          minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+        });
+        fundingTargets = recomputedFundingTargets;
+        mainReserveLamports = recomputedMainReserveLamports;
+        tipLamports = recomputedTipLamports;
+        await appendLog(launchId, "INFO", "Funding plan prepared", "funding", {
+          targetsCount: fundingTargets.length,
+          devFundingLamports: devFundingLamports.toString(),
+          creatorMinLamports: MIN_CREATOR_BALANCE_LAMPORTS.toString(),
+          creatorTargetLamports: creatorTargetLamports.toString(),
+          bundlerFundingTargetLamports: bundlerFundingTargetLamports.map(
+            (lamports) => lamports.toString()
+          ),
+          totalBundlerFundingLamports: totalBundlerFundingLamports.toString(),
+          totalBundleBuyLamports: totalBundleBuyLamports.toString(),
+          ataRentLamports: ataRentLamports.toString(),
+          userVolumeAccumulatorRentLamports:
+            userVolumeAccumulatorRentLamports.toString(),
+          buyRentLamports: buyRentLamports.toString(),
+          distributionAtaLamports: distributionAtaLamports.toString(),
+          mainReserveLamports: mainReserveLamports.toString(),
+          tipLamports: tipLamports.toString(),
+          bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
+          source: "recomputed",
+        });
+      }
       const fundingResult = await fundWalletsFromMain(
         launchId,
         mainWalletKeypair,
@@ -4807,10 +4897,7 @@ export const launchService = {
           (total, target) => total + target.amountLamports,
           BigInt(0)
         );
-        const baseTipLamports = Math.max(
-          0,
-          Math.floor(jitoTipAmountSol * LAMPORTS_PER_SOL)
-        );
+        const baseTipLamports = Math.max(0, Number(tipLamports));
         await appendLog(launchId, "INFO", "Bundle buy prepared", "create", {
           buyers: buyerWallets.length,
           totalBuySol: lamportsToSol(totalBuyLamports).toFixed(4),

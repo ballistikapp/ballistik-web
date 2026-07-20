@@ -151,7 +151,11 @@ const pumpfunPlanWalletSchema = z.object({
   publicKey: z.string().min(1),
   platformRole: z.string().min(1),
   isManaged: z.boolean(),
-  /** Max lamports this attempt may fund into the wallet (recovery cap). */
+  /**
+   * Required balance target for this attempt (funding authority).
+   * Failed-launch reclaim uses the recorded top-up on Managed Launch Wallet rows,
+   * not this required-target value, so shared/imported prior balances are not swept.
+   */
   fundedCapLamports: lamportsStringSchema,
 });
 

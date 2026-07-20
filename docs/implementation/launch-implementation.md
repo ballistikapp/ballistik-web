@@ -16,7 +16,7 @@
 3. Schema-valid submissions create a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON **before** Platform planning, then schedule the shared lifecycle.
 4. Lifecycle resolves pump.fun via `resolveLaunchPlatform`, calls `platform.plan`, persists the secret-free authoritative plan (`plan` / `planSchemaVersion` / `planPersistedAt`), then calls `platform.execute` with that exact plan on the lifecycle context.
 5. Planning validation failures and insufficient main-Wallet funds transition the Launch to visible, retryable `FAILED` history (no silent discard). If plan persistence fails, pump.fun compensates local key refs / vanity reservations created during planning.
-6. Execute still delegates to the existing launch job (compat). The job reuses persisted plan wallet identities and vanity reservations when present; funding amounts may still be recomputed until Managed Launch Wallet funding extraction.
+6. Execute still delegates to the existing launch job (compat). When a persisted plan is present, the job materializes Managed Launch Wallet rows from plan identities/`platformRole`, funds wallets to the plan’s required-balance targets (`fundedCapLamports` + `mainReserveLamports`), then submits on-chain. Actual top-ups are snapshotted onto `LaunchRecoveryWallet.fundedLamports` and bound failed-launch reclaim (auto + manual).
 7. Job writes structured logs to `LaunchLog` and updates `Launch.progress` (compat path; later tickets migrate writes onto the lifecycle context).
 8. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
 9. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint; the compat job still checks that flag between steps (context-based cancel queries land as execution is extracted).
@@ -72,8 +72,9 @@ Per-launch recovery tracking for managed wallets (cross-Platform term: Managed L
 - One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION` via legacy `role` enum)
 - `platformRole`: optional Platform-defined role identifier string (not a global enum of every future role)
 - `isManaged`: whether launch cleanup is allowed to operate on the wallet automatically
-- `fundedLamports`: the actual SOL top-up this launch funded into that wallet
+- `fundedLamports`: the actual SOL top-up this launch funded into that wallet (recovery cap; not the plan required-balance target)
 - `reclaimStatus`, `reclaimTxSignature`, `reclaimError`, `lastAttemptAt`, `reclaimedAt`: reclaim bookkeeping for auto and manual recovery flows
+- New-version launches persist MLW rows from the authoritative plan before funding (`platformRole` + exact public keys). Legacy / no-plan execute still builds rows from input.
 
 ### VanityMint
 
@@ -185,9 +186,9 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
 2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `8` bundler wallets).
-3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
+3. **Wallets**: load main wallet and Managed Launch Wallet keypairs. With a persisted plan, identities come from the plan (keys already created during planning); otherwise resolve/generate as before. Persist `LaunchRecoveryWallet` rows before funding (`platformRole` from plan when present).
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
-5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
+5. **Funding**: transfer SOL to reach plan required-balance targets (or recompute targets only on the legacy no-plan path) before venue submission. Snapshot actual top-ups onto `fundedLamports`.
 6. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
    - Metadata description appends `Launched with ballistik.app` by default.
    - Attribution is appended after two line breaks when user description exists.
@@ -487,6 +488,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - Automatic reclaim outcome is stored in `Launch.result.failureRecovery` for user-facing messaging.
 - `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Manage Tokens for reclaim.
 - Failed-launch reclaim is launch-scoped: each managed wallet can only return the funded top-up recorded for that launch, never more than its current balance.
+- Manual `recoverSol` uses the same funded-cap drain when the Launch has a `plan_funded_cap` recovery policy or a recorded `fundedLamports` top-up. Legacy launches without plan/funding snapshots keep full-balance reclaim.
 - Failed launches without `failureRecovery` metadata fall back to showing My Tokens guidance so older/stale failure records still have a recovery path.
 - Manual reclaim remains available from Manage Tokens row actions and the reclaim dialog.
 
