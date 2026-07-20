@@ -104,7 +104,7 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 ### Platform contracts (additive; execution unchanged)
 
 - `versionedLaunchInputSchema`: discriminated input with shared Token metadata and a pump.fun `config` branch. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation.
-- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items).
+- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage.
 - `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation.
 - `isLegacyPlatformRecord`: null `platformVersion` ⇒ legacy.
 

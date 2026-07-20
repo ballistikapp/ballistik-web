@@ -81,23 +81,29 @@ export const versionedLaunchInputSchema = z.discriminatedUnion("platform", [
 ]);
 export type VersionedLaunchInput = z.infer<typeof versionedLaunchInputSchema>;
 
+/** Integer lamports as a decimal string so summaries survive Prisma Json persistence. */
+const lamportsStringSchema = z
+  .string()
+  .regex(/^-?\d+$/, "Lamports must be an integer decimal string");
+
 export const launchMoneyLineItemSchema = z.object({
   label: z.string().min(1),
-  amountLamports: z.bigint(),
+  amountLamports: lamportsStringSchema,
 });
 export type LaunchMoneyLineItem = z.infer<typeof launchMoneyLineItemSchema>;
 
 /**
  * Shared preview/plan monetary summary. Platform execution details stay opaque.
+ * Amounts are string lamports for Json-safe plan/preview persistence.
  */
 export const normalizedLaunchMoneySummarySchema = z.object({
-  immediateRequiredBalanceLamports: z.bigint(),
-  temporaryFundingLamports: z.bigint(),
-  permanentSpendLamports: z.bigint(),
-  expectedReturnLamports: z.bigint(),
-  expectedMainWalletDeltaNowLamports: z.bigint(),
-  expectedMainWalletDeltaAfterCleanupLamports: z.bigint(),
-  usageFeeLamports: z.bigint(),
+  immediateRequiredBalanceLamports: lamportsStringSchema,
+  temporaryFundingLamports: lamportsStringSchema,
+  permanentSpendLamports: lamportsStringSchema,
+  expectedReturnLamports: lamportsStringSchema,
+  expectedMainWalletDeltaNowLamports: lamportsStringSchema,
+  expectedMainWalletDeltaAfterCleanupLamports: lamportsStringSchema,
+  usageFeeLamports: lamportsStringSchema,
   lineItems: z.array(launchMoneyLineItemSchema),
 });
 export type NormalizedLaunchMoneySummary = z.infer<

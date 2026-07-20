@@ -76,22 +76,36 @@ test("versioned launch input rejects system creator Wallet option", () => {
 
 test("normalized money summary requires funding, spend, return, fee, and labeled line items", () => {
   const parsed = normalizedLaunchMoneySummarySchema.parse({
-    immediateRequiredBalanceLamports: BigInt(1_500_000_000),
-    temporaryFundingLamports: BigInt(1_000_000_000),
-    permanentSpendLamports: BigInt(200_000_000),
-    expectedReturnLamports: BigInt(800_000_000),
-    expectedMainWalletDeltaNowLamports: BigInt(-1_500_000_000),
-    expectedMainWalletDeltaAfterCleanupLamports: BigInt(-200_000_000),
-    usageFeeLamports: BigInt(50_000_000),
+    immediateRequiredBalanceLamports: "1500000000",
+    temporaryFundingLamports: "1000000000",
+    permanentSpendLamports: "200000000",
+    expectedReturnLamports: "800000000",
+    expectedMainWalletDeltaNowLamports: "-1500000000",
+    expectedMainWalletDeltaAfterCleanupLamports: "-200000000",
+    usageFeeLamports: "50000000",
     lineItems: [
-      { label: "Dev buy", amountLamports: BigInt(100_000_000) },
-      { label: "Usage fee", amountLamports: BigInt(50_000_000) },
+      { label: "Dev buy", amountLamports: "100000000" },
+      { label: "Usage fee", amountLamports: "50000000" },
     ],
   });
 
-  assert.equal(parsed.immediateRequiredBalanceLamports, BigInt(1_500_000_000));
+  assert.equal(parsed.immediateRequiredBalanceLamports, "1500000000");
   assert.equal(parsed.lineItems.length, 2);
   assert.equal(parsed.lineItems[0]?.label, "Dev buy");
+});
+
+test("normalized money summary rejects non-integer lamport strings", () => {
+  const result = normalizedLaunchMoneySummarySchema.safeParse({
+    immediateRequiredBalanceLamports: "1.5",
+    temporaryFundingLamports: "0",
+    permanentSpendLamports: "0",
+    expectedReturnLamports: "0",
+    expectedMainWalletDeltaNowLamports: "0",
+    expectedMainWalletDeltaAfterCleanupLamports: "0",
+    usageFeeLamports: "0",
+    lineItems: [],
+  });
+  assert.equal(result.success, false);
 });
 
 test("null Platform version identifies a legacy Launch or Token record", () => {
