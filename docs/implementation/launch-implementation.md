@@ -12,19 +12,21 @@
 ## Core Flow
 
 1. UI submits versioned pump.fun launch input via `trpc.launch.start` (`versionedLaunchInputSchema`).
-2. Server validates Platform (pump.fun only), performs synchronous funding preflight, then queues.
+2. `launchLifecycle` validates Platform (pump.fun only), performs synchronous funding preflight, then queues.
 3. If the external input schema rejects the request, or the main wallet cannot cover required launch funding, `launch.start` throws and no `Launch` record is created.
-4. When preflight passes, server creates a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON, and starts an async job.
-5. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
-6. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-7. Cancellation sets `cancelRequestedAt`; job checks between steps.
+4. When preflight passes, server creates a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON, and schedules Platform execution through the shared lifecycle.
+5. Lifecycle resolves pump.fun via `resolveLaunchPlatform` and calls `platform.execute` with a lifecycle context (progress / logs / cancel). The current pump module delegates execute to the existing launch job (compat) until planning/execution extraction tickets land.
+6. Job writes structured logs to `LaunchLog` and updates `Launch.progress` (compat path; later tickets migrate writes onto the lifecycle context).
+7. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+8. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint; the compat job still checks that flag between steps (context-based cancel queries land as execution is extracted).
 
 ## tRPC Endpoints
 
-- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Runs funding preflight, then creates launch and starts async job.
+- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, history, and `previewCosts` remain on `launchService` until later tickets.
+- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Runs funding preflight, then creates launch and schedules Platform execute via the lifecycle.
   - Schema-invalid requests never create a Launch row.
   - Insufficient-funds failures return immediately and do not enqueue a launch.
-- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact.
+- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact (normalized Platform preview lands in a later ticket).
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
@@ -109,7 +111,8 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - `launch-input-compat`: `flattenVersionedLaunchInput` / `toVersionedLaunchInput` / `resolveStoredLaunchInput` / `buildNewLaunchPersistence` bridge versioned storage and flat execution without rewriting legacy rows.
 - Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage.
-- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover`. pump.fun `execute` currently delegates to `runPumpfunLaunchJobCompat`; preview/plan/recover throw until extraction tickets implement them.
+- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; schedules Platform execute; provides lifecycle contexts; maps typed Platform outcomes; owns the post-success usage-fee helper. Start/cancel/retry bodies and the compat job still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
 - `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
 
 ### Legacy custody-safe capability policy

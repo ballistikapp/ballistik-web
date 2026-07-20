@@ -20,11 +20,15 @@ function stubServerOnlyModule() {
   } as unknown as NodeJS.Module;
 }
 
-test("platform registry resolves pump.fun", async () => {
+test("platform registry resolves pump.fun with preview/plan/execute/recover", async () => {
   stubServerOnlyModule();
   const { resolveLaunchPlatform } = await import("./launch-platform-registry");
   const platform = resolveLaunchPlatform("PUMPFUN");
   assert.equal(platform.id, "PUMPFUN");
+  assert.equal(typeof platform.preview, "function");
+  assert.equal(typeof platform.plan, "function");
+  assert.equal(typeof platform.execute, "function");
+  assert.equal(typeof platform.recover, "function");
 });
 
 test("platform registry rejects unsupported Platforms before record creation", async () => {

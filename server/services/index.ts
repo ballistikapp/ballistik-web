@@ -10,6 +10,8 @@ export * from "./wallet.service";
 export * from "./launch.service";
 export * from "./launch-capability";
 export * from "./launch-platform-registry";
+export * from "./launch-lifecycle";
+export * from "./launch-platform-pumpfun";
 export * from "./holding.service";
 export * from "./transaction.service";
 export * from "./storage.service";

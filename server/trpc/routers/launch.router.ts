@@ -5,6 +5,7 @@ import {
   sensitiveProcedure,
 } from "../trpc";
 import { launchService } from "@/server/services/launch.service";
+import { launchLifecycle } from "@/server/services/launch-lifecycle";
 import {
   launchPreviewCostsSchema,
   launchRecoverSolByTokenSchema,
@@ -25,19 +26,19 @@ export const launchRouter = router({
   start: expensiveProtectedProcedure
     .input(versionedLaunchInputSchema)
     .mutation(async ({ input, ctx }) => {
-      return await launchService.startLaunch(input, ctx.user);
+      return await launchLifecycle.startLaunch(input, ctx.user);
     }),
   status: protectedRateLimitedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
-    return await launchService.getLaunchStatus(input.launchId, ctx.user.id);
+    return await launchLifecycle.getLaunchStatus(input.launchId, ctx.user.id);
   }),
   cancel: expensiveProtectedProcedure.input(launchStatusSchema).mutation(async ({ input, ctx }) => {
-    return await launchService.cancelLaunch(input.launchId, ctx.user.id);
+    return await launchLifecycle.cancelLaunch(input.launchId, ctx.user.id);
   }),
   retry: expensiveProtectedProcedure.input(launchRetrySchema).mutation(async ({ input, ctx }) => {
-    return await launchService.retryLaunch(input.launchId, ctx.user);
+    return await launchLifecycle.retryLaunch(input.launchId, ctx.user);
   }),
   getActive: protectedRateLimitedProcedure.query(async ({ ctx }) => {
-    return await launchService.getActiveLaunch(ctx.user.id);
+    return await launchLifecycle.getActiveLaunch(ctx.user.id);
   }),
   getFailedLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getFailedLaunches(ctx.user.id);

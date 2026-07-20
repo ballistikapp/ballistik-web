@@ -64,7 +64,6 @@ import { persistGeneratedPrivateKey } from "@/server/services/private-key-persis
 import { persistLaunchLog } from "@/server/services/log-persistence.service";
 import { summarizeFailureRecoveryAttempt } from "@/server/services/launch-failure-recovery.helpers";
 import { storageService } from "@/server/services/storage.service";
-import { usageFeeService } from "@/server/services/usage-fee.service";
 import { retryLaunchDbWrite } from "@/server/services/launch-db.helpers";
 import { withActionLock, withIdempotency } from "@/server/security/api-abuse";
 import { computeFailedLaunchDrainLamports } from "@/server/services/launch-failure-recovery.helpers";
@@ -2716,43 +2715,13 @@ async function finalizeLaunch(
     : "SUCCEEDED";
 
   if (finalStatus === "SUCCEEDED" && usageFeeTotalSol > 0) {
-    try {
-      const usageFeeResult = await usageFeeService.collectFromMainWallet({
-        userId,
-        totalFeeSol: usageFeeTotalSol,
-        reason: "launch.success",
-        txSource: "LAUNCH",
-        referenceId: launchId,
-        tokenPublicKey,
-      });
-      await appendLog(launchId, "INFO", "Usage fee collected", "fees", {
-        skipped: usageFeeResult.skipped,
-        amountSol: usageFeeResult.amountSol,
-        amountLamports: usageFeeResult.amountLamports,
-        signature: usageFeeResult.signature,
-        fromPublicKey: usageFeeResult.fromPublicKey,
-        toPublicKey: usageFeeResult.toPublicKey,
-        reason: usageFeeResult.reason,
-      });
-    } catch (error) {
-      const message = getErrorMessage(error) || "Failed to collect usage fee";
-      logger.warn("Launch usage fee collection on success failed", {
-        launchId,
-        userId,
-        message,
-      });
-      await appendLog(
-        launchId,
-        "WARN",
-        "Usage fee collection failed after successful launch",
-        "fees",
-        {
-          amountSol: usageFeeTotalSol,
-          errorMessage: message,
-          reason: "launch.success",
-        }
-      );
-    }
+    const { launchLifecycle } = await import("./launch-lifecycle");
+    await launchLifecycle.collectUsageFeeAfterSuccess({
+      launchId,
+      userId,
+      tokenPublicKey,
+      usageFeeTotalSol,
+    });
   }
 
   await updateLaunchRecord(launchId, {
@@ -3549,7 +3518,9 @@ export const launchService = {
           });
 
           appendLog(launch.id, "STEP", "Launch queued", "queue");
-          void this.runLaunchJob(launch.id);
+          void import("./launch-lifecycle").then(({ launchLifecycle }) =>
+            launchLifecycle.runPlatformExecution(launch.id)
+          );
 
           return { launchId: launch.id };
         },
@@ -3651,7 +3622,9 @@ export const launchService = {
         sourceLaunchStatus: sourceLaunch.status,
         feeRecollected: false,
       });
-      void this.runLaunchJob(retryLaunch.id);
+      void import("./launch-lifecycle").then(({ launchLifecycle }) =>
+        launchLifecycle.runPlatformExecution(retryLaunch.id)
+      );
 
       return { launchId: retryLaunch.id, retriedFromLaunchId: sourceLaunch.id };
     });
