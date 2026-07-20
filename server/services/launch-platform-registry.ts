@@ -22,6 +22,9 @@ export type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 export type LaunchLifecycleContext = {
   launchId: string;
   userId: string;
+  /** Authoritative plan when already persisted; null during planning. */
+  plan: unknown | null;
+  planSchemaVersion: string | null;
   reportProgress: (progress: number, step?: string) => Promise<void>;
   appendLog: (
     level: LaunchLogLevel,
@@ -52,16 +55,34 @@ export type LaunchPlatformExecuteResult =
   | { kind: "failed"; errorMessage: string }
   | { kind: "canceled" };
 
-export type LaunchPlatformPlanResult = {
-  planSchemaVersion: number;
-  plan: unknown;
+/** Local reservations / key refs created during planning that need compensation. */
+export type LaunchPlatformPlanLocalResources = {
+  reservedVanityMintId: string | null;
+  createdWalletPublicKeys: string[];
 };
+
+/**
+ * Typed plan outcomes. Expected operational failures (validation, insufficient
+ * funds) are `failed` results — not thrown exceptions.
+ */
+export type LaunchPlatformPlanResult =
+  | {
+      kind: "planned";
+      planSchemaVersion: string;
+      plan: unknown;
+      localResources?: LaunchPlatformPlanLocalResources;
+    }
+  | {
+      kind: "failed";
+      errorMessage: string;
+      localResources?: LaunchPlatformPlanLocalResources;
+    };
 
 /**
  * Shared Platform module interface.
  * preview returns normalized money plus the thin review envelope fields.
- * plan / recover deepen in later tickets; execute initially delegates to
- * pump.fun compatibility code.
+ * plan produces a secret-free authoritative plan; recover deepens later.
+ * execute initially delegates to pump.fun compatibility code.
  */
 export type LaunchPlatformModule = {
   readonly id: LaunchPlatformId;
@@ -75,6 +96,11 @@ export type LaunchPlatformModule = {
   ) => Promise<LaunchPlatformPlanResult>;
   execute: (ctx: LaunchLifecycleContext) => Promise<LaunchPlatformExecuteResult>;
   recover: (ctx: LaunchLifecycleContext) => Promise<void>;
+  /** Release vanity reservations / abandon unfunded key refs after plan failure. */
+  compensatePlanResources: (
+    ctx: LaunchLifecycleContext,
+    resources: LaunchPlatformPlanLocalResources
+  ) => Promise<void>;
 };
 
 type LaunchPlatformRegistry = Record<LaunchPlatformId, LaunchPlatformModule>;

@@ -12,20 +12,21 @@
 ## Core Flow
 
 1. UI submits versioned pump.fun launch input via `trpc.launch.start` (`versionedLaunchInputSchema`).
-2. `launchLifecycle` validates Platform (pump.fun only), performs synchronous funding preflight, then queues.
-3. If the external input schema rejects the request, or the main wallet cannot cover required launch funding, `launch.start` throws and no `Launch` record is created.
-4. When preflight passes, server creates a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON, and schedules Platform execution through the shared lifecycle.
-5. Lifecycle resolves pump.fun via `resolveLaunchPlatform` and calls `platform.execute` with a lifecycle context (progress / logs / cancel). The current pump module delegates execute to the existing launch job (compat) until planning/execution extraction tickets land.
-6. Job writes structured logs to `LaunchLog` and updates `Launch.progress` (compat path; later tickets migrate writes onto the lifecycle context).
-7. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-8. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint; the compat job still checks that flag between steps (context-based cancel queries land as execution is extracted).
+2. If the external input schema rejects the request, no `Launch` record is created.
+3. Schema-valid submissions create a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON **before** Platform planning, then schedule the shared lifecycle.
+4. Lifecycle resolves pump.fun via `resolveLaunchPlatform`, calls `platform.plan`, persists the secret-free authoritative plan (`plan` / `planSchemaVersion` / `planPersistedAt`), then calls `platform.execute` with that exact plan on the lifecycle context.
+5. Planning validation failures and insufficient main-Wallet funds transition the Launch to visible, retryable `FAILED` history (no silent discard). If plan persistence fails, pump.fun compensates local key refs / vanity reservations created during planning.
+6. Execute still delegates to the existing launch job (compat). The job reuses persisted plan wallet identities and vanity reservations when present; funding amounts may still be recomputed until Managed Launch Wallet funding extraction.
+7. Job writes structured logs to `LaunchLog` and updates `Launch.progress` (compat path; later tickets migrate writes onto the lifecycle context).
+8. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+9. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint; the compat job still checks that flag between steps (context-based cancel queries land as execution is extracted).
 
 ## tRPC Endpoints
 
 - `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, and history remain on `launchService` until later tickets.
-- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Runs funding preflight, then creates launch and schedules Platform execute via the lifecycle.
+- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Creates the Launch row first, then schedules lifecycle plan → persist → execute.
   - Schema-invalid requests never create a Launch row.
-  - Insufficient-funds failures return immediately and do not enqueue a launch.
+  - Insufficient-funds and other planning failures become visible retryable `FAILED` Launch history after the row exists.
 - `launch.previewCosts` (query): accepts `versionedLaunchPreviewInputSchema` (Platform + config, no Token metadata). Routes through `resolveLaunchPlatform(...).preview` and returns the review envelope: `money` (`normalizedLaunchMoneySummarySchema` lamport strings + labeled line items) plus `mainWalletBalanceLamports`, `hasSufficientMainWallet`, `platformFeeWaived`, and `platformFeeDiscountRate`. Side-effect-free (read-only RPC/balance); does not persist plans, fund Wallets, publish metadata, or submit on-chain.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
@@ -49,7 +50,7 @@ Tracks state and progress.
 - `currentStep`: string
 - `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
 - `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Execution/retry/clone resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON.
-- `plan` / `planSchemaVersion` / `planPersistedAt`: additive secret-free authoritative Platform plan storage (nullable until planning lands).
+- `plan` / `planSchemaVersion` / `planPersistedAt`: secret-free authoritative Platform plan. Written after `platform.plan` succeeds and before `platform.execute`. pump.fun plan schema version `"1"` (`pumpfunLaunchPlanV1Schema`) includes normalized money, public wallet identities, allocations, intended effects, recovery caps, and opaque pump fields (vanity reservation ids — never private keys).
 - `outcomeKind` / `outcomeDetails`: additive Platform-owned outcome classification (nullable until classification lands).
 - `result`: output metadata (JSON)
 - `tokenPublicKey`: token link when available
@@ -112,8 +113,9 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage. Signed main-Wallet deltas are outflows (negative).
 - `versionedLaunchPreviewInputSchema` / `launchPlatformPreviewResultSchema`: preview input (Platform + config) and API envelope (`money` + wallet/policy fields). Stable pump.fun line labels live in `lib/launch/money-labels.ts`.
-- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `execute` delegates to `runPumpfunLaunchJobCompat`; plan/recover throw until later tickets.
-- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; schedules Platform execute; provides lifecycle contexts; maps typed Platform outcomes; owns the post-success usage-fee helper. Start/cancel/retry bodies and the compat job still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `plan` builds the secret-free authoritative plan (may create unfunded Wallet key refs and vanity reservations; must not fund or submit on-chain); `execute` delegates to `runPumpfunLaunchJobCompat` which reads the persisted plan when present; `recover` throws until later tickets.
+- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns plan durability (plan → persist → execute); provides lifecycle contexts including the persisted plan; maps typed Platform outcomes; owns the post-success usage-fee helper. Start/cancel/retry bodies and the compat job still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
+- Retry creates a new Launch linked to the failed attempt, reuses saved new-version input, and produces a fresh plan; the prior Launch and plan remain immutable.
 - `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
 
 ### Legacy custody-safe capability policy

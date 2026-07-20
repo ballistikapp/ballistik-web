@@ -29,6 +29,7 @@ test("platform registry resolves pump.fun with preview/plan/execute/recover", as
   assert.equal(typeof platform.plan, "function");
   assert.equal(typeof platform.execute, "function");
   assert.equal(typeof platform.recover, "function");
+  assert.equal(typeof platform.compensatePlanResources, "function");
 });
 
 test("platform registry rejects unsupported Platforms before record creation", async () => {

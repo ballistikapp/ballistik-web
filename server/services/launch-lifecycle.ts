@@ -3,7 +3,10 @@ import "server-only";
 import { prisma, Prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { usageFeeService } from "@/server/services/usage-fee.service";
-import type { VersionedLaunchInput } from "@/server/schemas/launch-platform.schema";
+import {
+  versionedLaunchInputSchema,
+  type VersionedLaunchInput,
+} from "@/server/schemas/launch-platform.schema";
 import type { ContextUser } from "@/server/schemas/auth.schema";
 import {
   resolveLaunchPlatform,
@@ -11,6 +14,7 @@ import {
   type LaunchLogLevel,
   type LaunchPlatformExecuteResult,
   type LaunchPlatformModule,
+  type LaunchPlatformPlanLocalResources,
 } from "@/server/services/launch-platform-registry";
 
 type RequestUser = Pick<ContextUser, "id" | "plan">;
@@ -24,11 +28,20 @@ type LaunchExecutionRecord = {
   userId: string;
   platform: string | null;
   status: string;
+  plan: unknown | null;
+  planSchemaVersion: string | null;
+  planPersistedAt: Date | null;
+  input: unknown;
 };
 
 export type LaunchLifecycleDeps = {
   resolvePlatform: (platform: string) => LaunchPlatformModule;
   loadLaunch: (launchId: string) => Promise<LaunchExecutionRecord | null>;
+  persistPlan: (
+    launchId: string,
+    planSchemaVersion: string,
+    plan: unknown
+  ) => Promise<void>;
   reportProgress: (
     launchId: string,
     progress: number,
@@ -54,17 +67,33 @@ export type LaunchLifecycleDeps = {
 
 function createLifecycleContext(
   launch: LaunchExecutionRecord,
-  deps: LaunchLifecycleDeps
+  deps: LaunchLifecycleDeps,
+  planOverride?: { plan: unknown | null; planSchemaVersion: string | null }
 ): LaunchLifecycleContext {
   return {
     launchId: launch.id,
     userId: launch.userId,
+    plan: planOverride?.plan ?? launch.plan,
+    planSchemaVersion:
+      planOverride?.planSchemaVersion ?? launch.planSchemaVersion,
     reportProgress: (progress, step) =>
       deps.reportProgress(launch.id, progress, step),
     appendLog: (level, message, step, data) =>
       deps.appendLog(launch.id, level, message, step, data),
     isCancelRequested: () => deps.isCancelRequested(launch.id),
   };
+}
+
+function parseVersionedLaunchInput(raw: unknown): VersionedLaunchInput | null {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    return null;
+  }
+  const { entitlementSnapshot: _entitlementSnapshot, ...body } = raw as Record<
+    string,
+    unknown
+  >;
+  const parsed = versionedLaunchInputSchema.safeParse(body);
+  return parsed.success ? parsed.data : null;
 }
 
 async function collectUsageFeeAfterSuccess(
@@ -149,6 +178,23 @@ async function applyPlatformExecuteResult(
   await deps.updateLaunchStatus(launchId, "FAILED", result.errorMessage);
 }
 
+async function compensateResources(
+  platform: LaunchPlatformModule,
+  ctx: LaunchLifecycleContext,
+  resources: LaunchPlatformPlanLocalResources | undefined
+): Promise<void> {
+  if (!resources) {
+    return;
+  }
+  if (
+    !resources.reservedVanityMintId &&
+    resources.createdWalletPublicKeys.length === 0
+  ) {
+    return;
+  }
+  await platform.compensatePlanResources(ctx, resources);
+}
+
 export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
   return {
     createContext(launch: LaunchExecutionRecord): LaunchLifecycleContext {
@@ -162,7 +208,122 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
       }
 
       const platform = deps.resolvePlatform(launch.platform ?? "PUMPFUN");
-      const ctx = createLifecycleContext(launch, deps);
+      let plan = launch.plan;
+      let planSchemaVersion = launch.planSchemaVersion;
+
+      if (!launch.planPersistedAt) {
+        const input = parseVersionedLaunchInput(launch.input);
+        if (!input) {
+          await deps.updateLaunchStatus(
+            launch.id,
+            "FAILED",
+            "Launch input is no longer valid"
+          );
+          await deps.appendLog(
+            launch.id,
+            "ERROR",
+            "Launch input is no longer valid",
+            "plan"
+          );
+          return;
+        }
+
+        await deps.reportProgress(launch.id, 2, "plan");
+        await deps.appendLog(
+          launch.id,
+          "STEP",
+          "Building authoritative Platform plan",
+          "plan"
+        );
+
+        const planCtx = createLifecycleContext(launch, deps, {
+          plan: null,
+          planSchemaVersion: null,
+        });
+        const planResult = await platform.plan(planCtx, input);
+
+        if (planResult.kind === "failed") {
+          await compensateResources(
+            platform,
+            planCtx,
+            planResult.localResources
+          );
+          await deps.appendLog(
+            launch.id,
+            "ERROR",
+            planResult.errorMessage,
+            "plan"
+          );
+          await deps.updateLaunchStatus(
+            launch.id,
+            "FAILED",
+            planResult.errorMessage
+          );
+          return;
+        }
+
+        try {
+          await deps.persistPlan(
+            launch.id,
+            planResult.planSchemaVersion,
+            planResult.plan
+          );
+        } catch (error) {
+          await compensateResources(
+            platform,
+            planCtx,
+            planResult.localResources
+          );
+          const message =
+            (error instanceof Error && error.message) ||
+            "Failed to persist authoritative plan";
+          logger.error("Launch plan persistence failed", {
+            launchId: launch.id,
+            errorMessage: message,
+          });
+          await deps.appendLog(
+            launch.id,
+            "ERROR",
+            "Failed to persist authoritative plan",
+            "plan",
+            { errorMessage: message }
+          );
+          await deps.updateLaunchStatus(
+            launch.id,
+            "FAILED",
+            "Failed to persist authoritative plan"
+          );
+          return;
+        }
+
+        plan = planResult.plan;
+        planSchemaVersion = planResult.planSchemaVersion;
+        await deps.appendLog(
+          launch.id,
+          "INFO",
+          "Authoritative Platform plan persisted",
+          "plan",
+          { planSchemaVersion }
+        );
+      } else if (!planSchemaVersion || plan == null) {
+        await deps.updateLaunchStatus(
+          launch.id,
+          "FAILED",
+          "Persisted launch plan is incomplete and cannot be executed"
+        );
+        await deps.appendLog(
+          launch.id,
+          "ERROR",
+          "Persisted launch plan is incomplete and cannot be executed",
+          "plan"
+        );
+        return;
+      }
+
+      const ctx = createLifecycleContext(launch, deps, {
+        plan,
+        planSchemaVersion,
+      });
       const result = await platform.execute(ctx);
       await applyPlatformExecuteResult(deps, launch.id, result);
     },
@@ -222,9 +383,23 @@ const defaultDeps: LaunchLifecycleDeps = {
         userId: true,
         platform: true,
         status: true,
+        plan: true,
+        planSchemaVersion: true,
+        planPersistedAt: true,
+        input: true,
       },
     });
     return launch;
+  },
+  persistPlan: async (launchId, planSchemaVersion, plan) => {
+    await prisma.launch.update({
+      where: { id: launchId },
+      data: {
+        plan: plan as Prisma.InputJsonValue,
+        planSchemaVersion,
+        planPersistedAt: new Date(),
+      },
+    });
   },
   reportProgress: async (launchId, progress, step) => {
     await prisma.launch.update({
@@ -263,7 +438,8 @@ const lifecycle = createLaunchLifecycle(defaultDeps);
 
 /**
  * Shared Launch lifecycle: router-facing start/status/cancel/retry/active,
- * Platform execution scheduling, and post-success fee orchestration.
+ * plan durability before execute, Platform execution scheduling, and
+ * post-success fee orchestration.
  * Heavy pump.fun job work remains in launch.service via Platform compat execute.
  */
 export const launchLifecycle = {

@@ -8,12 +8,15 @@ import {
   versionedLaunchPreviewInputSchema,
   type LaunchPlatformPreviewResult,
   type NormalizedLaunchMoneySummary,
+  type VersionedLaunchInput,
   type VersionedLaunchPreviewInput,
 } from "@/server/schemas/launch-platform.schema";
 import type {
   LaunchLifecycleContext,
   LaunchPlatformExecuteResult,
   LaunchPlatformModule,
+  LaunchPlatformPlanLocalResources,
+  LaunchPlatformPlanResult,
 } from "@/server/services/launch-platform-registry";
 
 type RequestUser = Pick<ContextUser, "id" | "plan">;
@@ -55,6 +58,14 @@ export type PumpfunPlatformModuleDeps = {
     input: VersionedLaunchPreviewInput["config"],
     user: RequestUser
   ) => Promise<PumpfunLegacyCostPreview>;
+  buildPlan: (
+    ctx: LaunchLifecycleContext,
+    input: VersionedLaunchInput
+  ) => Promise<LaunchPlatformPlanResult>;
+  compensatePlanResources: (
+    ctx: LaunchLifecycleContext,
+    resources: LaunchPlatformPlanLocalResources
+  ) => Promise<void>;
 };
 
 function lineItem(label: string, sol: number) {
@@ -143,6 +154,26 @@ async function defaultCalculateCostPreview(
   return calculateLaunchCostPreview(config, user);
 }
 
+async function defaultBuildPlan(
+  ctx: LaunchLifecycleContext,
+  input: VersionedLaunchInput
+): Promise<LaunchPlatformPlanResult> {
+  const { buildPumpfunAuthoritativePlan } = await import("./launch.service");
+  return buildPumpfunAuthoritativePlan({
+    launchId: ctx.launchId,
+    userId: ctx.userId,
+    input,
+  });
+}
+
+async function defaultCompensatePlanResources(
+  _ctx: LaunchLifecycleContext,
+  resources: LaunchPlatformPlanLocalResources
+): Promise<void> {
+  const { compensatePumpfunPlanResources } = await import("./launch.service");
+  await compensatePumpfunPlanResources(resources);
+}
+
 function notExtractedYet(operation: string): never {
   throw new AppError(
     `pump.fun Platform ${operation} is not extracted yet`,
@@ -153,14 +184,18 @@ function notExtractedYet(operation: string): never {
 
 /**
  * pump.fun Platform module.
- * preview is implemented; plan/recover deepen in later tickets.
- * execute still delegates to the existing launch job (compat).
+ * preview and plan are implemented; recover deepens later.
+ * execute still delegates to the existing launch job (compat), which reads the
+ * persisted plan for wallet identities and vanity reservations when present.
  */
 export function createPumpfunPlatformModule(
   deps: Partial<PumpfunPlatformModuleDeps> = {}
 ): LaunchPlatformModule {
   const calculateCostPreview =
     deps.calculateCostPreview ?? defaultCalculateCostPreview;
+  const buildPlan = deps.buildPlan ?? defaultBuildPlan;
+  const compensatePlanResources =
+    deps.compensatePlanResources ?? defaultCompensatePlanResources;
 
   return {
     id: "PUMPFUN",
@@ -174,21 +209,21 @@ export function createPumpfunPlatformModule(
       const preview = await calculateCostPreview(parsed.data.config, ctx.user);
       return toPreviewResult(preview);
     },
-    plan: async () => notExtractedYet("plan"),
+    plan: async (ctx, input) => buildPlan(ctx, input),
     execute: async (ctx: LaunchLifecycleContext) => {
       await runPumpfunLaunchJobCompat(ctx.launchId);
       return { kind: "compat" } satisfies LaunchPlatformExecuteResult;
     },
     recover: async () => notExtractedYet("recover"),
+    compensatePlanResources,
   };
 }
 
 /**
  * pump.fun Platform compatibility entry points.
- * Later tickets move planning, execution, classification, and recovery here
- * and will consume LaunchLifecycleContext for progress/logs/cancel instead of
- * writing Launch rows from the job. Until then, execute ignores the context
- * and delegates to the existing launch job.
+ * Execute still delegates to the existing launch job. The job reuses persisted
+ * plan identities/vanity when present; funding amounts may still be recomputed
+ * until Managed Launch Wallet funding extraction (ticket 08).
  */
 export async function runPumpfunLaunchJobCompat(launchId: string): Promise<void> {
   const { launchService } = await import("./launch.service");

@@ -21,9 +21,21 @@ import type {
   VersionedLaunchInput,
   VersionedLaunchPreviewInput,
 } from "@/server/schemas/launch-platform.schema";
-import { isLegacyPlatformRecord } from "@/server/schemas/launch-platform.schema";
-import { resolveLaunchPlatform } from "@/server/services/launch-platform-registry";
+import {
+  isLegacyPlatformRecord,
+  PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+  pumpfunLaunchPlanV1Schema,
+} from "@/server/schemas/launch-platform.schema";
+import {
+  resolveLaunchPlatform,
+  type LaunchPlatformPlanLocalResources,
+  type LaunchPlatformPlanResult,
+} from "@/server/services/launch-platform-registry";
 import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
+import {
+  assemblePumpfunLaunchPlan,
+  type PumpfunPlanWalletDraft,
+} from "@/server/services/launch-platform-pumpfun-plan";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -1680,19 +1692,6 @@ async function resolvePreflightDevWalletBalance(params: {
   return { devWalletPublicKey, currentLamports };
 }
 
-async function ensureLaunchFundingAvailable(
-  input: LaunchCostInput,
-  user: RequestUser
-) {
-  const preview = await calculateLaunchCostPreview(input, user);
-  if (!preview.hasSufficientMainWallet) {
-    throw new AppError(
-      `Main wallet requires ${preview.requiredMainWalletSol.toFixed(4)} SOL to fund launch wallets and usage fees`,
-      400
-    );
-  }
-}
-
 export async function calculateLaunchCostPreview(
   input: LaunchCostInput,
   user: RequestUser
@@ -3322,6 +3321,274 @@ export type UserLaunchRow = {
   input: Record<string, unknown> | null;
 };
 
+async function loadWalletKeypairByPublicKey(publicKey: string): Promise<Keypair> {
+  const wallet = await prisma.wallet.findUnique({
+    where: { publicKey },
+    select: { privateKey: true },
+  });
+  if (!wallet?.privateKey) {
+    throw new AppError(`Managed launch wallet not found: ${publicKey}`, 500);
+  }
+  return keypairFromPrivateKey(wallet.privateKey);
+}
+
+/**
+ * Release vanity reservations and delete unfunded generated wallets created
+ * during planning when the plan cannot be used (failure or persist error).
+ */
+export async function compensatePumpfunPlanResources(
+  resources: LaunchPlatformPlanLocalResources
+): Promise<void> {
+  if (resources.reservedVanityMintId) {
+    await releaseReservedVanityMint(resources.reservedVanityMintId);
+  }
+  if (resources.createdWalletPublicKeys.length === 0) {
+    return;
+  }
+  await prisma.wallet.deleteMany({
+    where: {
+      publicKey: { in: resources.createdWalletPublicKeys },
+      isImported: false,
+      isSystemWallet: false,
+      launchRecoveryWallets: { none: {} },
+      holdings: { none: {} },
+    },
+  });
+}
+
+/**
+ * Build the secret-free authoritative pump.fun plan for a Launch.
+ * May create unfunded Wallet key refs and vanity reservations; must not fund
+ * or submit on-chain work. Expected operational failures return `failed`.
+ */
+export async function buildPumpfunAuthoritativePlan(params: {
+  launchId: string;
+  userId: string;
+  input: VersionedLaunchInput;
+}): Promise<LaunchPlatformPlanResult> {
+  const { mapPumpfunCostPreviewToNormalizedMoney } = await import(
+    "./launch-platform-pumpfun"
+  );
+  const flatInput = flattenVersionedLaunchInput(params.input);
+  const localResources: LaunchPlatformPlanLocalResources = {
+    reservedVanityMintId: null,
+    createdWalletPublicKeys: [],
+  };
+
+  try {
+    const {
+      createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+      minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+    } = getLaunchConfig();
+    const {
+      devBuyAmountSol,
+      jitoTipAmountSol,
+      bundlerWalletCount,
+      bundlerBuyAmountSol,
+      bundlerBuyVariancePercent,
+      distributionWalletMultiplier,
+    } = validateLaunchInput(flatInput);
+
+    if (flatInput.mayhemMode) {
+      await assertMayhemCreateAllowed(true);
+    }
+
+    const user = await loadUserWithMainWallet(params.userId);
+    const mainWalletKeypair = keypairFromPrivateKey(user.mainWallet.privateKey);
+    const mainWalletPublicKey = user.mainWallet.publicKey;
+
+    const walletsBefore = new Set(
+      (
+        await prisma.wallet.findMany({
+          where: { userId: params.userId },
+          select: { publicKey: true },
+        })
+      ).map((wallet) => wallet.publicKey)
+    );
+
+    const { devWalletKeypair, devWalletPublicKey } = await resolveDevWallet(
+      flatInput,
+      params.userId,
+      mainWalletKeypair,
+      mainWalletPublicKey
+    );
+    void devWalletKeypair;
+
+    const bundlerWalletKeypairs =
+      flatInput.bundleBuyEnabled && bundlerWalletCount > 0
+        ? await ensureBundlerWallets(params.userId, bundlerWalletCount)
+        : [];
+    const distributionWallets =
+      bundlerWalletKeypairs.length > 0
+        ? await ensureDistributionWallets(
+            params.userId,
+            bundlerWalletKeypairs,
+            distributionWalletMultiplier
+          )
+        : [];
+
+    const walletsAfter = await prisma.wallet.findMany({
+      where: { userId: params.userId },
+      select: { publicKey: true, isImported: true, isSystemWallet: true },
+    });
+    localResources.createdWalletPublicKeys = walletsAfter
+      .filter(
+        (wallet) =>
+          !walletsBefore.has(wallet.publicKey) &&
+          !wallet.isImported &&
+          !wallet.isSystemWallet
+      )
+      .map((wallet) => wallet.publicKey);
+
+    const bundlerBuyAllocation = flatInput.bundleBuyEnabled
+      ? buildBundlerBuyTargets(
+          bundlerWalletKeypairs,
+          bundlerBuyAmountSol,
+          bundlerBuyVariancePercent,
+          params.launchId
+        )
+      : {
+          amountLamportsByWallet: [] as bigint[],
+          usedFallback: false,
+        };
+
+    const fundingPlan = await buildLaunchFundingPlan({
+      input: flatInput,
+      bundlerWalletCount,
+      bundlerBuyAmountSol,
+      bundlerBuyVariancePercent,
+      distributionWalletMultiplier,
+      devBuyAmountSol,
+      jitoTipAmountSol,
+      mainWalletPublicKey,
+      devWalletPublicKey,
+      bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
+        (wallet) => wallet.publicKey
+      ),
+      bundlerBuyAmountLamportsByWallet:
+        bundlerBuyAllocation.amountLamportsByWallet,
+      allocationSeed: params.launchId,
+      createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
+      minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
+    });
+
+    const costPreview = await calculateLaunchCostPreview(flatInput, {
+      id: params.userId,
+      plan: user.plan,
+    });
+
+    if (!costPreview.hasSufficientMainWallet) {
+      await compensatePumpfunPlanResources(localResources);
+      return {
+        kind: "failed",
+        errorMessage: `Main wallet requires ${costPreview.requiredMainWalletSol.toFixed(4)} SOL to fund launch wallets and usage fees`,
+        localResources: {
+          reservedVanityMintId: null,
+          createdWalletPublicKeys: [],
+        },
+      };
+    }
+
+    let reservedVanityMintPublicKey: string | null = null;
+    if (flatInput.vanityMint) {
+      const mintReservation = await reserveMintIfRequested(
+        params.launchId,
+        params.userId,
+        true
+      );
+      localResources.reservedVanityMintId = mintReservation.reservedVanityId;
+      reservedVanityMintPublicKey =
+        mintReservation.mintKeypair.publicKey.toBase58();
+    }
+
+    const managedWallets: PumpfunPlanWalletDraft[] = [];
+    if (devWalletPublicKey !== mainWalletPublicKey) {
+      managedWallets.push({
+        publicKey: devWalletPublicKey,
+        platformRole: "creator",
+        isManaged: flatInput.devWalletOption === "generate",
+        fundedCapLamports: fundingPlan.devFundingLamports.toString(),
+      });
+    }
+    for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
+      managedWallets.push({
+        publicKey: bundlerWalletKeypairs[i]!.publicKey.toBase58(),
+        platformRole: "bundler",
+        isManaged: true,
+        fundedCapLamports: (
+          fundingPlan.bundlerFundingTargetLamports[i] ?? BigInt(0)
+        ).toString(),
+      });
+    }
+    for (const distribution of distributionWallets) {
+      managedWallets.push({
+        publicKey: distribution.wallet.publicKey.toBase58(),
+        platformRole: "distribution",
+        isManaged: true,
+        fundedCapLamports: "0",
+      });
+    }
+
+    const plan = assemblePumpfunLaunchPlan({
+      money: mapPumpfunCostPreviewToNormalizedMoney(costPreview),
+      mainWalletPublicKey,
+      creatorWalletPublicKey: devWalletPublicKey,
+      creatorWalletOption: flatInput.devWalletOption,
+      managedWallets,
+      creatorBuyLamports: toLamports(devBuyAmountSol).toString(),
+      bundlerBuyLamportsByWallet: bundlerWalletKeypairs.map((wallet, index) => ({
+        publicKey: wallet.publicKey.toBase58(),
+        amountLamports: (
+          bundlerBuyAllocation.amountLamportsByWallet[index] ?? BigInt(0)
+        ).toString(),
+      })),
+      jitoTipLamports: fundingPlan.tipLamports.toString(),
+      mainReserveLamports: fundingPlan.mainReserveLamports.toString(),
+      intendedEffects: {
+        bundleBuyEnabled: flatInput.bundleBuyEnabled,
+        mayhemMode: flatInput.mayhemMode ?? false,
+        vanityMint: flatInput.vanityMint,
+        removeAttribution: flatInput.removeAttribution,
+        distributionWalletMultiplier,
+      },
+      reservedVanityMintId: localResources.reservedVanityMintId,
+      reservedVanityMintPublicKey,
+      bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
+      platformFeeWaived: costPreview.platformFeeWaived,
+      platformFeeDiscountRate: costPreview.platformFeeDiscountRate,
+      hasSufficientMainWallet: costPreview.hasSufficientMainWallet,
+      mainWalletBalanceLamports: costPreview.mainWalletBalanceLamports,
+    });
+
+    return {
+      kind: "planned",
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      plan,
+      localResources,
+    };
+  } catch (error) {
+    await compensatePumpfunPlanResources(localResources);
+    const message = isAppError(error)
+      ? error.message
+      : "Failed to build launch plan";
+    if (!isAppError(error)) {
+      logger.error("Pump.fun authoritative plan build failed", {
+        launchId: params.launchId,
+        errorMessage:
+          error instanceof Error ? error.message : "unknown error",
+      });
+    }
+    return {
+      kind: "failed",
+      errorMessage: message,
+      localResources: {
+        reservedVanityMintId: null,
+        createdWalletPublicKeys: [],
+      },
+    };
+  }
+}
+
 export const launchService = {
   async previewCosts(
     input: VersionedLaunchPreviewInput,
@@ -3501,7 +3768,6 @@ export const launchService = {
 
           const normalizedFlat =
             await normalizeLaunchInputMediaForStorage(flatInput);
-          await ensureLaunchFundingAvailable(normalizedFlat, user);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
             "launch-fast-confirmation"
@@ -3597,7 +3863,6 @@ export const launchService = {
         );
       }
       const retryInput = resolvedInput as LaunchTokenInput;
-      await ensureLaunchFundingAvailable(retryInput, user);
       const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
         user,
         "launch-fast-confirmation"
@@ -4177,38 +4442,113 @@ export const launchService = {
       const walletsStartedAt = Date.now();
       const user = await loadUserWithMainWallet(launch.userId);
       mainWalletKeypair = keypairFromPrivateKey(user.mainWallet.privateKey);
-      const { devWalletKeypair, devWalletPublicKey } = await resolveDevWallet(
-        input,
-        user.id,
-        mainWalletKeypair,
-        user.mainWallet.publicKey
-      );
-      const bundlerWalletKeypairs =
-        input.bundleBuyEnabled && bundlerWalletCount > 0
-          ? await ensureBundlerWallets(user.id, bundlerWalletCount)
-          : [];
-      const distributionWallets =
-        bundlerWalletKeypairs.length > 0
-          ? await ensureDistributionWallets(
-              user.id,
-              bundlerWalletKeypairs,
-              distributionWalletMultiplier
-            )
-          : [];
-      const bundlerBuyAllocation = input.bundleBuyEnabled
-        ? buildBundlerBuyTargets(
-            bundlerWalletKeypairs,
-            bundlerBuyAmountSol,
-            bundlerBuyVariancePercent,
-            launchId
+
+      let authoritativePlan: ReturnType<
+        typeof pumpfunLaunchPlanV1Schema.parse
+      > | null = null;
+      if (launch.planPersistedAt) {
+        const persistedPlan = pumpfunLaunchPlanV1Schema.safeParse(launch.plan);
+        if (!persistedPlan.success) {
+          throw new AppError(
+            "Persisted launch plan is invalid and cannot be executed",
+            500
+          );
+        }
+        authoritativePlan = persistedPlan.data;
+      }
+
+      let devWalletKeypair: Keypair;
+      let devWalletPublicKey: string;
+      let bundlerWalletKeypairs: Keypair[];
+      let distributionWallets: DistributionWallet[];
+      let bundlerBuyAllocation: {
+        amountLamportsByWallet: bigint[];
+        lowerBoundLamports: bigint;
+        upperBoundLamports: bigint;
+        usedFallback: boolean;
+        targets: BundlerBuyTarget[];
+      };
+
+      if (authoritativePlan) {
+        devWalletPublicKey = authoritativePlan.wallets.creatorWalletPublicKey;
+        if (devWalletPublicKey === user.mainWallet.publicKey) {
+          devWalletKeypair = mainWalletKeypair;
+        } else {
+          devWalletKeypair =
+            await loadWalletKeypairByPublicKey(devWalletPublicKey);
+        }
+        const bundlerPublicKeys = authoritativePlan.allocations
+          .bundlerBuyLamportsByWallet.map((entry) => entry.publicKey);
+        bundlerWalletKeypairs = await Promise.all(
+          bundlerPublicKeys.map((publicKey) =>
+            loadWalletKeypairByPublicKey(publicKey)
           )
-        : {
-            amountLamportsByWallet: [] as bigint[],
-            lowerBoundLamports: BigInt(0),
-            upperBoundLamports: BigInt(0),
-            usedFallback: false,
-            targets: [] as BundlerBuyTarget[],
-          };
+        );
+        const distributionPublicKeys = authoritativePlan.wallets.managedWallets
+          .filter((wallet) => wallet.platformRole === "distribution")
+          .map((wallet) => wallet.publicKey);
+        distributionWallets = await Promise.all(
+          distributionPublicKeys.map(async (publicKey, index) => ({
+            parentIndex: Math.floor(
+              index /
+                Math.max(1, authoritativePlan.intendedEffects.distributionWalletMultiplier - 1)
+            ),
+            wallet: await loadWalletKeypairByPublicKey(publicKey),
+          }))
+        );
+        bundlerBuyAllocation = {
+          amountLamportsByWallet:
+            authoritativePlan.allocations.bundlerBuyLamportsByWallet.map(
+              (entry) => BigInt(entry.amountLamports)
+            ),
+          lowerBoundLamports: BigInt(0),
+          upperBoundLamports: BigInt(0),
+          usedFallback:
+            authoritativePlan.opaque.bundlerBuyAllocationUsedFallback,
+          targets: bundlerWalletKeypairs.map((wallet, index) => ({
+            wallet,
+            amountLamports: BigInt(
+              authoritativePlan.allocations.bundlerBuyLamportsByWallet[index]
+                ?.amountLamports ?? "0"
+            ),
+          })),
+        };
+      } else {
+        const resolved = await resolveDevWallet(
+          input,
+          user.id,
+          mainWalletKeypair,
+          user.mainWallet.publicKey
+        );
+        devWalletKeypair = resolved.devWalletKeypair;
+        devWalletPublicKey = resolved.devWalletPublicKey;
+        bundlerWalletKeypairs =
+          input.bundleBuyEnabled && bundlerWalletCount > 0
+            ? await ensureBundlerWallets(user.id, bundlerWalletCount)
+            : [];
+        distributionWallets =
+          bundlerWalletKeypairs.length > 0
+            ? await ensureDistributionWallets(
+                user.id,
+                bundlerWalletKeypairs,
+                distributionWalletMultiplier
+              )
+            : [];
+        bundlerBuyAllocation = input.bundleBuyEnabled
+          ? buildBundlerBuyTargets(
+              bundlerWalletKeypairs,
+              bundlerBuyAmountSol,
+              bundlerBuyVariancePercent,
+              launchId
+            )
+          : {
+              amountLamportsByWallet: [] as bigint[],
+              lowerBoundLamports: BigInt(0),
+              upperBoundLamports: BigInt(0),
+              usedFallback: false,
+              targets: [] as BundlerBuyTarget[],
+            };
+      }
       await appendLog(launchId, "INFO", "Wallets prepared", "wallets", {
         mainWalletPublicKey: user.mainWallet.publicKey,
         devWalletPublicKey,
@@ -4357,18 +4697,50 @@ export const launchService = {
 
       await setStep(launchId, 30, "mint", "Preparing mint");
       const mintStartedAt = Date.now();
-      const mintReservation = await reserveMintIfRequested(
-        launchId,
-        user.id,
-        input.vanityMint
-      );
-      const { mintKeypair } = mintReservation;
-      reservedVanityId = mintReservation.reservedVanityId;
+      let mintKeypair: Keypair;
+      if (authoritativePlan?.opaque.reservedVanityMintId) {
+        const reserved = await prisma.vanityMint.findUnique({
+          where: { id: authoritativePlan.opaque.reservedVanityMintId },
+          select: { id: true, publicKey: true, privateKey: true, usedAt: true },
+        });
+        if (!reserved || reserved.usedAt) {
+          throw new AppError(
+            "Planned vanity mint reservation is no longer available",
+            400
+          );
+        }
+        mintKeypair = keypairFromPrivateKey(reserved.privateKey);
+        if (
+          mintKeypair.publicKey.toBase58() !== reserved.publicKey ||
+          (authoritativePlan.opaque.reservedVanityMintPublicKey &&
+            mintKeypair.publicKey.toBase58() !==
+              authoritativePlan.opaque.reservedVanityMintPublicKey)
+        ) {
+          throw new AppError(
+            "Planned vanity mint reservation is invalid",
+            500
+          );
+        }
+        reservedVanityId = reserved.id;
+      } else if (authoritativePlan && !authoritativePlan.intendedEffects.vanityMint) {
+        const generated = await reserveMintIfRequested(launchId, user.id, false);
+        mintKeypair = generated.mintKeypair;
+        reservedVanityId = null;
+      } else {
+        const mintReservation = await reserveMintIfRequested(
+          launchId,
+          user.id,
+          input.vanityMint
+        );
+        mintKeypair = mintReservation.mintKeypair;
+        reservedVanityId = mintReservation.reservedVanityId;
+      }
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),
         vanityMint: input.vanityMint,
         reservedVanityId,
+        reusedAuthoritativePlan: Boolean(authoritativePlan),
       });
 
       if (await cancelLaunchIfRequested(launchId)) {

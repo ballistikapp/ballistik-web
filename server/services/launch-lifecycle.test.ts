@@ -1,11 +1,17 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
+import {
+  LAUNCH_INPUT_SCHEMA_VERSION_V1,
+  type VersionedLaunchInput,
+} from "@/server/schemas/launch-platform.schema";
 import type {
   LaunchLifecycleContext,
   LaunchPlatformExecuteResult,
   LaunchPlatformModule,
+  LaunchPlatformPlanResult,
 } from "./launch-platform-registry";
+import type { LaunchLifecycleDeps } from "./launch-lifecycle";
 
 const require = createRequire(import.meta.url);
 
@@ -44,17 +50,252 @@ function emptyPreviewResult() {
   };
 }
 
-function createFakePlatform(
-  execute: (ctx: LaunchLifecycleContext) => Promise<LaunchPlatformExecuteResult>
-): LaunchPlatformModule {
+const sampleInput: VersionedLaunchInput = {
+  schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
+  platform: "PUMPFUN",
+  metadata: {
+    tokenName: "Test",
+    tokenSymbol: "TST",
+    tokenImage: "https://example.com/a.png",
+  },
+  config: {
+    devWalletOption: "use_main",
+    devBuyAmountSol: 0.1,
+    jitoTipAmountSol: 0,
+    bundleBuyEnabled: false,
+    vanityMint: false,
+    removeAttribution: false,
+    mayhemMode: false,
+    bundlerWalletCount: 0,
+    bundlerBuyAmountSol: 0.05,
+    bundlerBuyVariancePercent: 0,
+    distributionWalletMultiplier: 1,
+  },
+};
+
+function createFakePlatform(handlers: {
+  plan?: (
+    ctx: LaunchLifecycleContext,
+    input: VersionedLaunchInput
+  ) => Promise<LaunchPlatformPlanResult>;
+  execute?: (
+    ctx: LaunchLifecycleContext
+  ) => Promise<LaunchPlatformExecuteResult>;
+  compensatePlanResources?: LaunchPlatformModule["compensatePlanResources"];
+}): LaunchPlatformModule {
   return {
     id: "PUMPFUN",
     preview: async () => emptyPreviewResult(),
-    plan: async () => ({ planSchemaVersion: 1, plan: {} }),
-    execute,
+    plan:
+      handlers.plan ??
+      (async () => ({
+        kind: "planned",
+        planSchemaVersion: "1",
+        plan: { ok: true },
+      })),
+    execute: handlers.execute ?? (async () => ({ kind: "compat" })),
     recover: async () => undefined,
+    compensatePlanResources:
+      handlers.compensatePlanResources ?? (async () => undefined),
   };
 }
+
+function baseDeps(
+  overrides: Partial<LaunchLifecycleDeps> & {
+    resolvePlatform: LaunchLifecycleDeps["resolvePlatform"];
+  }
+): LaunchLifecycleDeps {
+  return {
+    loadLaunch: async () => ({
+      id: "launch-1",
+      userId: "user-1",
+      platform: "PUMPFUN",
+      status: "PENDING",
+      plan: null,
+      planSchemaVersion: null,
+      planPersistedAt: null,
+      input: sampleInput,
+    }),
+    persistPlan: async () => undefined,
+    reportProgress: async () => undefined,
+    appendLog: async () => undefined,
+    isCancelRequested: async () => false,
+    updateLaunchStatus: async () => undefined,
+    collectUsageFee: async () => {
+      throw new Error("fees should not run");
+    },
+    ...overrides,
+  };
+}
+
+test("lifecycle persists plan before execute and passes exact plan to execute", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  const events: string[] = [];
+  const planned = { wallets: { mainWalletPublicKey: "Main111" } };
+
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          plan: async () => {
+            events.push("plan");
+            return {
+              kind: "planned",
+              planSchemaVersion: "1",
+              plan: planned,
+            };
+          },
+          execute: async (ctx) => {
+            events.push("execute");
+            assert.deepEqual(ctx.plan, planned);
+            assert.equal(ctx.planSchemaVersion, "1");
+            return { kind: "compat" };
+          },
+        }),
+      persistPlan: async (_launchId, version, plan) => {
+        events.push("persist");
+        assert.equal(version, "1");
+        assert.deepEqual(plan, planned);
+      },
+    })
+  );
+
+  await lifecycle.runPlatformExecution("launch-1");
+
+  assert.deepEqual(events, ["plan", "persist", "execute"]);
+});
+
+test("lifecycle marks FAILED and skips execute when planning fails", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  let executeCalled = false;
+  let finalStatus: string | null = null;
+  let errorMessage: string | null | undefined;
+
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          plan: async () => ({
+            kind: "failed",
+            errorMessage:
+              "Main wallet requires 1.2500 SOL to fund launch wallets and usage fees",
+          }),
+          execute: async () => {
+            executeCalled = true;
+            return { kind: "compat" };
+          },
+        }),
+      updateLaunchStatus: async (_launchId, status, message) => {
+        finalStatus = status;
+        errorMessage = message;
+      },
+    })
+  );
+
+  await lifecycle.runPlatformExecution("launch-1");
+
+  assert.equal(executeCalled, false);
+  assert.equal(finalStatus, "FAILED");
+  assert.match(errorMessage ?? "", /Main wallet requires/i);
+});
+
+test("lifecycle compensates and marks FAILED when plan persistence fails", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  const events: string[] = [];
+  let finalStatus: string | null = null;
+
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          plan: async () => ({
+            kind: "planned",
+            planSchemaVersion: "1",
+            plan: { ok: true },
+            localResources: {
+              reservedVanityMintId: "vanity-1",
+              createdWalletPublicKeys: ["Wallet111"],
+            },
+          }),
+          execute: async () => {
+            events.push("execute");
+            return { kind: "compat" };
+          },
+          compensatePlanResources: async (_ctx, resources) => {
+            events.push("compensate");
+            assert.equal(resources.reservedVanityMintId, "vanity-1");
+            assert.deepEqual(resources.createdWalletPublicKeys, ["Wallet111"]);
+          },
+        }),
+      persistPlan: async () => {
+        events.push("persist");
+        throw new Error("db write failed");
+      },
+      updateLaunchStatus: async (_launchId, status) => {
+        finalStatus = status;
+      },
+    })
+  );
+
+  await lifecycle.runPlatformExecution("launch-1");
+
+  assert.deepEqual(events, ["persist", "compensate"]);
+  assert.equal(finalStatus, "FAILED");
+});
+
+test("lifecycle skips planning when an authoritative plan is already persisted", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  let planCalled = false;
+  let sawPlan: unknown = null;
+
+  const existingPlan = { wallets: { mainWalletPublicKey: "Main222" } };
+
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          plan: async () => {
+            planCalled = true;
+            return {
+              kind: "planned",
+              planSchemaVersion: "1",
+              plan: { shouldNot: "run" },
+            };
+          },
+          execute: async (ctx) => {
+            sawPlan = ctx.plan;
+            return { kind: "compat" };
+          },
+        }),
+      loadLaunch: async () => ({
+        id: "launch-1",
+        userId: "user-1",
+        platform: "PUMPFUN",
+        status: "PENDING",
+        plan: existingPlan,
+        planSchemaVersion: "1",
+        planPersistedAt: new Date("2026-07-20T00:00:00.000Z"),
+        input: sampleInput,
+      }),
+      persistPlan: async () => {
+        throw new Error("should not persist again");
+      },
+    })
+  );
+
+  await lifecycle.runPlatformExecution("launch-1");
+
+  assert.equal(planCalled, false);
+  assert.deepEqual(sawPlan, existingPlan);
+});
 
 test("lifecycle runs Platform execute with progress and cancel context", async () => {
   stubServerOnlyModule();
@@ -64,39 +305,35 @@ test("lifecycle runs Platform execute with progress and cancel context", async (
   let sawCancelQuery = false;
   let executeCalled = false;
 
-  const lifecycle = createLaunchLifecycle({
-    resolvePlatform: () =>
-      createFakePlatform(async (ctx) => {
-        executeCalled = true;
-        assert.equal(ctx.launchId, "launch-1");
-        assert.equal(ctx.userId, "user-1");
-        await ctx.reportProgress(40, "create");
-        sawCancelQuery = await ctx.isCancelRequested();
-        await ctx.appendLog("INFO", "fake step", "create");
-        return { kind: "compat" };
-      }),
-    loadLaunch: async () => ({
-      id: "launch-1",
-      userId: "user-1",
-      platform: "PUMPFUN",
-      status: "PENDING",
-    }),
-    reportProgress: async (_launchId, progress, step) => {
-      progressUpdates.push({ progress, step });
-    },
-    appendLog: async () => undefined,
-    isCancelRequested: async () => false,
-    updateLaunchStatus: async () => undefined,
-    collectUsageFee: async () => {
-      throw new Error("fees should not run for compat outcomes");
-    },
-  });
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          execute: async (ctx) => {
+            executeCalled = true;
+            assert.equal(ctx.launchId, "launch-1");
+            assert.equal(ctx.userId, "user-1");
+            await ctx.reportProgress(40, "create");
+            sawCancelQuery = await ctx.isCancelRequested();
+            await ctx.appendLog("INFO", "fake step", "create");
+            return { kind: "compat" };
+          },
+        }),
+      reportProgress: async (_launchId, progress, step) => {
+        progressUpdates.push({ progress, step });
+      },
+      isCancelRequested: async () => false,
+    })
+  );
 
   await lifecycle.runPlatformExecution("launch-1");
 
   assert.equal(executeCalled, true);
   assert.equal(sawCancelQuery, false);
-  assert.deepEqual(progressUpdates, [{ progress: 40, step: "create" }]);
+  assert.deepEqual(progressUpdates, [
+    { progress: 2, step: "plan" },
+    { progress: 40, step: "create" },
+  ]);
 });
 
 test("lifecycle collects usage fees only after Platform success", async () => {
@@ -106,45 +343,40 @@ test("lifecycle collects usage fees only after Platform success", async () => {
   const feeCalls: Array<{ totalFeeSol: number; referenceId: string }> = [];
   let finalStatus: string | null = null;
 
-  const lifecycle = createLaunchLifecycle({
-    resolvePlatform: () =>
-      createFakePlatform(async () => ({
-        kind: "succeeded",
-        usageFeeTotalSol: 0.25,
-        userId: "user-1",
-        tokenPublicKey: "Token1111111111111111111111111111111111111",
-        referenceId: "launch-1",
-      })),
-    loadLaunch: async () => ({
-      id: "launch-1",
-      userId: "user-1",
-      platform: "PUMPFUN",
-      status: "PENDING",
-    }),
-    reportProgress: async () => undefined,
-    appendLog: async () => undefined,
-    isCancelRequested: async () => false,
-    updateLaunchStatus: async (_launchId, status) => {
-      finalStatus = status;
-    },
-    collectUsageFee: async (input) => {
-      feeCalls.push({
-        totalFeeSol: input.totalFeeSol,
-        referenceId: input.referenceId ?? "",
-      });
-      return {
-        skipped: false,
-        signature: "sig",
-        fromPublicKey: "from",
-        toPublicKey: "to",
-        amountSol: input.totalFeeSol,
-        amountLamports: 250_000_000,
-        reason: input.reason,
-        transfers: [],
-        referralPayout: null,
-      };
-    },
-  });
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          execute: async () => ({
+            kind: "succeeded",
+            usageFeeTotalSol: 0.25,
+            userId: "user-1",
+            tokenPublicKey: "Token1111111111111111111111111111111111111",
+            referenceId: "launch-1",
+          }),
+        }),
+      updateLaunchStatus: async (_launchId, status) => {
+        finalStatus = status;
+      },
+      collectUsageFee: async (input) => {
+        feeCalls.push({
+          totalFeeSol: input.totalFeeSol,
+          referenceId: input.referenceId ?? "",
+        });
+        return {
+          skipped: false,
+          signature: "sig",
+          fromPublicKey: "from",
+          toPublicKey: "to",
+          amountSol: input.totalFeeSol,
+          amountLamports: 250_000_000,
+          reason: input.reason,
+          transfers: [],
+          referralPayout: null,
+        };
+      },
+    })
+  );
 
   await lifecycle.runPlatformExecution("launch-1");
 
@@ -159,35 +391,31 @@ test("lifecycle does not downgrade success when usage fee collection fails", asy
   let finalStatus: string | null = null;
   const warnings: string[] = [];
 
-  const lifecycle = createLaunchLifecycle({
-    resolvePlatform: () =>
-      createFakePlatform(async () => ({
-        kind: "succeeded",
-        usageFeeTotalSol: 0.25,
-        userId: "user-1",
-        tokenPublicKey: "Token1111111111111111111111111111111111111",
-        referenceId: "launch-1",
-      })),
-    loadLaunch: async () => ({
-      id: "launch-1",
-      userId: "user-1",
-      platform: "PUMPFUN",
-      status: "PENDING",
-    }),
-    reportProgress: async () => undefined,
-    appendLog: async (_launchId, level, message) => {
-      if (level === "WARN") {
-        warnings.push(message);
-      }
-    },
-    isCancelRequested: async () => false,
-    updateLaunchStatus: async (_launchId, status) => {
-      finalStatus = status;
-    },
-    collectUsageFee: async () => {
-      throw new Error("collector unavailable");
-    },
-  });
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          execute: async () => ({
+            kind: "succeeded",
+            usageFeeTotalSol: 0.25,
+            userId: "user-1",
+            tokenPublicKey: "Token1111111111111111111111111111111111111",
+            referenceId: "launch-1",
+          }),
+        }),
+      appendLog: async (_launchId, level, message) => {
+        if (level === "WARN") {
+          warnings.push(message);
+        }
+      },
+      updateLaunchStatus: async (_launchId, status) => {
+        finalStatus = status;
+      },
+      collectUsageFee: async () => {
+        throw new Error("collector unavailable");
+      },
+    })
+  );
 
   await lifecycle.runPlatformExecution("launch-1");
 
@@ -203,29 +431,24 @@ test("lifecycle skips fee collection for non-success Platform outcomes", async (
   let feeCalled = false;
   let finalStatus: string | null = null;
 
-  const lifecycle = createLaunchLifecycle({
-    resolvePlatform: () =>
-      createFakePlatform(async () => ({
-        kind: "failed",
-        errorMessage: "RPC timeout",
-      })),
-    loadLaunch: async () => ({
-      id: "launch-1",
-      userId: "user-1",
-      platform: "PUMPFUN",
-      status: "PENDING",
-    }),
-    reportProgress: async () => undefined,
-    appendLog: async () => undefined,
-    isCancelRequested: async () => false,
-    updateLaunchStatus: async (_launchId, status) => {
-      finalStatus = status;
-    },
-    collectUsageFee: async () => {
-      feeCalled = true;
-      throw new Error("should not collect");
-    },
-  });
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      resolvePlatform: () =>
+        createFakePlatform({
+          execute: async () => ({
+            kind: "failed",
+            errorMessage: "RPC timeout",
+          }),
+        }),
+      updateLaunchStatus: async (_launchId, status) => {
+        finalStatus = status;
+      },
+      collectUsageFee: async () => {
+        feeCalled = true;
+        throw new Error("should not collect");
+      },
+    })
+  );
 
   await lifecycle.runPlatformExecution("launch-1");
 

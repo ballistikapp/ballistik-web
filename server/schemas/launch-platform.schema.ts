@@ -144,6 +144,66 @@ export type LaunchPlatformPreviewResult = z.infer<
   typeof launchPlatformPreviewResultSchema
 >;
 
+/** Schema version for the secret-free pump.fun authoritative plan payload. */
+export const PUMPFUN_PLAN_SCHEMA_VERSION_V1 = "1" as const;
+
+const pumpfunPlanWalletSchema = z.object({
+  publicKey: z.string().min(1),
+  platformRole: z.string().min(1),
+  isManaged: z.boolean(),
+  /** Max lamports this attempt may fund into the wallet (recovery cap). */
+  fundedCapLamports: lamportsStringSchema,
+});
+
+/**
+ * Secret-free pump.fun plan. Validated whenever persisted data re-enters
+ * execute/recover. Never contains private keys or raw secret material.
+ */
+export const pumpfunLaunchPlanV1Schema = z.object({
+  schemaVersion: z.literal(PUMPFUN_PLAN_SCHEMA_VERSION_V1),
+  platform: z.literal("PUMPFUN"),
+  money: normalizedLaunchMoneySummarySchema,
+  wallets: z.object({
+    mainWalletPublicKey: z.string().min(1),
+    creatorWalletPublicKey: z.string().min(1),
+    creatorWalletOption: z.enum(["import", "generate", "use_main"]),
+    managedWallets: z.array(pumpfunPlanWalletSchema),
+  }),
+  allocations: z.object({
+    creatorBuyLamports: lamportsStringSchema,
+    bundlerBuyLamportsByWallet: z.array(
+      z.object({
+        publicKey: z.string().min(1),
+        amountLamports: lamportsStringSchema,
+      })
+    ),
+    jitoTipLamports: lamportsStringSchema,
+    mainReserveLamports: lamportsStringSchema,
+  }),
+  intendedEffects: z.object({
+    bundleBuyEnabled: z.boolean(),
+    mayhemMode: z.boolean(),
+    vanityMint: z.boolean(),
+    removeAttribution: z.boolean(),
+    distributionWalletMultiplier: z.number().int().min(1).max(5),
+  }),
+  recovery: z.object({
+    policy: z.literal("plan_funded_cap"),
+    capsByWalletPublicKey: z.record(z.string(), lamportsStringSchema),
+  }),
+  /** Opaque pump payload — still secret-free; Platform-owned fields. */
+  opaque: z.object({
+    reservedVanityMintId: z.string().nullable(),
+    reservedVanityMintPublicKey: z.string().nullable(),
+    bundlerBuyAllocationUsedFallback: z.boolean(),
+    platformFeeWaived: z.boolean(),
+    platformFeeDiscountRate: z.number().min(0).max(1),
+    hasSufficientMainWallet: z.boolean(),
+    mainWalletBalanceLamports: lamportsStringSchema,
+  }),
+});
+export type PumpfunLaunchPlanV1 = z.infer<typeof pumpfunLaunchPlanV1Schema>;
+
 /**
  * Null Platform version marks a legacy Launch or Token.
  * Do not infer legacy status from JSON input shape.

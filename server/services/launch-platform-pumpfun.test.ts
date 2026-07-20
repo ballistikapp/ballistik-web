@@ -133,6 +133,113 @@ test("pump.fun preview returns normalized money and review envelope without writ
   );
 });
 
+test("pump.fun plan returns injected authoritative plan without secrets", async () => {
+  stubServerOnlyModule();
+  const { createPumpfunPlatformModule } = await import(
+    "./launch-platform-pumpfun"
+  );
+  const { planPayloadContainsSecretMaterial } = await import(
+    "./launch-platform-pumpfun-plan"
+  );
+
+  const planned = {
+    schemaVersion: "1",
+    platform: "PUMPFUN",
+    money: {
+      immediateRequiredBalanceLamports: "1",
+      temporaryFundingLamports: "0",
+      permanentSpendLamports: "1",
+      expectedReturnLamports: "0",
+      expectedMainWalletDeltaNowLamports: "-1",
+      expectedMainWalletDeltaAfterCleanupLamports: "-1",
+      usageFeeLamports: "0",
+      lineItems: [],
+    },
+  };
+
+  const platform = createPumpfunPlatformModule({
+    buildPlan: async () => ({
+      kind: "planned",
+      planSchemaVersion: "1",
+      plan: planned,
+      localResources: {
+        reservedVanityMintId: null,
+        createdWalletPublicKeys: [],
+      },
+    }),
+  });
+
+  const result = await platform.plan(
+    {
+      launchId: "launch-1",
+      userId: "user-1",
+      plan: null,
+      planSchemaVersion: null,
+      reportProgress: async () => undefined,
+      appendLog: async () => undefined,
+      isCancelRequested: async () => false,
+    },
+    {
+      schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
+      platform: "PUMPFUN",
+      metadata: {
+        tokenName: "Test",
+        tokenSymbol: "TST",
+        tokenImage: "https://example.com/a.png",
+      },
+      config: previewInput.config,
+    }
+  );
+
+  assert.equal(result.kind, "planned");
+  if (result.kind === "planned") {
+    assert.deepEqual(result.plan, planned);
+    assert.equal(planPayloadContainsSecretMaterial(result.plan), false);
+  }
+});
+
+test("pump.fun plan surfaces insufficient-funds as a failed plan outcome", async () => {
+  stubServerOnlyModule();
+  const { createPumpfunPlatformModule } = await import(
+    "./launch-platform-pumpfun"
+  );
+
+  const platform = createPumpfunPlatformModule({
+    buildPlan: async () => ({
+      kind: "failed",
+      errorMessage:
+        "Main wallet requires 1.2500 SOL to fund launch wallets and usage fees",
+    }),
+  });
+
+  const result = await platform.plan(
+    {
+      launchId: "launch-1",
+      userId: "user-1",
+      plan: null,
+      planSchemaVersion: null,
+      reportProgress: async () => undefined,
+      appendLog: async () => undefined,
+      isCancelRequested: async () => false,
+    },
+    {
+      schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
+      platform: "PUMPFUN",
+      metadata: {
+        tokenName: "Test",
+        tokenSymbol: "TST",
+        tokenImage: "https://example.com/a.png",
+      },
+      config: previewInput.config,
+    }
+  );
+
+  assert.equal(result.kind, "failed");
+  if (result.kind === "failed") {
+    assert.match(result.errorMessage, /Main wallet requires/i);
+  }
+});
+
 test("pump.fun preview rejects invalid configuration with a user-safe error", async () => {
   stubServerOnlyModule();
   const { isAppError } = await import("@/server/errors");
