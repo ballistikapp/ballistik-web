@@ -95,11 +95,7 @@ function toStoredLaunchInput(
   }
   return {
     ...flat,
-    entitlementSnapshot: {
-      plan: entitlementSnapshot.plan as ContextUser["plan"],
-      launchRealtimeEnabled: entitlementSnapshot.launchRealtimeEnabled,
-      platformFeeWaived: entitlementSnapshot.platformFeeWaived,
-    },
+    entitlementSnapshot,
   };
 }
 const LAUNCH_LOG_WINDOW = 200;
@@ -3384,7 +3380,6 @@ export const launchService = {
     });
 
     return launches.map((launch) => {
-      const display = launchInputDisplayFields(launch.input);
       const resolved = resolveStoredLaunchInput(launch.input);
       const {
         entitlementSnapshot: _entitlementSnapshot,
@@ -3396,12 +3391,20 @@ export const launchService = {
         retriedFromLaunchId: launch.retriedFromLaunchId,
         hasRetryAttempts: launch.retryAttempts.length > 0,
         tokenPublicKey: launch.tokenPublicKey,
-        tokenName: launch.token?.name ?? display.tokenName ?? "Unknown",
-        tokenSymbol: launch.token?.symbol ?? display.tokenSymbol ?? "—",
+        tokenName:
+          launch.token?.name ?? resolved?.tokenName ?? "Unknown",
+        tokenSymbol:
+          launch.token?.symbol ?? resolved?.tokenSymbol ?? "—",
         imageUrl: launch.token?.imageUrl ?? null,
-        websiteUrl: launch.token?.websiteUrl ?? display.website,
-        twitterUrl: launch.token?.twitterUrl ?? display.twitter,
-        telegramUrl: launch.token?.telegramUrl ?? display.telegram,
+        websiteUrl:
+          launch.token?.websiteUrl ??
+          (resolved?.website?.trim() || null),
+        twitterUrl:
+          launch.token?.twitterUrl ??
+          (resolved?.twitter?.trim() || null),
+        telegramUrl:
+          launch.token?.telegramUrl ??
+          (resolved?.telegram?.trim() || null),
         errorMessage: launch.errorMessage,
         createdAt: launch.createdAt,
         // Flat form-compatible input for clone; legacy and versioned rows both resolve.
@@ -3538,8 +3541,6 @@ export const launchService = {
           id: true,
           userId: true,
           input: true,
-          platform: true,
-          platformVersion: true,
           tokenPublicKey: true,
           status: true,
           token: {
@@ -3584,30 +3585,19 @@ export const launchService = {
         launchRealtimeEnabled: retryRealtimeAccess.allowed,
         platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
       };
-      const retryPersistence =
-        sourceLaunch.platformVersion != null
-          ? buildNewLaunchPersistence(
-              toVersionedLaunchInput(retryInput),
-              entitlementSnapshot
-            )
-          : null;
+      // Every new Launch gets explicit Platform identity; legacy source rows stay unmodified.
+      const retryPersistence = buildNewLaunchPersistence(
+        toVersionedLaunchInput(retryInput),
+        entitlementSnapshot
+      );
 
       const retryLaunch = await prisma.launch.create({
         data: {
           userId: sourceLaunch.userId,
           status: "PENDING",
-          ...(retryPersistence
-            ? {
-                platform: retryPersistence.platform,
-                platformVersion: retryPersistence.platformVersion,
-                input: retryPersistence.input,
-              }
-            : {
-                input: {
-                  ...retryInput,
-                  entitlementSnapshot,
-                } satisfies StoredLaunchInput,
-              }),
+          platform: retryPersistence.platform,
+          platformVersion: retryPersistence.platformVersion,
+          input: retryPersistence.input,
           retriedFromLaunchId: sourceLaunch.id,
         },
       });

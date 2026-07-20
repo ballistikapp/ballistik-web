@@ -1,3 +1,4 @@
+import { z } from "zod";
 import {
   LAUNCH_INPUT_SCHEMA_VERSION_V1,
   LAUNCH_PLATFORM_VERSION_V1,
@@ -10,11 +11,14 @@ import {
   type LaunchTokenInput,
 } from "./launch.schema";
 
-export type LaunchEntitlementSnapshot = {
-  plan: string;
-  launchRealtimeEnabled: boolean;
-  platformFeeWaived: boolean;
-};
+export const launchEntitlementSnapshotSchema = z.object({
+  plan: z.enum(["FREE", "DEVELOPER", "PRO"]),
+  launchRealtimeEnabled: z.boolean(),
+  platformFeeWaived: z.boolean(),
+});
+export type LaunchEntitlementSnapshot = z.infer<
+  typeof launchEntitlementSnapshotSchema
+>;
 
 export type VersionedStoredLaunchInput = VersionedLaunchInput & {
   entitlementSnapshot?: LaunchEntitlementSnapshot;
@@ -30,27 +34,6 @@ export type NewLaunchPersistence = {
   input: VersionedStoredLaunchInput;
 };
 
-function asEntitlementSnapshot(
-  value: unknown
-): LaunchEntitlementSnapshot | undefined {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
-    return undefined;
-  }
-  const record = value as Record<string, unknown>;
-  if (
-    typeof record.plan !== "string" ||
-    typeof record.launchRealtimeEnabled !== "boolean" ||
-    typeof record.platformFeeWaived !== "boolean"
-  ) {
-    return undefined;
-  }
-  return {
-    plan: record.plan,
-    launchRealtimeEnabled: record.launchRealtimeEnabled,
-    platformFeeWaived: record.platformFeeWaived,
-  };
-}
-
 function splitEntitlement(raw: unknown): {
   body: unknown;
   entitlementSnapshot?: LaunchEntitlementSnapshot;
@@ -59,9 +42,13 @@ function splitEntitlement(raw: unknown): {
     return { body: raw };
   }
   const { entitlementSnapshot, ...body } = raw as Record<string, unknown>;
+  const parsedSnapshot =
+    launchEntitlementSnapshotSchema.safeParse(entitlementSnapshot);
   return {
     body,
-    entitlementSnapshot: asEntitlementSnapshot(entitlementSnapshot),
+    entitlementSnapshot: parsedSnapshot.success
+      ? parsedSnapshot.data
+      : undefined,
   };
 }
 
