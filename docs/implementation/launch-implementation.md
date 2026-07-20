@@ -11,17 +11,18 @@
 
 ## Core Flow
 
-1. UI submits launch input via `trpc.launch.start`.
-2. Server performs synchronous input and funding preflight checks before queueing.
-3. If the main wallet cannot cover required launch funding, `launch.start` throws the exact user-facing error and no `Launch` record is created.
-4. When preflight passes, server creates a `Launch` record and starts an async job.
+1. UI submits versioned pump.fun launch input via `trpc.launch.start` (`versionedLaunchInputSchema`).
+2. Server validates Platform (pump.fun only), performs synchronous funding preflight, then queues.
+3. If the external input schema rejects the request, or the main wallet cannot cover required launch funding, `launch.start` throws and no `Launch` record is created.
+4. When preflight passes, server creates a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON, and starts an async job.
 5. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
 6. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
 7. Cancellation sets `cancelRequestedAt`; job checks between steps.
 
 ## tRPC Endpoints
 
-- `launch.start` (mutation): runs synchronous validation/funding preflight, then creates launch and starts async job.
+- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Runs funding preflight, then creates launch and starts async job.
+  - Schema-invalid requests never create a Launch row.
   - Insufficient-funds failures return immediately and do not enqueue a launch.
 - `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact.
 - `launch.status` (query): returns launch + logs for polling.
@@ -45,7 +46,7 @@ Tracks state and progress.
 - `progress`: 0–100
 - `currentStep`: string
 - `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
-- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions will use the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`).
+- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Execution/retry/clone resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON.
 - `plan` / `planSchemaVersion` / `planPersistedAt`: additive secret-free authoritative Platform plan storage (nullable until planning lands).
 - `outcomeKind` / `outcomeDetails`: additive Platform-owned outcome classification (nullable until classification lands).
 - `result`: output metadata (JSON)
@@ -101,14 +102,17 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - `ACTIVE`: set after on-chain confirmation/distribution completes
 - `FAILED`: set when launch errors after token persistence
 
-### Platform contracts (additive; execution unchanged)
+### Platform contracts
 
-- `versionedLaunchInputSchema`: discriminated input with shared Token metadata and a pump.fun `config` branch. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation.
+- `versionedLaunchInputSchema`: external `launch.start` input — shared Token metadata + pump.fun `config`. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation.
+- New Launch/Token rows persist `platform=PUMPFUN` and `platformVersion="1"`. Tokens inherit Platform identity from the Launch at pending-token persistence.
+- `launch-input-compat`: `flattenVersionedLaunchInput` / `toVersionedLaunchInput` / `resolveStoredLaunchInput` / `buildNewLaunchPersistence` bridge versioned storage and flat execution without rewriting legacy rows.
+- Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage.
 - `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation.
 - `isLegacyPlatformRecord`: null `platformVersion` ⇒ legacy.
 
-Schema fields are prepared in Prisma; database migrations remain human-owned (do not agent-run `prisma migrate`).
+Database migrations remain human-owned (do not agent-run `prisma migrate`).
 
 ## Wallet Handling
 

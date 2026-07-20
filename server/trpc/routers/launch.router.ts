@@ -12,9 +12,9 @@ import {
   launchRecoveryByTokenSchema,
   launchRetrySchema,
   launchRecoverSolSchema,
-  launchTokenSchema,
   launchStatusSchema,
 } from "@/server/schemas/launch.schema";
+import { versionedLaunchInputSchema } from "@/server/schemas/launch-platform.schema";
 
 export const launchRouter = router({
   previewCosts: protectedRateLimitedProcedure
@@ -22,9 +22,11 @@ export const launchRouter = router({
     .query(async ({ input, ctx }) => {
       return await launchService.previewCosts(input, ctx.user);
     }),
-  start: expensiveProtectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
-    return await launchService.startLaunch(input, ctx.user);
-  }),
+  start: expensiveProtectedProcedure
+    .input(versionedLaunchInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await launchService.startLaunch(input, ctx.user);
+    }),
   status: protectedRateLimitedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
     return await launchService.getLaunchStatus(input.launchId, ctx.user.id);
   }),

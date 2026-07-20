@@ -696,26 +696,32 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
       return;
     }
     startLaunchMutation.mutate({
-      tokenName: values.tokenName,
-      tokenSymbol: values.tokenSymbol,
-      description: values.description || undefined,
-      tokenImage: values.tokenImage,
-      tokenBanner: values.tokenBanner,
-      twitter: values.twitter || undefined,
-      telegram: values.telegram || undefined,
-      website: values.website || undefined,
-      devWalletOption: values.devWalletOption,
-      importedDevWalletKey: values.importedDevWalletKey || undefined,
-      devBuyAmountSol: values.devBuyAmountSol,
-      jitoTipAmountSol: values.jitoTipAmountSol,
-      bundleBuyEnabled: values.bundleBuyEnabled,
-      vanityMint: values.vanityMint,
-      removeAttribution: values.removeAttribution,
-      mayhemMode: values.mayhemMode,
-      bundlerWalletCount: values.bundlerWalletCount,
-      bundlerBuyAmountSol: values.bundlerBuyAmountSol,
-      bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
-      distributionWalletMultiplier: values.distributionWalletMultiplier,
+      schemaVersion: 1,
+      platform: "PUMPFUN",
+      metadata: {
+        tokenName: values.tokenName,
+        tokenSymbol: values.tokenSymbol,
+        description: values.description || undefined,
+        tokenImage: values.tokenImage,
+        tokenBanner: values.tokenBanner || undefined,
+        twitter: values.twitter || undefined,
+        telegram: values.telegram || undefined,
+        website: values.website || undefined,
+      },
+      config: {
+        devWalletOption: values.devWalletOption,
+        importedDevWalletKey: values.importedDevWalletKey || undefined,
+        devBuyAmountSol: values.devBuyAmountSol,
+        jitoTipAmountSol: values.jitoTipAmountSol,
+        bundleBuyEnabled: values.bundleBuyEnabled,
+        vanityMint: values.vanityMint,
+        removeAttribution: values.removeAttribution,
+        mayhemMode: values.mayhemMode,
+        bundlerWalletCount: values.bundlerWalletCount,
+        bundlerBuyAmountSol: values.bundlerBuyAmountSol,
+        bundlerBuyVariancePercent: values.bundlerBuyVariancePercent,
+        distributionWalletMultiplier: values.distributionWalletMultiplier,
+      },
     });
   };
   const previewInput = React.useMemo(
@@ -806,19 +812,6 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                         className="size-5 opacity-40"
                       />
                       <span className="opacity-60">SPL</span>
-                      <span className="ml-auto rounded-full border border-border bg-muted px-2 py-px text-[10px] font-medium text-muted-foreground">
-                        Soon
-                      </span>
-                    </CommandItem>
-                    <CommandItem value="evm" disabled>
-                      <Image
-                        src="/logos/ethereum.svg"
-                        alt="Ethereum"
-                        width={20}
-                        height={20}
-                        className="size-5 opacity-40"
-                      />
-                      <span className="opacity-60">EVM</span>
                       <span className="ml-auto rounded-full border border-border bg-muted px-2 py-px text-[10px] font-medium text-muted-foreground">
                         Soon
                       </span>

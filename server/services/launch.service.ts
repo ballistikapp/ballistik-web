@@ -6,11 +6,19 @@ import { appTransactionService } from "@/server/services/app-transaction.service
 import { settleSignature } from "@/server/services/app-transaction-settler";
 import { logger } from "@/lib/logger";
 import {
-  launchInputFromStorageSchema,
   type LaunchInputFromStorage,
   type LaunchPreviewCostsInput,
   type LaunchTokenInput,
 } from "@/server/schemas/launch.schema";
+import {
+  buildNewLaunchPersistence,
+  flattenVersionedLaunchInput,
+  launchInputDisplayFields,
+  resolveStoredLaunchInput,
+  toVersionedLaunchInput,
+} from "@/server/schemas/launch-input-compat";
+import type { VersionedLaunchInput } from "@/server/schemas/launch-platform.schema";
+import { resolveLaunchPlatform } from "@/server/services/launch-platform-registry";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -77,6 +85,23 @@ type StoredLaunchInput = LaunchInputFromStorage & {
     platformFeeWaived: boolean;
   };
 };
+
+function toStoredLaunchInput(
+  resolved: NonNullable<ReturnType<typeof resolveStoredLaunchInput>>
+): StoredLaunchInput {
+  const { entitlementSnapshot, ...flat } = resolved;
+  if (!entitlementSnapshot) {
+    return flat;
+  }
+  return {
+    ...flat,
+    entitlementSnapshot: {
+      plan: entitlementSnapshot.plan as ContextUser["plan"],
+      launchRealtimeEnabled: entitlementSnapshot.launchRealtimeEnabled,
+      platformFeeWaived: entitlementSnapshot.platformFeeWaived,
+    },
+  };
+}
 const LAUNCH_LOG_WINDOW = 200;
 
 function toLamports(amount: number) {
@@ -2317,7 +2342,11 @@ async function persistTokenPending(
   devWalletPublicKey: string,
   bundlerWalletKeypairs: Keypair[],
   distributionWallets: DistributionWallet[],
-  reservedVanityId: string | null
+  reservedVanityId: string | null,
+  platformIdentity?: {
+    platform: "PUMPFUN" | null;
+    platformVersion: string | null;
+  }
 ) {
   let distributionWalletCount = 0;
   const token = await prisma.$transaction(
@@ -2336,6 +2365,12 @@ async function persistTokenPending(
           telegramUrl: input.telegram?.trim() || null,
           websiteUrl: input.website?.trim() || null,
           userId,
+          ...(platformIdentity?.platform
+            ? { platform: platformIdentity.platform }
+            : {}),
+          ...(platformIdentity?.platformVersion
+            ? { platformVersion: platformIdentity.platformVersion }
+            : {}),
         },
       });
 
@@ -3349,32 +3384,28 @@ export const launchService = {
     });
 
     return launches.map((launch) => {
-      const input = launch.input as Record<string, unknown> | null;
+      const display = launchInputDisplayFields(launch.input);
+      const resolved = resolveStoredLaunchInput(launch.input);
+      const {
+        entitlementSnapshot: _entitlementSnapshot,
+        ...cloneInput
+      } = resolved ?? {};
       return {
         id: launch.id,
         status: launch.status,
         retriedFromLaunchId: launch.retriedFromLaunchId,
         hasRetryAttempts: launch.retryAttempts.length > 0,
         tokenPublicKey: launch.tokenPublicKey,
-        tokenName:
-          launch.token?.name ??
-          (typeof input?.tokenName === "string" ? input.tokenName : "Unknown"),
-        tokenSymbol:
-          launch.token?.symbol ??
-          (typeof input?.tokenSymbol === "string" ? input.tokenSymbol : "—"),
+        tokenName: launch.token?.name ?? display.tokenName ?? "Unknown",
+        tokenSymbol: launch.token?.symbol ?? display.tokenSymbol ?? "—",
         imageUrl: launch.token?.imageUrl ?? null,
-        websiteUrl:
-          launch.token?.websiteUrl ??
-          (typeof input?.website === "string" ? input.website : null),
-        twitterUrl:
-          launch.token?.twitterUrl ??
-          (typeof input?.twitter === "string" ? input.twitter : null),
-        telegramUrl:
-          launch.token?.telegramUrl ??
-          (typeof input?.telegram === "string" ? input.telegram : null),
+        websiteUrl: launch.token?.websiteUrl ?? display.website,
+        twitterUrl: launch.token?.twitterUrl ?? display.twitter,
+        telegramUrl: launch.token?.telegramUrl ?? display.telegram,
         errorMessage: launch.errorMessage,
         createdAt: launch.createdAt,
-        input: (input ?? {}) as Record<string, unknown>,
+        // Flat form-compatible input for clone; legacy and versioned rows both resolve.
+        input: cloneInput as Record<string, unknown>,
       };
     });
   },
@@ -3400,17 +3431,13 @@ export const launchService = {
       });
       logger.info("getFailedLaunches result", { count: launches.length });
       return launches.map((launch) => {
-        const input = launch.input as Record<string, unknown> | null;
+        const display = launchInputDisplayFields(launch.input);
         return {
           launchId: launch.id,
           launchStatus: launch.status,
           tokenPublicKey: launch.tokenPublicKey,
-          tokenName:
-            typeof input?.tokenName === "string"
-              ? input.tokenName
-              : "Failed Launch",
-          tokenSymbol:
-            typeof input?.tokenSymbol === "string" ? input.tokenSymbol : "—",
+          tokenName: display.tokenName ?? "Failed Launch",
+          tokenSymbol: display.tokenSymbol ?? "—",
           errorMessage: launch.errorMessage,
           createdAt: launch.createdAt,
         };
@@ -3424,12 +3451,14 @@ export const launchService = {
     }
   },
 
-  async startLaunch(input: LaunchTokenInput, user: RequestUser) {
+  async startLaunch(input: VersionedLaunchInput, user: RequestUser) {
+    resolveLaunchPlatform(input.platform);
+    const flatInput = flattenVersionedLaunchInput(input);
     const idempotencyKey = [
       "launch-start",
       user.id,
-      input.tokenName.trim().toLowerCase(),
-      normalizeSymbol(input.tokenSymbol),
+      flatInput.tokenName.trim().toLowerCase(),
+      normalizeSymbol(flatInput.tokenSymbol),
     ].join(":");
     const actionKey = `launch:start:${user.id}`;
 
@@ -3450,26 +3479,28 @@ export const launchService = {
             return { launchId: existing.id };
           }
 
-          const normalizedInput =
-            await normalizeLaunchInputMediaForStorage(input);
-          await ensureLaunchFundingAvailable(normalizedInput, user);
+          const normalizedFlat =
+            await normalizeLaunchInputMediaForStorage(flatInput);
+          await ensureLaunchFundingAvailable(normalizedFlat, user);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
             "launch-fast-confirmation"
           );
-          const queuedInput: StoredLaunchInput = {
-            ...normalizedInput,
-            entitlementSnapshot: {
+          const persistence = buildNewLaunchPersistence(
+            toVersionedLaunchInput(normalizedFlat),
+            {
               plan: user.plan,
               launchRealtimeEnabled: launchRealtimeAccess.allowed,
               platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
-            },
-          };
+            }
+          );
           const launch = await prisma.launch.create({
             data: {
               userId: user.id,
               status: "PENDING",
-              input: queuedInput,
+              platform: persistence.platform,
+              platformVersion: persistence.platformVersion,
+              input: persistence.input,
             },
           });
 
@@ -3507,6 +3538,8 @@ export const launchService = {
           id: true,
           userId: true,
           input: true,
+          platform: true,
+          platformVersion: true,
           tokenPublicKey: true,
           status: true,
           token: {
@@ -3527,41 +3560,54 @@ export const launchService = {
         );
       }
 
-      const parsedInput = launchInputFromStorageSchema.safeParse(
-        sourceLaunch.input
-      );
-      if (!parsedInput.success) {
+      const resolvedInput = resolveStoredLaunchInput(sourceLaunch.input);
+      if (!resolvedInput) {
         throw new AppError(
           "Launch retry is unavailable because original input is no longer valid",
           400
         );
       }
-      const parsed = parsedInput.data;
-      if (parsed.devWalletOption === "system") {
+      if (resolvedInput.devWalletOption === "system") {
         throw new AppError(
           "The platform dev wallet is no longer available. Create a new launch and choose Generate, Import, or Main wallet for the dev wallet.",
           400
         );
       }
-      const retryInput = parsed as LaunchTokenInput;
+      const retryInput = resolvedInput as LaunchTokenInput;
       await ensureLaunchFundingAvailable(retryInput, user);
       const retryRealtimeAccess = grpcAccessService.getFeatureAccess(
         user,
         "launch-fast-confirmation"
       );
+      const entitlementSnapshot = {
+        plan: user.plan,
+        launchRealtimeEnabled: retryRealtimeAccess.allowed,
+        platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
+      };
+      const retryPersistence =
+        sourceLaunch.platformVersion != null
+          ? buildNewLaunchPersistence(
+              toVersionedLaunchInput(retryInput),
+              entitlementSnapshot
+            )
+          : null;
 
       const retryLaunch = await prisma.launch.create({
         data: {
           userId: sourceLaunch.userId,
           status: "PENDING",
-          input: {
-            ...retryInput,
-            entitlementSnapshot: {
-              plan: user.plan,
-              launchRealtimeEnabled: retryRealtimeAccess.allowed,
-              platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
-            },
-          } satisfies StoredLaunchInput,
+          ...(retryPersistence
+            ? {
+                platform: retryPersistence.platform,
+                platformVersion: retryPersistence.platformVersion,
+                input: retryPersistence.input,
+              }
+            : {
+                input: {
+                  ...retryInput,
+                  entitlementSnapshot,
+                } satisfies StoredLaunchInput,
+              }),
           retriedFromLaunchId: sourceLaunch.id,
         },
       });
@@ -4009,7 +4055,22 @@ export const launchService = {
     });
 
     const launchStartedAt = Date.now();
-    const input = launch.input as StoredLaunchInput;
+    const resolvedInput = resolveStoredLaunchInput(launch.input);
+    if (!resolvedInput) {
+      await updateLaunchRecord(launchId, {
+        status: "FAILED",
+        errorMessage: "Launch input is no longer valid",
+        completedAt: new Date(),
+      });
+      await appendLog(
+        launchId,
+        "ERROR",
+        "Launch input is no longer valid",
+        "validate"
+      );
+      return;
+    }
+    const input = toStoredLaunchInput(resolvedInput);
     const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
     const {
       createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
@@ -4320,7 +4381,11 @@ export const launchService = {
         devWalletPublicKey,
         bundlerWalletKeypairs,
         distributionWallets,
-        reservedVanityId
+        reservedVanityId,
+        {
+          platform: launch.platform,
+          platformVersion: launch.platformVersion,
+        }
       );
       persistedTokenPublicKey = mintPublicKey;
       await appendLog(launchId, "INFO", "Pending token saved", "persist", {
