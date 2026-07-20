@@ -17,10 +17,13 @@ import {
   resolveStoredLaunchInput,
   toVersionedLaunchInput,
 } from "@/server/schemas/launch-input-compat";
-import type { VersionedLaunchInput } from "@/server/schemas/launch-platform.schema";
+import type {
+  VersionedLaunchInput,
+  VersionedLaunchPreviewInput,
+} from "@/server/schemas/launch-platform.schema";
+import { isLegacyPlatformRecord } from "@/server/schemas/launch-platform.schema";
 import { resolveLaunchPlatform } from "@/server/services/launch-platform-registry";
 import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
-import { isLegacyPlatformRecord } from "@/server/schemas/launch-platform.schema";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -1690,7 +1693,7 @@ async function ensureLaunchFundingAvailable(
   }
 }
 
-async function calculateLaunchCostPreview(
+export async function calculateLaunchCostPreview(
   input: LaunchCostInput,
   user: RequestUser
 ): Promise<LaunchCostPreview> {
@@ -3320,8 +3323,12 @@ export type UserLaunchRow = {
 };
 
 export const launchService = {
-  async previewCosts(input: LaunchPreviewCostsInput, user: RequestUser) {
-    return await calculateLaunchCostPreview(input, user);
+  async previewCosts(
+    input: VersionedLaunchPreviewInput,
+    user: RequestUser
+  ) {
+    const platform = resolveLaunchPlatform(input.platform);
+    return await platform.preview(input, { user });
   },
 
   async getCloneInput(

@@ -74,6 +74,11 @@ import {
 } from "@/lib/config/usage-fees.config";
 import { DEVELOPER_FEE_DISCOUNT_RATE } from "@/lib/config/subscription.config";
 import { MAX_BUNDLE_WALLETS } from "@/lib/config/launch.config";
+import { PUMPFUN_MONEY_LINE_LABELS } from "@/lib/launch/money-labels";
+import {
+  findMoneyLineItem,
+  formatLamportsAsSol,
+} from "@/lib/launch/lamports";
 
 const DEV_BUY_SOL_MIN = 0.05;
 const DEV_BUY_SOL_MAX = 100;
@@ -726,21 +731,26 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
   };
   const previewInput = React.useMemo(
     () => ({
-      devWalletOption: form.state.values.devWalletOption,
-      importedDevWalletKey:
-        form.state.values.devWalletOption === "import"
-          ? form.state.values.importedDevWalletKey
-          : undefined,
-      devBuyAmountSol: form.state.values.devBuyAmountSol,
-      jitoTipAmountSol: form.state.values.jitoTipAmountSol,
-      bundleBuyEnabled: form.state.values.bundleBuyEnabled,
-      vanityMint: form.state.values.vanityMint,
-      removeAttribution: form.state.values.removeAttribution,
-      bundlerWalletCount: form.state.values.bundlerWalletCount,
-      bundlerBuyAmountSol: form.state.values.bundlerBuyAmountSol,
-      bundlerBuyVariancePercent: form.state.values.bundlerBuyVariancePercent,
-      distributionWalletMultiplier:
-        form.state.values.distributionWalletMultiplier,
+      schemaVersion: 1 as const,
+      platform: "PUMPFUN" as const,
+      config: {
+        devWalletOption: form.state.values.devWalletOption,
+        importedDevWalletKey:
+          form.state.values.devWalletOption === "import"
+            ? form.state.values.importedDevWalletKey
+            : undefined,
+        devBuyAmountSol: form.state.values.devBuyAmountSol,
+        jitoTipAmountSol: form.state.values.jitoTipAmountSol,
+        bundleBuyEnabled: form.state.values.bundleBuyEnabled,
+        vanityMint: form.state.values.vanityMint,
+        removeAttribution: form.state.values.removeAttribution,
+        mayhemMode: form.state.values.mayhemMode,
+        bundlerWalletCount: form.state.values.bundlerWalletCount,
+        bundlerBuyAmountSol: form.state.values.bundlerBuyAmountSol,
+        bundlerBuyVariancePercent: form.state.values.bundlerBuyVariancePercent,
+        distributionWalletMultiplier:
+          form.state.values.distributionWalletMultiplier,
+      },
     }),
     [form.state.values]
   );
@@ -748,6 +758,19 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
     refetchOnWindowFocus: false,
   });
   const preview = previewCostsQuery.data;
+  const previewLineItems = preview?.money.lineItems ?? [];
+  const creatorReserveDisplay = findMoneyLineItem(
+    previewLineItems,
+    PUMPFUN_MONEY_LINE_LABELS.creatorReserve
+  );
+  const buyWalletReserveDisplay = findMoneyLineItem(
+    previewLineItems,
+    PUMPFUN_MONEY_LINE_LABELS.buyWalletReserve
+  );
+  const transferReserveDisplay = findMoneyLineItem(
+    previewLineItems,
+    PUMPFUN_MONEY_LINE_LABELS.transferReserve
+  );
 
   return (
     <div className="space-y-6 pb-12">
@@ -2128,8 +2151,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     </Tooltip>
                                   </div>
                                   <span className="tabular-nums text-xs text-muted-foreground">
-                                    {preview
-                                      ? `${preview.lineItems.creatorReserveSol.toFixed(4)} SOL`
+                                    {creatorReserveDisplay
+                                      ? `${formatLamportsAsSol(creatorReserveDisplay)} SOL`
                                       : "Calculating..."}
                                   </span>
                                 </div>
@@ -2161,8 +2184,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                   </div>
                                   <span className="tabular-nums text-xs text-muted-foreground">
                                     {values.bundleBuyEnabled
-                                      ? preview
-                                        ? `${preview.lineItems.buyWalletReserveSol.toFixed(4)} SOL`
+                                      ? buyWalletReserveDisplay
+                                        ? `${formatLamportsAsSol(buyWalletReserveDisplay)} SOL`
                                         : "Calculating..."
                                       : "Not needed"}
                                   </span>
@@ -2190,8 +2213,8 @@ export function LaunchForm({ initialValues }: LaunchFormProps) {
                                     </Tooltip>
                                   </div>
                                   <span className="tabular-nums text-xs text-muted-foreground">
-                                    {preview
-                                      ? `${preview.lineItems.transferReserveSol.toFixed(4)} SOL`
+                                    {transferReserveDisplay
+                                      ? `${formatLamportsAsSol(transferReserveDisplay)} SOL`
                                       : "Calculating..."}
                                   </span>
                                 </div>

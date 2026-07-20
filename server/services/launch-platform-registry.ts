@@ -1,12 +1,15 @@
 import "server-only";
 
 import { AppError } from "@/server/errors";
+import type { ContextUser } from "@/server/schemas/auth.schema";
 import type {
   LaunchPlatformId,
-  NormalizedLaunchMoneySummary,
+  LaunchPlatformPreviewResult,
   VersionedLaunchInput,
+  VersionedLaunchPreviewInput,
 } from "@/server/schemas/launch-platform.schema";
 import { launchPlatformIdSchema } from "@/server/schemas/launch-platform.schema";
+import { createPumpfunPlatformModule } from "@/server/services/launch-platform-pumpfun";
 
 export type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 
@@ -27,6 +30,10 @@ export type LaunchLifecycleContext = {
     data?: Record<string, unknown>
   ) => Promise<void>;
   isCancelRequested: () => Promise<boolean>;
+};
+
+export type LaunchPlatformPreviewContext = {
+  user: Pick<ContextUser, "id" | "plan">;
 };
 
 /**
@@ -51,12 +58,17 @@ export type LaunchPlatformPlanResult = {
 };
 
 /**
- * Shared Platform module interface. preview / plan / recover deepen in later
- * tickets; execute initially delegates to pump.fun compatibility code.
+ * Shared Platform module interface.
+ * preview returns normalized money plus the thin review envelope fields.
+ * plan / recover deepen in later tickets; execute initially delegates to
+ * pump.fun compatibility code.
  */
 export type LaunchPlatformModule = {
   readonly id: LaunchPlatformId;
-  preview: (input: VersionedLaunchInput) => Promise<NormalizedLaunchMoneySummary>;
+  preview: (
+    input: VersionedLaunchPreviewInput,
+    ctx: LaunchPlatformPreviewContext
+  ) => Promise<LaunchPlatformPreviewResult>;
   plan: (
     ctx: LaunchLifecycleContext,
     input: VersionedLaunchInput
@@ -69,35 +81,10 @@ type LaunchPlatformRegistry = Record<LaunchPlatformId, LaunchPlatformModule>;
 
 let registry: LaunchPlatformRegistry | null = null;
 
-function notExtractedYet(operation: string): never {
-  throw new AppError(
-    `pump.fun Platform ${operation} is not extracted yet`,
-    501,
-    { operation }
-  );
-}
-
-function createPumpfunCompatModule(): LaunchPlatformModule {
-  return {
-    id: "PUMPFUN",
-    preview: async () => notExtractedYet("preview"),
-    plan: async () => notExtractedYet("plan"),
-    execute: async (ctx) => {
-      // Dynamic import avoids a load-time cycle with launch.service.
-      const { runPumpfunLaunchJobCompat } = await import(
-        "./launch-platform-pumpfun"
-      );
-      await runPumpfunLaunchJobCompat(ctx.launchId);
-      return { kind: "compat" };
-    },
-    recover: async () => notExtractedYet("recover"),
-  };
-}
-
 function getRegistry(): LaunchPlatformRegistry {
   if (!registry) {
     registry = {
-      PUMPFUN: createPumpfunCompatModule(),
+      PUMPFUN: createPumpfunPlatformModule(),
     };
   }
   return registry;
@@ -115,4 +102,11 @@ export function resolveLaunchPlatform(platform: string): LaunchPlatformModule {
     });
   }
   return getRegistry()[parsed.data];
+}
+
+/** Test helper to replace the registry between unit tests. */
+export function __setLaunchPlatformRegistryForTests(
+  next: LaunchPlatformRegistry | null
+): void {
+  registry = next;
 }

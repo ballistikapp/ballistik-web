@@ -7,7 +7,6 @@ import {
 import { launchService } from "@/server/services/launch.service";
 import { launchLifecycle } from "@/server/services/launch-lifecycle";
 import {
-  launchPreviewCostsSchema,
   launchRecoverSolByTokenSchema,
   launchRecoverySchema,
   launchRecoveryByTokenSchema,
@@ -15,11 +14,14 @@ import {
   launchRecoverSolSchema,
   launchStatusSchema,
 } from "@/server/schemas/launch.schema";
-import { versionedLaunchInputSchema } from "@/server/schemas/launch-platform.schema";
+import {
+  versionedLaunchInputSchema,
+  versionedLaunchPreviewInputSchema,
+} from "@/server/schemas/launch-platform.schema";
 
 export const launchRouter = router({
   previewCosts: protectedRateLimitedProcedure
-    .input(launchPreviewCostsSchema)
+    .input(versionedLaunchPreviewInputSchema)
     .query(async ({ input, ctx }) => {
       return await launchService.previewCosts(input, ctx.user);
     }),

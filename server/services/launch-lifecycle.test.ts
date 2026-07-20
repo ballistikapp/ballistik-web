@@ -25,16 +25,22 @@ function stubServerOnlyModule() {
   } as unknown as NodeJS.Module;
 }
 
-function emptyPreviewSummary() {
+function emptyPreviewResult() {
   return {
-    immediateRequiredBalanceLamports: "0",
-    temporaryFundingLamports: "0",
-    permanentSpendLamports: "0",
-    expectedReturnLamports: "0",
-    expectedMainWalletDeltaNowLamports: "0",
-    expectedMainWalletDeltaAfterCleanupLamports: "0",
-    usageFeeLamports: "0",
-    lineItems: [],
+    money: {
+      immediateRequiredBalanceLamports: "0",
+      temporaryFundingLamports: "0",
+      permanentSpendLamports: "0",
+      expectedReturnLamports: "0",
+      expectedMainWalletDeltaNowLamports: "0",
+      expectedMainWalletDeltaAfterCleanupLamports: "0",
+      usageFeeLamports: "0",
+      lineItems: [],
+    },
+    mainWalletBalanceLamports: "0",
+    hasSufficientMainWallet: true,
+    platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
   };
 }
 
@@ -43,7 +49,7 @@ function createFakePlatform(
 ): LaunchPlatformModule {
   return {
     id: "PUMPFUN",
-    preview: async () => emptyPreviewSummary(),
+    preview: async () => emptyPreviewResult(),
     plan: async () => ({ planSchemaVersion: 1, plan: {} }),
     execute,
     recover: async () => undefined,

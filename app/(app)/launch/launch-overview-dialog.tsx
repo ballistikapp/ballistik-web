@@ -22,6 +22,12 @@ import {
   descriptionAttributionRemovalFeeSol,
   vanityMintFeeSol,
 } from "@/lib/config/usage-fees.config";
+import { PUMPFUN_MONEY_LINE_LABELS } from "@/lib/launch/money-labels";
+import {
+  findMoneyLineItem,
+  formatLamportsAsSol,
+  lamportsStringToSol,
+} from "@/lib/launch/lamports";
 import { trpc } from "@/lib/trpc/client";
 
 interface LaunchOverviewDialogProps {
@@ -55,6 +61,36 @@ interface LaunchOverviewDialogProps {
   isLoading?: boolean;
 }
 
+function lineAmountSol(
+  lineItems: ReadonlyArray<{ label: string; amountLamports: string }>,
+  label: string
+): number {
+  const lamports = findMoneyLineItem(lineItems, label);
+  return lamports ? lamportsStringToSol(lamports) : 0;
+}
+
+function findGeneratedWalletFee(
+  lineItems: ReadonlyArray<{ label: string; amountLamports: string }>
+) {
+  const exact = lineItems.find(
+    (item) => item.label === PUMPFUN_MONEY_LINE_LABELS.generatedWalletFee
+  );
+  if (exact) {
+    return { amountLamports: exact.amountLamports, walletCount: 0 };
+  }
+  const prefixed = lineItems.find((item) =>
+    item.label.startsWith(`${PUMPFUN_MONEY_LINE_LABELS.generatedWalletFee} (`)
+  );
+  if (!prefixed) {
+    return { amountLamports: "0", walletCount: 0 };
+  }
+  const match = /\((\d+)\)/.exec(prefixed.label);
+  return {
+    amountLamports: prefixed.amountLamports,
+    walletCount: match ? Number(match[1]) : 0,
+  };
+}
+
 export function LaunchOverviewDialog({
   open,
   onOpenChange,
@@ -67,23 +103,28 @@ export function LaunchOverviewDialog({
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
   const previewInput = React.useMemo(
     () => ({
-      devWalletOption:
-        launchInput.devWalletOption === "system"
-          ? "generate"
-          : launchInput.devWalletOption,
-      importedDevWalletKey:
-        launchInput.devWalletOption === "import"
-          ? launchInput.importedDevWalletKey
-          : undefined,
-      devBuyAmountSol: launchInput.devBuyAmountSol,
-      jitoTipAmountSol: launchInput.jitoTipAmountSol,
-      bundleBuyEnabled: launchInput.bundleBuyEnabled,
-      vanityMint: launchInput.vanityMint,
-      removeAttribution: launchInput.removeAttribution,
-      bundlerWalletCount: launchInput.bundlerWalletCount,
-      bundlerBuyAmountSol: launchInput.bundlerBuyAmountSol,
-      bundlerBuyVariancePercent: launchInput.bundlerBuyVariancePercent,
-      distributionWalletMultiplier: launchInput.distributionWalletMultiplier,
+      schemaVersion: 1 as const,
+      platform: "PUMPFUN" as const,
+      config: {
+        devWalletOption:
+          launchInput.devWalletOption === "system"
+            ? ("generate" as const)
+            : launchInput.devWalletOption,
+        importedDevWalletKey:
+          launchInput.devWalletOption === "import"
+            ? launchInput.importedDevWalletKey
+            : undefined,
+        devBuyAmountSol: launchInput.devBuyAmountSol,
+        jitoTipAmountSol: launchInput.jitoTipAmountSol,
+        bundleBuyEnabled: launchInput.bundleBuyEnabled,
+        vanityMint: launchInput.vanityMint,
+        removeAttribution: launchInput.removeAttribution,
+        mayhemMode: launchInput.mayhemMode,
+        bundlerWalletCount: launchInput.bundlerWalletCount,
+        bundlerBuyAmountSol: launchInput.bundlerBuyAmountSol,
+        bundlerBuyVariancePercent: launchInput.bundlerBuyVariancePercent,
+        distributionWalletMultiplier: launchInput.distributionWalletMultiplier,
+      },
     }),
     [launchInput]
   );
@@ -92,49 +133,65 @@ export function LaunchOverviewDialog({
     refetchOnWindowFocus: false,
   });
   const preview = previewCostsQuery.data;
+  const money = preview?.money;
   const quoteLoading =
     previewCostsQuery.isLoading || previewCostsQuery.isFetching;
   const quoteError = previewCostsQuery.error?.message ?? null;
   const canConfirm =
     preview?.hasSufficientMainWallet === true && !quoteLoading && !isLoading;
-  const generatedWalletCount =
-    (launchInput.devWalletOption === "generate" ? 1 : 0) +
-    (launchInput.bundleBuyEnabled
-      ? launchInput.bundlerWalletCount +
-        launchInput.bundlerWalletCount *
-          Math.max(0, launchInput.distributionWalletMultiplier - 1)
-      : 0);
-  const vanityFeeDisplaySol = launchInput.vanityMint
-    ? (preview?.lineItems.vanityMintFeeSol ?? vanityMintFeeSol)
+
+  const lineItems = money?.lineItems ?? [];
+  const generatedWalletFee = findGeneratedWalletFee(lineItems);
+  const vanityFeeSol = launchInput.vanityMint
+    ? lineAmountSol(lineItems, PUMPFUN_MONEY_LINE_LABELS.vanityMintFee)
     : vanityMintFeeSol;
-  const attributionFeeDisplaySol = launchInput.removeAttribution
-    ? (preview?.lineItems.descriptionAttributionRemovalFeeSol ??
-      descriptionAttributionRemovalFeeSol)
+  const attributionFeeSol = launchInput.removeAttribution
+    ? lineAmountSol(lineItems, PUMPFUN_MONEY_LINE_LABELS.attributionRemovalFee)
     : descriptionAttributionRemovalFeeSol;
-  const bundleFeeDisplaySol = launchInput.bundleBuyEnabled
-    ? (preview?.lineItems.bundleBuyFeeSol ?? bundleBuyFeeSol)
+  const bundleFeeSol = launchInput.bundleBuyEnabled
+    ? lineAmountSol(lineItems, PUMPFUN_MONEY_LINE_LABELS.bundleBuyFee)
     : bundleBuyFeeSol;
-  const customDevWalletFeeDisplaySol =
-    preview?.lineItems.nonSystemDevWalletFeeSol ?? 0;
-  const temporaryReserveItems = preview
+  const customDevWalletFeeSol = lineAmountSol(
+    lineItems,
+    PUMPFUN_MONEY_LINE_LABELS.customDevWalletFee
+  );
+  const estimatedSpendSol = money
+    ? Math.abs(
+        lamportsStringToSol(money.expectedMainWalletDeltaAfterCleanupLamports)
+      )
+    : 0;
+  const creatorReserveSol = lineAmountSol(
+    lineItems,
+    PUMPFUN_MONEY_LINE_LABELS.creatorReserve
+  );
+  const buyWalletReserveSol = lineAmountSol(
+    lineItems,
+    PUMPFUN_MONEY_LINE_LABELS.buyWalletReserve
+  );
+  const transferReserveSol = lineAmountSol(
+    lineItems,
+    PUMPFUN_MONEY_LINE_LABELS.transferReserve
+  );
+
+  const temporaryReserveItems = money
     ? [
         {
           label: "Creator reserve",
-          amount: `${preview.lineItems.creatorReserveSol.toFixed(4)} SOL`,
+          amount: `${creatorReserveSol.toFixed(4)} SOL`,
           tooltip:
             "Temporary SOL reserved for token creation and creator-side launch steps. Any unused amount is expected to be returned after launch cleanup.",
         },
         {
           label: "Buy wallet reserve",
           amount: launchInput.bundleBuyEnabled
-            ? `${preview.lineItems.buyWalletReserveSol.toFixed(4)} SOL`
+            ? `${buyWalletReserveSol.toFixed(4)} SOL`
             : "Not needed",
           tooltip:
             "Temporary SOL reserved across buy wallets so bundle execution can complete smoothly. Any unused amount is expected to be returned after launch cleanup.",
         },
         {
           label: "Transfer reserve",
-          amount: `${preview.lineItems.transferReserveSol.toFixed(4)} SOL`,
+          amount: `${transferReserveSol.toFixed(4)} SOL`,
           tooltip:
             "A small temporary amount reserved so launch wallets can send remaining SOL back during cleanup. Any unused amount is expected to be returned after launch cleanup.",
         },
@@ -355,7 +412,7 @@ export function LaunchOverviewDialog({
                 Could not calculate launch costs. Please retry.
               </p>
             )}
-            {!quoteLoading && preview && (
+            {!quoteLoading && preview && money && (
               <div className="space-y-3 text-sm">
                 <div className="rounded-md border bg-muted/30 p-3">
                   <div className="flex items-center justify-between">
@@ -363,7 +420,8 @@ export function LaunchOverviewDialog({
                       Main wallet balance
                     </span>
                     <span className="tabular-nums">
-                      {preview.mainWalletBalanceSol.toFixed(4)} SOL
+                      {formatLamportsAsSol(preview.mainWalletBalanceLamports)}{" "}
+                      SOL
                     </span>
                   </div>
                   <div className="mt-1 flex items-center justify-between">
@@ -371,7 +429,34 @@ export function LaunchOverviewDialog({
                       Required at start
                     </span>
                     <span className="tabular-nums">
-                      {preview.requiredMainWalletSol.toFixed(4)} SOL
+                      {formatLamportsAsSol(
+                        money.immediateRequiredBalanceLamports
+                      )}{" "}
+                      SOL
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Temporary funding
+                    </span>
+                    <span className="tabular-nums">
+                      {formatLamportsAsSol(money.temporaryFundingLamports)} SOL
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Expected return
+                    </span>
+                    <span className="tabular-nums">
+                      {formatLamportsAsSol(money.expectedReturnLamports)} SOL
+                    </span>
+                  </div>
+                  <div className="mt-1 flex items-center justify-between">
+                    <span className="text-muted-foreground">
+                      Permanent spend
+                    </span>
+                    <span className="tabular-nums">
+                      {formatLamportsAsSol(money.permanentSpendLamports)} SOL
                     </span>
                   </div>
                   <div className="mt-1 flex items-center justify-between border-t pt-2">
@@ -379,7 +464,7 @@ export function LaunchOverviewDialog({
                       Estimated main-wallet spend
                     </span>
                     <span className="tabular-nums font-medium">
-                      {preview.netMainWalletDeltaAfterCleanupSol.toFixed(4)} SOL
+                      {estimatedSpendSol.toFixed(4)} SOL
                     </span>
                   </div>
                 </div>
@@ -387,15 +472,14 @@ export function LaunchOverviewDialog({
                   <div className="flex items-center justify-between border-b pb-2">
                     <span className="font-medium">Total fees</span>
                     <span className="tabular-nums font-medium">
-                      {preview.lineItems.usageFeesSol.toFixed(4)} SOL
+                      {formatLamportsAsSol(money.usageFeeLamports)} SOL
                     </span>
                   </div>
                   {preview.platformFeeWaived ? (
                     <div className="mt-2 text-xs text-emerald-400">
                       Pro active. Platform fees are waived for this launch.
                     </div>
-                  ) : preview.platformFeeDiscountRate != null &&
-                    preview.platformFeeDiscountRate > 0 ? (
+                  ) : preview.platformFeeDiscountRate > 0 ? (
                     <div className="mt-2 text-xs text-emerald-400">
                       Developer active. Platform fees are reduced by{" "}
                       {Math.round(preview.platformFeeDiscountRate * 100)}%.
@@ -404,8 +488,7 @@ export function LaunchOverviewDialog({
                   <div className="mt-2 space-y-2">
                     <div
                       className={`flex items-center justify-between ${
-                        preview.lineItems.generatedWalletsBilledForFeeCount ===
-                        0
+                        generatedWalletFee.walletCount === 0
                           ? "opacity-50 line-through"
                           : ""
                       }`}
@@ -413,22 +496,21 @@ export function LaunchOverviewDialog({
                       <div className="text-muted-foreground">
                         Generated wallets fee
                         <span className="ml-2 text-xs">
-                          (
-                          {preview.lineItems.generatedWalletsBilledForFeeCount}{" "}
-                          wallets)
+                          ({generatedWalletFee.walletCount} wallets)
                         </span>
                       </div>
                       <span className="tabular-nums">
-                        {preview.lineItems.generatedWalletFeeSol.toFixed(4)} SOL
+                        {formatLamportsAsSol(generatedWalletFee.amountLamports)}{" "}
+                        SOL
                       </span>
                     </div>
-                    {customDevWalletFeeDisplaySol > 0 && (
+                    {customDevWalletFeeSol > 0 && (
                       <div className="flex items-center justify-between">
                         <div className="text-muted-foreground">
                           Custom dev wallet fee
                         </div>
                         <span className="tabular-nums">
-                          {customDevWalletFeeDisplaySol.toFixed(4)} SOL
+                          {customDevWalletFeeSol.toFixed(4)} SOL
                         </span>
                       </div>
                     )}
@@ -441,7 +523,7 @@ export function LaunchOverviewDialog({
                         Vanity mint fee
                       </div>
                       <span className="tabular-nums">
-                        {vanityFeeDisplaySol.toFixed(4)} SOL
+                        {vanityFeeSol.toFixed(4)} SOL
                       </span>
                     </div>
                     <div
@@ -455,7 +537,7 @@ export function LaunchOverviewDialog({
                         Attribution removal fee
                       </div>
                       <span className="tabular-nums">
-                        {attributionFeeDisplaySol.toFixed(4)} SOL
+                        {attributionFeeSol.toFixed(4)} SOL
                       </span>
                     </div>
                     <div
@@ -467,7 +549,7 @@ export function LaunchOverviewDialog({
                     >
                       <div className="text-muted-foreground">Bundler fee</div>
                       <span className="tabular-nums">
-                        {bundleFeeDisplaySol.toFixed(4)} SOL
+                        {bundleFeeSol.toFixed(4)} SOL
                       </span>
                     </div>
                   </div>

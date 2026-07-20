@@ -22,11 +22,11 @@
 
 ## tRPC Endpoints
 
-- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, history, and `previewCosts` remain on `launchService` until later tickets.
+- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, and history remain on `launchService` until later tickets.
 - `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Runs funding preflight, then creates launch and schedules Platform execute via the lifecycle.
   - Schema-invalid requests never create a Launch row.
   - Insufficient-funds failures return immediately and do not enqueue a launch.
-- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact (normalized Platform preview lands in a later ticket).
+- `launch.previewCosts` (query): accepts `versionedLaunchPreviewInputSchema` (Platform + config, no Token metadata). Routes through `resolveLaunchPlatform(...).preview` and returns the review envelope: `money` (`normalizedLaunchMoneySummarySchema` lamport strings + labeled line items) plus `mainWalletBalanceLamports`, `hasSufficientMainWallet`, `platformFeeWaived`, and `platformFeeDiscountRate`. Side-effect-free (read-only RPC/balance); does not persist plans, fund Wallets, publish metadata, or submit on-chain.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
@@ -110,8 +110,9 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - New Launch/Token rows persist `platform=PUMPFUN` and `platformVersion="1"`. Tokens inherit Platform identity from the Launch at pending-token persistence.
 - `launch-input-compat`: `flattenVersionedLaunchInput` / `toVersionedLaunchInput` / `resolveStoredLaunchInput` / `buildNewLaunchPersistence` bridge versioned storage and flat execution without rewriting legacy rows.
 - Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
-- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage.
-- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover`. pump.fun `execute` currently delegates to `runPumpfunLaunchJobCompat`; preview/plan/recover throw until extraction tickets implement them.
+- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage. Signed main-Wallet deltas are outflows (negative).
+- `versionedLaunchPreviewInputSchema` / `launchPlatformPreviewResultSchema`: preview input (Platform + config) and API envelope (`money` + wallet/policy fields). Stable pump.fun line labels live in `lib/launch/money-labels.ts`.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `execute` delegates to `runPumpfunLaunchJobCompat`; plan/recover throw until later tickets.
 - Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; schedules Platform execute; provides lifecycle contexts; maps typed Platform outcomes; owns the post-success usage-fee helper. Start/cancel/retry bodies and the compat job still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
 - `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
 
@@ -299,27 +300,29 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 Launch uses a hybrid quote model:
 
-- Edit-time estimate in the form for responsive feedback.
-- Confirm-time server quote (`launch.previewCosts`) as the source of truth.
+- Edit-time estimate in the form for responsive fee totals (client-side usage-fee helpers).
+- Server quote (`launch.previewCosts` → Platform `preview`) as the source of truth for review/overview and temporary reserves.
 
-The server quote groups values into:
+The normalized `money` summary groups values into:
 
-- `chargedNowSol`: immediate debit from main wallet when launch starts.
-- `temporaryFundingSol`: operational wallet funding and reserves expected to return later.
-- `expectedReturnSol`: estimated SOL returned after post-launch cleanup.
-- `permanentSpendSol`: expected non-recoverable spend.
-- `netMainWalletDeltaNowSol`: immediate impact.
-- `netMainWalletDeltaAfterCleanupSol`: expected final impact after return.
+- `immediateRequiredBalanceLamports`: immediate debit from main wallet when launch starts.
+- `temporaryFundingLamports`: operational wallet funding and reserves expected to return later.
+- `expectedReturnLamports`: estimated SOL returned after post-launch cleanup.
+- `permanentSpendLamports`: expected non-recoverable spend.
+- `expectedMainWalletDeltaNowLamports` / `expectedMainWalletDeltaAfterCleanupLamports`: signed main-Wallet deltas (negative = outflow).
+- `usageFeeLamports` plus labeled `lineItems` for fees, buys, tips, rent, buffers, and expected return.
 
 ### Quote Categories
 
-`launch.previewCosts` includes line items for:
+Platform preview line items cover:
 
 - Usage fees (bundle-buy fee, attribution-removal fee, vanity fee, generated-wallet fee).
 - Dev buy and bundle-buy funding requirements.
 - Jito tip (when bundle buy is enabled).
 - Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
 - Operational buffers (`createFeeBufferLamports`, `fundingBufferLamports`, `transferFeeBufferLamports`) and creator/main reserves.
+
+The Launch overview dialog reads these fields from the API envelope rather than parallel named SOL objects.
 
 ### Fixed Bundle Spend
 

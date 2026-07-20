@@ -112,6 +112,39 @@ export type NormalizedLaunchMoneySummary = z.infer<
 >;
 
 /**
+ * Preview accepts versioned Platform identity + config without requiring
+ * shared Token metadata (cost quotes stay responsive while editing the funnel).
+ */
+export const versionedLaunchPreviewInputSchema = z.discriminatedUnion(
+  "platform",
+  [
+    z.object({
+      schemaVersion: z.literal(LAUNCH_INPUT_SCHEMA_VERSION_V1),
+      platform: z.literal("PUMPFUN"),
+      config: pumpfunLaunchConfigSchema,
+    }),
+  ]
+);
+export type VersionedLaunchPreviewInput = z.infer<
+  typeof versionedLaunchPreviewInputSchema
+>;
+
+/**
+ * API/review envelope: shared normalized money plus wallet/policy fields the
+ * review surface needs that are not part of Platform money itself.
+ */
+export const launchPlatformPreviewResultSchema = z.object({
+  money: normalizedLaunchMoneySummarySchema,
+  mainWalletBalanceLamports: lamportsStringSchema,
+  hasSufficientMainWallet: z.boolean(),
+  platformFeeWaived: z.boolean(),
+  platformFeeDiscountRate: z.number().min(0).max(1),
+});
+export type LaunchPlatformPreviewResult = z.infer<
+  typeof launchPlatformPreviewResultSchema
+>;
+
+/**
  * Null Platform version marks a legacy Launch or Token.
  * Do not infer legacy status from JSON input shape.
  */
