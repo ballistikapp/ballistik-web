@@ -47,6 +47,13 @@ export const TokenStatus = {
 export type TokenStatus = (typeof TokenStatus)[keyof typeof TokenStatus]
 
 
+export const LaunchPlatform = {
+  PUMPFUN: 'PUMPFUN'
+} as const
+
+export type LaunchPlatform = (typeof LaunchPlatform)[keyof typeof LaunchPlatform]
+
+
 export const LaunchStatus = {
   PENDING: 'PENDING',
   RUNNING: 'RUNNING',

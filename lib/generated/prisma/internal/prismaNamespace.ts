@@ -2912,6 +2912,8 @@ export const TokenScalarFieldEnum = {
   privateKey: 'privateKey',
   status: 'status',
   isMayhemMode: 'isMayhemMode',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   name: 'name',
   symbol: 'symbol',
   description: 'description',
@@ -2942,7 +2944,14 @@ export const LaunchScalarFieldEnum = {
   status: 'status',
   progress: 'progress',
   currentStep: 'currentStep',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   input: 'input',
+  plan: 'plan',
+  planSchemaVersion: 'planSchemaVersion',
+  planPersistedAt: 'planPersistedAt',
+  outcomeKind: 'outcomeKind',
+  outcomeDetails: 'outcomeDetails',
   result: 'result',
   tokenPublicKey: 'tokenPublicKey',
   startedAt: 'startedAt',
@@ -2975,6 +2984,7 @@ export const LaunchRecoveryWalletScalarFieldEnum = {
   walletPublicKey: 'walletPublicKey',
   walletType: 'walletType',
   role: 'role',
+  platformRole: 'platformRole',
   isManaged: 'isManaged',
   fundedLamports: 'fundedLamports',
   reclaimStatus: 'reclaimStatus',
@@ -3444,6 +3454,20 @@ export type EnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pris
  * Reference to a field of type 'TokenStatus[]'
  */
 export type ListEnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TokenStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchPlatform'
+ */
+export type EnumLaunchPlatformFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchPlatform'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchPlatform[]'
+ */
+export type ListEnumLaunchPlatformFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchPlatform[]'>
     
 
 

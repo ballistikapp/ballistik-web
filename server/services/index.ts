@@ -8,6 +8,7 @@ export * from "./test.service";
 export * from "./auth.service";
 export * from "./wallet.service";
 export * from "./launch.service";
+export * from "./launch-platform-registry";
 export * from "./holding.service";
 export * from "./transaction.service";
 export * from "./storage.service";

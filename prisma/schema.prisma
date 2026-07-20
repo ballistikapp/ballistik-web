@@ -218,6 +218,9 @@ model Token {
   privateKey String @unique
   status TokenStatus @default(PENDING)
   isMayhemMode Boolean @default(false)
+  /// Null Platform / version marks a legacy Token; do not infer from JSON shape.
+  platform LaunchPlatform?
+  platformVersion String?
   name String
   symbol String
   description String?
@@ -251,6 +254,10 @@ model TokenDevWallet {
   wallet Wallet @relation("DevWalletTokens", fields: [walletPublicKey], references: [publicKey])
   @@id([tokenPublicKey, walletPublicKey])
   @@map("TokenDevWallet")
+}
+
+enum LaunchPlatform {
+  PUMPFUN
 }
 
 enum LaunchStatus {
@@ -334,7 +341,17 @@ model Launch {
   status LaunchStatus @default(PENDING)
   progress Int @default(0)
   currentStep String?
+  /// Null Platform / version marks a legacy Launch; do not infer from JSON shape.
+  platform LaunchPlatform?
+  platformVersion String?
   input Json
+  /// Secret-free authoritative Platform plan. Validated by the Platform on read.
+  plan Json?
+  planSchemaVersion String?
+  planPersistedAt DateTime?
+  /// Platform-owned outcome classification (e.g. success, canceled, failed, partial).
+  outcomeKind String?
+  outcomeDetails Json?
   result Json?
   tokenPublicKey String?
   token Token? @relation("LaunchToken", fields: [tokenPublicKey], references: [publicKey])
@@ -371,6 +388,8 @@ model LaunchRecoveryWallet {
   wallet Wallet @relation("LaunchRecoveryWalletRecordWallet", fields: [walletPublicKey], references: [publicKey])
   walletType WalletType
   role LaunchRecoveryWalletRole
+  /// Platform-defined Managed Launch Wallet role identifier (not a global enum).
+  platformRole String?
   isManaged Boolean @default(true)
   fundedLamports Decimal @default(0) @db.Decimal(20, 0)
   reclaimStatus LaunchRecoveryWalletStatus @default(ELIGIBLE)

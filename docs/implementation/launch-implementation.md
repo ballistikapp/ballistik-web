@@ -44,7 +44,10 @@ Tracks state and progress.
 - `status`: PENDING | RUNNING | SUCCEEDED | FAILED | CANCELED
 - `progress`: 0–100
 - `currentStep`: string
-- `input`: original launch payload (JSON)
+- `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
+- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions will use the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`).
+- `plan` / `planSchemaVersion` / `planPersistedAt`: additive secret-free authoritative Platform plan storage (nullable until planning lands).
+- `outcomeKind` / `outcomeDetails`: additive Platform-owned outcome classification (nullable until classification lands).
 - `result`: output metadata (JSON)
 - `tokenPublicKey`: token link when available
 - `cancelRequestedAt`: used for safe cancellation
@@ -60,9 +63,10 @@ Structured log entries per launch.
 
 ### LaunchRecoveryWallet
 
-Per-launch recovery tracking for managed wallets.
+Per-launch recovery tracking for managed wallets (cross-Platform term: Managed Launch Wallet).
 
-- One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION`)
+- One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION` via legacy `role` enum)
+- `platformRole`: optional Platform-defined role identifier string (not a global enum of every future role)
 - `isManaged`: whether launch cleanup is allowed to operate on the wallet automatically
 - `fundedLamports`: the actual SOL top-up this launch funded into that wallet
 - `reclaimStatus`, `reclaimTxSignature`, `reclaimError`, `lastAttemptAt`, `reclaimedAt`: reclaim bookkeeping for auto and manual recovery flows
@@ -92,9 +96,19 @@ Pool of pre-generated vanity mints (reserve first, consume after on-chain confir
 Token records are created before on-chain submission to avoid wallet orphaning.
 
 - `status`: PENDING | ACTIVE | FAILED
+- `platform` / `platformVersion`: nullable Platform identity matching the Launch that created the Token. Null version marks a legacy Token.
 - `PENDING`: token and wallet links are persisted before create transaction is submitted
 - `ACTIVE`: set after on-chain confirmation/distribution completes
 - `FAILED`: set when launch errors after token persistence
+
+### Platform contracts (additive; execution unchanged)
+
+- `versionedLaunchInputSchema`: discriminated input with shared Token metadata and a pump.fun `config` branch. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation.
+- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items).
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation.
+- `isLegacyPlatformRecord`: null `platformVersion` ⇒ legacy.
+
+Schema fields are prepared in Prisma; database migrations remain human-owned (do not agent-run `prisma migrate`).
 
 ## Wallet Handling
 

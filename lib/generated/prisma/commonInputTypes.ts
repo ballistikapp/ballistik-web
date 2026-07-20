@@ -260,6 +260,13 @@ export type EnumTokenStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel> | $Enums.TokenStatus
 }
 
+export type EnumLaunchPlatformNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchPlatform | Prisma.EnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  in?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel> | $Enums.LaunchPlatform | null
+}
+
 export type EnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
   in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
@@ -268,6 +275,16 @@ export type EnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+}
+
+export type EnumLaunchPlatformNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchPlatform | Prisma.EnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  in?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumLaunchPlatformNullableWithAggregatesFilter<$PrismaModel> | $Enums.LaunchPlatform | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel>
 }
 
 export type EnumLaunchStatusFilter<$PrismaModel = never> = {
@@ -1022,6 +1039,13 @@ export type NestedEnumTokenStatusFilter<$PrismaModel = never> = {
   not?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel> | $Enums.TokenStatus
 }
 
+export type NestedEnumLaunchPlatformNullableFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchPlatform | Prisma.EnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  in?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel> | $Enums.LaunchPlatform | null
+}
+
 export type NestedEnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
   equals?: $Enums.TokenStatus | Prisma.EnumTokenStatusFieldRefInput<$PrismaModel>
   in?: $Enums.TokenStatus[] | Prisma.ListEnumTokenStatusFieldRefInput<$PrismaModel>
@@ -1030,6 +1054,16 @@ export type NestedEnumTokenStatusWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntFilter<$PrismaModel>
   _min?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
   _max?: Prisma.NestedEnumTokenStatusFilter<$PrismaModel>
+}
+
+export type NestedEnumLaunchPlatformNullableWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.LaunchPlatform | Prisma.EnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  in?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  notIn?: $Enums.LaunchPlatform[] | Prisma.ListEnumLaunchPlatformFieldRefInput<$PrismaModel> | null
+  not?: Prisma.NestedEnumLaunchPlatformNullableWithAggregatesFilter<$PrismaModel> | $Enums.LaunchPlatform | null
+  _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumLaunchPlatformNullableFilter<$PrismaModel>
 }
 
 export type NestedEnumLaunchStatusFilter<$PrismaModel = never> = {

@@ -17,3 +17,4 @@ export * from "./app-transaction.schema";
 export * from "./creator-rewards.schema";
 export * from "./ops.schema";
 export * from "./marketer.schema";
+export * from "./launch-platform.schema";

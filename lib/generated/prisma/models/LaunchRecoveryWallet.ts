@@ -40,6 +40,7 @@ export type LaunchRecoveryWalletMinAggregateOutputType = {
   walletPublicKey: string | null
   walletType: $Enums.WalletType | null
   role: $Enums.LaunchRecoveryWalletRole | null
+  platformRole: string | null
   isManaged: boolean | null
   fundedLamports: runtime.Decimal | null
   reclaimStatus: $Enums.LaunchRecoveryWalletStatus | null
@@ -57,6 +58,7 @@ export type LaunchRecoveryWalletMaxAggregateOutputType = {
   walletPublicKey: string | null
   walletType: $Enums.WalletType | null
   role: $Enums.LaunchRecoveryWalletRole | null
+  platformRole: string | null
   isManaged: boolean | null
   fundedLamports: runtime.Decimal | null
   reclaimStatus: $Enums.LaunchRecoveryWalletStatus | null
@@ -74,6 +76,7 @@ export type LaunchRecoveryWalletCountAggregateOutputType = {
   walletPublicKey: number
   walletType: number
   role: number
+  platformRole: number
   isManaged: number
   fundedLamports: number
   reclaimStatus: number
@@ -101,6 +104,7 @@ export type LaunchRecoveryWalletMinAggregateInputType = {
   walletPublicKey?: true
   walletType?: true
   role?: true
+  platformRole?: true
   isManaged?: true
   fundedLamports?: true
   reclaimStatus?: true
@@ -118,6 +122,7 @@ export type LaunchRecoveryWalletMaxAggregateInputType = {
   walletPublicKey?: true
   walletType?: true
   role?: true
+  platformRole?: true
   isManaged?: true
   fundedLamports?: true
   reclaimStatus?: true
@@ -135,6 +140,7 @@ export type LaunchRecoveryWalletCountAggregateInputType = {
   walletPublicKey?: true
   walletType?: true
   role?: true
+  platformRole?: true
   isManaged?: true
   fundedLamports?: true
   reclaimStatus?: true
@@ -239,6 +245,7 @@ export type LaunchRecoveryWalletGroupByOutputType = {
   walletPublicKey: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole: string | null
   isManaged: boolean
   fundedLamports: runtime.Decimal
   reclaimStatus: $Enums.LaunchRecoveryWalletStatus
@@ -279,6 +286,7 @@ export type LaunchRecoveryWalletWhereInput = {
   walletPublicKey?: Prisma.StringFilter<"LaunchRecoveryWallet"> | string
   walletType?: Prisma.EnumWalletTypeFilter<"LaunchRecoveryWallet"> | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.StringNullableFilter<"LaunchRecoveryWallet"> | string | null
   isManaged?: Prisma.BoolFilter<"LaunchRecoveryWallet"> | boolean
   fundedLamports?: Prisma.DecimalFilter<"LaunchRecoveryWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletStatus
@@ -298,6 +306,7 @@ export type LaunchRecoveryWalletOrderByWithRelationInput = {
   walletPublicKey?: Prisma.SortOrder
   walletType?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrderInput | Prisma.SortOrder
   isManaged?: Prisma.SortOrder
   fundedLamports?: Prisma.SortOrder
   reclaimStatus?: Prisma.SortOrder
@@ -321,6 +330,7 @@ export type LaunchRecoveryWalletWhereUniqueInput = Prisma.AtLeast<{
   walletPublicKey?: Prisma.StringFilter<"LaunchRecoveryWallet"> | string
   walletType?: Prisma.EnumWalletTypeFilter<"LaunchRecoveryWallet"> | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.StringNullableFilter<"LaunchRecoveryWallet"> | string | null
   isManaged?: Prisma.BoolFilter<"LaunchRecoveryWallet"> | boolean
   fundedLamports?: Prisma.DecimalFilter<"LaunchRecoveryWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletStatus
@@ -340,6 +350,7 @@ export type LaunchRecoveryWalletOrderByWithAggregationInput = {
   walletPublicKey?: Prisma.SortOrder
   walletType?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrderInput | Prisma.SortOrder
   isManaged?: Prisma.SortOrder
   fundedLamports?: Prisma.SortOrder
   reclaimStatus?: Prisma.SortOrder
@@ -365,6 +376,7 @@ export type LaunchRecoveryWalletScalarWhereWithAggregatesInput = {
   walletPublicKey?: Prisma.StringWithAggregatesFilter<"LaunchRecoveryWallet"> | string
   walletType?: Prisma.EnumWalletTypeWithAggregatesFilter<"LaunchRecoveryWallet"> | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleWithAggregatesFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.StringNullableWithAggregatesFilter<"LaunchRecoveryWallet"> | string | null
   isManaged?: Prisma.BoolWithAggregatesFilter<"LaunchRecoveryWallet"> | boolean
   fundedLamports?: Prisma.DecimalWithAggregatesFilter<"LaunchRecoveryWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusWithAggregatesFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletStatus
@@ -380,6 +392,7 @@ export type LaunchRecoveryWalletCreateInput = {
   id?: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -399,6 +412,7 @@ export type LaunchRecoveryWalletUncheckedCreateInput = {
   walletPublicKey: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -414,6 +428,7 @@ export type LaunchRecoveryWalletUpdateInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -433,6 +448,7 @@ export type LaunchRecoveryWalletUncheckedUpdateInput = {
   walletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -450,6 +466,7 @@ export type LaunchRecoveryWalletCreateManyInput = {
   walletPublicKey: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -465,6 +482,7 @@ export type LaunchRecoveryWalletUpdateManyMutationInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -482,6 +500,7 @@ export type LaunchRecoveryWalletUncheckedUpdateManyInput = {
   walletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -514,6 +533,7 @@ export type LaunchRecoveryWalletCountOrderByAggregateInput = {
   walletPublicKey?: Prisma.SortOrder
   walletType?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
   isManaged?: Prisma.SortOrder
   fundedLamports?: Prisma.SortOrder
   reclaimStatus?: Prisma.SortOrder
@@ -535,6 +555,7 @@ export type LaunchRecoveryWalletMaxOrderByAggregateInput = {
   walletPublicKey?: Prisma.SortOrder
   walletType?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
   isManaged?: Prisma.SortOrder
   fundedLamports?: Prisma.SortOrder
   reclaimStatus?: Prisma.SortOrder
@@ -552,6 +573,7 @@ export type LaunchRecoveryWalletMinOrderByAggregateInput = {
   walletPublicKey?: Prisma.SortOrder
   walletType?: Prisma.SortOrder
   role?: Prisma.SortOrder
+  platformRole?: Prisma.SortOrder
   isManaged?: Prisma.SortOrder
   fundedLamports?: Prisma.SortOrder
   reclaimStatus?: Prisma.SortOrder
@@ -663,6 +685,7 @@ export type LaunchRecoveryWalletCreateWithoutWalletInput = {
   id?: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -680,6 +703,7 @@ export type LaunchRecoveryWalletUncheckedCreateWithoutWalletInput = {
   launchId: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -726,6 +750,7 @@ export type LaunchRecoveryWalletScalarWhereInput = {
   walletPublicKey?: Prisma.StringFilter<"LaunchRecoveryWallet"> | string
   walletType?: Prisma.EnumWalletTypeFilter<"LaunchRecoveryWallet"> | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.StringNullableFilter<"LaunchRecoveryWallet"> | string | null
   isManaged?: Prisma.BoolFilter<"LaunchRecoveryWallet"> | boolean
   fundedLamports?: Prisma.DecimalFilter<"LaunchRecoveryWallet"> | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFilter<"LaunchRecoveryWallet"> | $Enums.LaunchRecoveryWalletStatus
@@ -741,6 +766,7 @@ export type LaunchRecoveryWalletCreateWithoutLaunchInput = {
   id?: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -758,6 +784,7 @@ export type LaunchRecoveryWalletUncheckedCreateWithoutLaunchInput = {
   walletPublicKey: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -800,6 +827,7 @@ export type LaunchRecoveryWalletCreateManyWalletInput = {
   launchId: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -815,6 +843,7 @@ export type LaunchRecoveryWalletUpdateWithoutWalletInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -832,6 +861,7 @@ export type LaunchRecoveryWalletUncheckedUpdateWithoutWalletInput = {
   launchId?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -848,6 +878,7 @@ export type LaunchRecoveryWalletUncheckedUpdateManyWithoutWalletInput = {
   launchId?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -864,6 +895,7 @@ export type LaunchRecoveryWalletCreateManyLaunchInput = {
   walletPublicKey: string
   walletType: $Enums.WalletType
   role: $Enums.LaunchRecoveryWalletRole
+  platformRole?: string | null
   isManaged?: boolean
   fundedLamports?: runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: $Enums.LaunchRecoveryWalletStatus
@@ -879,6 +911,7 @@ export type LaunchRecoveryWalletUpdateWithoutLaunchInput = {
   id?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -896,6 +929,7 @@ export type LaunchRecoveryWalletUncheckedUpdateWithoutLaunchInput = {
   walletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -912,6 +946,7 @@ export type LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchInput = {
   walletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
   walletType?: Prisma.EnumWalletTypeFieldUpdateOperationsInput | $Enums.WalletType
   role?: Prisma.EnumLaunchRecoveryWalletRoleFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletRole
+  platformRole?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   isManaged?: Prisma.BoolFieldUpdateOperationsInput | boolean
   fundedLamports?: Prisma.DecimalFieldUpdateOperationsInput | runtime.Decimal | runtime.DecimalJsLike | number | string
   reclaimStatus?: Prisma.EnumLaunchRecoveryWalletStatusFieldUpdateOperationsInput | $Enums.LaunchRecoveryWalletStatus
@@ -931,6 +966,7 @@ export type LaunchRecoveryWalletSelect<ExtArgs extends runtime.Types.Extensions.
   walletPublicKey?: boolean
   walletType?: boolean
   role?: boolean
+  platformRole?: boolean
   isManaged?: boolean
   fundedLamports?: boolean
   reclaimStatus?: boolean
@@ -950,6 +986,7 @@ export type LaunchRecoveryWalletSelectCreateManyAndReturn<ExtArgs extends runtim
   walletPublicKey?: boolean
   walletType?: boolean
   role?: boolean
+  platformRole?: boolean
   isManaged?: boolean
   fundedLamports?: boolean
   reclaimStatus?: boolean
@@ -969,6 +1006,7 @@ export type LaunchRecoveryWalletSelectUpdateManyAndReturn<ExtArgs extends runtim
   walletPublicKey?: boolean
   walletType?: boolean
   role?: boolean
+  platformRole?: boolean
   isManaged?: boolean
   fundedLamports?: boolean
   reclaimStatus?: boolean
@@ -988,6 +1026,7 @@ export type LaunchRecoveryWalletSelectScalar = {
   walletPublicKey?: boolean
   walletType?: boolean
   role?: boolean
+  platformRole?: boolean
   isManaged?: boolean
   fundedLamports?: boolean
   reclaimStatus?: boolean
@@ -999,7 +1038,7 @@ export type LaunchRecoveryWalletSelectScalar = {
   updatedAt?: boolean
 }
 
-export type LaunchRecoveryWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "launchId" | "walletPublicKey" | "walletType" | "role" | "isManaged" | "fundedLamports" | "reclaimStatus" | "reclaimTxSignature" | "reclaimError" | "lastAttemptAt" | "reclaimedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["launchRecoveryWallet"]>
+export type LaunchRecoveryWalletOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"id" | "launchId" | "walletPublicKey" | "walletType" | "role" | "platformRole" | "isManaged" | "fundedLamports" | "reclaimStatus" | "reclaimTxSignature" | "reclaimError" | "lastAttemptAt" | "reclaimedAt" | "createdAt" | "updatedAt", ExtArgs["result"]["launchRecoveryWallet"]>
 export type LaunchRecoveryWalletInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   launch?: boolean | Prisma.LaunchDefaultArgs<ExtArgs>
   wallet?: boolean | Prisma.WalletDefaultArgs<ExtArgs>
@@ -1025,6 +1064,10 @@ export type $LaunchRecoveryWalletPayload<ExtArgs extends runtime.Types.Extension
     walletPublicKey: string
     walletType: $Enums.WalletType
     role: $Enums.LaunchRecoveryWalletRole
+    /**
+     * Platform-defined Managed Launch Wallet role identifier (not a global enum).
+     */
+    platformRole: string | null
     isManaged: boolean
     fundedLamports: runtime.Decimal
     reclaimStatus: $Enums.LaunchRecoveryWalletStatus
@@ -1464,6 +1507,7 @@ export interface LaunchRecoveryWalletFieldRefs {
   readonly walletPublicKey: Prisma.FieldRef<"LaunchRecoveryWallet", 'String'>
   readonly walletType: Prisma.FieldRef<"LaunchRecoveryWallet", 'WalletType'>
   readonly role: Prisma.FieldRef<"LaunchRecoveryWallet", 'LaunchRecoveryWalletRole'>
+  readonly platformRole: Prisma.FieldRef<"LaunchRecoveryWallet", 'String'>
   readonly isManaged: Prisma.FieldRef<"LaunchRecoveryWallet", 'Boolean'>
   readonly fundedLamports: Prisma.FieldRef<"LaunchRecoveryWallet", 'Decimal'>
   readonly reclaimStatus: Prisma.FieldRef<"LaunchRecoveryWallet", 'LaunchRecoveryWalletStatus'>
