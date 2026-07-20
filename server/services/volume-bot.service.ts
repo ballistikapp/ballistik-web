@@ -7,6 +7,7 @@ import { getVolumeBotConfig } from "@/lib/config/volume-bot.config";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
+import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
 import type {
   CloseVolumeBotAccountsInput,
   ListVolumeBotSessionsInput,
@@ -354,7 +355,12 @@ const resolveEligibleWallets = async (
 ) => {
   const token = await prisma.token.findFirst({
     where: { publicKey: tokenPublicKey, userId },
-    select: { publicKey: true, symbol: true, isMayhemMode: true },
+    select: {
+      publicKey: true,
+      symbol: true,
+      isMayhemMode: true,
+      platformVersion: true,
+    },
   });
 
   if (!token) {
@@ -403,6 +409,7 @@ export const volumeBotService = {
       input.tokenPublicKey,
       user.id
     );
+    assertNonLegacyPlatformCapability(token, "automation");
     if (token.isMayhemMode) {
       throw new AppError(
         "Volume bot is not yet supported for Mayhem-mode tokens (Token-2022). This is a known gap, coming in a fast-follow.",

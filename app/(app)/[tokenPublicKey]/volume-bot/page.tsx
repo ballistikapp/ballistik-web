@@ -14,6 +14,7 @@ import {
 } from "@/components/data-table";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { getColumns } from "./columns";
 import { PlusIcon } from "lucide-react";
 
@@ -59,8 +60,12 @@ export default function VolumeBotPage() {
         title="Volume Bot Sessions"
         rightContent={
           <div className="flex w-full flex-col items-start gap-3 text-left text-muted-foreground md:items-end md:text-right">
-            <Button asChild size="lg" disabled={tokenData.isMayhemMode}>
-              {tokenData.isMayhemMode ? (
+            <Button
+              asChild={!tokenData.isMayhemMode && !tokenData.isLegacy}
+              size="lg"
+              disabled={tokenData.isMayhemMode || tokenData.isLegacy}
+            >
+              {tokenData.isMayhemMode || tokenData.isLegacy ? (
                 <span>
                   <PlusIcon strokeWidth={2.5} className="size-5 mr-1.5" />
                   <span className="font-semibold">New Session</span>
@@ -72,11 +77,15 @@ export default function VolumeBotPage() {
                 </Link>
               )}
             </Button>
-            {tokenData.isMayhemMode && (
+            {tokenData.isLegacy ? (
+              <p className="text-xs text-amber-500">
+                {legacyCapabilityDeniedMessage("automation")}
+              </p>
+            ) : tokenData.isMayhemMode ? (
               <p className="text-xs text-amber-500">
                 Not yet supported for Mayhem-mode tokens.
               </p>
-            )}
+            ) : null}
           </div>
         }
       />

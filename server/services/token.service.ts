@@ -6,6 +6,7 @@ import {
   type Prisma,
 } from "@/lib/generated/prisma/client";
 import { AppError } from "@/server/errors";
+import { isLegacyPlatformRecord } from "@/server/schemas/launch-platform.schema";
 import { getServerUser } from "@/lib/utils/auth";
 import type { CreateTokenInput } from "@/server/schemas/token.schema";
 import { Keypair, PublicKey } from "@solana/web3.js";
@@ -25,6 +26,8 @@ const tokenPublicSelect = {
   publicKey: true,
   status: true,
   isMayhemMode: true,
+  platform: true,
+  platformVersion: true,
   name: true,
   symbol: true,
   description: true,
@@ -36,6 +39,15 @@ const tokenPublicSelect = {
   updatedAt: true,
   userId: true,
 } satisfies Prisma.TokenSelect;
+
+function withLegacyFlag<
+  T extends { platformVersion: string | null },
+>(token: T): T & { isLegacy: boolean } {
+  return {
+    ...token,
+    isLegacy: isLegacyPlatformRecord(token),
+  };
+}
 
 export const tokenService = {
   async getUserTokens(
@@ -77,7 +89,7 @@ export const tokenService = {
         prisma.token.count({ where }),
       ]);
       return {
-        items,
+        items: items.map(withLegacyFlag),
         totalCount,
         page,
         pageSize,
@@ -123,7 +135,7 @@ export const tokenService = {
         prisma.token.count({ where }),
       ]);
       return {
-        items,
+        items: items.map(withLegacyFlag),
         totalCount,
         page,
         pageSize,
@@ -197,7 +209,7 @@ export const tokenService = {
         }
       }
 
-      return token;
+      return withLegacyFlag(token);
     } catch (error) {
       if (error instanceof Error) {
         if (error.message.includes("Unique constraint")) {
@@ -218,7 +230,7 @@ export const tokenService = {
       throw new AppError("Token not found", 404);
     }
 
-    return token;
+    return withLegacyFlag(token);
   },
 
   async getSidebarCounts(publicKey: string, userId: string) {

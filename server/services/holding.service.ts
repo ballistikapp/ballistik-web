@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import type { Prisma } from "@/lib/generated/prisma/client";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { AppError } from "@/server/errors";
+import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { refreshCacheService } from "@/server/services/refresh-cache.service";
 import { walletService } from "@/server/services/wallet.service";
@@ -270,6 +271,7 @@ async function getAllowedWalletsWithKeys(
       name: true,
       symbol: true,
       imageUrl: true,
+      platformVersion: true,
     },
   });
 
@@ -827,6 +829,7 @@ export const holdingService = {
       userId,
       input.walletPublicKeys
     );
+    assertNonLegacyPlatformCapability(token, "new buys");
     const wallets = resolvedWallets.filter(
       (wallet) => wallet.type !== "MAIN_WALLET"
     );

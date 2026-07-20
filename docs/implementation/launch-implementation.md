@@ -110,7 +110,24 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage.
 - `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation.
-- `isLegacyPlatformRecord`: null `platformVersion` ⇒ legacy.
+- `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
+
+### Legacy custody-safe capability policy
+
+Null `platformVersion` Launch/Token records are custody-safe read-only for new operations. Enforcement is a single seam: `assertNonLegacyPlatformCapability` (`server/services/launch-capability.ts`), with shared copy in `lib/launch/legacy-capability.ts`.
+
+| Capability | Legacy (`platformVersion == null`) | Version `"1"` |
+|---|---|---|
+| History / detail reads | Allowed | Allowed |
+| Exit / sell | Allowed | Allowed |
+| SOL reclaim (launch + volume-bot) | Allowed | Allowed |
+| Key access | Allowed | Allowed |
+| Retry | Denied | Allowed (existing rules) |
+| Clone | Denied (`launch.getCloneInput` assert + `getUserLaunches` omits clone `input`) | Allowed |
+| New buys / create buyer wallets | Denied | Allowed |
+| Volume bot start | Denied | Allowed |
+
+Denied paths return a consistent user-safe `AppError` (400). UI hides/disables retry, clone, buy, and new volume-bot sessions using `isLegacy` / `platformVersion` from launch and token reads.
 
 Database migrations remain human-owned (do not agent-run `prisma migrate`).
 

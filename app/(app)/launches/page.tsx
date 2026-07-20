@@ -87,6 +87,7 @@ export default function ManageLaunchesPage() {
       createdAt: launch.createdAt,
       launchId: launch.id,
       errorMessage: launch.errorMessage,
+      isLegacy: launch.isLegacy,
     }));
   }, [launches]);
 

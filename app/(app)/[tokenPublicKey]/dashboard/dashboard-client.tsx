@@ -24,6 +24,7 @@ import {
   buildDashboardSummaryPayload,
 } from "./dashboard-log-payload";
 import { formatBuyHoldingsToast } from "@/lib/utils/buy-holdings-toast-message";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
 import { formatRefreshAge } from "@/lib/utils/relative-time";
 
@@ -1125,7 +1126,14 @@ export function DashboardClient() {
               <DashboardBuySellActions
                 onOpenBuyDialog={() => setBuyDialogOpen(true)}
                 onOpenExitDialog={handleOpenExitDialog}
-                buyDisabled={isBuying || !tokenPublicKey}
+                buyDisabled={
+                  isBuying || !tokenPublicKey || Boolean(tokenData.isLegacy)
+                }
+                buyDisabledReason={
+                  tokenData.isLegacy
+                    ? legacyCapabilityDeniedMessage("new buys")
+                    : null
+                }
                 hasHoldings={hasHoldings}
                 exitDisabled={
                   !hasHoldings ||

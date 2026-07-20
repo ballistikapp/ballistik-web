@@ -45,6 +45,11 @@ export const launchRouter = router({
   getUserLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getUserLaunches(ctx.user.id);
   }),
+  getCloneInput: protectedRateLimitedProcedure
+    .input(launchStatusSchema)
+    .query(async ({ input, ctx }) => {
+      return await launchService.getCloneInput(input.launchId, ctx.user.id);
+    }),
   recoveryWallets: protectedRateLimitedProcedure
     .input(launchRecoverySchema)
     .query(async ({ input, ctx }) => {

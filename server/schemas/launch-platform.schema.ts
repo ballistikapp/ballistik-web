@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isLegacyPlatformVersion } from "@/lib/launch/legacy-capability";
 
 /** First explicit Platform/version identity for new Launch and Token records. */
 export const LAUNCH_PLATFORM_VERSION_V1 = "1" as const;
@@ -117,5 +118,5 @@ export type NormalizedLaunchMoneySummary = z.infer<
 export function isLegacyPlatformRecord(record: {
   platformVersion: string | null | undefined;
 }): boolean {
-  return record.platformVersion == null;
+  return isLegacyPlatformVersion(record.platformVersion);
 }

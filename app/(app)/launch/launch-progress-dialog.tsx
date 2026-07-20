@@ -21,6 +21,10 @@ import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
 import { Spinner } from "@/components/ui/spinner";
 import {
+  isLegacyPlatformVersion,
+  legacyCapabilityDeniedMessage,
+} from "@/lib/launch/legacy-capability";
+import {
   buildLaunchActivityItems,
   getLaunchFailureGuidance,
 } from "./launch-progress-dialog.helpers";
@@ -78,6 +82,8 @@ export function LaunchProgressDialog({
   const status = launch?.status ?? "PENDING";
   const progress = launch?.progress ?? 0;
   const canCancel = status === "PENDING" || status === "RUNNING";
+  const isLegacyLaunch = isLegacyPlatformVersion(launch?.platformVersion);
+  const canRetry = status === "FAILED" && Boolean(onRetry) && !isLegacyLaunch;
   const canClose =
     status === "SUCCEEDED" || status === "FAILED" || status === "CANCELED";
   const currentStep = launch?.currentStep || "Preparing";
@@ -249,11 +255,16 @@ export function LaunchProgressDialog({
             </div>
           )}
           <div className="flex justify-end gap-3">
-            {status === "FAILED" && onRetry && (
+            {canRetry && (
               <Button onClick={onRetry} disabled={retryPending}>
                 {retryPending && <Spinner className="mr-2 size-4" />}
                 Retry launch
               </Button>
+            )}
+            {status === "FAILED" && isLegacyLaunch && (
+              <p className="mr-auto text-sm text-muted-foreground">
+                {legacyCapabilityDeniedMessage("retry")}
+              </p>
             )}
             {canCancel && (
               <Button variant="destructive" onClick={onCancel}>

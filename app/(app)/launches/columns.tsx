@@ -25,6 +25,12 @@ import {
   IconKey,
 } from "@tabler/icons-react";
 import { GalleryVerticalEnd, RotateCcw } from "lucide-react";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export type TokenRowStatus = "PENDING" | "ACTIVE" | "FAILED";
 
@@ -41,6 +47,7 @@ export type TokenTableRow = {
   createdAt: Date | string;
   launchId: string;
   errorMessage?: string | null;
+  isLegacy?: boolean;
 };
 
 type TokenColumnsOptions = {
@@ -329,11 +336,26 @@ export const createColumns = (
                 Reclaim SOL
               </DropdownMenuItem>
             )}
-            {isFailed && options.onRetry && (
+            {isFailed && options.onRetry && !item.isLegacy && (
               <DropdownMenuItem onClick={() => options.onRetry?.(item)}>
                 <RotateCcw className="size-4" />
                 Retry launch
               </DropdownMenuItem>
+            )}
+            {isFailed && options.onRetry && item.isLegacy && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <DropdownMenuItem disabled>
+                      <RotateCcw className="size-4" />
+                      Retry launch
+                    </DropdownMenuItem>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  {legacyCapabilityDeniedMessage("retry")}
+                </TooltipContent>
+              </Tooltip>
             )}
             {hasPublicKey && (
               <>

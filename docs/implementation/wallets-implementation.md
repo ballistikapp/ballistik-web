@@ -63,7 +63,7 @@ tRPC procedures:
 - `wallet.getOperationalByToken` fetches operational wallets by `tokenPublicKey` (`BUNDLER`, `VOLUME`, `BUYER`, `DISTRIBUTION`).
   - Supports optional pagination: `page`, `pageSize` (default `1` / `200`, max `200`).
   - Returns `totalCount` alongside the current page of wallets.
-- `wallet.createBuyerByToken` generates token-scoped `BUYER` wallets and collects the generated-wallet usage fee from the main wallet before persisting the new wallet rows.
+- `wallet.createBuyerByToken` generates token-scoped `BUYER` wallets and collects the generated-wallet usage fee from the main wallet before persisting the new wallet rows. Denied for legacy Tokens (`platformVersion == null`) via `assertNonLegacyPlatformCapability` ("new buys").
 - `wallet.getDevByToken` fetches dev wallet for a token via `TokenDevWallet`.
 - `wallet.getMain` fetches the user main wallet.
 - `wallet.getByPublicKey` fetches a single wallet with token ownership checks.

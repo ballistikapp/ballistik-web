@@ -20,7 +20,9 @@ import {
   DataTableSearch,
   DataTableColumnHeader,
 } from "@/components/data-table";
+import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { GalleryVerticalEnd } from "lucide-react";
 import { IconCopy } from "@tabler/icons-react";
 
@@ -32,7 +34,8 @@ type LaunchRow = {
   tokenSymbol: string;
   imageUrl: string | null;
   createdAt: Date | string;
-  input: Record<string, unknown>;
+  isLegacy: boolean;
+  input: Record<string, unknown> | null;
 };
 
 function truncateAddress(address: string) {
@@ -206,15 +209,55 @@ export function CloneTokenDialog({
 
   const columns = React.useMemo(() => createCloneColumns(), []);
 
-  const selectedLaunch = React.useMemo(
-    () => launches?.find((l) => l.id === selectedId) ?? null,
-    [launches, selectedId]
+  const cloneableLaunches: LaunchRow[] = React.useMemo(
+    () =>
+      (launches ?? [])
+        .filter((launch) => !launch.isLegacy && launch.input != null)
+        .map((launch) => ({
+          id: launch.id,
+          status: launch.status,
+          tokenPublicKey: launch.tokenPublicKey,
+          tokenName: launch.tokenName,
+          tokenSymbol: launch.tokenSymbol,
+          imageUrl: launch.imageUrl,
+          createdAt: launch.createdAt,
+          isLegacy: launch.isLegacy,
+          input: launch.input,
+        })),
+    [launches]
   );
 
-  const handleClone = () => {
+  const selectedLaunch = React.useMemo(
+    () => cloneableLaunches.find((l) => l.id === selectedId) ?? null,
+    [cloneableLaunches, selectedId]
+  );
+
+  const hasOnlyLegacyLaunches =
+    !isLoading &&
+    cloneableLaunches.length === 0 &&
+    (launches?.some((launch) => launch.isLegacy) ?? false);
+
+  const utils = trpc.useUtils();
+  const [isCloning, setIsCloning] = React.useState(false);
+
+  const handleClone = async () => {
     if (!selectedLaunch) return;
-    onClone(selectedLaunch.input);
-    onOpenChange(false);
+    setIsCloning(true);
+    try {
+      const input = await utils.launch.getCloneInput.fetch({
+        launchId: selectedLaunch.id,
+      });
+      onClone(input);
+      onOpenChange(false);
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : legacyCapabilityDeniedMessage("clone");
+      toast.error("Failed to clone launch", { description: message });
+    } finally {
+      setIsCloning(false);
+    }
   };
 
   return (
@@ -227,9 +270,22 @@ export function CloneTokenDialog({
           </DialogDescription>
         </DialogHeader>
 
+        {hasOnlyLegacyLaunches && (
+          <p className="text-sm text-muted-foreground">
+            {legacyCapabilityDeniedMessage("clone")}
+          </p>
+        )}
+        {!isLoading &&
+          !hasOnlyLegacyLaunches &&
+          cloneableLaunches.length === 0 && (
+            <p className="text-sm text-muted-foreground">
+              No previous launches available to clone.
+            </p>
+          )}
+
         <DataTable
           columns={columns}
-          data={launches ?? []}
+          data={cloneableLaunches}
           isLoading={isLoading}
           getRowId={(row) => row.id}
           searchableColumns={["token", "publicKey"]}
@@ -254,8 +310,11 @@ export function CloneTokenDialog({
           <Button variant="outline" onClick={() => onOpenChange(false)}>
             Cancel
           </Button>
-          <Button disabled={!selectedLaunch} onClick={handleClone}>
-            Clone
+          <Button
+            disabled={!selectedLaunch || isCloning}
+            onClick={() => void handleClone()}
+          >
+            {isCloning ? "Cloning..." : "Clone"}
           </Button>
         </DialogFooter>
       </DialogContent>

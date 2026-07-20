@@ -17,6 +17,7 @@ Holdings show per-wallet token balances, holding percentage vs mint supply, and 
 - Allowed wallets are the main wallet, token dev wallet, and token operational wallets.
 - Sell actions only execute for allowed wallets with private keys.
 - When `main = dev`, holdings behavior must treat that shared wallet as one owner keyed by `wallet.publicKey`.
+- Legacy Tokens (`platformVersion == null`) deny `holding.buyByToken` via `assertNonLegacyPlatformCapability` ("new buys"). Sell/exit remain allowed. See launch-implementation.md legacy policy.
 
 ## Refresh Flow
 

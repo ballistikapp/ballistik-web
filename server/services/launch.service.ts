@@ -19,6 +19,8 @@ import {
 } from "@/server/schemas/launch-input-compat";
 import type { VersionedLaunchInput } from "@/server/schemas/launch-platform.schema";
 import { resolveLaunchPlatform } from "@/server/services/launch-platform-registry";
+import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
+import { isLegacyPlatformRecord } from "@/server/schemas/launch-platform.schema";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { getLaunchConfig } from "@/lib/config/launch.config";
@@ -3342,12 +3344,47 @@ export type UserLaunchRow = {
   telegramUrl: string | null;
   errorMessage: string | null;
   createdAt: Date;
-  input: Record<string, unknown>;
+  platformVersion: string | null;
+  isLegacy: boolean;
+  /** Flat clone input; null for legacy rows so clone cannot guess Platform contracts. */
+  input: Record<string, unknown> | null;
 };
 
 export const launchService = {
   async previewCosts(input: LaunchPreviewCostsInput, user: RequestUser) {
     return await calculateLaunchCostPreview(input, user);
+  },
+
+  async getCloneInput(
+    launchId: string,
+    userId: string
+  ): Promise<Record<string, unknown>> {
+    const launch = await prisma.launch.findFirst({
+      where: { id: launchId, userId },
+      select: {
+        id: true,
+        platformVersion: true,
+        input: true,
+      },
+    });
+    if (!launch) {
+      throw new AppError("Launch not found", 404);
+    }
+
+    assertNonLegacyPlatformCapability(launch, "clone");
+
+    const resolved = resolveStoredLaunchInput(launch.input);
+    if (!resolved) {
+      throw new AppError(
+        "Launch clone is unavailable because original input is no longer valid",
+        400
+      );
+    }
+    const {
+      entitlementSnapshot: _entitlementSnapshot,
+      ...cloneInput
+    } = resolved;
+    return cloneInput as Record<string, unknown>;
   },
 
   async getUserLaunches(userId: string): Promise<UserLaunchRow[]> {
@@ -3358,6 +3395,7 @@ export const launchService = {
         id: true,
         status: true,
         retriedFromLaunchId: true,
+        platformVersion: true,
         input: true,
         tokenPublicKey: true,
         errorMessage: true,
@@ -3380,6 +3418,7 @@ export const launchService = {
     });
 
     return launches.map((launch) => {
+      const isLegacy = isLegacyPlatformRecord(launch);
       const resolved = resolveStoredLaunchInput(launch.input);
       const {
         entitlementSnapshot: _entitlementSnapshot,
@@ -3407,8 +3446,10 @@ export const launchService = {
           (resolved?.telegram?.trim() || null),
         errorMessage: launch.errorMessage,
         createdAt: launch.createdAt,
-        // Flat form-compatible input for clone; legacy and versioned rows both resolve.
-        input: cloneInput as Record<string, unknown>,
+        platformVersion: launch.platformVersion,
+        isLegacy,
+        // Clone input only for versioned rows; legacy clone is denied at the eligibility seam.
+        input: isLegacy ? null : (cloneInput as Record<string, unknown>),
       };
     });
   },
@@ -3543,6 +3584,7 @@ export const launchService = {
           input: true,
           tokenPublicKey: true,
           status: true,
+          platformVersion: true,
           token: {
             select: {
               status: true,
@@ -3553,6 +3595,8 @@ export const launchService = {
       if (!sourceLaunch) {
         throw new AppError("Failed launch not found", 404);
       }
+
+      assertNonLegacyPlatformCapability(sourceLaunch, "retry");
 
       if (sourceLaunch.token?.status === "ACTIVE") {
         throw new AppError(

@@ -13,6 +13,7 @@ import { WalletType } from "@/lib/generated/prisma/client";
 import type { UserPlan } from "@/lib/generated/prisma/client";
 import { getSolanaConnection } from "@/lib/solana/connection";
 import { AppError } from "@/server/errors";
+import { assertNonLegacyPlatformCapability } from "@/server/services/launch-capability";
 import { rpcConfig } from "@/lib/config/rpc.config";
 import { cacheConfig } from "@/lib/config/cache.config";
 import { logger } from "@/lib/logger";
@@ -198,12 +199,15 @@ export const walletService = {
           publicKey: true,
           name: true,
           symbol: true,
+          platformVersion: true,
         },
       });
 
       if (!token) {
         throw new AppError("Token not found", 404);
       }
+
+      assertNonLegacyPlatformCapability(token, "new buys");
 
       const rawFees = calculateBuyerWalletUsageFees(input.count);
       const discountRate = grpcAccessService.getPlatformFeeDiscountRate(userPlan);

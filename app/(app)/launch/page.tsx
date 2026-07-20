@@ -16,6 +16,7 @@ import {
   getLaunchPresetName,
   getLaunchPresetValues,
 } from "@/lib/config/launch-presets.config";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { useSearchParams } from "next/navigation";
 
 export default function LaunchPage() {
@@ -34,9 +35,14 @@ export default function LaunchPage() {
   const { data: launches, isLoading: isLoadingLaunches } =
     trpc.launch.getUserLaunches.useQuery();
 
-  const hasTokens =
-    launches?.some((launch) => Boolean(launch.tokenPublicKey)) ?? false;
-  const isPassive = !isLoadingLaunches && !hasTokens;
+  const hasCloneableLaunches =
+    launches?.some(
+      (launch) => !launch.isLegacy && launch.input != null
+    ) ?? false;
+  const hasOnlyLegacyLaunches =
+    !hasCloneableLaunches &&
+    (launches?.some((launch) => launch.isLegacy) ?? false);
+  const isPassive = !isLoadingLaunches && !hasCloneableLaunches;
 
   const handleClone = (input: Record<string, unknown>) => {
     setCloneValues(input);
@@ -77,7 +83,9 @@ export default function LaunchPage() {
             </TooltipTrigger>
             {isPassive && (
               <TooltipContent>
-                No previous tokens to clone
+                {hasOnlyLegacyLaunches
+                  ? legacyCapabilityDeniedMessage("clone")
+                  : "No previous tokens to clone"}
               </TooltipContent>
             )}
           </Tooltip>

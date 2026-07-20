@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
 import { invalidateTokenSidebarCounts } from "@/lib/trpc/invalidate-token-sidebar-counts";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -2108,18 +2109,23 @@ export default function VolumeBotStartPage() {
                 startMutation.isPending ||
                 !tokenPublicKey ||
                 isRunning ||
-                tokenData?.isMayhemMode
+                tokenData?.isMayhemMode ||
+                tokenData?.isLegacy
               }
               className="h-12 w-full border border-black px-4 text-xl font-black tracking-tight text-black/90 shadow-lg shadow-lime-400/10 hover:text-black hover:shadow-xl hover:shadow-lime-300/20 sm:w-auto md:text-2xl"
             >
               {startMutation.isPending ? "STARTING..." : "START VOLUME BOT"}
             </Button>
-            {tokenData?.isMayhemMode && (
+            {tokenData?.isLegacy ? (
+              <p className="text-sm text-amber-500">
+                {legacyCapabilityDeniedMessage("automation")}
+              </p>
+            ) : tokenData?.isMayhemMode ? (
               <p className="text-sm text-amber-500">
                 Volume bot is not yet supported for Mayhem-mode tokens
                 (Token-2022). Support is coming in a fast-follow.
               </p>
-            )}
+            ) : null}
           </div>
         </div>
       </section>
