@@ -98,7 +98,13 @@ export const accountRoutes: NavMainItem[] = [
     scope: "global",
   },
   {
-    title: "Launches",
+    title: "My Tokens",
+    url: "/tokens",
+    icon: IconCoins,
+    scope: "global",
+  },
+  {
+    title: "Launch history",
     url: "/launches",
     icon: IconList,
     scope: "global",

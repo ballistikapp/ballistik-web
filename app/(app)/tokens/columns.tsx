@@ -22,23 +22,14 @@ import {
   IconBrandTelegram,
   IconWorld,
   IconRecycle,
+  IconKey,
 } from "@tabler/icons-react";
-import { GalleryVerticalEnd, RotateCcw } from "lucide-react";
-import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip";
-import {
-  formatLaunchLineageLabel,
-  type LaunchHistoryRow,
-  type LaunchHistoryStatus,
-} from "./launch-history-rows";
+import { GalleryVerticalEnd } from "lucide-react";
+import type { TokenTableRow, TokenTableStatus } from "./token-rows";
 
-type LaunchHistoryColumnsOptions = {
-  onReclaim?: (row: LaunchHistoryRow) => void;
-  onRetry?: (row: LaunchHistoryRow) => void;
+type TokenColumnsOptions = {
+  onReclaim?: (row: TokenTableRow) => void;
+  onShowPrivateKey?: (row: TokenTableRow) => void;
 };
 
 function truncateAddress(address: string) {
@@ -60,29 +51,22 @@ function formatExactTime(dateValue?: Date | string | null) {
   return format(date, "MMM d, yyyy");
 }
 
-function statusBadgeClass(status: LaunchHistoryStatus) {
+function statusBadgeClass(status: TokenTableStatus) {
   switch (status) {
-    case "SUCCEEDED":
+    case "ACTIVE":
       return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
     case "PENDING":
-    case "RUNNING":
       return "bg-amber-500/10 text-amber-700 border-amber-500/20";
     case "FAILED":
       return "bg-red-500/10 text-red-700 border-red-500/20";
-    case "CANCELED":
-      return "bg-muted text-muted-foreground border-border";
     default:
       return "";
   }
 }
 
-function canReclaim(status: LaunchHistoryStatus) {
-  return status === "FAILED" || status === "CANCELED";
-}
-
-export const createLaunchHistoryColumns = (
-  options: LaunchHistoryColumnsOptions = {}
-): ColumnDef<LaunchHistoryRow>[] => [
+export const createTokenColumns = (
+  options: TokenColumnsOptions = {}
+): ColumnDef<TokenTableRow>[] => [
   {
     id: "token",
     accessorFn: (row) => `${row.name} ${row.symbol}`,
@@ -91,7 +75,6 @@ export const createLaunchHistoryColumns = (
     ),
     cell: ({ row }) => {
       const item = row.original;
-      const hasLink = Boolean(item.publicKey);
       const content = (
         <div className="flex items-center gap-3 group">
           <div className="flex aspect-square size-9 items-center justify-center rounded-lg overflow-hidden shrink-0 bg-muted">
@@ -118,10 +101,7 @@ export const createLaunchHistoryColumns = (
           </div>
         </div>
       );
-      if (hasLink) {
-        return <Link href={`/${item.publicKey}/dashboard`}>{content}</Link>;
-      }
-      return content;
+      return <Link href={`/${item.publicKey}/dashboard`}>{content}</Link>;
     },
     enableHiding: false,
     meta: {
@@ -130,15 +110,12 @@ export const createLaunchHistoryColumns = (
   },
   {
     id: "publicKey",
-    accessorFn: (row) => row.publicKey ?? row.launchId ?? "",
+    accessorFn: (row) => row.publicKey,
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="Address" />
     ),
     cell: ({ row }) => {
       const item = row.original;
-      if (!item.publicKey) {
-        return <span className="text-sm text-muted-foreground">—</span>;
-      }
       return (
         <div className="flex items-center gap-1.5">
           <span className="text-sm font-mono text-muted-foreground">
@@ -151,7 +128,7 @@ export const createLaunchHistoryColumns = (
             className="size-6 text-muted-foreground hover:text-foreground"
             onClick={(e) => {
               e.stopPropagation();
-              navigator.clipboard.writeText(item.publicKey!);
+              navigator.clipboard.writeText(item.publicKey);
             }}
           >
             <IconCopy className="size-3.5" />
@@ -181,27 +158,6 @@ export const createLaunchHistoryColumns = (
     filterFn: "textArray",
     meta: {
       filter: { filterType: "text" as const },
-    },
-  },
-  {
-    id: "lineage",
-    accessorFn: (row) =>
-      formatLaunchLineageLabel({
-        retriedFromLaunchId: row.retriedFromLaunchId,
-        hasRetryAttempts: row.hasRetryAttempts,
-      }) ?? "",
-    header: ({ column }) => (
-      <DataTableColumnHeader column={column} title="Lineage" />
-    ),
-    cell: ({ row }) => {
-      const label = formatLaunchLineageLabel({
-        retriedFromLaunchId: row.original.retriedFromLaunchId,
-        hasRetryAttempts: row.original.hasRetryAttempts,
-      });
-      if (!label) {
-        return <span className="text-sm text-muted-foreground">—</span>;
-      }
-      return <span className="text-sm text-muted-foreground">{label}</span>;
     },
   },
   {
@@ -296,9 +252,7 @@ export const createLaunchHistoryColumns = (
     id: "actions",
     cell: ({ row }) => {
       const item = row.original;
-      const reclaimable = canReclaim(item.status);
-      const hasPublicKey = Boolean(item.publicKey);
-      const retryable = item.status === "FAILED";
+      const isFailed = item.status === "FAILED";
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -312,80 +266,59 @@ export const createLaunchHistoryColumns = (
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48">
-            {hasPublicKey && (
-              <DropdownMenuItem asChild>
-                <Link href={`/${item.publicKey}/dashboard`}>
-                  <IconExternalLink className="size-4" />
-                  Go to Dashboard
-                </Link>
-              </DropdownMenuItem>
-            )}
-            {hasPublicKey && (
+            <DropdownMenuItem asChild>
+              <Link href={`/${item.publicKey}/dashboard`}>
+                <IconExternalLink className="size-4" />
+                Go to Dashboard
+              </Link>
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => navigator.clipboard.writeText(item.publicKey)}
+            >
+              <IconCopy className="size-4" />
+              Copy Address
+            </DropdownMenuItem>
+            {options.onShowPrivateKey && (
               <DropdownMenuItem
-                onClick={() => navigator.clipboard.writeText(item.publicKey!)}
+                onClick={() => options.onShowPrivateKey?.(item)}
               >
-                <IconCopy className="size-4" />
-                Copy Address
+                <IconKey className="size-4" />
+                Show Private Key
               </DropdownMenuItem>
             )}
-            {reclaimable && options.onReclaim && (
+            {isFailed && options.onReclaim && (
               <DropdownMenuItem onClick={() => options.onReclaim?.(item)}>
                 <IconRecycle className="size-4" />
                 Reclaim SOL
               </DropdownMenuItem>
             )}
-            {retryable && options.onRetry && !item.isLegacy && (
-              <DropdownMenuItem onClick={() => options.onRetry?.(item)}>
-                <RotateCcw className="size-4" />
-                Retry launch
-              </DropdownMenuItem>
-            )}
-            {retryable && options.onRetry && item.isLegacy && (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div>
-                    <DropdownMenuItem disabled>
-                      <RotateCcw className="size-4" />
-                      Retry launch
-                    </DropdownMenuItem>
-                  </div>
-                </TooltipTrigger>
-                <TooltipContent side="left">
-                  {legacyCapabilityDeniedMessage("retry")}
-                </TooltipContent>
-              </Tooltip>
-            )}
-            {hasPublicKey && (
-              <>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <a
-                    href={`https://solscan.io/token/${item.publicKey}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <Image
-                      src="/logos/solscan-logo-dark.svg"
-                      alt="Solscan"
-                      width={16}
-                      height={16}
-                      className="size-4"
-                    />
-                    View on Solscan
-                  </a>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <a
-                    href={`https://pump.fun/coin/${item.publicKey}`}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    <IconExternalLink className="size-4" />
-                    View on Pump.fun
-                  </a>
-                </DropdownMenuItem>
-              </>
-            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem asChild>
+              <a
+                href={`https://solscan.io/token/${item.publicKey}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <Image
+                  src="/logos/solscan-logo-dark.svg"
+                  alt="Solscan"
+                  width={16}
+                  height={16}
+                  className="size-4"
+                />
+                View on Solscan
+              </a>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <a
+                href={`https://pump.fun/coin/${item.publicKey}`}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <IconExternalLink className="size-4" />
+                View on Pump.fun
+              </a>
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );

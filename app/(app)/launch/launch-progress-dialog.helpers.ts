@@ -20,6 +20,8 @@ export type LaunchActivityItem = LaunchLogLike & {
   tone: "default" | "error";
 };
 
+export const LAUNCH_HISTORY_HREF = "/launches";
+
 function isFailureRecoveryLike(value: unknown): value is FailureRecoveryLike {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
@@ -52,16 +54,20 @@ export function getLaunchFailureGuidance(launch: LaunchFailureLike) {
 
   if (launch.status !== "FAILED") {
     return {
-      showManageTokensAction: false,
-      description: null,
+      showLaunchHistoryAction: false,
+      description: null as string | null,
+      href: LAUNCH_HISTORY_HREF,
     };
   }
 
+  const needsManualFollowUp =
+    manualActionRequired || !hasFailureRecoveryMetadata;
+
   return {
-    showManageTokensAction:
-      manualActionRequired || !hasFailureRecoveryMetadata,
-    description: manualActionRequired || !hasFailureRecoveryMetadata
-      ? "Automatic reclaim could not finish. Go to the My Tokens page to reclaim the remaining SOL."
+    showLaunchHistoryAction: needsManualFollowUp,
+    description: needsManualFollowUp
+      ? "Automatic reclaim could not finish. Go to Launch history to reclaim the remaining SOL."
       : null,
+    href: LAUNCH_HISTORY_HREF,
   };
 }

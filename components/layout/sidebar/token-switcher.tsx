@@ -222,9 +222,9 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
               </div>
             </CommandItem>
             <CommandItem
-              value="manage launches"
+              value="my tokens"
               onSelect={() => {
-                router.push("/launches");
+                router.push("/tokens");
                 setOpen(false);
               }}
               className="gap-2 opacity-80 hover:opacity-100"
@@ -233,7 +233,7 @@ export const TokenSwitcher = React.memo(function TokenSwitcher({
                 <Settings className="size-4" />
               </div>
               <div className="flex flex-col gap-0.5 leading-none min-w-0 flex-1">
-                <span className="font-medium truncate">Manage Launches</span>
+                <span className="font-medium truncate">My Tokens</span>
               </div>
             </CommandItem>
           </div>

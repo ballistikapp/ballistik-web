@@ -39,7 +39,7 @@
 - `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet via Platform `recover` (validates persisted plan when present; funded-cap drain).
   - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
 - `launch.recoveryWalletsByToken` (query): resolves failed/canceled launch by token and returns wallets eligible for recovery.
-- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions (also via Platform `recover`).
+- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for My Tokens and Launch history row actions when a Token mint exists (also via Platform `recover`).
 - `launch.status` also surfaces failed-launch auto reclaim activity through launch logs and `Launch.result`.
 - `launch.getUserLaunches` (query): returns all user launches with token join for the clone token dialog.
 
@@ -234,15 +234,16 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - The app header shows active launch progress beside the sidebar trigger via `activeProcess.list`; clicking the header pill opens the same launch progress dialog.
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
 - User can request cancellation.
-- Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
-- Reclaim actions remain owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true); the launch progress dialog does not open a reclaim dialog during launch.
+- Launch history (`/launches`) is powered by `launch.getUserLaunches` and shows every attempt, including pre-mint failures, with Launch statuses and retry lineage.
+- My Tokens (`/tokens`) is powered by `token.getAllUserTokens` and lists persisted Tokens only.
+- Reclaim actions are available from Launch history (including pre-mint attempts by `launchId`) and from My Tokens (token-scoped); the launch progress dialog does not open a reclaim dialog during launch.
 - During long launch work, the progress dialog surfaces helper copy: `Token creation may take couple of minutes. Please be patient.`
 - Progress activity is rendered newest-first, with the most recent row visually emphasized and raw log levels hidden from the user-facing list.
 - Failed launch progress first attempts automatic reclaim and shows reclaim as launch activity.
 - If automatic reclaim succeeds, the failed dialog keeps a visible reclaimed-funds step and does not show manual reclaim guidance.
-- If automatic reclaim fails, failed launch progress surfaces retry and Manage Tokens guidance for manual reclaim.
+- If automatic reclaim fails, failed launch progress surfaces retry and Launch history guidance for manual reclaim.
 - Shared main/dev launches with no generated recovery wallets are treated as a valid zero-wallet recovery state rather than an error.
-- Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
+- Retry from progress dialog and Launch history creates a new linked launch attempt and opens progress for the new attempt.
 
 ### Retry Model (Failed Launches)
 
@@ -454,10 +455,10 @@ Allows users to pre-populate the launch form with configuration from a previous 
 ### tRPC Endpoint
 
 - `launch.getUserLaunches` (query): returns all user launches ordered by `createdAt` desc.
-  - Selects: `id`, `status`, `input`, `tokenPublicKey`, `errorMessage`, `createdAt`, joined `token { name, symbol, imageUrl, websiteUrl, twitterUrl, telegramUrl }`, and `_count { recoveryWallets }`.
+  - Selects: `id`, `status`, `retriedFromLaunchId`, `input`, `tokenPublicKey`, `errorMessage`, `createdAt`, joined `token` metadata, and retry-attempt presence.
   - Extracts `tokenName`, `tokenSymbol`, and social URLs from `input` JSON as fallback when the token relation is null (e.g. launches that failed before token creation).
-  - Returns `hasRecoveryWallets` boolean derived from the recovery wallet count.
-  - Serves as the canonical data source for both the Manage Tokens table and the Clone Token dialog.
+  - Returns lineage fields (`retriedFromLaunchId`, `hasRetryAttempts`) and legacy markers for the Launch history surface and Clone Token dialog.
+  - Serves as the canonical data source for Launch history and the Clone Token dialog. My Tokens uses `token.getAllUserTokens` instead.
 
 ### Clone Behavior
 
@@ -468,7 +469,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 ### UI Flow
 
 1. User clicks "Clone Token" button in the launch page header.
-2. A dialog opens showing a table of previous launches (reuses the manage tokens table columns minus links/actions, plus single-row selection).
+2. A dialog opens showing a table of previous launches (clone-oriented columns plus single-row selection).
 3. User selects a launch and clicks "Clone".
 4. Dialog closes and the launch form is populated with the selected configuration.
 
@@ -491,7 +492,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 - Balances are refreshed on demand only
 - Server enforces a 15-second debounce per wallet
-- The My Tokens page explicitly refetches launches when it mounts so navigation does not reuse a fresh-cache snapshot for too long.
+- Launch history and My Tokens explicitly refetch on mount so navigation does not reuse a fresh-cache snapshot for too long.
 
 ## Failed Launch Reclaim UX
 
@@ -499,17 +500,17 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - Automatic reclaim is logged as launch activity so it appears in the launch progress dialog just like create, confirm, and cleanup steps.
 - Launch state remains `FAILED` even when automatic reclaim succeeds.
 - Automatic reclaim outcome is stored in `Launch.result.failureRecovery` for user-facing messaging.
-- `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Manage Tokens for reclaim.
+- `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Launch history for reclaim.
 - Failed-launch reclaim is launch-scoped: each managed wallet can only return the funded top-up recorded for that launch, never more than its current balance.
 - Manual `recoverSol` uses the same funded-cap drain when the Launch has a `plan_funded_cap` recovery policy or a recorded `fundedLamports` top-up. Legacy launches without plan/funding snapshots keep full-balance reclaim.
-- Failed launches without `failureRecovery` metadata fall back to showing My Tokens guidance so older/stale failure records still have a recovery path.
-- Manual reclaim remains available from Manage Tokens row actions and the reclaim dialog.
+- Failed launches without `failureRecovery` metadata fall back to showing Launch history guidance so older/stale failure records still have a recovery path.
+- Manual reclaim remains available from Launch history and My Tokens row actions and the reclaim dialog.
 
-## Manage Tokens Reclaim Dialog
+## Reclaim Dialog
 
 - The reclaim dialog keeps wallet rows in the scrollable region and uses a sticky footer for actions.
 - The sticky footer shows the total reclaimable SOL amount on the left.
-- Successful reclaim invalidates `launch.getUserLaunches` so the My Tokens table refreshes immediately.
+- Successful reclaim invalidates `launch.getUserLaunches` and `token.getAllUserTokens` so Launch history and My Tokens refresh immediately.
 
 ## Mayhem Mode
 

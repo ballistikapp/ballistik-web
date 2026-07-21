@@ -91,7 +91,6 @@ export function LaunchProgressDialog({
   const tokenPublicKey = launch?.tokenPublicKey ?? "";
   const hasTokenPublicKey = Boolean(tokenPublicKey);
   const hasTokenLink = status === "SUCCEEDED" && hasTokenPublicKey;
-  const failedTokensHref = "/tokens";
   const activityItems = buildLaunchActivityItems(launch?.logs ?? []);
   const failureGuidance = getLaunchFailureGuidance({
     status,
@@ -232,7 +231,7 @@ export function LaunchProgressDialog({
               )}
             </div>
           </div>
-          {status === "FAILED" && failureGuidance.showManageTokensAction && (
+          {status === "FAILED" && failureGuidance.showLaunchHistoryAction && (
             <div className="space-y-2">
               <div className="text-sm font-medium">Launch Failed</div>
               <div className="rounded-md border p-3 space-y-3">
@@ -248,7 +247,7 @@ export function LaunchProgressDialog({
                 ) : null}
                 <div className="flex items-center justify-end">
                   <Button asChild size="sm" variant="outline">
-                    <Link href={failedTokensHref}>Go to My Tokens</Link>
+                    <Link href={failureGuidance.href}>Go to Launch history</Link>
                   </Button>
                 </div>
               </div>

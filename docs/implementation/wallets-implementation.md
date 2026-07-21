@@ -134,7 +134,7 @@ Service rules:
 - Default token reads are sanitized (`token.getUserTokens`, `token.getAllUserTokens`, `token.getByPublicKey`) and return only non-sensitive token metadata.
 - Token private keys are available only through explicit user-triggered retrieval using `token.getPrivateKey`.
 - `token.getPrivateKey` is a protected mutation intended for on-demand access checks; consumers should avoid background/prefetch patterns for this call.
-- The My Tokens table includes a row action (`Show Private Key`) that opens a confirmation dialog and fetches the token private key only after the user clicks `Get private key`.
+- The My Tokens table (`/tokens`) includes a row action (`Show Private Key`) that opens a confirmation dialog and fetches the token private key only after the user clicks `Get private key`.
 
 ## UI Behavior
 
