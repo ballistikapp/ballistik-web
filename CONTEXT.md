@@ -21,11 +21,11 @@ A person who authenticates to the product with a wallet and owns tokens, launche
 _Avoid_: Account, customer, client (in Ops Console copy and lookup language)
 
 **Launch**:
-A token creation pipeline run for a User — from setup through venue-specific creation and initial market setup — with stages, logs, and optional recovery state.
+A User’s token creation attempt owned by the shared lifecycle — identity, plan durability, progress, cancellation, retry lineage, terminal status, and fee collection — with Platform-specific planning and execution behind a small `preview / plan / execute / recover` interface.
 _Avoid_: Token creation, mint job (when referring to the pipeline itself, not the on-chain mint)
 
 **Platform**:
-The launch path selected in the funnel: pump.fun or SPL. The SPL Platform means direct mint creation followed by initial liquidity on the DEX chosen by Ballistik; it does not mean that pump.fun tokens are outside the SPL token standards.
+The launch path selected in the funnel: pump.fun or SPL. The SPL Platform means direct mint creation followed by initial liquidity on the DEX chosen by Ballistik; it does not mean that pump.fun tokens are outside the SPL token standards. New backend records accept only pump.fun until an SPL module exists; null Platform version marks legacy Launch/Token records.
 _Avoid_: Launch route, launch type, user-selected DEX
 
 **Token**:

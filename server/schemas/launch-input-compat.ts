@@ -52,7 +52,11 @@ function splitEntitlement(raw: unknown): {
   };
 }
 
-/** Map versioned pump.fun submission fields onto the flat execution input shape. */
+/**
+ * Map versioned pump.fun fields onto the flat shape used for legacy reads,
+ * clone bags, and resolveStoredLaunchInput. New plan/start paths use
+ * versioned metadata/config directly.
+ */
 export function flattenVersionedLaunchInput(
   input: VersionedLaunchInput
 ): LaunchTokenInput {

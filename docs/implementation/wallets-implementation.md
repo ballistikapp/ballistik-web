@@ -25,9 +25,11 @@ Prisma changes:
 - `Token.operationalWallets` (relation to `Wallet`)
 - `TokenDevWallet` join model for dev wallet sharing
 
-### System Dev Wallet
+### System Dev Wallet (legacy custody only)
 
-The system dev wallet is a platform-provided keypair stored in the `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. Its DB `Wallet` row has `privateKey: ""` (empty placeholder) and `isSystemWallet: true`. It is used as the default dev wallet for free-tier launches and is available to Pro users as an explicit option.
+The system dev wallet is a platform-provided keypair stored in the `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. Its DB `Wallet` row has `privateKey: ""` (empty placeholder) and `isSystemWallet: true`.
+
+New Launches no longer offer or execute through the system creator Wallet option. Existing Tokens/holdings that used it remain under the legacy custody-safe policy: exits, reclaim, and permitted key access stay available; retry/clone/new buys/automation are denied.
 
 The system dev wallet is excluded from:
 - Wallet pages, wallet detail, wallet balance totals
@@ -35,13 +37,17 @@ The system dev wallet is excluded from:
 - Manual send/return SOL flows
 - Wallet balance refresh and live balance subscriptions
 - Volume bot eligibility
+- New Launch planning / execute
 
 The system dev wallet is included in:
 - Holdings, dashboard holdings, and transactions (token-position views)
 - Sell and exit flows (with forced SOL recovery to user's main wallet)
-- Launch funding and cleanup
 
 Creator rewards are **not available** for tokens using the system dev wallet — the service returns `eligible: false` and the dashboard card is hidden.
+
+### Managed Launch Wallets
+
+Cross-Platform term for Wallets temporarily prepared or funded for a Launch attempt. Persisted as `LaunchRecoveryWallet` rows with public identity, Platform role identifier (`platformRole`), managed flag, funded cap, and reclaim bookkeeping. New-version launches materialize these rows from the authoritative Platform plan before funding.
 
 ## Volume Bot Wallets
 

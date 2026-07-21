@@ -5,14 +5,15 @@ This document describes the current Jito bundle launch flow used by `ballistik-w
 ### Current Behavior (ALT Disabled)
 
 ### Trigger Conditions
-- Bundle launch is used when `bundleBuyEnabled` is true.
-- Buyers include the dev wallet if `devBuyAmountSol > 0`, plus all bundler wallets.
-- Maximum buyer wallets per launch: 9 (1 dev + 8 bundler wallets).
+- Bundle launch is used when the persisted pump.fun plan has `intendedEffects.bundleBuyEnabled` true (Platform execute → `runBundledPumpfunLaunchJob` → `createAndBuyInBundle`).
+- Buyers include the creator Wallet if planned creator buy > 0, plus all bundler wallets from the plan.
+- Maximum buyer wallets per launch: 9 (1 creator + `MAX_BUNDLE_WALLETS` bundlers from `lib/config/launch.config.ts`, currently 8).
+- All pump.fun Launch buys use the custom raw-instruction path (no PumpFunSDK on Launch).
 
 ### Core Flow (High Level)
-1. Build the token create transaction.
-2. Build buy transactions for each buyer wallet.
-3. Pack transactions into a Jito bundle.
+1. Platform execute validates the persisted plan and loads Managed Launch Wallet keypairs / allocations from it.
+2. Build the token create transaction and buy transactions for each planned buyer.
+3. Pack transactions into a Jito bundle (`bundle-transaction-builder` owns packing constants).
 4. Submit through the deep Jito transport (`sendJitoBundle` in `server/solana/jito-bundle.ts`). Tip placement, versioning, lookup-table compilation, simulation, endpoint rotation, resend/rebuild, and confirmation stay inside that module.
 5. Callers receive `{ bundleId, signatures, confirmation, telemetry }` and create/settle their own `AppTransaction` rows. Jito never writes Launch or Exit bookkeeping.
 

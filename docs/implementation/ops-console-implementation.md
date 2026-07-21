@@ -43,8 +43,18 @@ See ADRs:
 - `ops.listWalletAppTransactions` — `operatorProcedure`; paginated AppTransaction ledger for a Wallet (exact `walletPublicKey` actor match; `page`/`pageSize`; 404 if Wallet missing); no private keys
 - `ops.refreshWalletBalances` — `operatorProcedure`; refresh stored SOL balances for explicit Wallet public keys (max 100); force refresh via `walletService.refreshBalancesByPublicKeys`; no private keys
 - `ops.refreshMatchingWalletBalances` — `operatorProcedure`; refresh all Wallets matching current search/type/system/`userId` filters (empty filter = all); server-chunked (100); confirm count in UI; no hard max refuse; no private keys
-- `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs plus Platform diagnostics (Platform/version, plan presence, validated normalized plan summary without opaque payload, outcome classification, Jito telemetry projection from `source: "jito-bundle"` logs); no raw `input`/`result`/`plan`; private-key fields scrubbed
+- `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs plus Platform diagnostics (Platform/version, plan presence, validated normalized plan summary without opaque payload, outcome classification, Jito telemetry projection from `source: "jito-bundle"` logs); no raw `input`/`result`/`plan`; private-key fields scrubbed.
 - `ops.revealPrivateKey` — `operatorSensitiveProcedure` (8/min); wallet or mint key; logs Operator + target via request logger
+
+### Launch Platform diagnostics (Ops)
+
+Launch inspection follows the shared lifecycle + Platform architecture:
+
+- **Platform / version**: null `platformVersion` marks a legacy Launch (custody-safe read-only; retry/clone denied). New records use `PUMPFUN` + `"1"`.
+- **Authoritative plan**: autopsy shows whether a plan exists and a validated normalized money summary when present. Opaque plan payload and secrets are never dumped.
+- **Outcome classification**: `outcomeKind` / details from Platform execute (not inferred solely from mint existence).
+- **Managed Launch Wallets**: recovery wallet rows remain available via Launch recovery surfaces; Ops does not expose private keys.
+- **Removed system creator path**: new Launches cannot select or execute with the system creator Wallet; legacy system-wallet custody may still appear on Wallet browse (`isSystemWallet`) for exits/reclaim inspection.
 - `ops.listMarketers` — `operatorProcedure`; paginated Marketers browse (`page`/`pageSize`/`search`/`sortBy`/`sortDir`/`isEnabled`); shows nickname, rate, enabled, and whether referral code / fee-collector are configured (not the values); no private keys
 - `ops.getMarketer` — `operatorProcedure`; Marketer detail including read-only referral code and fee-collector public key when set
 - `ops.createMarketer` — `operatorProcedure`; designate an existing User as Marketer (`userId`, Ops `nickname`, `feeShareRate` in `[0, 1]`, optional `isEnabled`); nickname unique; User must not already be a Marketer

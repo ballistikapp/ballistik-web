@@ -6,8 +6,9 @@ ballistik-web is the web application for [Ballistik](https://ballistik.app). It 
 
 ## Core Features
 
-- Token launch workflow with progress tracking
-- Token-scoped wallets and operational wallet management
+- Token Launch workflow with shared lifecycle + Platform modules (pump.fun working; SPL coming soon)
+- Separate Launch history and My Tokens surfaces
+- Token-scoped wallets, Managed Launch Wallets, and operational wallet management
 - Solana RPC integrations for balance refresh and transactions
 - Transaction tracking and token holdings
 - Holdings and transactions refresh flows mirror wallet balance refresh behavior
@@ -15,18 +16,21 @@ ballistik-web is the web application for [Ballistik](https://ballistik.app). It 
 - Dashboard trade updates via `subscription.onVolumeBotUpdate` (in-memory EventEmitter bridge)
 - Shyft REST APIs for enriched wallet, token, and transaction data
 - Shyft Callback webhooks for passive event monitoring
+- Ops Console for Operator inspection (including safe Launch Platform diagnostics)
 
 ## Architecture
 
 - Next.js App Router for pages and layouts
 - tRPC for API layer (HTTP batch + SSE subscriptions)
 - Prisma + PostgreSQL for data layer
-- Service layer for business logic
-- Zod schemas for validation
+- Service layer for business logic (Launch lifecycle + Platform registry under `server/services/`)
+- Solana transaction builders and Jito transport under `server/solana/` (Jito does not own Launch/Exit bookkeeping)
+- Zod schemas for validation (versioned Launch Platform contracts in `server/schemas/launch-platform.schema.ts`)
 - React Query for client data caching (5 min default staleTime)
 - Shyft gRPC manager for real-time on-chain streaming
 - Shyft REST/DeFi/Callback APIs for enriched data
 - Pinata-backed IPFS media storage for token images
+- Domain vocabulary in root `CONTEXT.md` (Launch, Platform, Token, Managed Launch Wallet, Ops Console)
 
 ## Directory Structure
 

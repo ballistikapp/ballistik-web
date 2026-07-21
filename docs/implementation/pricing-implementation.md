@@ -69,9 +69,13 @@ Total launch usage fee is the sum of:
 
 Generated wallet count for launch:
 
-- `+1` when `devWalletOption = generate` (not counted for `system`, `import`, or `use_main`)
+- `+1` when `devWalletOption = generate` (not counted for `import` or `use_main`; `system` is legacy-only and not accepted on new Launch input)
 - `+bundlerWalletCount` when bundle buy is enabled
 - `+bundlerWalletCount * (distributionWalletMultiplier - 1)` when distribution multiplier is greater than `1`
+
+`nonSystemDevWalletFeeSol` is `0`. New launches do not charge a creator-wallet usage fee for `generate` / `import` / `use_main`. The line remains in fee breakdowns for display compatibility.
+
+Launch usage fees are included in the authoritative Platform plan / preview money summary and collected by the shared lifecycle only after Platform success (Referral Payout inheritance unchanged). Fee-collection failure after success does not reverse Launch success.
 
 ### Volume Bot
 

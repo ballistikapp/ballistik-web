@@ -36,7 +36,7 @@ const versionedPumpfunInput: VersionedLaunchInput = {
   },
 };
 
-test("flattenVersionedLaunchInput maps metadata and pump config to flat execution input", () => {
+test("flattenVersionedLaunchInput maps metadata and pump config to flat legacy/clone shape", () => {
   const flat = flattenVersionedLaunchInput(versionedPumpfunInput);
   assert.equal(flat.tokenName, "Test Token");
   assert.equal(flat.tokenSymbol, "TEST");

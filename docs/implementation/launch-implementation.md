@@ -27,8 +27,8 @@
 
 ## tRPC Endpoints
 
-- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, and history remain on `launchService` until later tickets.
-- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Creates the Launch row first, then schedules lifecycle plan → persist → execute.
+- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, and history remain on `launchService`.
+- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Creates the Launch row first (versioned input + media normalize on metadata), then schedules lifecycle plan → persist → execute.
   - Schema-invalid requests never create a Launch row.
   - Insufficient-funds and other planning failures become visible retryable `FAILED` Launch history after the row exists.
 - `launch.previewCosts` (query): accepts `versionedLaunchPreviewInputSchema` (Platform + config, no Token metadata). Routes through `resolveLaunchPlatform(...).preview` and returns the review envelope: `money` (`normalizedLaunchMoneySummarySchema` lamport strings + labeled line items) plus `mainWalletBalanceLamports`, `hasSufficientMainWallet`, `platformFeeWaived`, and `platformFeeDiscountRate`. Side-effect-free (read-only RPC/balance); does not persist plans, fund Wallets, publish metadata, or submit on-chain.
@@ -53,7 +53,7 @@ Tracks state and progress.
 - `progress`: 0–100
 - `currentStep`: string
 - `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
-- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Execution/retry/clone resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON.
+- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Plan/start use versioned `metadata`/`config` directly. Retry/clone/legacy reads resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON. Execute still resolves stored input for media/fees/logs while wallets and funding come from the persisted plan.
 - `plan` / `planSchemaVersion` / `planPersistedAt`: secret-free authoritative Platform plan. Written after `platform.plan` succeeds and before `platform.execute`. pump.fun plan schema version `"1"` (`pumpfunLaunchPlanV1Schema`) includes normalized money, public wallet identities, allocations, intended effects, recovery caps, and opaque pump fields (vanity reservation ids — never private keys).
 - `outcomeKind` / `outcomeDetails`: Platform-owned outcome classification persisted by the shared lifecycle (`succeeded`, `canceled`, `failed`, `partial`, `indeterminate`).
 - `result`: output metadata (JSON)
@@ -78,7 +78,7 @@ Per-launch recovery tracking for managed wallets (cross-Platform term: Managed L
 - `isManaged`: whether launch cleanup is allowed to operate on the wallet automatically
 - `fundedLamports`: the actual SOL top-up this launch funded into that wallet (recovery cap; not the plan required-balance target)
 - `reclaimStatus`, `reclaimTxSignature`, `reclaimError`, `lastAttemptAt`, `reclaimedAt`: reclaim bookkeeping for auto and manual recovery flows
-- New-version launches persist MLW rows from the authoritative plan before funding (`platformRole` + exact public keys). Legacy / no-plan execute still builds rows from input.
+- New-version launches persist MLW rows from the authoritative plan before funding (`platformRole` + exact public keys). Execute requires a persisted plan; there is no flat-input wallet-row fallback on the Platform path.
 
 ### VanityMint
 
@@ -112,14 +112,14 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 
 ### Platform contracts
 
-- `versionedLaunchInputSchema`: external `launch.start` input — shared Token metadata + pump.fun `config`. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation.
+- `versionedLaunchInputSchema`: external `launch.start` input — shared Token metadata + pump.fun `config`. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation. Buy/bundle limits (`MIN_BUY_AMOUNT_SOL`, `MAX_BUNDLE_WALLETS`) are owned by `lib/config/launch.config.ts` and imported by schemas/service.
 - New Launch/Token rows persist `platform=PUMPFUN` and `platformVersion="1"`. Tokens inherit Platform identity from the Launch at pending-token persistence.
-- `launch-input-compat`: `flattenVersionedLaunchInput` / `toVersionedLaunchInput` / `resolveStoredLaunchInput` / `buildNewLaunchPersistence` bridge versioned storage and flat execution without rewriting legacy rows.
-- Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
+- `launch-input-compat`: `resolveStoredLaunchInput` / `toVersionedLaunchInput` / `flattenVersionedLaunchInput` / `buildNewLaunchPersistence` support legacy flat rows, clone bags, and retry bridging without rewriting legacy JSON. New plan/start paths do not flatten as their working model.
+- Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection. Client funnel is a shared shell plus `components/launch/platforms/pumpfun/`.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage. Signed main-Wallet deltas are outflows (negative).
 - `versionedLaunchPreviewInputSchema` / `launchPlatformPreviewResultSchema`: preview input (Platform + config) and API envelope (`money` + wallet/policy fields). Stable pump.fun line labels live in `lib/launch/money-labels.ts`.
-- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `plan` builds the secret-free authoritative plan (may create unfunded Wallet key refs and vanity reservations; must not fund or submit on-chain); `execute` validates the persisted plan then routes non-bundled launches to `runPumpfunNonBundledExecute` and bundled launches to `runPumpfunBundledExecute`, returning typed outcomes; `recover` validates the plan when present and reclaims SOL from persisted Managed Launch Wallet evidence with funded caps (`recoverSol` routes through it).
-- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns plan durability (plan → persist → execute); provides lifecycle contexts including the persisted plan; maps typed Platform outcomes to `status` + `outcomeKind` / `outcomeDetails`; owns the post-success usage-fee helper. Start/cancel/retry bodies and Platform-owned execute jobs still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns the normalized envelope via the cost calculator; `plan` builds the secret-free authoritative plan from versioned `config` (may create unfunded Wallet key refs and vanity reservations; must not fund or submit on-chain); `execute` validates the persisted plan then routes non-bundled launches to `runPumpfunNonBundledExecute` and bundled launches to `runPumpfunBundledExecute`, returning typed outcomes; `recover` validates the plan when present and reclaims SOL from persisted Managed Launch Wallet evidence with funded caps (`recoverSol` routes through it).
+- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns plan durability (plan → persist → execute); provides lifecycle contexts including the persisted plan; maps typed Platform outcomes to `status` + `outcomeKind` / `outcomeDetails`; owns the post-success usage-fee helper. Start/cancel/retry orchestration helpers and Platform-owned execute job bodies still live in `launch.service.ts`. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails. Transitional lifecycle/execute compatibility delegates and the system creator Launch path are removed.
 - Retry creates a new Launch linked to the failed attempt, reuses saved new-version input, and produces a fresh plan; the prior Launch and plan remain immutable.
 - `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
 
@@ -148,20 +148,17 @@ Database migrations remain human-owned (do not agent-run `prisma migrate`).
 
 Used as the funding wallet (no selection in UI).
 
-### Dev Wallet
+### Dev Wallet (creator Wallet)
 
-Based on `devWalletOption`:
+New launches accept only:
 
-- `system`: platform-provided dev wallet from `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. The DB stores a metadata-only `Wallet` row (`privateKey: ""` placeholder, `isSystemWallet: true`). Available to all plans with no extra dev-wallet usage fee.
-- `use_main`: main wallet
+- `use_main`: main wallet as creator
 - `generate`: server creates a new `DEV` wallet
 - `import`: server validates and stores imported key as `DEV`
 
-Any plan may choose `use_main`, `generate`, or `import`. Choosing a non-system dev wallet adds a **0.1 SOL** launch usage fee (`nonSystemDevWalletFeeSol` in `lib/config/usage-fees.config.ts`), subject to the same platform fee policy as other launch usage fees (Pro: waived; Developer: discount applies to `totalFeeSol`). The server does not coerce `devWalletOption` by plan; `previewCosts`, `startLaunch`, and `retryLaunch` use the submitted value.
+The system creator Wallet option is removed from new Launch input, planning, and execute. Legacy rows that still store `devWalletOption: "system"` remain readable under the legacy custody-safe policy; retry/clone of those rows is denied with a user-safe explanation. `nonSystemDevWalletFeeSol` is `0` (legacy fee line retained for display compatibility).
 
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
-
-When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup, but failed-launch reclaim is capped to the launch-funded top-up recorded for that attempt so pre-existing system-wallet SOL is not swept to the user. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
 
 ### Bundler Wallets
 
@@ -189,11 +186,11 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
-2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `8` bundler wallets).
-3. **Wallets**: load main wallet and Managed Launch Wallet keypairs. With a persisted plan, identities come from the plan (keys already created during planning); otherwise resolve/generate as before. Persist `LaunchRecoveryWallet` rows before funding (`platformRole` from plan when present).
+2. **Validate**: enforce minimum buy thresholds and bundle wallet limit from `lib/config/launch.config.ts` (`MIN_BUY_AMOUNT_SOL` / `MAX_BUNDLE_WALLETS`; currently `0.05` SOL and `8` bundler wallets). System creator Wallet is rejected.
+3. **Wallets**: load main wallet and Managed Launch Wallet keypairs from the persisted plan (keys created during planning). Persist `LaunchRecoveryWallet` rows from the plan before funding.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
-5. **Funding**: transfer SOL to reach plan required-balance targets (or recompute targets only on the legacy no-plan path) before venue submission. Snapshot actual top-ups onto `fundedLamports`.
-6. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+5. **Funding**: transfer SOL to reach plan required-balance targets before venue submission. Snapshot actual top-ups onto `fundedLamports`.
+6. **Metadata + Mint**: resolve image, build pump venue metadata, consume vanity reservation from the plan when present.
    - Metadata description appends `Launched with ballistik.app` by default.
    - Attribution is appended after two line breaks when user description exists.
    - If description is empty, metadata uses only `Launched with ballistik.app`.
@@ -221,7 +218,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet. Cleanup tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
 13. **Failure Reclaim**: if launch execution fails after recovery wallets were persisted, attempt to return remaining SOL to the main wallet before final UI guidance is shown.
    - Failed-launch reclaim is capped per wallet to `min(current wallet balance, launch-funded lamports for that wallet)`.
-   - The per-wallet funded amount is persisted on `LaunchRecoveryWallet.fundedLamports` after funding succeeds, so shared wallets such as the system dev wallet only return launch-specific top-ups.
+   - The per-wallet funded amount is persisted on `LaunchRecoveryWallet.fundedLamports` after funding succeeds, so recovery never returns more than the plan-funded cap for a Managed Launch Wallet.
 14. **Complete**: mark SUCCEEDED or CANCELED, or mark FAILED after reclaim outcome is recorded, store result metadata, log completion.
 
 ## UI Integration
@@ -481,11 +478,11 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 ## Launch Presets
 
-- Launch supports URL-driven presets via the `preset` query parameter.
-- `preset=free` initializes a free configuration (`devWalletOption = system`, bundle buy disabled, vanity disabled, attribution removal disabled).
-- Missing or unknown `preset` values default to the regular preset (`devWalletOption = system`, bundle buy enabled, `bundlerWalletCount = 8`, vanity enabled, attribution removal disabled).
-- Free-tier users are always normalized to `devWalletOption = system` on the server regardless of preset or client input.
-- Preset values are applied before clone values; cloning overrides preset initialization.
+- Launch supports URL-driven presets via the `preset` query parameter (`lib/config/launch-presets.config.ts`).
+- `preset=free` initializes a free configuration (`devWalletOption = generate`, bundle buy disabled, vanity disabled, attribution removal disabled).
+- Missing or unknown `preset` values default to the regular preset (`devWalletOption = generate`, bundle buy enabled, `bundlerWalletCount = 8`, vanity enabled, attribution removal disabled).
+- The server does not coerce `devWalletOption` by plan; presets and submissions use `generate` / `import` / `use_main` only.
+- Preset values are applied before clone values; cloning overrides preset initialization. Clone/preset bags that still carry `system` are remapped to `generate` in the funnel.
 - Unauthenticated visits preserve preset URLs through auth redirects using the `redirect` query param (for example `/launch?preset=free` -> `/auth?redirect=%2Flaunch%3Fpreset%3Dfree` -> back to `/launch?preset=free` after login/signup).
 
 ## Balance Refresh Strategy

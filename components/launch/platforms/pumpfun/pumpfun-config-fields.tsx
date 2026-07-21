@@ -13,7 +13,11 @@ import {
   PageSectionDivider,
   PageSectionHeader,
 } from "@/components/layout/sections";
-import { bundlerWalletCountValidatorMessage } from "@/components/launch/launch-funnel-form-values";
+import {
+  BUNDLER_BUY_PER_WALLET_MIN,
+  DEV_BUY_SOL_MIN,
+  bundlerWalletCountValidatorMessage,
+} from "@/components/launch/launch-funnel-form-values";
 import type {
   FunnelFieldState,
   LaunchFunnelFormApi,
@@ -242,7 +246,7 @@ export function PumpfunConfigFields({
                       id={field.name}
                       type="number"
                       step="0.0001"
-                      min="0.05"
+                      min={DEV_BUY_SOL_MIN}
                       max="100"
                       value={field.state.value}
                       onBlur={field.handleBlur}
@@ -354,7 +358,7 @@ export function PumpfunConfigFields({
                               id={field.name}
                               type="number"
                               step="0.001"
-                              min="0.05"
+                              min={BUNDLER_BUY_PER_WALLET_MIN}
                               value={field.state.value}
                               onBlur={field.handleBlur}
                               onChange={(event) =>

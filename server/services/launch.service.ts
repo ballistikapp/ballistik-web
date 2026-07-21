@@ -12,7 +12,6 @@ import {
 } from "@/server/schemas/launch.schema";
 import {
   buildNewLaunchPersistence,
-  flattenVersionedLaunchInput,
   launchInputDisplayFields,
   resolveStoredLaunchInput,
   toVersionedLaunchInput,
@@ -44,7 +43,10 @@ import {
 } from "@/server/services/launch-platform-pumpfun-funding";
 import type { LaunchUsageFeeInput } from "@/lib/config/usage-fees.config";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { getLaunchConfig } from "@/lib/config/launch.config";
+import {
+  getLaunchConfig,
+  MIN_BUY_AMOUNT_SOL,
+} from "@/lib/config/launch.config";
 import {
   calculateLaunchUsageFees,
   waiveLaunchUsageFees,
@@ -105,6 +107,11 @@ type StoredLaunchInput = LaunchInputFromStorage & {
   };
 };
 
+/** Stored input after rejecting the removed system creator Wallet option. */
+type ExecutableLaunchInput = LaunchTokenInput & {
+  entitlementSnapshot?: StoredLaunchInput["entitlementSnapshot"];
+};
+
 function toStoredLaunchInput(
   resolved: NonNullable<ReturnType<typeof resolveStoredLaunchInput>>
 ): StoredLaunchInput {
@@ -117,6 +124,18 @@ function toStoredLaunchInput(
     entitlementSnapshot,
   };
 }
+
+function assertExecutableLaunchInput(
+  input: StoredLaunchInput
+): ExecutableLaunchInput {
+  if (input.devWalletOption === "system") {
+    throw new AppError(
+      "The platform dev wallet is no longer available for new launches",
+      400
+    );
+  }
+  return input as ExecutableLaunchInput;
+}
 const LAUNCH_LOG_WINDOW = 200;
 
 function toLamports(amount: number) {
@@ -126,8 +145,6 @@ function toLamports(amount: number) {
 function lamportsToSol(lamports: bigint) {
   return Number(lamports) / LAMPORTS_PER_SOL;
 }
-
-const MIN_BUNDLER_BUY_AMOUNT_SOL = 0.05;
 
 function normalizeSymbol(symbol: string) {
   return symbol.trim().toUpperCase();
@@ -216,7 +233,7 @@ type BundlerBuyTarget = {
 };
 
 type LaunchCostInput = Pick<
-  LaunchInputFromStorage,
+  LaunchTokenInput,
   | "devWalletOption"
   | "importedDevWalletKey"
   | "devBuyAmountSol"
@@ -228,7 +245,9 @@ type LaunchCostInput = Pick<
   | "bundlerBuyVariancePercent"
   | "distributionWalletMultiplier"
   | "removeAttribution"
->;
+> & {
+  mayhemMode?: boolean;
+};
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
@@ -384,7 +403,7 @@ function buildLaunchRecoveryData(
     mainWalletPublicKey,
     devWalletPublicKey,
     usesMainWalletAsDev,
-    devWalletManaged: input.devWalletOption === "generate" || input.devWalletOption === "system",
+    devWalletManaged: input.devWalletOption === "generate",
     bundlerWallets: bundlerWalletKeypairs.map((wallet) =>
       wallet.publicKey.toBase58()
     ),
@@ -392,67 +411,6 @@ function buildLaunchRecoveryData(
       wallet.wallet.publicKey.toBase58()
     ),
   };
-}
-
-function buildLaunchRecoveryWalletRows(
-  launchId: string,
-  input: LaunchInputFromStorage,
-  mainWalletPublicKey: string,
-  devWalletPublicKey: string,
-  bundlerWalletKeypairs: Keypair[],
-  distributionWallets: DistributionWallet[]
-) {
-  const rows: Prisma.LaunchRecoveryWalletCreateManyInput[] = [];
-  if (devWalletPublicKey !== mainWalletPublicKey) {
-    rows.push({
-      launchId,
-      walletPublicKey: devWalletPublicKey,
-      walletType: "DEV",
-      role: "DEV",
-      isManaged: input.devWalletOption === "generate" || input.devWalletOption === "system",
-    });
-  }
-  rows.push(
-    ...bundlerWalletKeypairs.map((wallet) => ({
-      launchId,
-      walletPublicKey: wallet.publicKey.toBase58(),
-      walletType: "BUNDLER" as const,
-      role: "BUNDLER" as const,
-      isManaged: true,
-    }))
-  );
-  rows.push(
-    ...distributionWallets.map((wallet) => ({
-      launchId,
-      walletPublicKey: wallet.wallet.publicKey.toBase58(),
-      walletType: "DISTRIBUTION" as const,
-      role: "DISTRIBUTION" as const,
-      isManaged: true,
-    }))
-  );
-  return rows;
-}
-
-async function persistLaunchRecoveryWallets(
-  launchId: string,
-  input: LaunchInputFromStorage,
-  mainWalletPublicKey: string,
-  devWalletPublicKey: string,
-  bundlerWalletKeypairs: Keypair[],
-  distributionWallets: DistributionWallet[]
-) {
-  const rows = buildLaunchRecoveryWalletRows(
-    launchId,
-    input,
-    mainWalletPublicKey,
-    devWalletPublicKey,
-    bundlerWalletKeypairs,
-    distributionWallets
-  );
-  await prisma.launchRecoveryWallet.deleteMany({ where: { launchId } });
-  if (rows.length > 0) {
-    await prisma.launchRecoveryWallet.createMany({ data: rows });
-  }
 }
 
 async function persistManagedLaunchWalletsFromPlan(
@@ -586,15 +544,16 @@ async function resolveBannerFile(tokenBanner: string, symbol: string) {
   });
 }
 
-async function normalizeLaunchInputMediaForStorage(
-  input: LaunchTokenInput
-): Promise<LaunchTokenInput> {
-  const normalizedInput: LaunchTokenInput = { ...input };
-  const symbol = normalizeSymbol(input.tokenSymbol);
+async function normalizeVersionedLaunchMediaForStorage(
+  input: VersionedLaunchInput
+): Promise<VersionedLaunchInput> {
+  const symbol = normalizeSymbol(input.metadata.tokenSymbol);
+  let tokenImage = input.metadata.tokenImage;
+  let tokenBanner = input.metadata.tokenBanner;
 
-  if (normalizedInput.tokenImage.startsWith("data:")) {
+  if (tokenImage.startsWith("data:")) {
     const uploadedMainMedia = await storageService.uploadImage(
-      normalizedInput.tokenImage,
+      tokenImage,
       symbol
     );
     if (uploadedMainMedia.startsWith("data:")) {
@@ -603,10 +562,10 @@ async function normalizeLaunchInputMediaForStorage(
         500
       );
     }
-    normalizedInput.tokenImage = uploadedMainMedia;
+    tokenImage = uploadedMainMedia;
   }
 
-  const trimmedBanner = normalizedInput.tokenBanner?.trim() ?? "";
+  const trimmedBanner = tokenBanner?.trim() ?? "";
   if (trimmedBanner.startsWith("data:")) {
     const uploadedBannerMedia = await storageService.uploadImage(
       trimmedBanner,
@@ -618,10 +577,17 @@ async function normalizeLaunchInputMediaForStorage(
         500
       );
     }
-    normalizedInput.tokenBanner = uploadedBannerMedia;
+    tokenBanner = uploadedBannerMedia;
   }
 
-  return normalizedInput;
+  return {
+    ...input,
+    metadata: {
+      ...input.metadata,
+      tokenImage,
+      ...(tokenBanner !== undefined ? { tokenBanner } : {}),
+    },
+  };
 }
 
 async function appendLog(
@@ -1078,11 +1044,6 @@ function keypairFromPrivateKey(privateKey: string) {
   return Keypair.fromSecretKey(bs58.decode(privateKey));
 }
 
-function getSystemDevWalletKeypair(): Keypair {
-  const { SYSTEM_DEV_WALLET_PRIVATE_KEY } = getEnv();
-  return keypairFromPrivateKey(SYSTEM_DEV_WALLET_PRIVATE_KEY);
-}
-
 async function mintAccountExistsOnChain(mint: PublicKey) {
   try {
     const connection = getSolanaConnection();
@@ -1441,12 +1402,9 @@ function validateLaunchInput(input: LaunchCostInput) {
       400
     );
   }
-  if (
-    bundlerBuyAmountSol > 0 &&
-    bundlerBuyAmountSol < MIN_BUNDLER_BUY_AMOUNT_SOL
-  ) {
+  if (bundlerBuyAmountSol > 0 && bundlerBuyAmountSol < MIN_BUY_AMOUNT_SOL) {
     throw new AppError(
-      `Buy amount per wallet must be at least ${MIN_BUNDLER_BUY_AMOUNT_SOL} SOL`,
+      `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL`,
       400
     );
   }
@@ -1656,14 +1614,6 @@ async function resolvePreflightDevWalletBalance(params: {
   input: LaunchCostInput;
   mainWalletPublicKey: string;
 }) {
-  if (params.input.devWalletOption === "system") {
-    const systemKeypair = getSystemDevWalletKeypair();
-    return {
-      devWalletPublicKey: systemKeypair.publicKey.toBase58(),
-      currentLamports: BigInt(0),
-    };
-  }
-
   if (params.input.devWalletOption === "use_main") {
     return {
       devWalletPublicKey: params.mainWalletPublicKey,
@@ -1857,28 +1807,13 @@ export async function calculateLaunchCostPreview(
 }
 
 async function resolveDevWallet(
-  input: LaunchInputFromStorage,
+  input: Pick<LaunchTokenInput, "devWalletOption" | "importedDevWalletKey">,
   userId: string,
   mainWalletKeypair: Keypair,
   mainWalletPublicKey: string
 ) {
   let devWalletKeypair = mainWalletKeypair;
   let devWalletPublicKey = mainWalletPublicKey;
-
-  if (input.devWalletOption === "system") {
-    devWalletKeypair = getSystemDevWalletKeypair();
-    devWalletPublicKey = devWalletKeypair.publicKey.toBase58();
-    await prisma.wallet.upsert({
-      where: { publicKey: devWalletPublicKey },
-      update: {},
-      create: {
-        publicKey: devWalletPublicKey,
-        privateKey: "",
-        type: "DEV",
-        isSystemWallet: true,
-      },
-    });
-  }
 
   if (input.devWalletOption === "import") {
     if (!input.importedDevWalletKey?.trim()) {
@@ -3665,7 +3600,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
   const { mapPumpfunCostPreviewToNormalizedMoney } = await import(
     "./launch-platform-pumpfun"
   );
-  const flatInput = flattenVersionedLaunchInput(params.input);
+  const config = params.input.config;
   const localResources: LaunchPlatformPlanLocalResources = {
     reservedVanityMintId: null,
     createdWalletPublicKeys: [],
@@ -3683,9 +3618,9 @@ export async function buildPumpfunAuthoritativePlan(params: {
       bundlerBuyAmountSol,
       bundlerBuyVariancePercent,
       distributionWalletMultiplier,
-    } = validateLaunchInput(flatInput);
+    } = validateLaunchInput(config);
 
-    if (flatInput.mayhemMode) {
+    if (config.mayhemMode) {
       await assertMayhemCreateAllowed(true);
     }
 
@@ -3703,7 +3638,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
     );
 
     const { devWalletKeypair, devWalletPublicKey } = await resolveDevWallet(
-      flatInput,
+      config,
       params.userId,
       mainWalletKeypair,
       mainWalletPublicKey
@@ -3711,7 +3646,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
     void devWalletKeypair;
 
     const bundlerWalletKeypairs =
-      flatInput.bundleBuyEnabled && bundlerWalletCount > 0
+      config.bundleBuyEnabled && bundlerWalletCount > 0
         ? await ensureBundlerWallets(params.userId, bundlerWalletCount)
         : [];
     const distributionWallets =
@@ -3736,7 +3671,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
       )
       .map((wallet) => wallet.publicKey);
 
-    const bundlerBuyAllocation = flatInput.bundleBuyEnabled
+    const bundlerBuyAllocation = config.bundleBuyEnabled
       ? buildBundlerBuyTargets(
           bundlerWalletKeypairs,
           bundlerBuyAmountSol,
@@ -3749,7 +3684,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
         };
 
     const fundingPlan = await buildLaunchFundingPlan({
-      input: flatInput,
+      input: config,
       bundlerWalletCount,
       bundlerBuyAmountSol,
       bundlerBuyVariancePercent,
@@ -3768,7 +3703,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
       minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
     });
 
-    const costPreview = await calculateLaunchCostPreview(flatInput, {
+    const costPreview = await calculateLaunchCostPreview(config, {
       id: params.userId,
       plan: user.plan,
     });
@@ -3786,7 +3721,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
     }
 
     let reservedVanityMintPublicKey: string | null = null;
-    if (flatInput.vanityMint) {
+    if (config.vanityMint) {
       const mintReservation = await reserveMintIfRequested(
         params.launchId,
         params.userId,
@@ -3802,7 +3737,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
       managedWallets.push({
         publicKey: devWalletPublicKey,
         platformRole: "creator",
-        isManaged: flatInput.devWalletOption === "generate",
+        isManaged: config.devWalletOption === "generate",
         fundedCapLamports: fundingPlan.devFundingLamports.toString(),
       });
     }
@@ -3829,7 +3764,7 @@ export async function buildPumpfunAuthoritativePlan(params: {
       money: mapPumpfunCostPreviewToNormalizedMoney(costPreview),
       mainWalletPublicKey,
       creatorWalletPublicKey: devWalletPublicKey,
-      creatorWalletOption: flatInput.devWalletOption,
+      creatorWalletOption: config.devWalletOption,
       managedWallets,
       creatorBuyLamports: toLamports(devBuyAmountSol).toString(),
       bundlerBuyLamportsByWallet: bundlerWalletKeypairs.map((wallet, index) => ({
@@ -3841,10 +3776,10 @@ export async function buildPumpfunAuthoritativePlan(params: {
       jitoTipLamports: fundingPlan.tipLamports.toString(),
       mainReserveLamports: fundingPlan.mainReserveLamports.toString(),
       intendedEffects: {
-        bundleBuyEnabled: flatInput.bundleBuyEnabled,
-        mayhemMode: flatInput.mayhemMode ?? false,
-        vanityMint: flatInput.vanityMint,
-        removeAttribution: flatInput.removeAttribution,
+        bundleBuyEnabled: config.bundleBuyEnabled,
+        mayhemMode: config.mayhemMode ?? false,
+        vanityMint: config.vanityMint,
+        removeAttribution: config.removeAttribution,
         distributionWalletMultiplier,
       },
       reservedVanityMintId: localResources.reservedVanityMintId,
@@ -4036,12 +3971,11 @@ export const launchService = {
 
   async startLaunch(input: VersionedLaunchInput, user: RequestUser) {
     resolveLaunchPlatform(input.platform);
-    const flatInput = flattenVersionedLaunchInput(input);
     const idempotencyKey = [
       "launch-start",
       user.id,
-      flatInput.tokenName.trim().toLowerCase(),
-      normalizeSymbol(flatInput.tokenSymbol),
+      input.metadata.tokenName.trim().toLowerCase(),
+      normalizeSymbol(input.metadata.tokenSymbol),
     ].join(":");
     const actionKey = `launch:start:${user.id}`;
 
@@ -4062,20 +3996,17 @@ export const launchService = {
             return { launchId: existing.id };
           }
 
-          const normalizedFlat =
-            await normalizeLaunchInputMediaForStorage(flatInput);
+          const normalizedInput =
+            await normalizeVersionedLaunchMediaForStorage(input);
           const launchRealtimeAccess = grpcAccessService.getFeatureAccess(
             user,
             "launch-fast-confirmation"
           );
-          const persistence = buildNewLaunchPersistence(
-            toVersionedLaunchInput(normalizedFlat),
-            {
-              plan: user.plan,
-              launchRealtimeEnabled: launchRealtimeAccess.allowed,
-              platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
-            }
-          );
+          const persistence = buildNewLaunchPersistence(normalizedInput, {
+            plan: user.plan,
+            launchRealtimeEnabled: launchRealtimeAccess.allowed,
+            platformFeeWaived: grpcAccessService.isPlatformFeeWaived(user),
+          });
           const launch = await prisma.launch.create({
             data: {
               userId: user.id,
@@ -4426,14 +4357,6 @@ export const launchService = {
     await appendLog(launchId, "WARN", "Cancel requested", "cancel");
     return updated;
   },
-
-  /**
-   * @deprecated Prefer `runBundledPumpfunLaunchJob` via Platform execute.
-   * Kept as a thin alias for transitional callers.
-   */
-  async runLaunchJob(launchId: string) {
-    await runBundledPumpfunLaunchJob(launchId);
-  },
 };
 
 /**
@@ -4498,25 +4421,20 @@ async function runPumpfunLaunchJobByMode(
         errorMessage: "Launch input is no longer valid",
       };
     }
-    const input = toStoredLaunchInput(resolvedInput);
-    if (mode === "bundled" && !input.bundleBuyEnabled) {
+    const storedInput = toStoredLaunchInput(resolvedInput);
+    if (mode === "bundled" && !storedInput.bundleBuyEnabled) {
       throw new AppError(
         "Non-bundled launches must execute through the non-bundled Platform path",
         500
       );
     }
-    if (mode === "non_bundled" && input.bundleBuyEnabled) {
+    if (mode === "non_bundled" && storedInput.bundleBuyEnabled) {
       throw new AppError(
         "Bundled launches must execute through the bundled Platform path",
         500
       );
     }
-    if (input.devWalletOption === "system") {
-      throw new AppError(
-        "The platform dev wallet is no longer available for new launches",
-        400
-      );
-    }
+    const input = assertExecutableLaunchInput(storedInput);
 
     await updateLaunchRecord(launchId, {
       status: "RUNNING",

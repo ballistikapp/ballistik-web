@@ -27,8 +27,8 @@ import { runPumpfunRecoverDefault } from "@/server/services/launch-platform-pump
 
 type RequestUser = Pick<ContextUser, "id" | "plan">;
 
-/** Cost snapshot shape produced by the existing launch cost calculator. */
-export type PumpfunLegacyCostPreview = {
+/** Cost snapshot shape produced by the pump.fun launch cost calculator. */
+export type PumpfunCostPreview = {
   platformFeeWaived: boolean;
   platformFeeDiscountRate: number;
   mainWalletBalanceLamports: string;
@@ -63,7 +63,7 @@ export type PumpfunPlatformModuleDeps = {
   calculateCostPreview: (
     input: VersionedLaunchPreviewInput["config"],
     user: RequestUser
-  ) => Promise<PumpfunLegacyCostPreview>;
+  ) => Promise<PumpfunCostPreview>;
   buildPlan: (
     ctx: LaunchLifecycleContext,
     input: VersionedLaunchInput
@@ -88,11 +88,11 @@ function lineItem(label: string, sol: number) {
 }
 
 /**
- * Map the legacy SOL cost preview into the shared normalized money summary.
+ * Map the pump.fun SOL cost preview into the shared normalized money summary.
  * Signed main-wallet deltas are outflows (negative).
  */
 export function mapPumpfunCostPreviewToNormalizedMoney(
-  preview: PumpfunLegacyCostPreview
+  preview: PumpfunCostPreview
 ): NormalizedLaunchMoneySummary {
   const items = preview.lineItems;
   const generatedLabel =
@@ -150,7 +150,7 @@ export function mapPumpfunCostPreviewToNormalizedMoney(
 }
 
 function toPreviewResult(
-  preview: PumpfunLegacyCostPreview
+  preview: PumpfunCostPreview
 ): LaunchPlatformPreviewResult {
   return {
     money: mapPumpfunCostPreviewToNormalizedMoney(preview),
@@ -164,7 +164,7 @@ function toPreviewResult(
 async function defaultCalculateCostPreview(
   config: VersionedLaunchPreviewInput["config"],
   user: RequestUser
-): Promise<PumpfunLegacyCostPreview> {
+): Promise<PumpfunCostPreview> {
   const { calculateLaunchCostPreview } = await import("./launch.service");
   return calculateLaunchCostPreview(config, user);
 }

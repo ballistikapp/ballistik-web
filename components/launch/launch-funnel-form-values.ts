@@ -1,10 +1,13 @@
 import * as z from "zod";
-import { MAX_BUNDLE_WALLETS } from "@/lib/config/launch.config";
+import {
+  MAX_BUNDLE_WALLETS,
+  MIN_BUY_AMOUNT_SOL,
+} from "@/lib/config/launch.config";
 import type { SubmittableFunnelPlatform } from "./platform-availability";
 
-export const DEV_BUY_SOL_MIN = 0.05;
+export const DEV_BUY_SOL_MIN = MIN_BUY_AMOUNT_SOL;
 export const DEV_BUY_SOL_MAX = 100;
-export const BUNDLER_BUY_PER_WALLET_MIN = 0.05;
+export const BUNDLER_BUY_PER_WALLET_MIN = MIN_BUY_AMOUNT_SOL;
 
 export const sharedTokenMetadataFormSchema = z.object({
   tokenName: z

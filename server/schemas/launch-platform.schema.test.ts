@@ -1,6 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
+  MAX_BUNDLE_WALLETS,
+  MIN_BUY_AMOUNT_SOL,
+} from "@/lib/config/launch.config";
+import {
   isLegacyPlatformRecord,
   normalizedLaunchMoneySummarySchema,
   versionedLaunchInputSchema,
@@ -72,6 +76,38 @@ test("versioned launch input rejects system creator Wallet option", () => {
     },
   });
   assert.equal(result.success, false);
+});
+
+test("versioned launch config buy and bundle limits match launch.config", () => {
+  const overBundle = versionedLaunchInputSchema.safeParse({
+    ...validPumpfunInput,
+    config: {
+      ...validPumpfunInput.config,
+      bundlerWalletCount: MAX_BUNDLE_WALLETS + 1,
+    },
+  });
+  assert.equal(overBundle.success, false);
+
+  const underMinBuy = versionedLaunchInputSchema.safeParse({
+    ...validPumpfunInput,
+    config: {
+      ...validPumpfunInput.config,
+      devBuyAmountSol: MIN_BUY_AMOUNT_SOL - 0.001,
+      bundlerBuyAmountSol: MIN_BUY_AMOUNT_SOL - 0.001,
+    },
+  });
+  assert.equal(underMinBuy.success, false);
+
+  const atLimits = versionedLaunchInputSchema.safeParse({
+    ...validPumpfunInput,
+    config: {
+      ...validPumpfunInput.config,
+      bundlerWalletCount: MAX_BUNDLE_WALLETS,
+      devBuyAmountSol: MIN_BUY_AMOUNT_SOL,
+      bundlerBuyAmountSol: MIN_BUY_AMOUNT_SOL,
+    },
+  });
+  assert.equal(atLimits.success, true);
 });
 
 test("normalized money summary requires funding, spend, return, fee, and labeled line items", () => {

@@ -1,6 +1,8 @@
 # Launch Platform Architecture Refactor
 
-Status: ready-for-agent
+Status: complete (ticket 16 done; production ship gate cleared)
+
+Ship rule: ticket `16` is complete. Intermediate tickets were allowed to break Launch; only the finished effort is production-safe.
 
 ## Problem Statement
 
@@ -149,6 +151,7 @@ SPL launching is not implemented by this effort. The backend will accept only th
 - **Shared interface evolution**: Adding SPL is not required to leave every shared type untouched. It may sharpen normalized summaries, outcomes, or lifecycle contracts when concrete differences are known, but it must not reintroduce pump assumptions into the shared lifecycle.
 - **Implementation documentation**: Launch, bundle/Jito, pricing, Ops, Wallet/recovery, and project overview documentation must be updated with the new terms, lifecycle, invariants, and removed system path.
 - **Database rollout**: Agents modify the Prisma schema and regenerate the client when implementation reaches that stage. A human creates/runs/reviews migrations and any required data backfill.
+- **Production ship gate**: No application code from this effort is pushed to production until the last ticket (`16`) is complete. Intermediate tickets may leave Launch broken, half-routed, or dependent on transitional delegates. Do not add compatibility scaffolding, dual-path keepalives, or “keep main green” work solely to preserve production readiness between tickets. Staging/review branches may break; only the finished effort must be production-safe.
 - **Delivery stages**:
   1. Add Platform/version/input contracts, legacy gating, normalized money types, and persistence fields without changing execution.
   2. Introduce shared lifecycle and Platform registry, then route current pump behavior through compatibility delegates.
@@ -227,6 +230,7 @@ SPL launching is not implemented by this effort. The backend will accept only th
 
 ## Further Notes
 
+- **Agent note — breakage between tickets is expected.** Application code for this effort is not production-bound until ticket `16` lands. Prefer the direct cut for each ticket over preserving a working Launch path for later tickets or production.
 - The generic Platform seam is intentionally provisional. It is deeper than the current implementation because it hides pump.fun behavior, but its shared types may be revised when SPL provides a second concrete adapter.
 - The architectural deletion test is: deleting the pump.fun Platform module should force its validation, planning, metadata, Wallet-role, execution, classification, and recovery complexity back into the shared lifecycle. Deleting the shared lifecycle should force status, logs, cancellation, retry, plan durability, and fee orchestration into every Platform.
 - The Platform plan is operational intent, not a durable workflow continuation. Its existence gates funding and supports recovery/audit, but does not imply resumable execution.
