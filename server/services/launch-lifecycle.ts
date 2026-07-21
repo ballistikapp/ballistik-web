@@ -58,7 +58,11 @@ export type LaunchLifecycleDeps = {
   updateLaunchStatus: (
     launchId: string,
     status: "SUCCEEDED" | "FAILED" | "CANCELED",
-    errorMessage?: string | null
+    errorMessage?: string | null,
+    outcome?: {
+      kind: string;
+      details?: Record<string, unknown> | null;
+    }
   ) => Promise<void>;
   collectUsageFee: (
     input: CollectUsageFeeInput
@@ -155,10 +159,6 @@ async function applyPlatformExecuteResult(
   launchId: string,
   result: LaunchPlatformExecuteResult
 ): Promise<void> {
-  if (result.kind === "compat") {
-    return;
-  }
-
   if (result.kind === "succeeded") {
     await collectUsageFeeAfterSuccess(deps, {
       launchId,
@@ -166,16 +166,41 @@ async function applyPlatformExecuteResult(
       tokenPublicKey: result.tokenPublicKey,
       usageFeeTotalSol: result.usageFeeTotalSol,
     });
-    await deps.updateLaunchStatus(launchId, "SUCCEEDED", null);
+    await deps.updateLaunchStatus(launchId, "SUCCEEDED", null, {
+      kind: "succeeded",
+      details: {
+        tokenPublicKey: result.tokenPublicKey,
+        ...(result.details ?? {}),
+      },
+    });
     return;
   }
 
   if (result.kind === "canceled") {
-    await deps.updateLaunchStatus(launchId, "CANCELED", null);
+    await deps.updateLaunchStatus(launchId, "CANCELED", null, {
+      kind: "canceled",
+      details: result.details ?? null,
+    });
     return;
   }
 
-  await deps.updateLaunchStatus(launchId, "FAILED", result.errorMessage);
+  if (result.kind === "partial" || result.kind === "indeterminate") {
+    await deps.updateLaunchStatus(launchId, "FAILED", result.errorMessage, {
+      kind: result.kind,
+      details: {
+        ...(result.tokenPublicKey
+          ? { tokenPublicKey: result.tokenPublicKey }
+          : {}),
+        ...(result.details ?? {}),
+      },
+    });
+    return;
+  }
+
+  await deps.updateLaunchStatus(launchId, "FAILED", result.errorMessage, {
+    kind: "failed",
+    details: result.details ?? null,
+  });
 }
 
 async function compensateResources(
@@ -418,7 +443,7 @@ const defaultDeps: LaunchLifecycleDeps = {
     });
     return Boolean(launch?.cancelRequestedAt);
   },
-  updateLaunchStatus: async (launchId, status, errorMessage) => {
+  updateLaunchStatus: async (launchId, status, errorMessage, outcome) => {
     await prisma.launch.update({
       where: { id: launchId },
       data: {
@@ -427,6 +452,15 @@ const defaultDeps: LaunchLifecycleDeps = {
         completedAt: new Date(),
         ...(status === "SUCCEEDED" || status === "CANCELED" || status === "FAILED"
           ? { progress: 100 }
+          : {}),
+        ...(outcome
+          ? {
+              outcomeKind: outcome.kind,
+              outcomeDetails:
+                outcome.details === undefined || outcome.details === null
+                  ? Prisma.JsonNull
+                  : (outcome.details as Prisma.InputJsonValue),
+            }
           : {}),
       },
     });
@@ -440,7 +474,8 @@ const lifecycle = createLaunchLifecycle(defaultDeps);
  * Shared Launch lifecycle: router-facing start/status/cancel/retry/active,
  * plan durability before execute, Platform execution scheduling, and
  * post-success fee orchestration.
- * Heavy pump.fun job work remains in launch.service via Platform compat execute.
+ * Heavy pump.fun job work remains in launch.service; Platform execute returns
+ * typed outcomes that this module maps to Launch status and outcomeKind.
  */
 export const launchLifecycle = {
   async startLaunch(input: VersionedLaunchInput, user: RequestUser) {

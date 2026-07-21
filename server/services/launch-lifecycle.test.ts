@@ -93,8 +93,11 @@ function createFakePlatform(handlers: {
         planSchemaVersion: "1",
         plan: { ok: true },
       })),
-    execute: handlers.execute ?? (async () => ({ kind: "compat" })),
-    recover: async () => undefined,
+    execute: handlers.execute ?? (async () => ({ kind: "canceled" })),
+    recover: async () => ({
+      mainWalletPublicKey: "Main111",
+      results: [],
+    }),
     compensatePlanResources:
       handlers.compensatePlanResources ?? (async () => undefined),
   };
@@ -151,7 +154,7 @@ test("lifecycle persists plan before execute and passes exact plan to execute", 
             events.push("execute");
             assert.deepEqual(ctx.plan, planned);
             assert.equal(ctx.planSchemaVersion, "1");
-            return { kind: "compat" };
+            return { kind: "canceled" };
           },
         }),
       persistPlan: async (_launchId, version, plan) => {
@@ -186,7 +189,7 @@ test("lifecycle marks FAILED and skips execute when planning fails", async () =>
           }),
           execute: async () => {
             executeCalled = true;
-            return { kind: "compat" };
+            return { kind: "canceled" };
           },
         }),
       updateLaunchStatus: async (_launchId, status, message) => {
@@ -225,7 +228,7 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
           }),
           execute: async () => {
             events.push("execute");
-            return { kind: "compat" };
+            return { kind: "canceled" };
           },
           compensatePlanResources: async (_ctx, resources) => {
             events.push("compensate");
@@ -272,7 +275,7 @@ test("lifecycle skips planning when an authoritative plan is already persisted",
           },
           execute: async (ctx) => {
             sawPlan = ctx.plan;
-            return { kind: "compat" };
+            return { kind: "canceled" };
           },
         }),
       loadLaunch: async () => ({
@@ -316,7 +319,7 @@ test("lifecycle runs Platform execute with progress and cancel context", async (
             await ctx.reportProgress(40, "create");
             sawCancelQuery = await ctx.isCancelRequested();
             await ctx.appendLog("INFO", "fake step", "create");
-            return { kind: "compat" };
+            return { kind: "canceled" };
           },
         }),
       reportProgress: async (_launchId, progress, step) => {
@@ -454,4 +457,94 @@ test("lifecycle skips fee collection for non-success Platform outcomes", async (
 
   assert.equal(feeCalled, false);
   assert.equal(finalStatus, "FAILED");
+});
+
+test("lifecycle maps partial and indeterminate outcomes to FAILED with outcomeKind", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  for (const kind of ["partial", "indeterminate"] as const) {
+    let finalStatus: string | null = null;
+    let outcomeKind: string | null = null;
+    let feeCalled = false;
+
+    const lifecycle = createLaunchLifecycle(
+      baseDeps({
+        loadLaunch: async () => ({
+          id: "launch-1",
+          userId: "user-1",
+          platform: "PUMPFUN",
+          status: "PENDING",
+          plan: { ok: true },
+          planSchemaVersion: "1",
+          planPersistedAt: new Date("2026-01-01T00:00:00.000Z"),
+          input: sampleInput,
+        }),
+        resolvePlatform: () =>
+          createFakePlatform({
+            execute: async () => ({
+              kind,
+              errorMessage: `${kind} evidence`,
+              tokenPublicKey: "Token1111111111111111111111111111111111111",
+            }),
+          }),
+        updateLaunchStatus: async (_launchId, status, _message, outcome) => {
+          finalStatus = status;
+          outcomeKind = outcome?.kind ?? null;
+        },
+        collectUsageFee: async () => {
+          feeCalled = true;
+          throw new Error("should not collect");
+        },
+      })
+    );
+
+    await lifecycle.runPlatformExecution("launch-1");
+
+    assert.equal(finalStatus, "FAILED");
+    assert.equal(outcomeKind, kind);
+    assert.equal(feeCalled, false);
+  }
+});
+
+test("lifecycle persists succeeded outcomeKind after fee collection", async () => {
+  stubServerOnlyModule();
+  const { createLaunchLifecycle } = await import("./launch-lifecycle");
+
+  let finalStatus: string | null = null;
+  let outcomeKind: string | null = null;
+
+  const lifecycle = createLaunchLifecycle(
+    baseDeps({
+      loadLaunch: async () => ({
+        id: "launch-1",
+        userId: "user-1",
+        platform: "PUMPFUN",
+        status: "PENDING",
+        plan: { ok: true },
+        planSchemaVersion: "1",
+        planPersistedAt: new Date("2026-01-01T00:00:00.000Z"),
+        input: sampleInput,
+      }),
+      resolvePlatform: () =>
+        createFakePlatform({
+          execute: async () => ({
+            kind: "succeeded",
+            usageFeeTotalSol: 0,
+            userId: "user-1",
+            tokenPublicKey: "Token1111111111111111111111111111111111111",
+            referenceId: "launch-1",
+          }),
+        }),
+      updateLaunchStatus: async (_launchId, status, _message, outcome) => {
+        finalStatus = status;
+        outcomeKind = outcome?.kind ?? null;
+      },
+    })
+  );
+
+  await lifecycle.runPlatformExecution("launch-1");
+
+  assert.equal(finalStatus, "SUCCEEDED");
+  assert.equal(outcomeKind, "succeeded");
 });

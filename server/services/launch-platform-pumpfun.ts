@@ -23,6 +23,7 @@ import {
   runPumpfunBundledExecuteDefault,
   runPumpfunNonBundledExecuteDefault,
 } from "@/server/services/launch-platform-pumpfun-execute";
+import { runPumpfunRecoverDefault } from "@/server/services/launch-platform-pumpfun-recover";
 
 type RequestUser = Pick<ContextUser, "id" | "plan">;
 
@@ -72,9 +73,14 @@ export type PumpfunPlatformModuleDeps = {
     resources: LaunchPlatformPlanLocalResources
   ) => Promise<void>;
   /** Bundled path — Platform-owned raw create + Jito buys. */
-  runBundledExecute: (ctx: LaunchLifecycleContext) => Promise<void>;
+  runBundledExecute: (
+    ctx: LaunchLifecycleContext
+  ) => Promise<LaunchPlatformExecuteResult>;
   /** Non-bundled path — Platform-owned raw create / create+dev-buy. */
-  runNonBundledExecute: (ctx: LaunchLifecycleContext) => Promise<void>;
+  runNonBundledExecute: (
+    ctx: LaunchLifecycleContext
+  ) => Promise<LaunchPlatformExecuteResult>;
+  recover: LaunchPlatformModule["recover"];
 };
 
 function lineItem(label: string, sol: number) {
@@ -183,19 +189,12 @@ async function defaultCompensatePlanResources(
   await compensatePumpfunPlanResources(resources);
 }
 
-function notExtractedYet(operation: string): never {
-  throw new AppError(
-    `pump.fun Platform ${operation} is not extracted yet`,
-    501,
-    { operation }
-  );
-}
-
 /**
  * pump.fun Platform module.
- * preview and plan are implemented; recover deepens later.
+ * preview, plan, execute, and recover are implemented.
  * execute validates the persisted plan, then routes bundled and non-bundled
- * launches to Platform-owned raw instruction paths (no PumpFunSDK).
+ * launches to Platform-owned raw instruction paths (no PumpFunSDK) and returns
+ * typed outcomes for the shared lifecycle to persist.
  */
 export function createPumpfunPlatformModule(
   deps: Partial<PumpfunPlatformModuleDeps> = {}
@@ -209,6 +208,7 @@ export function createPumpfunPlatformModule(
     deps.runBundledExecute ?? runPumpfunBundledExecuteDefault;
   const runNonBundledExecute =
     deps.runNonBundledExecute ?? runPumpfunNonBundledExecuteDefault;
+  const recover = deps.recover ?? runPumpfunRecoverDefault;
 
   return {
     id: "PUMPFUN",
@@ -226,13 +226,11 @@ export function createPumpfunPlatformModule(
     execute: async (ctx: LaunchLifecycleContext) => {
       const plan = requirePumpfunExecutePlan(ctx);
       if (plan.intendedEffects.bundleBuyEnabled) {
-        await runBundledExecute(ctx);
-      } else {
-        await runNonBundledExecute(ctx);
+        return runBundledExecute(ctx);
       }
-      return { kind: "compat" } satisfies LaunchPlatformExecuteResult;
+      return runNonBundledExecute(ctx);
     },
-    recover: async () => notExtractedYet("recover"),
+    recover,
     compensatePlanResources,
   };
 }

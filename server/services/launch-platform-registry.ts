@@ -16,8 +16,8 @@ export type LaunchLogLevel = "INFO" | "WARN" | "ERROR" | "STEP";
 /**
  * Narrow lifecycle context passed into Platform modules.
  * Platforms report progress/events and query cancellation here; they must not
- * write Launch / LaunchLog rows directly (compat execute may still do so until
- * later extraction tickets).
+ * write Launch / LaunchLog rows for terminal status (jobs may still write
+ * progress/logs/result bookkeeping until further extraction).
  */
 export type LaunchLifecycleContext = {
   launchId: string;
@@ -40,20 +40,48 @@ export type LaunchPlatformPreviewContext = {
 };
 
 /**
- * Typed execute outcomes. `compat` means the Platform delegate already applied
- * terminal status and fee timing (current pump.fun job path).
+ * Typed execute outcomes. Expected operational failures are results.
+ * Interface violations and implementation defects throw.
  */
 export type LaunchPlatformExecuteResult =
-  | { kind: "compat" }
   | {
       kind: "succeeded";
       usageFeeTotalSol: number;
       userId: string;
       tokenPublicKey: string;
       referenceId: string;
+      details?: Record<string, unknown>;
     }
-  | { kind: "failed"; errorMessage: string }
-  | { kind: "canceled" };
+  | { kind: "canceled"; details?: Record<string, unknown> }
+  | {
+      kind: "failed";
+      errorMessage: string;
+      details?: Record<string, unknown>;
+    }
+  | {
+      kind: "partial";
+      errorMessage: string;
+      tokenPublicKey?: string;
+      details?: Record<string, unknown>;
+    }
+  | {
+      kind: "indeterminate";
+      errorMessage: string;
+      tokenPublicKey?: string;
+      details?: Record<string, unknown>;
+    };
+
+/** Manual / Platform recover reclaim summary (funded-cap drain). */
+export type LaunchPlatformRecoverResult = {
+  mainWalletPublicKey: string;
+  results: Array<{
+    publicKey: string;
+    status: "returned" | "skipped" | "failed";
+    signature?: string;
+    amountSol?: number;
+    error?: string;
+  }>;
+};
 
 /** Local reservations / key refs created during planning that need compensation. */
 export type LaunchPlatformPlanLocalResources = {
@@ -81,8 +109,8 @@ export type LaunchPlatformPlanResult =
 /**
  * Shared Platform module interface.
  * preview returns normalized money plus the thin review envelope fields.
- * plan produces a secret-free authoritative plan; recover deepens later.
- * execute initially delegates to pump.fun compatibility code.
+ * plan produces a secret-free authoritative plan.
+ * execute returns typed outcomes; recover reconstructs from persisted plan evidence.
  */
 export type LaunchPlatformModule = {
   readonly id: LaunchPlatformId;
@@ -95,7 +123,10 @@ export type LaunchPlatformModule = {
     input: VersionedLaunchInput
   ) => Promise<LaunchPlatformPlanResult>;
   execute: (ctx: LaunchLifecycleContext) => Promise<LaunchPlatformExecuteResult>;
-  recover: (ctx: LaunchLifecycleContext) => Promise<void>;
+  recover: (
+    ctx: LaunchLifecycleContext,
+    options?: { walletPublicKeys?: string[] }
+  ) => Promise<LaunchPlatformRecoverResult>;
   /** Release vanity reservations / abandon unfunded key refs after plan failure. */
   compensatePlanResources: (
     ctx: LaunchLifecycleContext,

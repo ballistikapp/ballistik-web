@@ -5,7 +5,10 @@ import {
   pumpfunLaunchPlanV1Schema,
   type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
-import type { LaunchLifecycleContext } from "@/server/services/launch-platform-registry";
+import type {
+  LaunchLifecycleContext,
+  LaunchPlatformExecuteResult,
+} from "@/server/services/launch-platform-registry";
 
 const SUPPORTED_CREATOR_OPTIONS = ["import", "generate", "use_main"] as const;
 
@@ -77,11 +80,11 @@ export function assertNonSystemCreatorWalletOption(
 }
 
 export type PumpfunNonBundledExecuteDeps = {
-  runNonBundledJob: (launchId: string) => Promise<void>;
+  runNonBundledJob: (launchId: string) => Promise<LaunchPlatformExecuteResult>;
 };
 
 export type PumpfunBundledExecuteDeps = {
-  runBundledJob: (launchId: string) => Promise<void>;
+  runBundledJob: (launchId: string) => Promise<LaunchPlatformExecuteResult>;
 };
 
 /**
@@ -91,7 +94,7 @@ export type PumpfunBundledExecuteDeps = {
 export async function runPumpfunNonBundledExecute(
   ctx: LaunchLifecycleContext,
   deps: PumpfunNonBundledExecuteDeps
-): Promise<void> {
+): Promise<LaunchPlatformExecuteResult> {
   const plan = requirePumpfunExecutePlan(ctx);
   if (plan.intendedEffects.bundleBuyEnabled) {
     throw new AppError(
@@ -99,7 +102,7 @@ export async function runPumpfunNonBundledExecute(
       500
     );
   }
-  await deps.runNonBundledJob(ctx.launchId);
+  return deps.runNonBundledJob(ctx.launchId);
 }
 
 /**
@@ -109,7 +112,7 @@ export async function runPumpfunNonBundledExecute(
 export async function runPumpfunBundledExecute(
   ctx: LaunchLifecycleContext,
   deps: PumpfunBundledExecuteDeps
-): Promise<void> {
+): Promise<LaunchPlatformExecuteResult> {
   const plan = requirePumpfunExecutePlan(ctx);
   if (!plan.intendedEffects.bundleBuyEnabled) {
     throw new AppError(
@@ -117,31 +120,35 @@ export async function runPumpfunBundledExecute(
       500
     );
   }
-  await deps.runBundledJob(ctx.launchId);
+  return deps.runBundledJob(ctx.launchId);
 }
 
-async function defaultRunNonBundledJob(launchId: string): Promise<void> {
+async function defaultRunNonBundledJob(
+  launchId: string
+): Promise<LaunchPlatformExecuteResult> {
   const { runNonBundledPumpfunLaunchJob } = await import("./launch.service");
-  await runNonBundledPumpfunLaunchJob(launchId);
+  return runNonBundledPumpfunLaunchJob(launchId);
 }
 
-async function defaultRunBundledJob(launchId: string): Promise<void> {
+async function defaultRunBundledJob(
+  launchId: string
+): Promise<LaunchPlatformExecuteResult> {
   const { runBundledPumpfunLaunchJob } = await import("./launch.service");
-  await runBundledPumpfunLaunchJob(launchId);
+  return runBundledPumpfunLaunchJob(launchId);
 }
 
 export async function runPumpfunNonBundledExecuteDefault(
   ctx: LaunchLifecycleContext
-): Promise<void> {
-  await runPumpfunNonBundledExecute(ctx, {
+): Promise<LaunchPlatformExecuteResult> {
+  return runPumpfunNonBundledExecute(ctx, {
     runNonBundledJob: defaultRunNonBundledJob,
   });
 }
 
 export async function runPumpfunBundledExecuteDefault(
   ctx: LaunchLifecycleContext
-): Promise<void> {
-  await runPumpfunBundledExecute(ctx, {
+): Promise<LaunchPlatformExecuteResult> {
+  return runPumpfunBundledExecute(ctx, {
     runBundledJob: defaultRunBundledJob,
   });
 }

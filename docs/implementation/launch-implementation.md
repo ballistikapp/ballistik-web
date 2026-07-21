@@ -17,11 +17,13 @@
 4. Lifecycle resolves pump.fun via `resolveLaunchPlatform`, calls `platform.plan`, persists the secret-free authoritative plan (`plan` / `planSchemaVersion` / `planPersistedAt`), then calls `platform.execute` with that exact plan on the lifecycle context.
 5. Planning validation failures and insufficient main-Wallet funds transition the Launch to visible, retryable `FAILED` history (no silent discard). If plan persistence fails, pump.fun compensates local key refs / vanity reservations created during planning.
 6. Execute validates the persisted pump.fun plan (`pumpfunLaunchPlanV1Schema`) and branches:
-   - **Non-bundled** (`!intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunNonBundledExecute` → `runNonBundledPumpfunLaunchJob`). Uses plan identities/funding, pump venue metadata upload via raw `buildCreateTokenTransaction` / `buildCreateAndDevBuyVersionedTransaction`, Launch-owned AppTransaction bookkeeping, confirm/activate/cleanup/finalize. No PumpFunSDK. System creator Wallet is rejected. Returns `{ kind: "compat" }` (typed outcomes come later).
-   - **Bundled** (`intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunBundledExecute` → `runBundledPumpfunLaunchJob` → `createAndBuyInBundle`). Executes the exact persisted plan (wallets, allocations, tip, Mayhem flag, vanity reservation). Raw create/buy builders + Jito; Mayhem uses Token-2022 / dynamic ALT packing. Shared packing constants live in `bundle-transaction-builder`. No PumpFunSDK. System creator Wallet is rejected. Returns `{ kind: "compat" }` (typed outcomes come later).
-7. Job writes structured logs to `LaunchLog` and updates `Launch.progress` (compat / transitional path; later tickets migrate writes onto the lifecycle context).
-8. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-9. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint; execution paths still check that flag between steps (context-based cancel queries deepen as execution extraction continues).
+   - **Non-bundled** (`!intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunNonBundledExecute` → `runNonBundledPumpfunLaunchJob`). Uses plan identities/funding, pump venue metadata upload via raw `buildCreateTokenTransaction` / `buildCreateAndDevBuyVersionedTransaction`, Launch-owned AppTransaction bookkeeping, confirm/activate/cleanup. No PumpFunSDK. System creator Wallet is rejected. Returns a typed execute outcome (not `compat`).
+   - **Bundled** (`intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunBundledExecute` → `runBundledPumpfunLaunchJob` → `createAndBuyInBundle`). Executes the exact persisted plan (wallets, allocations, tip, Mayhem flag, vanity reservation). Raw create/buy builders + Jito; Mayhem uses Token-2022 / dynamic ALT packing. Shared packing constants live in `bundle-transaction-builder`. No PumpFunSDK. System creator Wallet is rejected. Returns a typed execute outcome.
+7. Platform success is confirmed plan-intended create/buy landing (non-bundled create or create+dev-buy; bundled Jito create+buys). Distribution, Token activate, SOL cleanup, and Launch row persistence are post-success control-plane steps: degradation keeps `succeeded` and never falsely cancels after irreversible submit.
+8. Typed outcomes (`succeeded` / `canceled` / `failed` / `partial` / `indeterminate`) are mapped by the shared lifecycle to `Launch.status` plus `outcomeKind` / `outcomeDetails`. `partial` and `indeterminate` map to `FAILED` with those kinds. Fee collection runs only on `succeeded`.
+9. Job writes structured logs and progress; terminal status is owned by the lifecycle after execute returns.
+10. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+11. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint. Cooperative cancel stops only at safe points before irreversible submission; after submit, outcomes are classified from chain evidence.
 
 ## tRPC Endpoints
 
@@ -34,10 +36,10 @@
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
 - `launch.recoveryWallets` (query): returns wallets eligible for SOL recovery after launch runs.
-- `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet.
+- `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet via Platform `recover` (validates persisted plan when present; funded-cap drain).
   - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
 - `launch.recoveryWalletsByToken` (query): resolves failed/canceled launch by token and returns wallets eligible for recovery.
-- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions.
+- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions (also via Platform `recover`).
 - `launch.status` also surfaces failed-launch auto reclaim activity through launch logs and `Launch.result`.
 - `launch.getUserLaunches` (query): returns all user launches with token join for the clone token dialog.
 
@@ -53,7 +55,7 @@ Tracks state and progress.
 - `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
 - `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Execution/retry/clone resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON.
 - `plan` / `planSchemaVersion` / `planPersistedAt`: secret-free authoritative Platform plan. Written after `platform.plan` succeeds and before `platform.execute`. pump.fun plan schema version `"1"` (`pumpfunLaunchPlanV1Schema`) includes normalized money, public wallet identities, allocations, intended effects, recovery caps, and opaque pump fields (vanity reservation ids — never private keys).
-- `outcomeKind` / `outcomeDetails`: additive Platform-owned outcome classification (nullable until classification lands).
+- `outcomeKind` / `outcomeDetails`: Platform-owned outcome classification persisted by the shared lifecycle (`succeeded`, `canceled`, `failed`, `partial`, `indeterminate`).
 - `result`: output metadata (JSON)
 - `tokenPublicKey`: token link when available
 - `cancelRequestedAt`: used for safe cancellation
@@ -116,8 +118,8 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 - Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection.
 - `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage. Signed main-Wallet deltas are outflows (negative).
 - `versionedLaunchPreviewInputSchema` / `launchPlatformPreviewResultSchema`: preview input (Platform + config) and API envelope (`money` + wallet/policy fields). Stable pump.fun line labels live in `lib/launch/money-labels.ts`.
-- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `plan` builds the secret-free authoritative plan (may create unfunded Wallet key refs and vanity reservations; must not fund or submit on-chain); `execute` validates the persisted plan then routes non-bundled launches to `runPumpfunNonBundledExecute` and bundled launches to `runPumpfunBundledExecute` (both Platform-owned raw instruction jobs; no PumpFunSDK / no system creator); `recover` throws until later tickets.
-- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns plan durability (plan → persist → execute); provides lifecycle contexts including the persisted plan; maps typed Platform outcomes; owns the post-success usage-fee helper. Start/cancel/retry bodies and Platform-owned execute jobs still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns the normalized envelope via the existing cost calculator; `plan` builds the secret-free authoritative plan (may create unfunded Wallet key refs and vanity reservations; must not fund or submit on-chain); `execute` validates the persisted plan then routes non-bundled launches to `runPumpfunNonBundledExecute` and bundled launches to `runPumpfunBundledExecute`, returning typed outcomes; `recover` validates the plan when present and reclaims SOL from persisted Managed Launch Wallet evidence with funded caps (`recoverSol` routes through it).
+- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns plan durability (plan → persist → execute); provides lifecycle contexts including the persisted plan; maps typed Platform outcomes to `status` + `outcomeKind` / `outcomeDetails`; owns the post-success usage-fee helper. Start/cancel/retry bodies and Platform-owned execute jobs still live in `launch.service.ts` until later extraction. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails.
 - Retry creates a new Launch linked to the failed attempt, reuses saved new-version input, and produces a fresh plan; the prior Launch and plan remain immutable.
 - `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
 

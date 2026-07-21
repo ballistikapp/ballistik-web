@@ -176,7 +176,7 @@ test("runPumpfunNonBundledExecute rejects bundled plans and runs job for non-bun
 
   const nonBundled = await buildSamplePlan(false);
   let ran = false;
-  await runPumpfunNonBundledExecute(
+  const result = await runPumpfunNonBundledExecute(
     lifecycleCtx({
       plan: nonBundled,
       planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
@@ -186,10 +186,12 @@ test("runPumpfunNonBundledExecute rejects bundled plans and runs job for non-bun
       runNonBundledJob: async (launchId) => {
         assert.equal(launchId, "launch-non-bundled");
         ran = true;
+        return { kind: "canceled" };
       },
     }
   );
   assert.equal(ran, true);
+  assert.equal(result.kind, "canceled");
 });
 
 test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundled", async () => {
@@ -218,7 +220,7 @@ test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundle
 
   const bundled = await buildSamplePlan(true);
   let ran = false;
-  await runPumpfunBundledExecute(
+  const result = await runPumpfunBundledExecute(
     lifecycleCtx({
       plan: bundled,
       planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
@@ -228,13 +230,21 @@ test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundle
       runBundledJob: async (launchId) => {
         assert.equal(launchId, "launch-bundled");
         ran = true;
+        return {
+          kind: "succeeded",
+          usageFeeTotalSol: 0,
+          userId: "user-1",
+          tokenPublicKey: "Token1111111111111111111111111111111111111",
+          referenceId: launchId,
+        };
       },
     }
   );
   assert.equal(ran, true);
+  assert.equal(result.kind, "succeeded");
 });
 
-test("platform execute routes non-bundled and bundled to Platform runners", async () => {
+test("platform execute routes typed job outcomes without compat", async () => {
   stubServerOnlyModule();
   const { createPumpfunPlatformModule } = await import(
     "./launch-platform-pumpfun"
@@ -244,9 +254,17 @@ test("platform execute routes non-bundled and bundled to Platform runners", asyn
   const platform = createPumpfunPlatformModule({
     runBundledExecute: async (ctx) => {
       calls.push(`bundled:${ctx.launchId}`);
+      return { kind: "canceled" };
     },
     runNonBundledExecute: async (ctx) => {
       calls.push(`non_bundled:${ctx.launchId}`);
+      return {
+        kind: "succeeded",
+        usageFeeTotalSol: 0,
+        userId: "user-1",
+        tokenPublicKey: "Token1111111111111111111111111111111111111",
+        referenceId: ctx.launchId,
+      };
     },
   });
 
@@ -258,7 +276,7 @@ test("platform execute routes non-bundled and bundled to Platform runners", asyn
       launchId: "nb-1",
     })
   );
-  assert.equal(nonBundledResult.kind, "compat");
+  assert.equal(nonBundledResult.kind, "succeeded");
 
   const bundled = await buildSamplePlan(true);
   const bundledResult = await platform.execute(
@@ -268,9 +286,82 @@ test("platform execute routes non-bundled and bundled to Platform runners", asyn
       launchId: "b-1",
     })
   );
-  assert.equal(bundledResult.kind, "compat");
+  assert.equal(bundledResult.kind, "canceled");
 
   assert.deepEqual(calls, ["non_bundled:nb-1", "bundled:b-1"]);
+});
+
+test("platform execute maps cancel-before-submit and post-confirm degraded success", async () => {
+  stubServerOnlyModule();
+  const { createPumpfunPlatformModule } = await import(
+    "./launch-platform-pumpfun"
+  );
+
+  const canceledPlatform = createPumpfunPlatformModule({
+    runNonBundledExecute: async () => ({ kind: "canceled" }),
+  });
+  const canceled = await canceledPlatform.execute(
+    lifecycleCtx({
+      plan: await buildSamplePlan(false),
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+    })
+  );
+  assert.equal(canceled.kind, "canceled");
+
+  const succeededPlatform = createPumpfunPlatformModule({
+    runNonBundledExecute: async () => ({
+      kind: "succeeded",
+      usageFeeTotalSol: 0.1,
+      userId: "user-1",
+      tokenPublicKey: "Token1111111111111111111111111111111111111",
+      referenceId: "launch-1",
+      details: {
+        cancelRequestedAfterIrreversibleSubmit: true,
+        postConfirmDegraded: true,
+      },
+    }),
+  });
+  const succeeded = await succeededPlatform.execute(
+    lifecycleCtx({
+      plan: await buildSamplePlan(false),
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+    })
+  );
+  assert.equal(succeeded.kind, "succeeded");
+  if (succeeded.kind === "succeeded") {
+    assert.equal(succeeded.details?.cancelRequestedAfterIrreversibleSubmit, true);
+    assert.equal(succeeded.details?.postConfirmDegraded, true);
+  }
+
+  const indeterminatePlatform = createPumpfunPlatformModule({
+    runNonBundledExecute: async () => ({
+      kind: "indeterminate",
+      errorMessage: "Confirmation timed out after submit",
+      tokenPublicKey: "Token1111111111111111111111111111111111111",
+    }),
+  });
+  const indeterminate = await indeterminatePlatform.execute(
+    lifecycleCtx({
+      plan: await buildSamplePlan(false),
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+    })
+  );
+  assert.equal(indeterminate.kind, "indeterminate");
+
+  const partialPlatform = createPumpfunPlatformModule({
+    runNonBundledExecute: async () => ({
+      kind: "partial",
+      errorMessage: "Mint landed but intended buy path incomplete",
+      tokenPublicKey: "Token1111111111111111111111111111111111111",
+    }),
+  });
+  const partial = await partialPlatform.execute(
+    lifecycleCtx({
+      plan: await buildSamplePlan(false),
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+    })
+  );
+  assert.equal(partial.kind, "partial");
 });
 
 test("platform execute fails without silent replan when plan is missing", async () => {
