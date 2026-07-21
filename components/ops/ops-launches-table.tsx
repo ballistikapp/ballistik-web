@@ -46,6 +46,44 @@ function buildColumns(hideUserColumn: boolean): ColumnDef<OpsLaunchRow>[] {
       cell: ({ row }) => row.original.status,
     },
     {
+      id: "platform",
+      accessorKey: "platform",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="platform" />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => {
+        if (row.original.isLegacy) {
+          return <span className="text-muted-foreground">legacy</span>;
+        }
+        return (
+          <span>
+            {row.original.platform ?? "—"}
+            {row.original.platformVersion
+              ? ` v${row.original.platformVersion}`
+              : ""}
+          </span>
+        );
+      },
+    },
+    {
+      id: "plan",
+      accessorKey: "hasPlan",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="plan" />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => (row.original.hasPlan ? "yes" : "no"),
+    },
+    {
+      accessorKey: "outcomeKind",
+      header: ({ column }) => (
+        <DataTableColumnHeader column={column} title="outcome" />
+      ),
+      enableSorting: false,
+      cell: ({ row }) => row.original.outcomeKind ?? "—",
+    },
+    {
       accessorKey: "progress",
       header: ({ column }) => (
         <DataTableColumnHeader column={column} title="progress" />

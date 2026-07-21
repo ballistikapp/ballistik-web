@@ -18,8 +18,70 @@ const DEV_WALLET =
 const SYSTEM_WALLET =
   "SystemWallet111111111111111111111111111111";
 const LAUNCH_ID = "launch-1";
+const PLATFORM_LAUNCH_ID = "launch-platform-1";
 const REFRESHED_BALANCE_SOL = 2.5;
 const REFRESHED_AT = new Date("2026-07-17T15:00:00.000Z");
+
+const SAFE_PLAN_MONEY = {
+  immediateRequiredBalanceLamports: "1500000000",
+  temporaryFundingLamports: "1000000000",
+  permanentSpendLamports: "500000000",
+  expectedReturnLamports: "1000000000",
+  expectedMainWalletDeltaNowLamports: "-1500000000",
+  expectedMainWalletDeltaAfterCleanupLamports: "-500000000",
+  usageFeeLamports: "10000000",
+  lineItems: [
+    { label: "Dev buy", amountLamports: "100000000" },
+    { label: "Usage fee", amountLamports: "10000000" },
+  ],
+};
+
+const SAFE_PUMPFUN_PLAN = {
+  schemaVersion: "1" as const,
+  platform: "PUMPFUN" as const,
+  money: SAFE_PLAN_MONEY,
+  wallets: {
+    mainWalletPublicKey: MAIN_WALLET,
+    creatorWalletPublicKey: DEV_WALLET,
+    creatorWalletOption: "generate" as const,
+    managedWallets: [
+      {
+        publicKey: DEV_WALLET,
+        platformRole: "creator",
+        isManaged: true,
+        fundedCapLamports: "200000000",
+      },
+    ],
+  },
+  allocations: {
+    creatorBuyLamports: "100000000",
+    bundlerBuyLamportsByWallet: [],
+    jitoTipLamports: "1000000",
+    mainReserveLamports: "5000000",
+  },
+  intendedEffects: {
+    bundleBuyEnabled: true,
+    mayhemMode: false,
+    vanityMint: false,
+    removeAttribution: false,
+    distributionWalletMultiplier: 1,
+  },
+  recovery: {
+    policy: "plan_funded_cap" as const,
+    capsByWalletPublicKey: {
+      [DEV_WALLET]: "200000000",
+    },
+  },
+  opaque: {
+    reservedVanityMintId: null,
+    reservedVanityMintPublicKey: null,
+    bundlerBuyAllocationUsedFallback: false,
+    platformFeeWaived: false,
+    platformFeeDiscountRate: 0,
+    hasSufficientMainWallet: true,
+    mainWalletBalanceLamports: "5000000000",
+  },
+};
 
 function restore<T extends object, K extends keyof T>(
   t: TestContext,
@@ -204,6 +266,13 @@ async function setupOpsTest(t: TestContext) {
         status: "FAILED" as const,
         progress: 40,
         currentStep: "bundle_submit",
+        platform: null as "PUMPFUN" | null,
+        platformVersion: null as string | null,
+        plan: null as unknown,
+        planSchemaVersion: null as string | null,
+        planPersistedAt: null as Date | null,
+        outcomeKind: null as string | null,
+        outcomeDetails: null as unknown,
         startedAt: new Date("2026-07-14T00:00:00.000Z"),
         completedAt: new Date("2026-07-14T00:05:00.000Z"),
         cancelRequestedAt: null as Date | null,
@@ -220,6 +289,103 @@ async function setupOpsTest(t: TestContext) {
             step: "init",
             data: { ok: true },
             createdAt: new Date("2026-07-14T00:00:01.000Z"),
+          },
+        ],
+      },
+    ],
+    [
+      PLATFORM_LAUNCH_ID,
+      {
+        id: PLATFORM_LAUNCH_ID,
+        userId: TARGET_USER_ID,
+        status: "FAILED" as const,
+        progress: 55,
+        currentStep: "create",
+        platform: "PUMPFUN" as const,
+        platformVersion: "1",
+        plan: {
+          ...SAFE_PUMPFUN_PLAN,
+          opaque: {
+            ...SAFE_PUMPFUN_PLAN.opaque,
+            // Should never appear in Ops projections.
+            privateKey: "plan-opaque-secret",
+          },
+        },
+        planSchemaVersion: "1",
+        planPersistedAt: new Date("2026-07-16T00:00:00.000Z"),
+        outcomeKind: "indeterminate",
+        outcomeDetails: {
+          reason: "bundle_confirm_timeout",
+          privateKey: "outcome-secret",
+        },
+        startedAt: new Date("2026-07-16T00:00:00.000Z"),
+        completedAt: new Date("2026-07-16T00:08:00.000Z"),
+        cancelRequestedAt: null as Date | null,
+        errorMessage: "Bundle confirmation timed out",
+        tokenPublicKey: null as string | null,
+        createdAt: new Date("2026-07-16T00:00:00.000Z"),
+        updatedAt: new Date("2026-07-16T00:08:00.000Z"),
+        logs: [
+          {
+            id: "log-platform-1",
+            level: "INFO" as const,
+            message: "Jito bundle sent",
+            step: "create",
+            data: {
+              source: "jito-bundle",
+              eventType: "bundle_sent",
+              bundleId: "bundle-abc",
+              endpoint: "https://ny.mainnet.block-engine.jito.wtf",
+              tipLamports: 1_000_000,
+              signatureCount: 2,
+            },
+            createdAt: new Date("2026-07-16T00:01:00.000Z"),
+          },
+          {
+            id: "log-platform-2",
+            level: "WARN" as const,
+            message: "Bundle dropped by block engine, resending",
+            step: "create",
+            data: {
+              source: "jito-bundle",
+              eventType: "bundle_dropped_by_engine",
+              bundleId: "bundle-abc",
+              endpoint: "https://ny.mainnet.block-engine.jito.wtf",
+            },
+            createdAt: new Date("2026-07-16T00:02:00.000Z"),
+          },
+          {
+            id: "log-platform-3",
+            level: "INFO" as const,
+            message: "Bundle resent",
+            step: "create",
+            data: {
+              source: "jito-bundle",
+              eventType: "bundle_resent",
+              bundleId: "bundle-abc",
+              endpoint: "https://amsterdam.mainnet.block-engine.jito.wtf",
+            },
+            createdAt: new Date("2026-07-16T00:03:00.000Z"),
+          },
+          {
+            id: "log-platform-4",
+            level: "ERROR" as const,
+            message: "Bundle confirmation timed out before create landed",
+            step: "create",
+            data: {
+              source: "jito-bundle",
+              eventType: "bundle_confirm_timeout",
+              bundleId: "bundle-abc",
+              endpoint: "https://amsterdam.mainnet.block-engine.jito.wtf",
+              resendCount: 1,
+              rebuildCount: 0,
+              foundCount: 0,
+              confirmedCount: 0,
+              failedCount: 0,
+              notFoundCount: 2,
+              createStatus: "not_found",
+            },
+            createdAt: new Date("2026-07-16T00:08:00.000Z"),
           },
         ],
       },
@@ -406,6 +572,13 @@ async function setupOpsTest(t: TestContext) {
       status: launch.status,
       progress: launch.progress,
       currentStep: launch.currentStep,
+      platform: launch.platform,
+      platformVersion: launch.platformVersion,
+      plan: launch.plan,
+      planSchemaVersion: launch.planSchemaVersion,
+      planPersistedAt: launch.planPersistedAt,
+      outcomeKind: launch.outcomeKind,
+      outcomeDetails: launch.outcomeDetails,
       startedAt: launch.startedAt,
       completedAt: launch.completedAt,
       cancelRequestedAt: launch.cancelRequestedAt,
@@ -856,6 +1029,10 @@ async function setupOpsTest(t: TestContext) {
         status: launch.status,
         progress: launch.progress,
         currentStep: launch.currentStep,
+        platform: launch.platform,
+        platformVersion: launch.platformVersion,
+        planPersistedAt: launch.planPersistedAt,
+        outcomeKind: launch.outcomeKind,
         tokenPublicKey: launch.tokenPublicKey,
         userId: launch.userId,
         startedAt: launch.startedAt,
@@ -937,8 +1114,8 @@ test("Operator Ops Overview returns the five summary tiles", async (t) => {
   const overview = await opsService.getOverview(OPERATOR_ID, { now: NOW });
   assert.deepEqual(overview, {
     newUsers7d: 1,
-    launches7d: 1,
-    failedLaunches7d: 1,
+    launches7d: 2,
+    failedLaunches7d: 2,
     totalUsers: 3,
     totalTokens: 1,
   });
@@ -1032,7 +1209,7 @@ test("User spine omits private keys and includes MAIN balance", async (t) => {
   const spine = await opsService.getUserSpine(OPERATOR_ID, TARGET_USER_ID);
   assert.equal(spine.id, TARGET_USER_ID);
   assert.equal(spine.tokens.length, 1);
-  assert.equal(spine.launches.length, 1);
+  assert.equal(spine.launches.length, 2);
   assert.equal(spine.wallets.length, 2);
   assert.equal(spine.wallets[0]?.publicKey, MAIN_WALLET);
   assert.equal(spine.wallets[0]?.balanceSol, 1.5);
@@ -1047,7 +1224,111 @@ test("Launch autopsy omits private keys and raw input/result", async (t) => {
   assert.equal(autopsy.logs.length, 1);
   assert.equal("input" in autopsy, false);
   assert.equal("result" in autopsy, false);
+  assert.equal("plan" in autopsy, false);
   assertNoPrivateKeyFields(autopsy);
+});
+
+test("Operator listLaunches exposes Platform identity, plan presence, outcome, and legacy flags", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const page = await opsService.listLaunches(OPERATOR_ID, {
+    page: 1,
+    pageSize: 25,
+  });
+
+  const platformRow = page.items.find((row) => row.id === PLATFORM_LAUNCH_ID);
+  const legacyRow = page.items.find((row) => row.id === LAUNCH_ID);
+  assert.ok(platformRow);
+  assert.ok(legacyRow);
+
+  assert.equal(platformRow.platform, "PUMPFUN");
+  assert.equal(platformRow.platformVersion, "1");
+  assert.equal(platformRow.hasPlan, true);
+  assert.equal(platformRow.outcomeKind, "indeterminate");
+  assert.equal(platformRow.isLegacy, false);
+  assert.equal(platformRow.retrySupported, true);
+  assert.equal(platformRow.cloneSupported, true);
+
+  assert.equal(legacyRow.platform, null);
+  assert.equal(legacyRow.platformVersion, null);
+  assert.equal(legacyRow.hasPlan, false);
+  assert.equal(legacyRow.outcomeKind, null);
+  assert.equal(legacyRow.isLegacy, true);
+  assert.equal(legacyRow.retrySupported, false);
+  assert.equal(legacyRow.cloneSupported, false);
+  assert.equal("plan" in legacyRow, false);
+  assertNoPrivateKeyFields(page);
+});
+
+test("Launch autopsy projects safe plan summary, outcome, and Jito diagnostics", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const autopsy = await opsService.getLaunchAutopsy(
+    OPERATOR_ID,
+    PLATFORM_LAUNCH_ID
+  );
+
+  assert.equal(autopsy.platform, "PUMPFUN");
+  assert.equal(autopsy.platformVersion, "1");
+  assert.equal(autopsy.isLegacy, false);
+  assert.equal(autopsy.retrySupported, true);
+  assert.equal(autopsy.cloneSupported, true);
+  assert.equal(autopsy.hasPlan, true);
+  assert.equal(autopsy.planSchemaVersion, "1");
+  assert.equal(
+    autopsy.planPersistedAt?.toISOString(),
+    "2026-07-16T00:00:00.000Z"
+  );
+  assert.equal(autopsy.outcomeKind, "indeterminate");
+  assert.equal("outcomeDetails" in autopsy, false);
+  assert.equal("plan" in autopsy, false);
+  assert.equal(autopsy.planSummaryAvailable, true);
+  assert.equal("opaque" in (autopsy.planSummary ?? {}), false);
+  assert.deepEqual(autopsy.planSummary?.money, SAFE_PLAN_MONEY);
+  assert.equal(
+    autopsy.planSummary?.wallets.creatorWalletPublicKey,
+    DEV_WALLET
+  );
+  assert.equal(autopsy.planSummary?.intendedEffects.bundleBuyEnabled, true);
+  assert.equal(autopsy.planSummary?.allocations.jitoTipLamports, "1000000");
+  assert.equal(autopsy.planSummary?.recovery.policy, "plan_funded_cap");
+
+  assert.deepEqual(autopsy.jitoDiagnostics, {
+    eventCount: 4,
+    bundleIds: ["bundle-abc"],
+    endpoints: [
+      "https://ny.mainnet.block-engine.jito.wtf",
+      "https://amsterdam.mainnet.block-engine.jito.wtf",
+    ],
+    resendCount: 1,
+    rebuildCount: 0,
+    lastEventType: "bundle_confirm_timeout",
+    lastFailureType: "bundle_confirm_timeout",
+    tipLamports: 1_000_000,
+    confirmation: {
+      foundCount: 0,
+      confirmedCount: 0,
+      failedCount: 0,
+      notFoundCount: 2,
+      createStatus: "not_found",
+    },
+  });
+  assertNoPrivateKeyFields(autopsy);
+});
+
+test("Legacy Launch autopsy stays inspectable without retry/clone support", async (t) => {
+  const { opsService } = await setupOpsTest(t);
+  const autopsy = await opsService.getLaunchAutopsy(OPERATOR_ID, LAUNCH_ID);
+
+  assert.equal(autopsy.platform, null);
+  assert.equal(autopsy.platformVersion, null);
+  assert.equal(autopsy.isLegacy, true);
+  assert.equal(autopsy.retrySupported, false);
+  assert.equal(autopsy.cloneSupported, false);
+  assert.equal(autopsy.hasPlan, false);
+  assert.equal(autopsy.planSummary, null);
+  assert.equal(autopsy.planSummaryAvailable, false);
+  assert.equal(autopsy.outcomeKind, null);
+  assert.equal(autopsy.jitoDiagnostics.eventCount, 0);
+  assert.equal(autopsy.jitoDiagnostics.confirmation, null);
 });
 
 test("reveal returns wallet secret and logs Operator + target", async (t) => {
@@ -1179,13 +1460,14 @@ test("Operator listLaunches includes owner and omits private keys", async (t) =>
     pageSize: 25,
   });
 
-  assert.equal(page.totalCount, 1);
-  assert.equal(page.items[0]?.id, LAUNCH_ID);
-  assert.equal(page.items[0]?.userId, TARGET_USER_ID);
-  assert.equal(page.items[0]?.userName, "Target User");
-  assert.equal(page.items[0]?.status, "FAILED");
-  assert.equal(page.items[0]?.tokenPublicKey, MINT);
-  assert.equal("input" in (page.items[0] as object), false);
+  assert.equal(page.totalCount, 2);
+  assert.equal(page.items[0]?.id, PLATFORM_LAUNCH_ID);
+  assert.equal(page.items[1]?.id, LAUNCH_ID);
+  assert.equal(page.items[1]?.userId, TARGET_USER_ID);
+  assert.equal(page.items[1]?.userName, "Target User");
+  assert.equal(page.items[1]?.status, "FAILED");
+  assert.equal(page.items[1]?.tokenPublicKey, MINT);
+  assert.equal("input" in (page.items[1] as object), false);
   assertNoPrivateKeyFields(page);
 });
 
@@ -1197,8 +1479,7 @@ test("Operator listLaunches searches id, mint, user, status, and step", async (t
     pageSize: 25,
     search: "fail",
   });
-  assert.equal(byStatus.totalCount, 1);
-  assert.equal(byStatus.items[0]?.id, LAUNCH_ID);
+  assert.equal(byStatus.totalCount, 2);
 
   const byStep = await opsService.listLaunches(OPERATOR_ID, {
     page: 1,
@@ -1206,6 +1487,7 @@ test("Operator listLaunches searches id, mint, user, status, and step", async (t
     search: "bundle_submit",
   });
   assert.equal(byStep.totalCount, 1);
+  assert.equal(byStep.items[0]?.id, LAUNCH_ID);
 
   const miss = await opsService.listLaunches(OPERATOR_ID, {
     page: 1,
@@ -1384,8 +1666,9 @@ test("Operator listLaunches scopes by userId", async (t) => {
     pageSize: 25,
     userId: TARGET_USER_ID,
   });
-  assert.equal(scoped.totalCount, 1);
-  assert.equal(scoped.items[0]?.id, LAUNCH_ID);
+  assert.equal(scoped.totalCount, 2);
+  assert.equal(scoped.items[0]?.id, PLATFORM_LAUNCH_ID);
+  assert.equal(scoped.items[1]?.id, LAUNCH_ID);
 
   const empty = await opsService.listLaunches(OPERATOR_ID, {
     page: 1,

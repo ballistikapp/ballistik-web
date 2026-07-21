@@ -32,7 +32,7 @@ See ADRs:
 
 - `ops.getOverview` — `operatorProcedure`; Ops Overview tiles (new Users 7d, Launches 7d, Failed Launches 7d, total Users, total Tokens)
 - `ops.listUsers` — `operatorProcedure`; paginated Users browse (`page`/`pageSize`/`search`/`sortBy`/`sortDir`); no private keys
-- `ops.listLaunches` — `operatorProcedure`; paginated Launches browse (same list shape + owner fields; optional `userId` scope); no private keys / no raw `input`/`result`
+- `ops.listLaunches` — `operatorProcedure`; paginated Launches browse (same list shape + owner fields; optional `userId` scope); includes Platform/version, plan presence, outcomeKind, and legacy/retry/clone flags; no private keys / no raw `input`/`result`/`plan`
 - `ops.listTokens` — `operatorProcedure`; paginated Tokens browse (owner fields; optional `userId` scope); no private keys
 - `ops.listWallets` — `operatorProcedure`; paginated Wallets browse including system (`type` / `isSystemWallet` / optional `userId` scope; MAIN matched via `mainWalletUser`); no private keys
 - `ops.lookupUser` — `operatorProcedure`; typed main-wallet or mint → User id (legacy)
@@ -43,7 +43,7 @@ See ADRs:
 - `ops.listWalletAppTransactions` — `operatorProcedure`; paginated AppTransaction ledger for a Wallet (exact `walletPublicKey` actor match; `page`/`pageSize`; 404 if Wallet missing); no private keys
 - `ops.refreshWalletBalances` — `operatorProcedure`; refresh stored SOL balances for explicit Wallet public keys (max 100); force refresh via `walletService.refreshBalancesByPublicKeys`; no private keys
 - `ops.refreshMatchingWalletBalances` — `operatorProcedure`; refresh all Wallets matching current search/type/system/`userId` filters (empty filter = all); server-chunked (100); confirm count in UI; no hard max refuse; no private keys
-- `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs (no raw `input`/`result`)
+- `ops.getLaunchAutopsy` — `operatorProcedure`; Launch status/timeline logs plus Platform diagnostics (Platform/version, plan presence, validated normalized plan summary without opaque payload, outcome classification, Jito telemetry projection from `source: "jito-bundle"` logs); no raw `input`/`result`/`plan`; private-key fields scrubbed
 - `ops.revealPrivateKey` — `operatorSensitiveProcedure` (8/min); wallet or mint key; logs Operator + target via request logger
 - `ops.listMarketers` — `operatorProcedure`; paginated Marketers browse (`page`/`pageSize`/`search`/`sortBy`/`sortDir`/`isEnabled`); shows nickname, rate, enabled, and whether referral code / fee-collector are configured (not the values); no private keys
 - `ops.getMarketer` — `operatorProcedure`; Marketer detail including read-only referral code and fee-collector public key when set
@@ -81,4 +81,4 @@ Agents edit the Prisma schema only. Humans run migrations. Relevant schema addit
 
 ## Tests
 
-`server/services/ops.service.test.ts` covers Operator vs non-Operator denial, Ops Overview tile counts, Users/Launches/Tokens/Wallets list pagination/search/sort (+ Wallet type/system filters + optional `userId` scope) + private-key omission, Token/Wallet detail reads, lookup/jump hits/misses (User main → Wallet → Token), private-key omission on spine/autopsy/detail, reveal + audit log behavior, and Wallet balance refresh (single/selected/filter-wide, selection cap, non-Operator not-found, no private keys) at the ops service seam.
+`server/services/ops.service.test.ts` covers Operator vs non-Operator denial, Ops Overview tile counts, Users/Launches/Tokens/Wallets list pagination/search/sort (+ Wallet type/system filters + optional `userId` scope) + private-key omission, Token/Wallet detail reads, lookup/jump hits/misses (User main → Wallet → Token), private-key omission on spine/autopsy/detail, Launch Platform diagnostics (Platform/version, plan presence, safe plan summary without opaque payload, outcome classification, Jito telemetry projection, legacy retry/clone flags), reveal + audit log behavior, and Wallet balance refresh (single/selected/filter-wide, selection cap, non-Operator not-found, no private keys) at the ops service seam.
