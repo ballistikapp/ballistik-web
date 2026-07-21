@@ -6,7 +6,12 @@ import {
 } from "@solana/web3.js";
 import { logger } from "@/lib/logger";
 import { getSolanaConnection } from "@/lib/solana/connection";
-import { buildBundleTransactionsForCreateAndBuys, type BundleBuyBuildFailure } from "@/server/solana/bundle-transaction-builder";
+import {
+  buildBundleTransactionsForCreateAndBuys,
+  bundleBuyerTransactionIndex,
+  bundleBuysPerFollowUpTransaction,
+  type BundleBuyBuildFailure,
+} from "@/server/solana/bundle-transaction-builder";
 import {
   sendJitoBundle,
   type BundleTelemetryEvent,
@@ -68,14 +73,13 @@ function buildBundleBuyers(
   };
 }
 
-// Bundle layout from buildBundleTransactionsForCreateAndBuys:
-//   tx[0] = create + first buyer
-//   tx[i>=1] = next 2 buyers each (must stay in sync with buysPerTransaction
-//   in bundle-transaction-builder.ts)
-const BUYS_PER_NON_CREATOR_TX = 2;
-function buyerTxIndex(buyerIndex: number): number {
-  if (buyerIndex === 0) return 0;
-  return 1 + Math.floor((buyerIndex - 1) / BUYS_PER_NON_CREATOR_TX);
+// Bundle layout from buildBundleTransactionsForCreateAndBuys — buyer→tx
+// mapping must use the shared packing helpers (ALT-aware buys per follow-up tx).
+function buyerTxIndex(buyerIndex: number, hasAlt: boolean): number {
+  return bundleBuyerTransactionIndex(
+    buyerIndex,
+    bundleBuysPerFollowUpTransaction(hasAlt)
+  );
 }
 
 export async function createAndBuyInBundle(input: BundleLaunchInput) {
@@ -222,6 +226,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
   const mintPk = input.mint.publicKey.toBase58();
   const creatorPk = input.creator.publicKey.toBase58();
   const tipperPk = input.tipper.publicKey.toBase58();
+  const hasAlt = altAccounts.length > 0;
 
   type TrackedRow = { id: string; walletPublicKey: string; txIndex: number };
   const trackedRows: TrackedRow[] = [];
@@ -230,7 +235,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
     // Buyer rows (one per buyer per their tx)
     for (let i = 0; i < buyerWallets.length; i += 1) {
       const buyerPk = buyerWallets[i].publicKey.toBase58();
-      const txIndex = Math.min(buyerTxIndex(i), lastTxIndex);
+      const txIndex = Math.min(buyerTxIndex(i, hasAlt), lastTxIndex);
       const intent = Number(buyAmountsLamport[i]) / 1_000_000_000;
       const id = await appTransactionService
         .create({

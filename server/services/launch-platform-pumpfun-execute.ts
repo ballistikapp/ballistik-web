@@ -80,6 +80,10 @@ export type PumpfunNonBundledExecuteDeps = {
   runNonBundledJob: (launchId: string) => Promise<void>;
 };
 
+export type PumpfunBundledExecuteDeps = {
+  runBundledJob: (launchId: string) => Promise<void>;
+};
+
 /**
  * Non-bundled pump.fun execute entry: validate plan, then run the Platform-owned
  * non-bundled job (raw create / create+dev-buy). Does not use PumpFunSDK.
@@ -98,9 +102,32 @@ export async function runPumpfunNonBundledExecute(
   await deps.runNonBundledJob(ctx.launchId);
 }
 
+/**
+ * Bundled pump.fun execute entry: validate plan, then run the Platform-owned
+ * bundled job (raw create + buys via Jito). Does not use PumpFunSDK.
+ */
+export async function runPumpfunBundledExecute(
+  ctx: LaunchLifecycleContext,
+  deps: PumpfunBundledExecuteDeps
+): Promise<void> {
+  const plan = requirePumpfunExecutePlan(ctx);
+  if (!plan.intendedEffects.bundleBuyEnabled) {
+    throw new AppError(
+      "Non-bundled launches must execute through the non-bundled Platform path",
+      500
+    );
+  }
+  await deps.runBundledJob(ctx.launchId);
+}
+
 async function defaultRunNonBundledJob(launchId: string): Promise<void> {
   const { runNonBundledPumpfunLaunchJob } = await import("./launch.service");
   await runNonBundledPumpfunLaunchJob(launchId);
+}
+
+async function defaultRunBundledJob(launchId: string): Promise<void> {
+  const { runBundledPumpfunLaunchJob } = await import("./launch.service");
+  await runBundledPumpfunLaunchJob(launchId);
 }
 
 export async function runPumpfunNonBundledExecuteDefault(
@@ -108,5 +135,13 @@ export async function runPumpfunNonBundledExecuteDefault(
 ): Promise<void> {
   await runPumpfunNonBundledExecute(ctx, {
     runNonBundledJob: defaultRunNonBundledJob,
+  });
+}
+
+export async function runPumpfunBundledExecuteDefault(
+  ctx: LaunchLifecycleContext
+): Promise<void> {
+  await runPumpfunBundledExecute(ctx, {
+    runBundledJob: defaultRunBundledJob,
   });
 }

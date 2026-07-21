@@ -192,7 +192,49 @@ test("runPumpfunNonBundledExecute rejects bundled plans and runs job for non-bun
   assert.equal(ran, true);
 });
 
-test("platform execute routes non-bundled to Platform runner and bundled to compat", async () => {
+test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundled", async () => {
+  stubServerOnlyModule();
+  const { isAppError } = await import("@/server/errors");
+  const { runPumpfunBundledExecute } = await import(
+    "./launch-platform-pumpfun-execute"
+  );
+
+  const nonBundled = await buildSamplePlan(false);
+  await assert.rejects(
+    () =>
+      runPumpfunBundledExecute(
+        lifecycleCtx({
+          plan: nonBundled,
+          planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+        }),
+        {
+          runBundledJob: async () => {
+            throw new Error("should not run for non-bundled plan");
+          },
+        }
+      ),
+    (error: unknown) => isAppError(error) && error.statusCode === 500
+  );
+
+  const bundled = await buildSamplePlan(true);
+  let ran = false;
+  await runPumpfunBundledExecute(
+    lifecycleCtx({
+      plan: bundled,
+      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      launchId: "launch-bundled",
+    }),
+    {
+      runBundledJob: async (launchId) => {
+        assert.equal(launchId, "launch-bundled");
+        ran = true;
+      },
+    }
+  );
+  assert.equal(ran, true);
+});
+
+test("platform execute routes non-bundled and bundled to Platform runners", async () => {
   stubServerOnlyModule();
   const { createPumpfunPlatformModule } = await import(
     "./launch-platform-pumpfun"
@@ -200,8 +242,8 @@ test("platform execute routes non-bundled to Platform runner and bundled to comp
 
   const calls: string[] = [];
   const platform = createPumpfunPlatformModule({
-    runBundledCompat: async (launchId) => {
-      calls.push(`bundled:${launchId}`);
+    runBundledExecute: async (ctx) => {
+      calls.push(`bundled:${ctx.launchId}`);
     },
     runNonBundledExecute: async (ctx) => {
       calls.push(`non_bundled:${ctx.launchId}`);
@@ -239,8 +281,8 @@ test("platform execute fails without silent replan when plan is missing", async 
   );
 
   const platform = createPumpfunPlatformModule({
-    runBundledCompat: async () => {
-      throw new Error("compat should not run");
+    runBundledExecute: async () => {
+      throw new Error("bundled should not run");
     },
     runNonBundledExecute: async () => {
       throw new Error("non-bundled should not run");

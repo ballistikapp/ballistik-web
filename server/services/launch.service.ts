@@ -2350,6 +2350,7 @@ async function persistTokenPending(
   platformIdentity?: {
     platform: "PUMPFUN" | null;
     platformVersion: string | null;
+    isMayhemMode?: boolean;
   }
 ) {
   let distributionWalletCount = 0;
@@ -2360,7 +2361,8 @@ async function persistTokenPending(
           publicKey: mintPublicKey,
           privateKey: mintPrivateKey,
           status: "PENDING",
-          isMayhemMode: input.mayhemMode ?? false,
+          isMayhemMode:
+            platformIdentity?.isMayhemMode ?? input.mayhemMode ?? false,
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
           description: composeTokenDescription(input) || null,
@@ -4336,13 +4338,23 @@ export const launchService = {
   },
 
   /**
-   * Bundled launch job (compat until ticket 10).
-   * Non-bundled launches must use `runNonBundledPumpfunLaunchJob` via Platform execute.
+   * @deprecated Prefer `runBundledPumpfunLaunchJob` via Platform execute.
+   * Kept as a thin alias for transitional callers.
    */
   async runLaunchJob(launchId: string) {
-    await runPumpfunLaunchJobByMode(launchId, "bundled");
+    await runBundledPumpfunLaunchJob(launchId);
   },
 };
+
+/**
+ * Bundled pump.fun launch job owned by Platform execute.
+ * Requires a persisted authoritative plan; uses raw create + buys via Jito.
+ */
+export async function runBundledPumpfunLaunchJob(
+  launchId: string
+): Promise<void> {
+  await runPumpfunLaunchJobByMode(launchId, "bundled");
+}
 
 /**
  * Non-bundled pump.fun launch job owned by Platform execute.
@@ -4390,17 +4402,17 @@ async function runPumpfunLaunchJobByMode(
     const input = toStoredLaunchInput(resolvedInput);
     if (mode === "bundled" && !input.bundleBuyEnabled) {
       throw new AppError(
-        "Non-bundled launches must execute through the pump.fun Platform module",
+        "Non-bundled launches must execute through the non-bundled Platform path",
         500
       );
     }
     if (mode === "non_bundled" && input.bundleBuyEnabled) {
       throw new AppError(
-        "Bundled launches must execute through the bundled launch job",
+        "Bundled launches must execute through the bundled Platform path",
         500
       );
     }
-    if (mode === "non_bundled" && input.devWalletOption === "system") {
+    if (input.devWalletOption === "system") {
       throw new AppError(
         "The platform dev wallet is no longer available for new launches",
         400
@@ -4415,10 +4427,6 @@ async function runPumpfunLaunchJobByMode(
 
     const launchStartedAt = Date.now();
     const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
-    const {
-      createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
-      minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
-    } = getLaunchConfig();
     let reservedVanityId: string | null = null;
     let vanityConsumed = false;
     let recoveryData: LaunchRecoveryData | null = null;
@@ -4495,11 +4503,6 @@ async function runPumpfunLaunchJobByMode(
         durationMs: Date.now() - validationStartedAt,
       });
 
-      if (input.mayhemMode) {
-        await assertMayhemCreateAllowed(true);
-        await appendLog(launchId, "INFO", "Mayhem mode preflight passed", "validate");
-      }
-
       await setStep(launchId, 6, "wallets", "Loading wallets");
 
       const walletsStartedAt = Date.now();
@@ -4508,30 +4511,47 @@ async function runPumpfunLaunchJobByMode(
 
       let authoritativePlan: ReturnType<
         typeof pumpfunLaunchPlanV1Schema.parse
-      > | null = null;
-      if (launch.planPersistedAt) {
-        const persistedPlan = pumpfunLaunchPlanV1Schema.safeParse(launch.plan);
-        if (!persistedPlan.success) {
-          throw new AppError(
-            "Persisted launch plan is invalid and cannot be executed",
-            500
-          );
-        }
-        authoritativePlan = persistedPlan.data;
+      >;
+      if (!launch.planPersistedAt) {
+        throw new AppError(
+          "Pump.fun execute requires a persisted authoritative plan",
+          500
+        );
       }
-      if (mode === "non_bundled") {
-        if (!authoritativePlan) {
-          throw new AppError(
-            "Non-bundled execute requires a persisted authoritative plan",
-            500
-          );
-        }
-        if (authoritativePlan.intendedEffects.bundleBuyEnabled) {
-          throw new AppError(
-            "Persisted plan is bundled but non-bundled Platform execute was invoked",
-            500
-          );
-        }
+      const persistedPlan = pumpfunLaunchPlanV1Schema.safeParse(launch.plan);
+      if (!persistedPlan.success) {
+        throw new AppError(
+          "Persisted launch plan is invalid and cannot be executed",
+          500
+        );
+      }
+      authoritativePlan = persistedPlan.data;
+      if (
+        mode === "bundled" &&
+        !authoritativePlan.intendedEffects.bundleBuyEnabled
+      ) {
+        throw new AppError(
+          "Persisted plan is non-bundled but bundled Platform execute was invoked",
+          500
+        );
+      }
+      if (
+        mode === "non_bundled" &&
+        authoritativePlan.intendedEffects.bundleBuyEnabled
+      ) {
+        throw new AppError(
+          "Persisted plan is bundled but non-bundled Platform execute was invoked",
+          500
+        );
+      }
+      if (authoritativePlan.intendedEffects.mayhemMode) {
+        await assertMayhemCreateAllowed(true);
+        await appendLog(
+          launchId,
+          "INFO",
+          "Mayhem mode preflight passed",
+          "validate"
+        );
       }
 
       let devWalletKeypair: Keypair;
@@ -4546,86 +4566,53 @@ async function runPumpfunLaunchJobByMode(
         targets: BundlerBuyTarget[];
       };
 
-      if (authoritativePlan) {
-        devWalletPublicKey = authoritativePlan.wallets.creatorWalletPublicKey;
-        if (devWalletPublicKey === user.mainWallet.publicKey) {
-          devWalletKeypair = mainWalletKeypair;
-        } else {
-          devWalletKeypair =
-            await loadWalletKeypairByPublicKey(devWalletPublicKey);
-        }
-        const bundlerPublicKeys = authoritativePlan.allocations
-          .bundlerBuyLamportsByWallet.map((entry) => entry.publicKey);
-        bundlerWalletKeypairs = await Promise.all(
-          bundlerPublicKeys.map((publicKey) =>
-            loadWalletKeypairByPublicKey(publicKey)
-          )
-        );
-        const distributionPublicKeys = authoritativePlan.wallets.managedWallets
-          .filter((wallet) => wallet.platformRole === "distribution")
-          .map((wallet) => wallet.publicKey);
-        distributionWallets = await Promise.all(
-          distributionPublicKeys.map(async (publicKey, index) => ({
-            parentIndex: Math.floor(
-              index /
-                Math.max(1, authoritativePlan.intendedEffects.distributionWalletMultiplier - 1)
-            ),
-            wallet: await loadWalletKeypairByPublicKey(publicKey),
-          }))
-        );
-        bundlerBuyAllocation = {
-          amountLamportsByWallet:
-            authoritativePlan.allocations.bundlerBuyLamportsByWallet.map(
-              (entry) => BigInt(entry.amountLamports)
-            ),
-          lowerBoundLamports: BigInt(0),
-          upperBoundLamports: BigInt(0),
-          usedFallback:
-            authoritativePlan.opaque.bundlerBuyAllocationUsedFallback,
-          targets: bundlerWalletKeypairs.map((wallet, index) => ({
-            wallet,
-            amountLamports: BigInt(
-              authoritativePlan.allocations.bundlerBuyLamportsByWallet[index]
-                ?.amountLamports ?? "0"
-            ),
-          })),
-        };
+      devWalletPublicKey = authoritativePlan.wallets.creatorWalletPublicKey;
+      if (devWalletPublicKey === user.mainWallet.publicKey) {
+        devWalletKeypair = mainWalletKeypair;
       } else {
-        const resolved = await resolveDevWallet(
-          input,
-          user.id,
-          mainWalletKeypair,
-          user.mainWallet.publicKey
-        );
-        devWalletKeypair = resolved.devWalletKeypair;
-        devWalletPublicKey = resolved.devWalletPublicKey;
-        bundlerWalletKeypairs =
-          input.bundleBuyEnabled && bundlerWalletCount > 0
-            ? await ensureBundlerWallets(user.id, bundlerWalletCount)
-            : [];
-        distributionWallets =
-          bundlerWalletKeypairs.length > 0
-            ? await ensureDistributionWallets(
-                user.id,
-                bundlerWalletKeypairs,
-                distributionWalletMultiplier
-              )
-            : [];
-        bundlerBuyAllocation = input.bundleBuyEnabled
-          ? buildBundlerBuyTargets(
-              bundlerWalletKeypairs,
-              bundlerBuyAmountSol,
-              bundlerBuyVariancePercent,
-              launchId
-            )
-          : {
-              amountLamportsByWallet: [] as bigint[],
-              lowerBoundLamports: BigInt(0),
-              upperBoundLamports: BigInt(0),
-              usedFallback: false,
-              targets: [] as BundlerBuyTarget[],
-            };
+        devWalletKeypair =
+          await loadWalletKeypairByPublicKey(devWalletPublicKey);
       }
+      const bundlerPublicKeys = authoritativePlan.allocations
+        .bundlerBuyLamportsByWallet.map((entry) => entry.publicKey);
+      bundlerWalletKeypairs = await Promise.all(
+        bundlerPublicKeys.map((publicKey) =>
+          loadWalletKeypairByPublicKey(publicKey)
+        )
+      );
+      const distributionPublicKeys = authoritativePlan.wallets.managedWallets
+        .filter((wallet) => wallet.platformRole === "distribution")
+        .map((wallet) => wallet.publicKey);
+      distributionWallets = await Promise.all(
+        distributionPublicKeys.map(async (publicKey, index) => ({
+          parentIndex: Math.floor(
+            index /
+              Math.max(
+                1,
+                authoritativePlan.intendedEffects.distributionWalletMultiplier -
+                  1
+              )
+          ),
+          wallet: await loadWalletKeypairByPublicKey(publicKey),
+        }))
+      );
+      bundlerBuyAllocation = {
+        amountLamportsByWallet:
+          authoritativePlan.allocations.bundlerBuyLamportsByWallet.map(
+            (entry) => BigInt(entry.amountLamports)
+          ),
+        lowerBoundLamports: BigInt(0),
+        upperBoundLamports: BigInt(0),
+        usedFallback:
+          authoritativePlan.opaque.bundlerBuyAllocationUsedFallback,
+        targets: bundlerWalletKeypairs.map((wallet, index) => ({
+          wallet,
+          amountLamports: BigInt(
+            authoritativePlan.allocations.bundlerBuyLamportsByWallet[index]
+              ?.amountLamports ?? "0"
+          ),
+        })),
+      };
       await appendLog(launchId, "INFO", "Wallets prepared", "wallets", {
         mainWalletPublicKey: user.mainWallet.publicKey,
         devWalletPublicKey,
@@ -4646,44 +4633,21 @@ async function runPumpfunLaunchJobByMode(
         distributionWallets
       );
       await setLaunchRecovery(launchId, recoveryData);
-      if (authoritativePlan) {
-        await persistManagedLaunchWalletsFromPlan(launchId, authoritativePlan);
-      } else {
-        await persistLaunchRecoveryWallets(
-          launchId,
-          input,
-          user.mainWallet.publicKey,
-          devWalletPublicKey,
-          bundlerWalletKeypairs,
-          distributionWallets
-        );
-      }
-      if (authoritativePlan) {
-        const managedPublicKeys = new Set(
-          authoritativePlan.wallets.managedWallets
-            .filter((wallet) => wallet.isManaged)
-            .map((wallet) => wallet.publicKey)
-        );
-        managedLaunchWallets = [
-          ...(devWalletPublicKey !== user.mainWallet.publicKey
-            ? [devWalletKeypair]
-            : []),
-          ...bundlerWalletKeypairs,
-          ...distributionWallets.map((wallet) => wallet.wallet),
-        ].filter((wallet) =>
-          managedPublicKeys.has(wallet.publicKey.toBase58())
-        );
-      } else {
-        managedLaunchWallets = [
-          ...((input.devWalletOption === "generate" ||
-            input.devWalletOption === "system") &&
-          devWalletPublicKey !== user.mainWallet.publicKey
-            ? [devWalletKeypair]
-            : []),
-          ...bundlerWalletKeypairs,
-          ...distributionWallets.map((wallet) => wallet.wallet),
-        ];
-      }
+      await persistManagedLaunchWalletsFromPlan(launchId, authoritativePlan);
+      const managedPublicKeys = new Set(
+        authoritativePlan.wallets.managedWallets
+          .filter((wallet) => wallet.isManaged)
+          .map((wallet) => wallet.publicKey)
+      );
+      managedLaunchWallets = [
+        ...(devWalletPublicKey !== user.mainWallet.publicKey
+          ? [devWalletKeypair]
+          : []),
+        ...bundlerWalletKeypairs,
+        ...distributionWallets.map((wallet) => wallet.wallet),
+      ].filter((wallet) =>
+        managedPublicKeys.has(wallet.publicKey.toBase58())
+      );
 
       const { SHYFT_API_KEY, APP_URL } = getEnv();
       if (SHYFT_API_KEY && APP_URL) {
@@ -4713,93 +4677,31 @@ async function runPumpfunLaunchJobByMode(
       }
 
       await setStep(launchId, 12, "funding", "Funding wallets");
-      let fundingTargets: { publicKey: PublicKey; requiredLamports: bigint }[];
-      let mainReserveLamports: bigint;
-      let tipLamports: bigint;
-      if (authoritativePlan) {
-        const planFunding =
-          buildFundingTargetsFromPumpfunPlan(authoritativePlan);
-        fundingTargets = planFunding.fundingTargets.map((target) => ({
-          publicKey: new PublicKey(target.publicKey),
-          requiredLamports: target.requiredLamports,
-        }));
-        mainReserveLamports = planFunding.mainReserveLamports;
-        tipLamports = planFunding.tipLamports;
-        await appendLog(
-          launchId,
-          "INFO",
-          "Funding plan loaded from authoritative plan",
-          "funding",
-          {
-            targetsCount: fundingTargets.length,
-            fundingTargets: planFunding.fundingTargets.map((target) => ({
-              publicKey: target.publicKey,
-              requiredLamports: target.requiredLamports.toString(),
-            })),
-            mainReserveLamports: mainReserveLamports.toString(),
-            tipLamports: tipLamports.toString(),
-            bundlerBuyAllocationUsedFallback:
-              bundlerBuyAllocation.usedFallback,
-            source: "authoritative_plan",
-          }
-        );
-      } else {
-        const {
-          ataRentLamports,
-          userVolumeAccumulatorRentLamports,
-          buyRentLamports,
-          distributionAtaLamports,
-          creatorTargetLamports,
-          devFundingLamports,
-          bundlerFundingTargetLamports,
-          totalBundlerFundingLamports,
-          totalBundleBuyLamports,
-          mainReserveLamports: recomputedMainReserveLamports,
-          tipLamports: recomputedTipLamports,
-          fundingTargets: recomputedFundingTargets,
-        } = await buildLaunchFundingPlan({
-          input,
-          bundlerWalletCount,
-          bundlerBuyAmountSol,
-          bundlerBuyVariancePercent,
-          distributionWalletMultiplier,
-          devBuyAmountSol,
-          jitoTipAmountSol,
-          mainWalletPublicKey: user.mainWallet.publicKey,
-          devWalletPublicKey,
-          bundlerWalletPublicKeys: bundlerWalletKeypairs.map(
-            (wallet) => wallet.publicKey
-          ),
-          bundlerBuyAmountLamportsByWallet:
-            bundlerBuyAllocation.amountLamportsByWallet,
-          allocationSeed: launchId,
-          createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
-          minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
-        });
-        fundingTargets = recomputedFundingTargets;
-        mainReserveLamports = recomputedMainReserveLamports;
-        tipLamports = recomputedTipLamports;
-        await appendLog(launchId, "INFO", "Funding plan prepared", "funding", {
+      const planFunding =
+        buildFundingTargetsFromPumpfunPlan(authoritativePlan);
+      const fundingTargets = planFunding.fundingTargets.map((target) => ({
+        publicKey: new PublicKey(target.publicKey),
+        requiredLamports: target.requiredLamports,
+      }));
+      const mainReserveLamports = planFunding.mainReserveLamports;
+      const tipLamports = planFunding.tipLamports;
+      await appendLog(
+        launchId,
+        "INFO",
+        "Funding plan loaded from authoritative plan",
+        "funding",
+        {
           targetsCount: fundingTargets.length,
-          devFundingLamports: devFundingLamports.toString(),
-          creatorMinLamports: MIN_CREATOR_BALANCE_LAMPORTS.toString(),
-          creatorTargetLamports: creatorTargetLamports.toString(),
-          bundlerFundingTargetLamports: bundlerFundingTargetLamports.map(
-            (lamports) => lamports.toString()
-          ),
-          totalBundlerFundingLamports: totalBundlerFundingLamports.toString(),
-          totalBundleBuyLamports: totalBundleBuyLamports.toString(),
-          ataRentLamports: ataRentLamports.toString(),
-          userVolumeAccumulatorRentLamports:
-            userVolumeAccumulatorRentLamports.toString(),
-          buyRentLamports: buyRentLamports.toString(),
-          distributionAtaLamports: distributionAtaLamports.toString(),
+          fundingTargets: planFunding.fundingTargets.map((target) => ({
+            publicKey: target.publicKey,
+            requiredLamports: target.requiredLamports.toString(),
+          })),
           mainReserveLamports: mainReserveLamports.toString(),
           tipLamports: tipLamports.toString(),
           bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
-          source: "recomputed",
-        });
-      }
+          source: "authoritative_plan",
+        }
+      );
       const fundingResult = await fundWalletsFromMain(
         launchId,
         mainWalletKeypair,
@@ -4833,7 +4735,7 @@ async function runPumpfunLaunchJobByMode(
       await setStep(launchId, 30, "mint", "Preparing mint");
       const mintStartedAt = Date.now();
       let mintKeypair: Keypair;
-      if (authoritativePlan?.opaque.reservedVanityMintId) {
+      if (authoritativePlan.opaque.reservedVanityMintId) {
         const reserved = await prisma.vanityMint.findUnique({
           where: { id: authoritativePlan.opaque.reservedVanityMintId },
           select: { id: true, publicKey: true, privateKey: true, usedAt: true },
@@ -4857,25 +4759,22 @@ async function runPumpfunLaunchJobByMode(
           );
         }
         reservedVanityId = reserved.id;
-      } else if (authoritativePlan && !authoritativePlan.intendedEffects.vanityMint) {
+      } else if (!authoritativePlan.intendedEffects.vanityMint) {
         const generated = await reserveMintIfRequested(launchId, user.id, false);
         mintKeypair = generated.mintKeypair;
         reservedVanityId = null;
       } else {
-        const mintReservation = await reserveMintIfRequested(
-          launchId,
-          user.id,
-          input.vanityMint
+        throw new AppError(
+          "Planned vanity mint reservation is missing from the authoritative plan",
+          500
         );
-        mintKeypair = mintReservation.mintKeypair;
-        reservedVanityId = mintReservation.reservedVanityId;
       }
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),
-        vanityMint: input.vanityMint,
+        vanityMint: authoritativePlan.intendedEffects.vanityMint,
         reservedVanityId,
-        reusedAuthoritativePlan: Boolean(authoritativePlan),
+        reusedAuthoritativePlan: true,
       });
 
       if (await cancelLaunchIfRequested(launchId)) {
@@ -4906,6 +4805,7 @@ async function runPumpfunLaunchJobByMode(
         {
           platform: launch.platform,
           platformVersion: launch.platformVersion,
+          isMayhemMode: authoritativePlan.intendedEffects.mayhemMode,
         }
       );
       persistedTokenPublicKey = mintPublicKey;
@@ -4930,10 +4830,9 @@ async function runPumpfunLaunchJobByMode(
       const createStartedAt = Date.now();
       let createSignature: string | null = null;
       let bundleId: string | null = null;
-      const creatorBuyLamports =
-        authoritativePlan != null
-          ? BigInt(authoritativePlan.allocations.creatorBuyLamports)
-          : toLamports(devBuyAmountSol);
+      const creatorBuyLamports = BigInt(
+        authoritativePlan.allocations.creatorBuyLamports
+      );
       const creatorBuySol = Number(creatorBuyLamports) / 1_000_000_000;
       if (mode === "bundled") {
         const buyerWallets = bundlerBuyAllocation.targets.map(
@@ -4964,7 +4863,7 @@ async function runPumpfunLaunchJobByMode(
           buyAmountsLamport,
           tipper: mainWalletKeypair,
           tipLamports: baseTipLamports,
-          isMayhemMode: input.mayhemMode ?? false,
+          isMayhemMode: authoritativePlan.intendedEffects.mayhemMode,
           adaptiveTipEscalation: {
             enabled: baseTipLamports > 0,
             multiplier: 2,
@@ -5023,10 +4922,7 @@ async function runPumpfunLaunchJobByMode(
         // Non-bundled Platform path: raw create / create+dev-buy only (no PumpFunSDK).
         const connection = getSolanaConnection();
         const devPk = devWalletKeypair.publicKey.toBase58();
-        const isMayhemMode =
-          authoritativePlan?.intendedEffects.mayhemMode ??
-          input.mayhemMode ??
-          false;
+        const isMayhemMode = authoritativePlan.intendedEffects.mayhemMode;
         // One row per (signature × user-owned wallet). When create + dev buy
         // share a single tx, the TRADE_BUY row owns the entire wallet delta.
         // Pure-create path uses a single TRADE_CREATE row instead.
@@ -5135,8 +5031,9 @@ async function runPumpfunLaunchJobByMode(
         reservedVanityId,
       });
 
-      // Sequential post-create bundler buys (PumpFunSDK) removed: non-bundled
-      // Platform execute is create/dev-buy only; bundled buys stay on Jito path.
+      // Sequential post-create bundler buys (PumpFunSDK) removed: all pump.fun
+      // Launch buys use the raw instruction path (bundled via Jito, non-bundled
+      // create/dev-buy only).
 
       if (distributionWallets.length > 0) {
         await setStep(launchId, 72, "distribution", "Distributing tokens");

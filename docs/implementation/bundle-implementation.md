@@ -23,6 +23,7 @@ This document describes the current Jito bundle launch flow used by `ballistik-w
   - Token create instructions
   - Up to 1 buy
 - Subsequent transactions include up to 2 buys each (4 when a launch ALT is supplied — see below).
+  - Caps and buyer→tx index mapping are exported from `bundle-transaction-builder.ts` (`bundleBuysPerFollowUpTransaction` / `bundleBuyerTransactionIndex` / `MAX_RAW_TRANSACTION_BYTES`) and reused by `bundle-create-and-buy.ts` so AppTransaction signature mapping stays ALT-aware.
   - Capped at 2/tx because the new pump IDL's `buy_exact_sol_in` uses 18 accounts per buy; 3/tx overflows the 1232-byte versioned transaction limit without an address lookup table.
 - The last transaction may also include the Jito tip transfer.
  - Each bundle transaction adds a compute budget instruction for consistency.
