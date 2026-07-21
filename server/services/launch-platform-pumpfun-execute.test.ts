@@ -1,8 +1,8 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
-import { PUMPFUN_PLAN_SCHEMA_VERSION_V1 } from "@/server/schemas/launch-platform.schema";
-import type { PumpfunLaunchPlanV1 } from "@/server/schemas/launch-platform.schema";
+import { LAUNCH_PLAN_SHELL_VERSION_V1 } from "@/server/schemas/launch-platform.schema";
+import type { LaunchPlanEnvelopeV1, PumpfunLaunchPlanV1 } from "@/server/schemas/launch-platform.schema";
 
 const require = createRequire(import.meta.url);
 
@@ -43,13 +43,14 @@ function lifecycleCtx(overrides: {
 
 async function buildSamplePlan(
   bundleBuyEnabled: boolean
-): Promise<PumpfunLaunchPlanV1> {
+): Promise<LaunchPlanEnvelopeV1> {
   stubServerOnlyModule();
   const { assemblePumpfunLaunchPlan } = await import(
     "./launch-platform-pumpfun-plan"
   );
+  const { assembleLaunchPlanEnvelope } = await import("./launch-plan-envelope");
 
-  return assemblePumpfunLaunchPlan({
+  const platformPlan = assemblePumpfunLaunchPlan({
     money: {
       immediateRequiredBalanceLamports: "500000000",
       temporaryFundingLamports: "200000000",
@@ -85,17 +86,25 @@ async function buildSamplePlan(
     intendedEffects: {
       bundleBuyEnabled,
       mayhemMode: false,
-      vanityMint: false,
-      removeAttribution: false,
+
       distributionWalletMultiplier: 1,
     },
-    reservedVanityMintId: null,
-    reservedVanityMintPublicKey: null,
+
     bundlerBuyAllocationUsedFallback: false,
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,
     hasSufficientMainWallet: true,
     mainWalletBalanceLamports: "5000000000",
+  });
+
+  return assembleLaunchPlanEnvelope({
+    optionsOutcomes: {
+      vanityMint: false,
+      removeAttribution: false,
+      reservedVanityMintId: null,
+      reservedVanityMintPublicKey: null,
+    },
+    platformPlan,
   });
 }
 
@@ -127,7 +136,7 @@ test("requirePumpfunExecutePlan rejects invalid plan payload", async () => {
       requirePumpfunExecutePlan(
         lifecycleCtx({
           plan: { not: "a plan" },
-          planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+          planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
         })
       ),
     (error: unknown) => isAppError(error) && error.statusCode === 500
@@ -163,7 +172,7 @@ test("runPumpfunNonBundledExecute rejects bundled plans and runs job for non-bun
       runPumpfunNonBundledExecute(
         lifecycleCtx({
           plan: bundled,
-          planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+          planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
         }),
         {
           runNonBundledJob: async () => {
@@ -179,7 +188,7 @@ test("runPumpfunNonBundledExecute rejects bundled plans and runs job for non-bun
   const result = await runPumpfunNonBundledExecute(
     lifecycleCtx({
       plan: nonBundled,
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
       launchId: "launch-non-bundled",
     }),
     {
@@ -207,7 +216,7 @@ test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundle
       runPumpfunBundledExecute(
         lifecycleCtx({
           plan: nonBundled,
-          planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+          planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
         }),
         {
           runBundledJob: async () => {
@@ -223,7 +232,7 @@ test("runPumpfunBundledExecute rejects non-bundled plans and runs job for bundle
   const result = await runPumpfunBundledExecute(
     lifecycleCtx({
       plan: bundled,
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
       launchId: "launch-bundled",
     }),
     {
@@ -272,7 +281,7 @@ test("platform execute routes typed job outcomes without compat", async () => {
   const nonBundledResult = await platform.execute(
     lifecycleCtx({
       plan: nonBundled,
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
       launchId: "nb-1",
     })
   );
@@ -282,7 +291,7 @@ test("platform execute routes typed job outcomes without compat", async () => {
   const bundledResult = await platform.execute(
     lifecycleCtx({
       plan: bundled,
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
       launchId: "b-1",
     })
   );
@@ -303,7 +312,7 @@ test("platform execute maps cancel-before-submit and post-confirm degraded succe
   const canceled = await canceledPlatform.execute(
     lifecycleCtx({
       plan: await buildSamplePlan(false),
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
     })
   );
   assert.equal(canceled.kind, "canceled");
@@ -324,7 +333,7 @@ test("platform execute maps cancel-before-submit and post-confirm degraded succe
   const succeeded = await succeededPlatform.execute(
     lifecycleCtx({
       plan: await buildSamplePlan(false),
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
     })
   );
   assert.equal(succeeded.kind, "succeeded");
@@ -343,7 +352,7 @@ test("platform execute maps cancel-before-submit and post-confirm degraded succe
   const indeterminate = await indeterminatePlatform.execute(
     lifecycleCtx({
       plan: await buildSamplePlan(false),
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
     })
   );
   assert.equal(indeterminate.kind, "indeterminate");
@@ -358,7 +367,7 @@ test("platform execute maps cancel-before-submit and post-confirm degraded succe
   const partial = await partialPlatform.execute(
     lifecycleCtx({
       plan: await buildSamplePlan(false),
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
     })
   );
   assert.equal(partial.kind, "partial");

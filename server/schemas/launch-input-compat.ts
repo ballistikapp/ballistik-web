@@ -74,8 +74,8 @@ export function flattenVersionedLaunchInput(
     devBuyAmountSol: input.config.devBuyAmountSol,
     jitoTipAmountSol: input.config.jitoTipAmountSol,
     bundleBuyEnabled: input.config.bundleBuyEnabled,
-    vanityMint: input.config.vanityMint,
-    removeAttribution: input.config.removeAttribution,
+    vanityMint: input.options.vanityMint,
+    removeAttribution: input.options.removeAttribution,
     mayhemMode: input.config.mayhemMode,
     bundlerWalletCount: input.config.bundlerWalletCount,
     bundlerBuyAmountSol: input.config.bundlerBuyAmountSol,
@@ -105,6 +105,10 @@ export function toVersionedLaunchInput(
       ...(flat.telegram !== undefined ? { telegram: flat.telegram } : {}),
       ...(flat.website !== undefined ? { website: flat.website } : {}),
     },
+    options: {
+      vanityMint: flat.vanityMint,
+      removeAttribution: flat.removeAttribution,
+    },
     config: {
       devWalletOption: flat.devWalletOption,
       ...(flat.importedDevWalletKey !== undefined
@@ -113,8 +117,6 @@ export function toVersionedLaunchInput(
       devBuyAmountSol: flat.devBuyAmountSol,
       jitoTipAmountSol: flat.jitoTipAmountSol,
       bundleBuyEnabled: flat.bundleBuyEnabled,
-      vanityMint: flat.vanityMint,
-      removeAttribution: flat.removeAttribution,
       mayhemMode: flat.mayhemMode ?? false,
       bundlerWalletCount: flat.bundlerWalletCount,
       bundlerBuyAmountSol: flat.bundlerBuyAmountSol,

@@ -4,10 +4,20 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
 import { usageFeeService } from "@/server/services/usage-fee.service";
 import {
+  pumpfunLaunchPlanV1Schema,
   versionedLaunchInputSchema,
   type VersionedLaunchInput,
 } from "@/server/schemas/launch-platform.schema";
 import type { ContextUser } from "@/server/schemas/auth.schema";
+import {
+  assembleLaunchPlanEnvelope,
+  LAUNCH_PLAN_SHELL_VERSION_V1,
+} from "@/server/services/launch-plan-envelope";
+import {
+  mergeLaunchOptionsFeesIntoMoney,
+  quoteLaunchOptionsFees,
+} from "@/server/services/launch-options-money";
+import { materializeLaunchOptionsOutcomes } from "@/server/services/launch-options-outcomes";
 import {
   resolveLaunchPlatform,
   type LaunchLifecycleContext,
@@ -287,18 +297,96 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           return;
         }
 
-        try {
-          await deps.persistPlan(
-            launch.id,
-            planResult.planSchemaVersion,
-            planResult.plan
-          );
-        } catch (error) {
+        const platformPlanParsed = pumpfunLaunchPlanV1Schema.safeParse(
+          planResult.plan
+        );
+        if (!platformPlanParsed.success) {
           await compensateResources(
             platform,
             planCtx,
             planResult.localResources
           );
+          await deps.appendLog(
+            launch.id,
+            "ERROR",
+            "Platform plan is invalid",
+            "plan"
+          );
+          await deps.updateLaunchStatus(
+            launch.id,
+            "FAILED",
+            "Platform plan is invalid"
+          );
+          return;
+        }
+
+        let optionsResources: LaunchPlatformPlanLocalResources = {
+          reservedVanityMintId: null,
+          createdWalletPublicKeys: [],
+        };
+        try {
+          const materialized = await materializeLaunchOptionsOutcomes({
+            launchId: launch.id,
+            userId: launch.userId,
+            options: input.options,
+          });
+          optionsResources = {
+            reservedVanityMintId:
+              materialized.localResources.reservedVanityMintId,
+            createdWalletPublicKeys: [],
+          };
+
+          const optionsFees = quoteLaunchOptionsFees(input.options, {
+            platformFeeWaived:
+              platformPlanParsed.data.opaque.platformFeeWaived,
+            platformFeeDiscountRate:
+              platformPlanParsed.data.opaque.platformFeeDiscountRate,
+          });
+          const money = mergeLaunchOptionsFeesIntoMoney(
+            platformPlanParsed.data.money,
+            optionsFees
+          );
+          const required = BigInt(money.immediateRequiredBalanceLamports);
+          const balance = BigInt(
+            platformPlanParsed.data.opaque.mainWalletBalanceLamports
+          );
+          if (balance < required) {
+            await compensateResources(platform, planCtx, {
+              reservedVanityMintId: optionsResources.reservedVanityMintId,
+              createdWalletPublicKeys:
+                planResult.localResources?.createdWalletPublicKeys ?? [],
+            });
+            const message = `Main wallet requires ${(Number(required) / 1_000_000_000).toFixed(4)} SOL to fund launch wallets and usage fees`;
+            await deps.appendLog(launch.id, "ERROR", message, "plan");
+            await deps.updateLaunchStatus(launch.id, "FAILED", message);
+            return;
+          }
+
+          const envelope = assembleLaunchPlanEnvelope({
+            optionsOutcomes: materialized.optionsOutcomes,
+            platformPlan: {
+              ...platformPlanParsed.data,
+              money,
+              opaque: {
+                ...platformPlanParsed.data.opaque,
+                hasSufficientMainWallet: true,
+              },
+            },
+          });
+
+          await deps.persistPlan(
+            launch.id,
+            LAUNCH_PLAN_SHELL_VERSION_V1,
+            envelope
+          );
+          plan = envelope;
+          planSchemaVersion = LAUNCH_PLAN_SHELL_VERSION_V1;
+        } catch (error) {
+          await compensateResources(platform, planCtx, {
+            reservedVanityMintId: optionsResources.reservedVanityMintId,
+            createdWalletPublicKeys:
+              planResult.localResources?.createdWalletPublicKeys ?? [],
+          });
           const message =
             (error instanceof Error && error.message) ||
             "Failed to persist authoritative plan";
@@ -309,20 +397,22 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           await deps.appendLog(
             launch.id,
             "ERROR",
-            "Failed to persist authoritative plan",
+            message.includes("vanity")
+              ? message
+              : "Failed to persist authoritative plan",
             "plan",
             { errorMessage: message }
           );
           await deps.updateLaunchStatus(
             launch.id,
             "FAILED",
-            "Failed to persist authoritative plan"
+            message.includes("vanity")
+              ? message
+              : "Failed to persist authoritative plan"
           );
           return;
         }
 
-        plan = planResult.plan;
-        planSchemaVersion = planResult.planSchemaVersion;
         await deps.appendLog(
           launch.id,
           "INFO",

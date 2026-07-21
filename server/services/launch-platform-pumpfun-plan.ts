@@ -20,8 +20,6 @@ export type AssemblePumpfunLaunchPlanInput = {
   jitoTipLamports: string;
   mainReserveLamports: string;
   intendedEffects: PumpfunLaunchPlanV1["intendedEffects"];
-  reservedVanityMintId: string | null;
-  reservedVanityMintPublicKey: string | null;
   bundlerBuyAllocationUsedFallback: boolean;
   platformFeeWaived: boolean;
   platformFeeDiscountRate: number;
@@ -32,6 +30,7 @@ export type AssemblePumpfunLaunchPlanInput = {
 /**
  * Assemble the secret-free pump.fun plan document from already-resolved
  * identities and allocations. Does not touch the database or chain.
+ * Vanity / attribution outcomes belong on the Launch plan envelope, not here.
  */
 export function assemblePumpfunLaunchPlan(
   input: AssemblePumpfunLaunchPlanInput
@@ -63,8 +62,6 @@ export function assemblePumpfunLaunchPlan(
       capsByWalletPublicKey,
     },
     opaque: {
-      reservedVanityMintId: input.reservedVanityMintId,
-      reservedVanityMintPublicKey: input.reservedVanityMintPublicKey,
       bundlerBuyAllocationUsedFallback: input.bundlerBuyAllocationUsedFallback,
       platformFeeWaived: input.platformFeeWaived,
       platformFeeDiscountRate: input.platformFeeDiscountRate,

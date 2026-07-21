@@ -12,6 +12,7 @@ import type {
   LaunchPlatformPlanResult,
 } from "./launch-platform-registry";
 import type { LaunchLifecycleDeps } from "./launch-lifecycle";
+import { samplePumpfunPlatformPlan } from "./test-launch-plan-fixtures";
 
 const require = createRequire(import.meta.url);
 
@@ -58,13 +59,15 @@ const sampleInput: VersionedLaunchInput = {
     tokenSymbol: "TST",
     tokenImage: "https://example.com/a.png",
   },
+  options: {
+    vanityMint: false,
+    removeAttribution: false,
+  },
   config: {
     devWalletOption: "use_main",
     devBuyAmountSol: 0.1,
     jitoTipAmountSol: 0,
     bundleBuyEnabled: false,
-    vanityMint: false,
-    removeAttribution: false,
     mayhemMode: false,
     bundlerWalletCount: 0,
     bundlerBuyAmountSol: 0.05,
@@ -91,7 +94,7 @@ function createFakePlatform(handlers: {
       (async () => ({
         kind: "planned",
         planSchemaVersion: "1",
-        plan: { ok: true },
+        plan: samplePumpfunPlatformPlan(),
       })),
     execute: handlers.execute ?? (async () => ({ kind: "canceled" })),
     recover: async () => ({
@@ -136,7 +139,7 @@ test("lifecycle persists plan before execute and passes exact plan to execute", 
   const { createLaunchLifecycle } = await import("./launch-lifecycle");
 
   const events: string[] = [];
-  const planned = { wallets: { mainWalletPublicKey: "Main111" } };
+  const planned = samplePumpfunPlatformPlan();
 
   const lifecycle = createLaunchLifecycle(
     baseDeps({
@@ -152,15 +155,27 @@ test("lifecycle persists plan before execute and passes exact plan to execute", 
           },
           execute: async (ctx) => {
             events.push("execute");
-            assert.deepEqual(ctx.plan, planned);
             assert.equal(ctx.planSchemaVersion, "1");
+            assert.ok(ctx.plan && typeof ctx.plan === "object");
+            assert.equal(
+              (ctx.plan as { shellVersion?: string }).shellVersion,
+              "1"
+            );
+            assert.deepEqual(
+              (ctx.plan as { platformPlan?: unknown }).platformPlan,
+              planned
+            );
             return { kind: "canceled" };
           },
         }),
       persistPlan: async (_launchId, version, plan) => {
         events.push("persist");
         assert.equal(version, "1");
-        assert.deepEqual(plan, planned);
+        assert.equal((plan as { shellVersion?: string }).shellVersion, "1");
+        assert.deepEqual(
+          (plan as { platformPlan?: unknown }).platformPlan,
+          planned
+        );
       },
     })
   );
@@ -220,9 +235,9 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
           plan: async () => ({
             kind: "planned",
             planSchemaVersion: "1",
-            plan: { ok: true },
+            plan: samplePumpfunPlatformPlan(),
             localResources: {
-              reservedVanityMintId: "vanity-1",
+              reservedVanityMintId: null,
               createdWalletPublicKeys: ["Wallet111"],
             },
           }),
@@ -232,7 +247,7 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
           },
           compensatePlanResources: async (_ctx, resources) => {
             events.push("compensate");
-            assert.equal(resources.reservedVanityMintId, "vanity-1");
+            assert.equal(resources.reservedVanityMintId, null);
             assert.deepEqual(resources.createdWalletPublicKeys, ["Wallet111"]);
           },
         }),

@@ -21,13 +21,15 @@ const versionedPumpfunInput: VersionedLaunchInput = {
     telegram: "https://t.me/test",
     website: "https://example.com",
   },
+  options: {
+    vanityMint: false,
+    removeAttribution: false,
+  },
   config: {
     devWalletOption: "use_main",
     devBuyAmountSol: 0.1,
     jitoTipAmountSol: 0.001,
     bundleBuyEnabled: false,
-    vanityMint: false,
-    removeAttribution: false,
     mayhemMode: false,
     bundlerWalletCount: 0,
     bundlerBuyAmountSol: 0.05,
@@ -36,19 +38,27 @@ const versionedPumpfunInput: VersionedLaunchInput = {
   },
 };
 
-test("flattenVersionedLaunchInput maps metadata and pump config to flat legacy/clone shape", () => {
+test("flattenVersionedLaunchInput maps metadata, options, and pump config to flat legacy/clone shape", () => {
   const flat = flattenVersionedLaunchInput(versionedPumpfunInput);
   assert.equal(flat.tokenName, "Test Token");
   assert.equal(flat.tokenSymbol, "TEST");
   assert.equal(flat.devWalletOption, "use_main");
   assert.equal(flat.devBuyAmountSol, 0.1);
   assert.equal(flat.bundleBuyEnabled, false);
+  assert.equal(flat.vanityMint, false);
+  assert.equal(flat.removeAttribution, false);
 });
 
-test("toVersionedLaunchInput nests flat fields under metadata and config", () => {
-  const flat = flattenVersionedLaunchInput(versionedPumpfunInput);
+test("toVersionedLaunchInput nests flat fields under metadata, options, and config", () => {
+  const flat = flattenVersionedLaunchInput({
+    ...versionedPumpfunInput,
+    options: { vanityMint: true, removeAttribution: true },
+  });
   const nested = toVersionedLaunchInput(flat);
-  assert.deepEqual(nested, versionedPumpfunInput);
+  assert.equal(nested.options.vanityMint, true);
+  assert.equal(nested.options.removeAttribution, true);
+  assert.equal("vanityMint" in nested.config, false);
+  assert.deepEqual(nested.metadata, versionedPumpfunInput.metadata);
 });
 
 test("buildNewLaunchPersistence sets PUMPFUN platform identity and versioned input", () => {

@@ -6,12 +6,14 @@ import {
 } from "./build-versioned-launch-payload";
 import { createDefaultLaunchFunnelFormValues } from "./launch-funnel-form-values";
 
-test("buildVersionedLaunchInput nests shared metadata and pump config for PUMPFUN", () => {
+test("buildVersionedLaunchInput nests metadata, options, and pump config for PUMPFUN", () => {
   const values = createDefaultLaunchFunnelFormValues();
   values.metadata.tokenName = "Alpha";
   values.metadata.tokenSymbol = "ALP";
   values.metadata.tokenImage = "data:image/png;base64,abc";
   values.metadata.description = "A token";
+  values.options.vanityMint = true;
+  values.options.removeAttribution = false;
   values.config.devWalletOption = "use_main";
   values.config.devBuyAmountSol = 1.25;
   values.config.bundleBuyEnabled = false;
@@ -27,13 +29,15 @@ test("buildVersionedLaunchInput nests shared metadata and pump config for PUMPFU
       tokenImage: "data:image/png;base64,abc",
       description: "A token",
     },
+    options: {
+      vanityMint: true,
+      removeAttribution: false,
+    },
     config: {
       devWalletOption: "use_main",
       devBuyAmountSol: 1.25,
-      jitoTipAmountSol: 0.001,
+      jitoTipAmountSol: 0.005,
       bundleBuyEnabled: false,
-      vanityMint: true,
-      removeAttribution: false,
       mayhemMode: false,
       bundlerWalletCount: 8,
       bundlerBuyAmountSol: 0.1,
@@ -69,14 +73,15 @@ test("buildVersionedLaunchInput rejects non-submittable Platform selection", () 
   assert.equal(buildVersionedLaunchPreviewInput(blocked), null);
 });
 
-test("buildVersionedLaunchPreviewInput omits metadata", () => {
+test("buildVersionedLaunchPreviewInput includes Launch Options and omits metadata", () => {
   const values = createDefaultLaunchFunnelFormValues();
   values.metadata.tokenName = "ShouldNotAppear";
-  values.config.vanityMint = false;
+  values.options.vanityMint = false;
 
   const preview = buildVersionedLaunchPreviewInput(values);
   assert.ok(preview);
   assert.equal(preview.platform, "PUMPFUN");
-  assert.equal(preview.config.vanityMint, false);
+  assert.equal(preview.options.vanityMint, false);
   assert.equal("metadata" in preview, false);
+  assert.equal("vanityMint" in preview.config, false);
 });

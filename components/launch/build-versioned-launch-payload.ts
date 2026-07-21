@@ -22,6 +22,15 @@ function toSharedMetadata(
   };
 }
 
+function toLaunchOptions(
+  options: LaunchFunnelFormValues["options"]
+): VersionedLaunchInput["options"] {
+  return {
+    vanityMint: options.vanityMint,
+    removeAttribution: options.removeAttribution,
+  };
+}
+
 function toPumpfunConfig(
   config: LaunchFunnelFormValues["config"]
 ): VersionedLaunchInput["config"] {
@@ -33,8 +42,6 @@ function toPumpfunConfig(
     devBuyAmountSol: config.devBuyAmountSol,
     jitoTipAmountSol: config.jitoTipAmountSol,
     bundleBuyEnabled: config.bundleBuyEnabled,
-    vanityMint: config.vanityMint,
-    removeAttribution: config.removeAttribution,
     mayhemMode: config.mayhemMode,
     bundlerWalletCount: config.bundlerWalletCount,
     bundlerBuyAmountSol: config.bundlerBuyAmountSol,
@@ -57,16 +64,17 @@ export function buildVersionedLaunchInput(
     schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
     platform: "PUMPFUN",
     metadata: toSharedMetadata(values.metadata),
+    options: toLaunchOptions(values.options),
     config: toPumpfunConfig(values.config),
   };
 }
 
 /**
- * Assemble the versioned preview payload (Platform + config only).
+ * Assemble the versioned preview payload (Platform + Launch Options + config).
  * Returns null when the selected Platform cannot be previewed/submitted.
  */
 export function buildVersionedLaunchPreviewInput(
-  values: Pick<LaunchFunnelFormValues, "platform" | "config">
+  values: Pick<LaunchFunnelFormValues, "platform" | "options" | "config">
 ): VersionedLaunchPreviewInput | null {
   if (!isSubmittableFunnelPlatform(values.platform)) {
     return null;
@@ -74,6 +82,7 @@ export function buildVersionedLaunchPreviewInput(
   return {
     schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
     platform: "PUMPFUN",
+    options: toLaunchOptions(values.options),
     config: toPumpfunConfig(values.config),
   };
 }

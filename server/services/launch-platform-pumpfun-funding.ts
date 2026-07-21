@@ -2,6 +2,7 @@ import "server-only";
 
 import { AppError } from "@/server/errors";
 import {
+  launchPlanEnvelopeV1Schema,
   pumpfunLaunchPlanV1Schema,
   type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
@@ -91,6 +92,10 @@ export function buildManagedLaunchWalletRowsFromPumpfunPlan(
 
 /** True when a validated plan requires funded-cap reclaim. */
 export function launchUsesPlanFundedCapRecovery(plan: unknown): boolean {
+  const envelope = launchPlanEnvelopeV1Schema.safeParse(plan);
+  if (envelope.success) {
+    return envelope.data.platformPlan.recovery.policy === "plan_funded_cap";
+  }
   const parsed = pumpfunLaunchPlanV1Schema.safeParse(plan);
   return (
     parsed.success && parsed.data.recovery.policy === "plan_funded_cap"

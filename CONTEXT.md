@@ -40,6 +40,18 @@ _Avoid_: Account, address (when referring to the Wallet record, not the pubkey s
 A Wallet temporarily prepared or funded for a Launch and tracked until its Platform-specific cleanup or recovery is complete. Its role is defined by the selected Platform rather than by a global list of launch roles.
 _Avoid_: Recovery wallet, bundler wallet (when referring to the cross-Platform concept)
 
+**Launch Options**:
+Shared, Platform-agnostic Launch settings — vanity mint intent and whether to remove Launch Attribution — owned by the shared lifecycle, not by any Platform module.
+_Avoid_: pump.fun options, product options, shared config (when referring to this bag)
+
+**Launch Attribution**:
+The Ballistik product line appended to a Token description at publish time unless the User removes it via Launch Options. Distinct from Referral attribution of a User to a Marketer.
+_Avoid_: Attribution (alone), pump attribution, description footer
+
+**Vanity Mint**:
+A mint keypair reserved from Ballistik’s pool so the Token address matches a vanity pattern. Requested through Launch Options; mint identity is chosen by the shared lifecycle for every Launch (pool reserve or a fresh key), then consumed by the selected Platform.
+_Avoid_: custom mint, grinded address, pump vanity (when referring to the cross-Platform intent)
+
 **Marketer**:
 A User designated by an Operator in the Ops Console with a fee-share rate (0–1) that applies to every User they refer. The live rate at each fee collection is what matters — not the rate at signup. The Marketer chooses and may change their referral code; a code change invalidates prior share links, but existing Referrals stay attached. An Operator-only nickname labels the Marketer for Ops memory; it is not the referral code. When an Operator disables a Marketer, their code stops attributing new Users and existing Referrals stop producing Referral Payouts; past payouts remain.
 _Avoid_: Referrer, affiliate, partner (when referring to the designated User role)

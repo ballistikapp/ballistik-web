@@ -4,10 +4,11 @@ import { launchPresets } from "@/lib/config/launch-presets.config";
 import { createDefaultLaunchFunnelFormValues } from "@/components/launch/launch-funnel-form-values";
 import {
   applyPumpfunPresetToConfig,
+  applyPumpfunPresetToOptions,
   mapFlatInitialToLaunchFunnelValues,
 } from "./map-flat-initial-values";
 
-test("mapFlatInitialToLaunchFunnelValues maps clone bag into nested metadata and config", () => {
+test("mapFlatInitialToLaunchFunnelValues maps clone bag into nested metadata, options, and config", () => {
   const nested = mapFlatInitialToLaunchFunnelValues({
     tokenName: "Cloned",
     tokenSymbol: "CLN",
@@ -35,7 +36,8 @@ test("mapFlatInitialToLaunchFunnelValues maps clone bag into nested metadata and
   assert.equal(nested.config.devWalletOption, "use_main");
   assert.equal(nested.config.devBuyAmountSol, 2);
   assert.equal(nested.config.bundlerWalletCount, 4);
-  assert.equal(nested.config.vanityMint, false);
+  assert.equal(nested.options.vanityMint, false);
+  assert.equal(nested.options.removeAttribution, true);
   assert.equal(nested.config.mayhemMode, true);
 });
 
@@ -53,14 +55,18 @@ test("mapFlatInitialToLaunchFunnelValues skips media and remaps system creator w
   assert.equal(nested.config.devWalletOption, "generate");
 });
 
-test("applyPumpfunPresetToConfig applies free and regular presets without touching metadata", () => {
+test("applyPumpfunPreset helpers apply free and regular presets", () => {
   const base = createDefaultLaunchFunnelFormValues();
   const freeConfig = applyPumpfunPresetToConfig(
     base.config,
     launchPresets.free
   );
+  const freeOptions = applyPumpfunPresetToOptions(
+    base.options,
+    launchPresets.free
+  );
   assert.equal(freeConfig.bundleBuyEnabled, false);
-  assert.equal(freeConfig.vanityMint, false);
+  assert.equal(freeOptions.vanityMint, false);
   assert.equal(freeConfig.bundlerWalletCount, 5);
   assert.equal(freeConfig.devWalletOption, "generate");
 
@@ -68,7 +74,11 @@ test("applyPumpfunPresetToConfig applies free and regular presets without touchi
     base.config,
     launchPresets.regular
   );
+  const regularOptions = applyPumpfunPresetToOptions(
+    base.options,
+    launchPresets.regular
+  );
   assert.equal(regularConfig.bundleBuyEnabled, true);
-  assert.equal(regularConfig.vanityMint, true);
+  assert.equal(regularOptions.vanityMint, true);
   assert.equal(regularConfig.bundlerWalletCount, 8);
 });

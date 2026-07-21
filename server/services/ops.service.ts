@@ -23,7 +23,9 @@ import type {
 } from "@/server/schemas/ops.schema";
 import {
   isLegacyPlatformRecord,
+  launchPlanEnvelopeV1Schema,
   pumpfunLaunchPlanV1Schema,
+  type LaunchOptionsOutcomesV1,
   type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
 import { appTransactionService } from "@/server/services/app-transaction.service";
@@ -46,6 +48,7 @@ type OpsSafePumpfunPlanSummary = {
   allocations: PumpfunLaunchPlanV1["allocations"];
   intendedEffects: PumpfunLaunchPlanV1["intendedEffects"];
   recovery: PumpfunLaunchPlanV1["recovery"];
+  optionsOutcomes?: LaunchOptionsOutcomesV1;
 };
 
 type OpsJitoDiagnostics = {
@@ -177,6 +180,19 @@ function projectOpsLaunchPlatformIdentity(launch: {
 function projectSafePumpfunPlanSummary(
   plan: unknown
 ): OpsSafePumpfunPlanSummary | null {
+  const envelope = launchPlanEnvelopeV1Schema.safeParse(plan);
+  if (envelope.success) {
+    const platformPlan = envelope.data.platformPlan;
+    return {
+      money: platformPlan.money,
+      wallets: platformPlan.wallets,
+      allocations: platformPlan.allocations,
+      intendedEffects: platformPlan.intendedEffects,
+      recovery: platformPlan.recovery,
+      optionsOutcomes: envelope.data.optionsOutcomes,
+    };
+  }
+
   const parsed = pumpfunLaunchPlanV1Schema.safeParse(plan);
   if (!parsed.success) {
     return null;

@@ -88,13 +88,15 @@ test("previewCosts routes through Platform preview and returns the review envelo
     const input = versionedLaunchPreviewInputSchema.parse({
       schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
       platform: "PUMPFUN",
+      options: {
+        vanityMint: false,
+        removeAttribution: false,
+      },
       config: {
         devWalletOption: "generate",
         devBuyAmountSol: 0.5,
         jitoTipAmountSol: 0,
         bundleBuyEnabled: false,
-        vanityMint: false,
-        removeAttribution: false,
         mayhemMode: false,
         bundlerWalletCount: 0,
         bundlerBuyAmountSol: 0.05,

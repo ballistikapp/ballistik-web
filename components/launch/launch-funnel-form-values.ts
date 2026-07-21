@@ -28,6 +28,11 @@ export const sharedTokenMetadataFormSchema = z.object({
   website: z.string(),
 });
 
+export const launchOptionsFormSchema = z.object({
+  vanityMint: z.boolean(),
+  removeAttribution: z.boolean(),
+});
+
 export const pumpfunConfigFormSchema = z
   .object({
     devWalletOption: z.enum(["import", "generate", "use_main"]),
@@ -41,8 +46,6 @@ export const pumpfunConfigFormSchema = z
       .max(DEV_BUY_SOL_MAX, `Dev buy cannot exceed ${DEV_BUY_SOL_MAX} SOL.`),
     jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
     bundleBuyEnabled: z.boolean(),
-    vanityMint: z.boolean(),
-    removeAttribution: z.boolean(),
     mayhemMode: z.boolean(),
     bundlerWalletCount: z
       .number()
@@ -84,6 +87,7 @@ export const pumpfunConfigFormSchema = z
 export const launchFunnelFormSchema = z.object({
   platform: z.literal("PUMPFUN"),
   metadata: sharedTokenMetadataFormSchema,
+  options: launchOptionsFormSchema,
   config: pumpfunConfigFormSchema,
 });
 
@@ -91,6 +95,7 @@ export type LaunchFunnelFormValues = z.infer<typeof launchFunnelFormSchema>;
 export type SharedTokenMetadataFormValues = z.infer<
   typeof sharedTokenMetadataFormSchema
 >;
+export type LaunchOptionsFormValues = z.infer<typeof launchOptionsFormSchema>;
 export type PumpfunConfigFormValues = z.infer<typeof pumpfunConfigFormSchema>;
 
 export const DEFAULT_SHARED_TOKEN_METADATA: SharedTokenMetadataFormValues = {
@@ -104,14 +109,17 @@ export const DEFAULT_SHARED_TOKEN_METADATA: SharedTokenMetadataFormValues = {
   website: "",
 };
 
+export const DEFAULT_LAUNCH_OPTIONS: LaunchOptionsFormValues = {
+  vanityMint: true,
+  removeAttribution: false,
+};
+
 export const DEFAULT_PUMPFUN_CONFIG: PumpfunConfigFormValues = {
   devWalletOption: "generate",
   importedDevWalletKey: "",
   devBuyAmountSol: 0.5,
   jitoTipAmountSol: 0.005,
   bundleBuyEnabled: true,
-  vanityMint: true,
-  removeAttribution: false,
   mayhemMode: false,
   bundlerWalletCount: 8,
   bundlerBuyAmountSol: 0.1,
@@ -125,6 +133,7 @@ export function createDefaultLaunchFunnelFormValues(
   return {
     platform,
     metadata: { ...DEFAULT_SHARED_TOKEN_METADATA },
+    options: { ...DEFAULT_LAUNCH_OPTIONS },
     config: { ...DEFAULT_PUMPFUN_CONFIG },
   };
 }

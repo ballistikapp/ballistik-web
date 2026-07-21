@@ -16,6 +16,7 @@ import {
 } from "@/components/launch/build-versioned-launch-payload";
 import { PumpfunConfigFields } from "@/components/launch/platforms/pumpfun/pumpfun-config-fields";
 import { mapFlatInitialToLaunchFunnelValues } from "@/components/launch/platforms/pumpfun/map-flat-initial-values";
+import { LaunchOptionsFields } from "@/components/launch/shared/launch-options-fields";
 import { LaunchReviewSection } from "@/components/launch/shared/launch-review-section";
 import { PlatformSelector } from "@/components/launch/shared/platform-selector";
 import { TokenMetadataFields } from "@/components/launch/shared/token-metadata-fields";
@@ -88,9 +89,10 @@ function FunnelReview({
     () =>
       buildVersionedLaunchPreviewInput({
         platform: values.platform,
+        options: values.options,
         config: values.config,
       }),
-    [values.platform, values.config]
+    [values.platform, values.options, values.config]
   );
   const previewCostsQuery = trpc.launch.previewCosts.useQuery(previewInput!, {
     enabled: Boolean(previewInput),
@@ -109,7 +111,7 @@ function FunnelReview({
       bannerPreview={bannerPreview}
       description={getLaunchAttributionDescription(
         values.metadata.description,
-        values.config.removeAttribution
+        values.options.removeAttribution
       )}
     />
   );
@@ -137,6 +139,7 @@ export function LaunchFunnelShell({
       typeof initialValues === "object" &&
       "platform" in initialValues &&
       "metadata" in initialValues &&
+      "options" in initialValues &&
       "config" in initialValues
     ) {
       return initialValues as LaunchFunnelFormValues;
@@ -457,6 +460,9 @@ export function LaunchFunnelShell({
             />
           </PageSection>
         </section>
+        <PageSectionDivider />
+
+        <LaunchOptionsFields form={form} />
         <PageSectionDivider />
 
         {values.platform === "PUMPFUN" && (

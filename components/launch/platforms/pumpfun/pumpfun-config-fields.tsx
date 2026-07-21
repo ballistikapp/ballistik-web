@@ -81,40 +81,10 @@ export function PumpfunConfigFields({
 }: PumpfunConfigFieldsProps) {
   return (
     <>
-      <section id="pumpfun-options" className="scroll-mt-4">
+      <section id="pumpfun-configuration" className="scroll-mt-4">
         <PageSection>
-          <PageSectionHeader title="pump.fun Options" />
+          <PageSectionHeader title="pump.fun Configuration" />
           <div className="space-y-3">
-            <form.Field name="config.vanityMint">
-              {(field) => (
-                <ConfigToggle
-                  id="vanity-mint"
-                  label="Vanity Token Address"
-                  tooltip='Generate a custom token address ending with "pump".'
-                >
-                  <Switch
-                    id="vanity-mint"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                  />
-                </ConfigToggle>
-              )}
-            </form.Field>
-            <form.Field name="config.removeAttribution">
-              {(field) => (
-                <ConfigToggle
-                  id="remove-attribution"
-                  label="Remove Ballistik attribution (+0.1 SOL)"
-                  tooltip='By default, token descriptions include "Launched with ballistik.app". Enable this to remove it.'
-                >
-                  <Switch
-                    id="remove-attribution"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                  />
-                </ConfigToggle>
-              )}
-            </form.Field>
             <form.Field name="config.mayhemMode">
               {(field) => (
                 <ConfigToggle

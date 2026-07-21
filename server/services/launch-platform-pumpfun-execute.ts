@@ -1,10 +1,11 @@
 import "server-only";
 
 import { AppError } from "@/server/errors";
-import {
-  pumpfunLaunchPlanV1Schema,
-  type PumpfunLaunchPlanV1,
+import type {
+  LaunchPlanEnvelopeV1,
+  PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
+import { requireLaunchPlanEnvelope } from "@/server/services/launch-plan-envelope";
 import type {
   LaunchLifecycleContext,
   LaunchPlatformExecuteResult,
@@ -21,41 +22,24 @@ function isSupportedCreatorWalletOption(
 }
 
 /**
- * Validate the persisted pump.fun plan on the lifecycle context.
+ * Validate the persisted Launch plan envelope and return the pump.fun platform plan.
  * Execute must never silent-replan or trust unparsed opaque JSON.
  */
 export function requirePumpfunExecutePlan(
   ctx: Pick<LaunchLifecycleContext, "plan" | "planSchemaVersion">
 ): PumpfunLaunchPlanV1 {
-  if (ctx.plan == null || ctx.planSchemaVersion == null) {
-    throw new AppError(
-      "Persisted launch plan is required before pump.fun execute",
-      500
-    );
-  }
+  return requirePumpfunExecuteEnvelope(ctx).platformPlan;
+}
 
-  const parsed = pumpfunLaunchPlanV1Schema.safeParse(ctx.plan);
-  if (!parsed.success) {
-    throw new AppError(
-      "Persisted launch plan is invalid and cannot be executed",
-      500,
-      { issues: parsed.error.issues }
-    );
-  }
-
-  if (parsed.data.schemaVersion !== ctx.planSchemaVersion) {
-    throw new AppError(
-      "Persisted launch plan schema version does not match Launch record",
-      500,
-      {
-        planSchemaVersion: parsed.data.schemaVersion,
-        launchPlanSchemaVersion: ctx.planSchemaVersion,
-      }
-    );
-  }
-
-  assertNonSystemCreatorWalletOption(parsed.data.wallets.creatorWalletOption);
-  return parsed.data;
+/** Validate the persisted Launch plan envelope (optionsOutcomes + platformPlan). */
+export function requirePumpfunExecuteEnvelope(
+  ctx: Pick<LaunchLifecycleContext, "plan" | "planSchemaVersion">
+): LaunchPlanEnvelopeV1 {
+  const envelope = requireLaunchPlanEnvelope(ctx.plan, ctx.planSchemaVersion);
+  assertNonSystemCreatorWalletOption(
+    envelope.platformPlan.wallets.creatorWalletOption
+  );
+  return envelope;
 }
 
 /**

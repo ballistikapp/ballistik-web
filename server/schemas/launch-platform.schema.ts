@@ -37,49 +37,60 @@ const sharedTokenMetadataFields = {
 export const sharedTokenMetadataSchema = z.object(sharedTokenMetadataFields);
 export type SharedTokenMetadata = z.infer<typeof sharedTokenMetadataSchema>;
 
-export const pumpfunLaunchConfigSchema = z.object({
-  devWalletOption: z.enum(["import", "generate", "use_main"]),
-  importedDevWalletKey: z.string().optional(),
-  devBuyAmountSol: z
-    .number()
-    .min(MIN_BUY_AMOUNT_SOL, `Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`)
-    .max(100, "Dev buy cannot exceed 100 SOL."),
-  jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
-  bundleBuyEnabled: z.boolean(),
+/**
+ * Shared Launch Options — Platform-agnostic settings owned by the lifecycle.
+ * Vanity mint intent and Launch Attribution removal live here, not in Platform config.
+ */
+export const launchOptionsSchema = z.object({
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
-  /** Pump.fun Mayhem mode: create_v2 (Token-2022), AI-agent trading for 24h. Beta, immutable once launched. */
-  mayhemMode: z.boolean().optional().default(false),
-  bundlerWalletCount: z
-    .number()
-    .int()
-    .min(0, "Bundler wallet count must be 0 or more")
-    .max(
-      MAX_BUNDLE_WALLETS,
-      `Bundler wallet count must be ${MAX_BUNDLE_WALLETS} or less`
-    ),
-  bundlerBuyAmountSol: z
-    .number()
-    .min(
-      MIN_BUY_AMOUNT_SOL,
-      `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`
-    ),
-  bundlerBuyVariancePercent: z
-    .number()
-    .min(0, "Bundler buy variance must be 0 or more")
-    .max(50, "Bundler buy variance must be 50 or less"),
-  distributionWalletMultiplier: z
-    .number()
-    .int()
-    .min(1, "Distribution multiplier must be at least 1")
-    .max(5, "Distribution multiplier must be 5 or less"),
 });
+export type LaunchOptions = z.infer<typeof launchOptionsSchema>;
+
+export const pumpfunLaunchConfigSchema = z
+  .object({
+    devWalletOption: z.enum(["import", "generate", "use_main"]),
+    importedDevWalletKey: z.string().optional(),
+    devBuyAmountSol: z
+      .number()
+      .min(MIN_BUY_AMOUNT_SOL, `Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`)
+      .max(100, "Dev buy cannot exceed 100 SOL."),
+    jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
+    bundleBuyEnabled: z.boolean(),
+    /** Pump.fun Mayhem mode: create_v2 (Token-2022), AI-agent trading for 24h. Beta, immutable once launched. */
+    mayhemMode: z.boolean().optional().default(false),
+    bundlerWalletCount: z
+      .number()
+      .int()
+      .min(0, "Bundler wallet count must be 0 or more")
+      .max(
+        MAX_BUNDLE_WALLETS,
+        `Bundler wallet count must be ${MAX_BUNDLE_WALLETS} or less`
+      ),
+    bundlerBuyAmountSol: z
+      .number()
+      .min(
+        MIN_BUY_AMOUNT_SOL,
+        `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`
+      ),
+    bundlerBuyVariancePercent: z
+      .number()
+      .min(0, "Bundler buy variance must be 0 or more")
+      .max(50, "Bundler buy variance must be 50 or less"),
+    distributionWalletMultiplier: z
+      .number()
+      .int()
+      .min(1, "Distribution multiplier must be at least 1")
+      .max(5, "Distribution multiplier must be 5 or less"),
+  })
+  .strict();
 export type PumpfunLaunchConfig = z.infer<typeof pumpfunLaunchConfigSchema>;
 
 const pumpfunVersionedLaunchInputSchema = z.object({
   schemaVersion: z.literal(LAUNCH_INPUT_SCHEMA_VERSION_V1),
   platform: z.literal("PUMPFUN"),
   metadata: sharedTokenMetadataSchema,
+  options: launchOptionsSchema,
   config: pumpfunLaunchConfigSchema,
 });
 
@@ -122,8 +133,8 @@ export type NormalizedLaunchMoneySummary = z.infer<
 >;
 
 /**
- * Preview accepts versioned Platform identity + config without requiring
- * shared Token metadata (cost quotes stay responsive while editing the funnel).
+ * Preview accepts versioned Platform identity + Launch Options + config without
+ * requiring shared Token metadata (cost quotes stay responsive while editing).
  */
 export const versionedLaunchPreviewInputSchema = z.discriminatedUnion(
   "platform",
@@ -131,6 +142,7 @@ export const versionedLaunchPreviewInputSchema = z.discriminatedUnion(
     z.object({
       schemaVersion: z.literal(LAUNCH_INPUT_SCHEMA_VERSION_V1),
       platform: z.literal("PUMPFUN"),
+      options: launchOptionsSchema,
       config: pumpfunLaunchConfigSchema,
     }),
   ]
@@ -157,6 +169,9 @@ export type LaunchPlatformPreviewResult = z.infer<
 /** Schema version for the secret-free pump.fun authoritative plan payload. */
 export const PUMPFUN_PLAN_SCHEMA_VERSION_V1 = "1" as const;
 
+/** Schema version for the shared Launch plan envelope (optionsOutcomes + platformPlan). */
+export const LAUNCH_PLAN_SHELL_VERSION_V1 = "1" as const;
+
 const pumpfunPlanWalletSchema = z.object({
   publicKey: z.string().min(1),
   platformRole: z.string().min(1),
@@ -172,6 +187,8 @@ const pumpfunPlanWalletSchema = z.object({
 /**
  * Secret-free pump.fun plan. Validated whenever persisted data re-enters
  * execute/recover. Never contains private keys or raw secret material.
+ * Vanity reservation and Launch Attribution live in the plan envelope's
+ * optionsOutcomes — not in intendedEffects / opaque.
  */
 export const pumpfunLaunchPlanV1Schema = z.object({
   schemaVersion: z.literal(PUMPFUN_PLAN_SCHEMA_VERSION_V1),
@@ -197,8 +214,6 @@ export const pumpfunLaunchPlanV1Schema = z.object({
   intendedEffects: z.object({
     bundleBuyEnabled: z.boolean(),
     mayhemMode: z.boolean(),
-    vanityMint: z.boolean(),
-    removeAttribution: z.boolean(),
     distributionWalletMultiplier: z.number().int().min(1).max(5),
   }),
   recovery: z.object({
@@ -207,8 +222,6 @@ export const pumpfunLaunchPlanV1Schema = z.object({
   }),
   /** Opaque pump payload — still secret-free; Platform-owned fields. */
   opaque: z.object({
-    reservedVanityMintId: z.string().nullable(),
-    reservedVanityMintPublicKey: z.string().nullable(),
     bundlerBuyAllocationUsedFallback: z.boolean(),
     platformFeeWaived: z.boolean(),
     platformFeeDiscountRate: z.number().min(0).max(1),
@@ -217,6 +230,31 @@ export const pumpfunLaunchPlanV1Schema = z.object({
   }),
 });
 export type PumpfunLaunchPlanV1 = z.infer<typeof pumpfunLaunchPlanV1Schema>;
+
+/**
+ * Launch Options outcomes materialized by the shared lifecycle before execute.
+ * Public mint identity / vanity reservation fields only — never private keys.
+ */
+export const launchOptionsOutcomesV1Schema = z.object({
+  vanityMint: z.boolean(),
+  removeAttribution: z.boolean(),
+  reservedVanityMintId: z.string().nullable(),
+  reservedVanityMintPublicKey: z.string().nullable(),
+});
+export type LaunchOptionsOutcomesV1 = z.infer<
+  typeof launchOptionsOutcomesV1Schema
+>;
+
+/**
+ * Persisted Launch.plan envelope. shellVersion is stored on Launch.planSchemaVersion.
+ * Platforms validate platformPlan with their own schema whenever it re-enters execute/recover.
+ */
+export const launchPlanEnvelopeV1Schema = z.object({
+  shellVersion: z.literal(LAUNCH_PLAN_SHELL_VERSION_V1),
+  optionsOutcomes: launchOptionsOutcomesV1Schema,
+  platformPlan: pumpfunLaunchPlanV1Schema,
+});
+export type LaunchPlanEnvelopeV1 = z.infer<typeof launchPlanEnvelopeV1Schema>;
 
 /**
  * Null Platform version marks a legacy Launch or Token.

@@ -62,8 +62,7 @@ const SAFE_PUMPFUN_PLAN = {
   intendedEffects: {
     bundleBuyEnabled: true,
     mayhemMode: false,
-    vanityMint: false,
-    removeAttribution: false,
+
     distributionWalletMultiplier: 1,
   },
   recovery: {
@@ -73,8 +72,7 @@ const SAFE_PUMPFUN_PLAN = {
     },
   },
   opaque: {
-    reservedVanityMintId: null,
-    reservedVanityMintPublicKey: null,
+
     bundlerBuyAllocationUsedFallback: false,
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,

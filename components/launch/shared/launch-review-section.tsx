@@ -102,9 +102,13 @@ export function LaunchReviewSection({
   description,
   showSubmitFooter = true,
 }: LaunchReviewSectionProps) {
-  const { metadata, config } = values;
+  const { metadata, options, config } = values;
   const isVideoPreview = Boolean(imagePreview?.startsWith("data:video"));
-  const money = toPreviewMoneyDisplay(preview, config);
+  const money = toPreviewMoneyDisplay(preview, {
+    vanityMint: options.vanityMint,
+    removeAttribution: options.removeAttribution,
+    bundleBuyEnabled: config.bundleBuyEnabled,
+  });
   const calculating = previewLoading || (!previewError && !money);
 
   return (
@@ -235,12 +239,12 @@ export function LaunchReviewSection({
               )}
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Vanity Address</span>
-                <span>{config.vanityMint ? "Enabled" : "Disabled"}</span>
+                <span>{options.vanityMint ? "Enabled" : "Disabled"}</span>
               </div>
               <div className="grid grid-cols-[140px_1fr] gap-2">
                 <span className="text-muted-foreground">Attribution</span>
                 <span>
-                  {config.removeAttribution
+                  {options.removeAttribution
                     ? "Removed"
                     : "Included by default"}
                 </span>
@@ -309,12 +313,12 @@ export function LaunchReviewSection({
               <MoneyLine
                 label="Vanity mint fee"
                 amount={money.vanityFeeSol}
-                inactive={!config.vanityMint}
+                inactive={!options.vanityMint}
               />
               <MoneyLine
                 label="Attribution removal fee"
                 amount={money.attributionFeeSol}
-                inactive={!config.removeAttribution}
+                inactive={!options.removeAttribution}
               />
               <MoneyLine
                 label="Bundler fee"

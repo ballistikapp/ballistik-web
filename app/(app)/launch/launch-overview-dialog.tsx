@@ -42,9 +42,10 @@ export function LaunchOverviewDialog({
     () =>
       buildVersionedLaunchPreviewInput({
         platform: launchInput.platform,
+        options: launchInput.options,
         config: launchInput.config,
       }),
-    [launchInput.platform, launchInput.config]
+    [launchInput.platform, launchInput.options, launchInput.config]
   );
   const previewCostsQuery = trpc.launch.previewCosts.useQuery(previewInput!, {
     enabled: open && Boolean(previewInput),
@@ -75,7 +76,7 @@ export function LaunchOverviewDialog({
           bannerPreview={bannerPreview}
           description={getLaunchAttributionDescription(
             launchInput.metadata.description,
-            launchInput.config.removeAttribution
+            launchInput.options.removeAttribution
           )}
           showSubmitFooter={false}
         />

@@ -1,8 +1,11 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test from "node:test";
-import { PUMPFUN_PLAN_SCHEMA_VERSION_V1 } from "@/server/schemas/launch-platform.schema";
-import type { PumpfunLaunchPlanV1 } from "@/server/schemas/launch-platform.schema";
+import { LAUNCH_PLAN_SHELL_VERSION_V1 } from "@/server/schemas/launch-platform.schema";
+import type {
+  LaunchPlanEnvelopeV1,
+  PumpfunLaunchPlanV1,
+} from "@/server/schemas/launch-platform.schema";
 
 const require = createRequire(import.meta.url);
 
@@ -42,13 +45,14 @@ function lifecycleCtx(overrides: {
   };
 }
 
-async function buildSamplePlan(): Promise<PumpfunLaunchPlanV1> {
+async function buildSamplePlan(): Promise<LaunchPlanEnvelopeV1> {
   stubServerOnlyModule();
   const { assemblePumpfunLaunchPlan } = await import(
     "./launch-platform-pumpfun-plan"
   );
+  const { assembleLaunchPlanEnvelope } = await import("./launch-plan-envelope");
 
-  return assemblePumpfunLaunchPlan({
+  const platformPlan = assemblePumpfunLaunchPlan({
     money: {
       immediateRequiredBalanceLamports: "500000000",
       temporaryFundingLamports: "200000000",
@@ -77,17 +81,25 @@ async function buildSamplePlan(): Promise<PumpfunLaunchPlanV1> {
     intendedEffects: {
       bundleBuyEnabled: false,
       mayhemMode: false,
-      vanityMint: false,
-      removeAttribution: false,
+
       distributionWalletMultiplier: 1,
     },
-    reservedVanityMintId: null,
-    reservedVanityMintPublicKey: null,
+
     bundlerBuyAllocationUsedFallback: false,
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,
     hasSufficientMainWallet: true,
     mainWalletBalanceLamports: "5000000000",
+  });
+
+  return assembleLaunchPlanEnvelope({
+    optionsOutcomes: {
+      vanityMint: false,
+      removeAttribution: false,
+      reservedVanityMintId: null,
+      reservedVanityMintPublicKey: null,
+    },
+    platformPlan,
   });
 }
 
@@ -107,7 +119,7 @@ test("platform recover validates persisted plan and reclaims from durable state"
   const result = await runPumpfunRecover(
     lifecycleCtx({
       plan,
-      planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+      planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
       launchId: "launch-recover",
       userId: "user-recover",
     }),
@@ -151,7 +163,7 @@ test("platform recover rejects invalid persisted plan before reclaim", async () 
       runPumpfunRecover(
         lifecycleCtx({
           plan: { not: "valid" },
-          planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
+          planSchemaVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
         }),
         undefined,
         {

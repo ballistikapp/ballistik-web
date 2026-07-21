@@ -57,12 +57,8 @@ test("assemblePumpfunLaunchPlan builds a secret-free versioned plan", async () =
     intendedEffects: {
       bundleBuyEnabled: false,
       mayhemMode: false,
-      vanityMint: true,
-      removeAttribution: false,
       distributionWalletMultiplier: 1,
     },
-    reservedVanityMintId: "vanity-1",
-    reservedVanityMintPublicKey: "Mint333333333333333333333333333333333333333",
     bundlerBuyAllocationUsedFallback: false,
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,
@@ -78,7 +74,8 @@ test("assemblePumpfunLaunchPlan builds a secret-free versioned plan", async () =
     ],
     "200000000"
   );
-  assert.equal(plan.opaque.reservedVanityMintId, "vanity-1");
+  assert.equal("reservedVanityMintId" in plan.opaque, false);
+  assert.equal("vanityMint" in plan.intendedEffects, false);
   assert.equal(planPayloadContainsSecretMaterial(plan), false);
 });
 

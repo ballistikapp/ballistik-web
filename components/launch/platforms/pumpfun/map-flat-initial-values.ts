@@ -2,6 +2,7 @@ import type { LaunchPresetValues } from "@/lib/config/launch-presets.config";
 import {
   createDefaultLaunchFunnelFormValues,
   type LaunchFunnelFormValues,
+  type LaunchOptionsFormValues,
   type PumpfunConfigFormValues,
   type SharedTokenMetadataFormValues,
 } from "@/components/launch/launch-funnel-form-values";
@@ -17,14 +18,17 @@ const METADATA_KEYS = [
   "website",
 ] as const satisfies ReadonlyArray<keyof SharedTokenMetadataFormValues>;
 
+const OPTIONS_KEYS = [
+  "vanityMint",
+  "removeAttribution",
+] as const satisfies ReadonlyArray<keyof LaunchOptionsFormValues>;
+
 const CONFIG_KEYS = [
   "devWalletOption",
   "importedDevWalletKey",
   "devBuyAmountSol",
   "jitoTipAmountSol",
   "bundleBuyEnabled",
-  "vanityMint",
-  "removeAttribution",
   "mayhemMode",
   "bundlerWalletCount",
   "bundlerBuyAmountSol",
@@ -45,6 +49,7 @@ export function mapFlatInitialToLaunchFunnelValues(
     return {
       platform: "PUMPFUN",
       metadata: { ...base.metadata },
+      options: { ...base.options },
       config: { ...base.config },
     };
   }
@@ -55,6 +60,12 @@ export function mapFlatInitialToLaunchFunnelValues(
     if (key in flat && flat[key] != null) {
       metadata[key] = flat[key] as SharedTokenMetadataFormValues[typeof key];
     }
+  }
+
+  const options = { ...base.options };
+  for (const key of OPTIONS_KEYS) {
+    if (!(key in flat) || flat[key] == null) continue;
+    Object.assign(options, { [key]: flat[key] });
   }
 
   const config = { ...base.config };
@@ -70,11 +81,12 @@ export function mapFlatInitialToLaunchFunnelValues(
   return {
     platform: "PUMPFUN",
     metadata,
+    options,
     config,
   };
 }
 
-/** Apply a launch preset onto pump.fun config (shared metadata unchanged). */
+/** Apply a launch preset onto Launch Options + pump.fun config. */
 export function applyPumpfunPresetToConfig(
   config: PumpfunConfigFormValues,
   preset: LaunchPresetValues
@@ -84,6 +96,15 @@ export function applyPumpfunPresetToConfig(
     devWalletOption: preset.devWalletOption,
     bundleBuyEnabled: preset.bundleBuyEnabled,
     bundlerWalletCount: preset.bundlerWalletCount,
+  };
+}
+
+export function applyPumpfunPresetToOptions(
+  options: LaunchOptionsFormValues,
+  preset: LaunchPresetValues
+): LaunchOptionsFormValues {
+  return {
+    ...options,
     vanityMint: preset.vanityMint,
     removeAttribution: preset.removeAttribution,
   };

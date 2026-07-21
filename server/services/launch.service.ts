@@ -23,8 +23,10 @@ import type {
 import {
   isLegacyPlatformRecord,
   PUMPFUN_PLAN_SCHEMA_VERSION_V1,
-  pumpfunLaunchPlanV1Schema,
+  type LaunchOptionsOutcomesV1,
+  type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
+import { requireLaunchPlanEnvelope } from "@/server/services/launch-plan-envelope";
 import {
   resolveLaunchPlatform,
   type LaunchPlatformExecuteResult,
@@ -161,8 +163,16 @@ function applyLaunchFeePolicy(
     bundleBuyEnabled: input.bundleBuyEnabled,
     bundlerWalletCount: input.bundlerWalletCount,
     distributionWalletMultiplier: input.distributionWalletMultiplier,
-    vanityMint: input.vanityMint,
-    removeAttribution: input.removeAttribution,
+    // Launch Options fees are composed by shared lifecycle/preview, not pump money.
+    vanityMint:
+      "vanityMint" in input && typeof input.vanityMint === "boolean"
+        ? input.vanityMint
+        : false,
+    removeAttribution:
+      "removeAttribution" in input &&
+      typeof input.removeAttribution === "boolean"
+        ? input.removeAttribution
+        : false,
   };
   const usageFees = calculateLaunchUsageFees(feeInput);
   const discountRate = grpcAccessService.getPlatformFeeDiscountRate(user);
@@ -239,12 +249,10 @@ type LaunchCostInput = Pick<
   | "devBuyAmountSol"
   | "jitoTipAmountSol"
   | "bundleBuyEnabled"
-  | "vanityMint"
   | "bundlerWalletCount"
   | "bundlerBuyAmountSol"
   | "bundlerBuyVariancePercent"
   | "distributionWalletMultiplier"
-  | "removeAttribution"
 > & {
   mayhemMode?: boolean;
 };
@@ -415,7 +423,7 @@ function buildLaunchRecoveryData(
 
 async function persistManagedLaunchWalletsFromPlan(
   launchId: string,
-  plan: ReturnType<typeof pumpfunLaunchPlanV1Schema.parse>
+  plan: PumpfunLaunchPlanV1
 ) {
   const rows = buildManagedLaunchWalletRowsFromPumpfunPlan(launchId, plan);
   await prisma.launchRecoveryWallet.deleteMany({ where: { launchId } });
@@ -1948,6 +1956,15 @@ async function cancelRequestedAtSafePoint(launchId: string) {
   return true;
 }
 
+/** Shared mint materialization for Launch Options / Platform execute. */
+export async function reserveMintForLaunchOptions(
+  launchId: string,
+  userId: string,
+  vanityRequested: boolean
+) {
+  return reserveMintIfRequested(launchId, userId, vanityRequested);
+}
+
 async function reserveMintIfRequested(
   launchId: string,
   userId: string,
@@ -2301,7 +2318,8 @@ async function persistTokenPending(
             platformIdentity?.isMayhemMode ?? input.mayhemMode ?? false,
           name: input.tokenName.trim(),
           symbol: normalizeSymbol(input.tokenSymbol),
-          description: composeTokenDescription(input) || null,
+          // Persist user-authored description; Launch Attribution is applied at publish.
+          description: input.description?.trim() || null,
           imageUrl: tokenImageUrl,
           twitterUrl: input.twitter?.trim() || null,
           telegramUrl: input.telegram?.trim() || null,
@@ -3720,18 +3738,6 @@ export async function buildPumpfunAuthoritativePlan(params: {
       };
     }
 
-    let reservedVanityMintPublicKey: string | null = null;
-    if (config.vanityMint) {
-      const mintReservation = await reserveMintIfRequested(
-        params.launchId,
-        params.userId,
-        true
-      );
-      localResources.reservedVanityMintId = mintReservation.reservedVanityId;
-      reservedVanityMintPublicKey =
-        mintReservation.mintKeypair.publicKey.toBase58();
-    }
-
     const managedWallets: PumpfunPlanWalletDraft[] = [];
     if (devWalletPublicKey !== mainWalletPublicKey) {
       managedWallets.push({
@@ -3778,12 +3784,8 @@ export async function buildPumpfunAuthoritativePlan(params: {
       intendedEffects: {
         bundleBuyEnabled: config.bundleBuyEnabled,
         mayhemMode: config.mayhemMode ?? false,
-        vanityMint: config.vanityMint,
-        removeAttribution: config.removeAttribution,
         distributionWalletMultiplier,
       },
-      reservedVanityMintId: localResources.reservedVanityMintId,
-      reservedVanityMintPublicKey,
       bundlerBuyAllocationUsedFallback: bundlerBuyAllocation.usedFallback,
       platformFeeWaived: costPreview.platformFeeWaived,
       platformFeeDiscountRate: costPreview.platformFeeDiscountRate,
@@ -4529,23 +4531,20 @@ async function runPumpfunLaunchJobByMode(
       const user = await loadUserWithMainWallet(launch.userId);
       mainWalletKeypair = keypairFromPrivateKey(user.mainWallet.privateKey);
 
-      let authoritativePlan: ReturnType<
-        typeof pumpfunLaunchPlanV1Schema.parse
-      >;
+      let authoritativePlan: PumpfunLaunchPlanV1;
+      let optionsOutcomes: LaunchOptionsOutcomesV1;
       if (!launch.planPersistedAt) {
         throw new AppError(
           "Pump.fun execute requires a persisted authoritative plan",
           500
         );
       }
-      const persistedPlan = pumpfunLaunchPlanV1Schema.safeParse(launch.plan);
-      if (!persistedPlan.success) {
-        throw new AppError(
-          "Persisted launch plan is invalid and cannot be executed",
-          500
-        );
-      }
-      authoritativePlan = persistedPlan.data;
+      const envelope = requireLaunchPlanEnvelope(
+        launch.plan,
+        launch.planSchemaVersion
+      );
+      authoritativePlan = envelope.platformPlan;
+      optionsOutcomes = envelope.optionsOutcomes;
       if (
         mode === "bundled" &&
         !authoritativePlan.intendedEffects.bundleBuyEnabled
@@ -4742,7 +4741,14 @@ async function runPumpfunLaunchJobByMode(
         input.tokenBanner ?? "",
         input.tokenSymbol
       );
-      const metadata = buildTokenMetadata(input, file, bannerFile);
+      const metadata = buildTokenMetadata(
+        {
+          ...input,
+          removeAttribution: optionsOutcomes.removeAttribution,
+        },
+        file,
+        bannerFile
+      );
       await appendLog(launchId, "INFO", "Metadata prepared", "metadata", {
         durationMs: Date.now() - metadataStartedAt,
         tokenMediaSource,
@@ -4755,9 +4761,9 @@ async function runPumpfunLaunchJobByMode(
       await setStep(launchId, 30, "mint", "Preparing mint");
       const mintStartedAt = Date.now();
       let mintKeypair: Keypair;
-      if (authoritativePlan.opaque.reservedVanityMintId) {
+      if (optionsOutcomes.reservedVanityMintId) {
         const reserved = await prisma.vanityMint.findUnique({
-          where: { id: authoritativePlan.opaque.reservedVanityMintId },
+          where: { id: optionsOutcomes.reservedVanityMintId },
           select: { id: true, publicKey: true, privateKey: true, usedAt: true },
         });
         if (!reserved || reserved.usedAt) {
@@ -4769,9 +4775,9 @@ async function runPumpfunLaunchJobByMode(
         mintKeypair = keypairFromPrivateKey(reserved.privateKey);
         if (
           mintKeypair.publicKey.toBase58() !== reserved.publicKey ||
-          (authoritativePlan.opaque.reservedVanityMintPublicKey &&
+          (optionsOutcomes.reservedVanityMintPublicKey &&
             mintKeypair.publicKey.toBase58() !==
-              authoritativePlan.opaque.reservedVanityMintPublicKey)
+              optionsOutcomes.reservedVanityMintPublicKey)
         ) {
           throw new AppError(
             "Planned vanity mint reservation is invalid",
@@ -4779,7 +4785,7 @@ async function runPumpfunLaunchJobByMode(
           );
         }
         reservedVanityId = reserved.id;
-      } else if (!authoritativePlan.intendedEffects.vanityMint) {
+      } else if (!optionsOutcomes.vanityMint) {
         const generated = await reserveMintIfRequested(launchId, user.id, false);
         mintKeypair = generated.mintKeypair;
         reservedVanityId = null;
@@ -4792,7 +4798,7 @@ async function runPumpfunLaunchJobByMode(
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),
-        vanityMint: authoritativePlan.intendedEffects.vanityMint,
+        vanityMint: optionsOutcomes.vanityMint,
         reservedVanityId,
         reusedAuthoritativePlan: true,
       });

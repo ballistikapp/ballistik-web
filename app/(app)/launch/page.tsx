@@ -7,6 +7,7 @@ import { CloneTokenDialog } from "./clone-token-dialog";
 import { createDefaultLaunchFunnelFormValues } from "@/components/launch/launch-funnel-form-values";
 import {
   applyPumpfunPresetToConfig,
+  applyPumpfunPresetToOptions,
   mapFlatInitialToLaunchFunnelValues,
 } from "@/components/launch/platforms/pumpfun/map-flat-initial-values";
 import { PageHeader } from "@/components/layout/sections";
@@ -56,6 +57,7 @@ export default function LaunchPage() {
   const initialValues = React.useMemo(() => {
     const base = createDefaultLaunchFunnelFormValues();
     base.config = applyPumpfunPresetToConfig(base.config, presetValues);
+    base.options = applyPumpfunPresetToOptions(base.options, presetValues);
     return mapFlatInitialToLaunchFunnelValues(cloneValues, base);
   }, [presetValues, cloneValues]);
 

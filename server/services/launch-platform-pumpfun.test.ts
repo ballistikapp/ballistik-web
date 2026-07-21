@@ -29,13 +29,15 @@ function stubServerOnlyModule() {
 const previewInput = versionedLaunchPreviewInputSchema.parse({
   schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
   platform: "PUMPFUN",
+  options: {
+    vanityMint: false,
+    removeAttribution: false,
+  },
   config: {
     devWalletOption: "use_main",
     devBuyAmountSol: 0.1,
     jitoTipAmountSol: 0.001,
     bundleBuyEnabled: false,
-    vanityMint: false,
-    removeAttribution: false,
     mayhemMode: false,
     bundlerWalletCount: 0,
     bundlerBuyAmountSol: 0.05,
@@ -187,6 +189,7 @@ test("pump.fun plan returns injected authoritative plan without secrets", async 
         tokenSymbol: "TST",
         tokenImage: "https://example.com/a.png",
       },
+      options: previewInput.options,
       config: previewInput.config,
     }
   );
@@ -230,6 +233,7 @@ test("pump.fun plan surfaces insufficient-funds as a failed plan outcome", async
         tokenSymbol: "TST",
         tokenImage: "https://example.com/a.png",
       },
+      options: previewInput.options,
       config: previewInput.config,
     }
   );
@@ -259,6 +263,7 @@ test("pump.fun preview rejects invalid configuration with a user-safe error", as
         {
           schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
           platform: "PUMPFUN",
+          options: previewInput.options,
           config: {
             ...previewInput.config,
             bundlerWalletCount: 99,

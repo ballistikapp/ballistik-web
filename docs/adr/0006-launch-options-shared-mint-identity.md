@@ -1,0 +1,3 @@
+# Launch Options and shared mint identity
+
+Vanity mint intent and Launch Attribution are Ballistik Launch Options, not pump.fun Platform configuration. The shared lifecycle owns mint identity (pool reserve or fresh key), attribution apply-at-publish over user-authored description, and the related usage fees; Platforms consume those outcomes. Authoritative plans persist an envelope (`optionsOutcomes` + `platformPlan`) rather than burying vanity/attribution inside the pump plan. We rejected leaving these flags in pump `config` because description and mint identity are cross-Platform concerns and the funnel was teaching the wrong model before SPL exists.

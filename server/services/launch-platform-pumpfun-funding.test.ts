@@ -73,12 +73,10 @@ async function buildSamplePlan(): Promise<PumpfunLaunchPlanV1> {
     intendedEffects: {
       bundleBuyEnabled: true,
       mayhemMode: false,
-      vanityMint: false,
-      removeAttribution: false,
+
       distributionWalletMultiplier: 2,
     },
-    reservedVanityMintId: null,
-    reservedVanityMintPublicKey: null,
+
     bundlerBuyAllocationUsedFallback: false,
     platformFeeWaived: false,
     platformFeeDiscountRate: 0,
