@@ -104,6 +104,7 @@ async function buildSamplePlan(
       reservedVanityMintId: null,
       reservedVanityMintPublicKey: null,
     },
+    money: platformPlan.money,
     platformPlan,
   });
 }

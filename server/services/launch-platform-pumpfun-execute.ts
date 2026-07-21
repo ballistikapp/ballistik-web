@@ -1,9 +1,10 @@
 import "server-only";
 
 import { AppError } from "@/server/errors";
-import type {
-  LaunchPlanEnvelopeV1,
-  PumpfunLaunchPlanV1,
+import {
+  pumpfunLaunchPlanV1Schema,
+  type LaunchPlanEnvelopeV1,
+  type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
 import { requireLaunchPlanEnvelope } from "@/server/services/launch-plan-envelope";
 import type {
@@ -31,15 +32,27 @@ export function requirePumpfunExecutePlan(
   return requirePumpfunExecuteEnvelope(ctx).platformPlan;
 }
 
+export type PumpfunExecuteEnvelope = ReturnType<
+  typeof requirePumpfunExecuteEnvelope
+>;
+
 /** Validate the persisted Launch plan envelope (optionsOutcomes + platformPlan). */
 export function requirePumpfunExecuteEnvelope(
   ctx: Pick<LaunchLifecycleContext, "plan" | "planSchemaVersion">
-): LaunchPlanEnvelopeV1 {
+): LaunchPlanEnvelopeV1 & { platformPlan: PumpfunLaunchPlanV1 } {
   const envelope = requireLaunchPlanEnvelope(ctx.plan, ctx.planSchemaVersion);
+  const platformPlan = pumpfunLaunchPlanV1Schema.safeParse(envelope.platformPlan);
+  if (!platformPlan.success) {
+    throw new AppError(
+      "Persisted launch plan is invalid and cannot be executed",
+      500,
+      { issues: platformPlan.error.issues }
+    );
+  }
   assertNonSystemCreatorWalletOption(
-    envelope.platformPlan.wallets.creatorWalletOption
+    platformPlan.data.wallets.creatorWalletOption
   );
-  return envelope;
+  return { ...envelope, platformPlan: platformPlan.data };
 }
 
 /**

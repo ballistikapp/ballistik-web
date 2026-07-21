@@ -85,6 +85,7 @@ export function sampleLaunchPlanEnvelope(
       reservedVanityMintId: null,
       reservedVanityMintPublicKey: null,
     },
+    money: platformPlan.money,
     platformPlan,
   };
 }

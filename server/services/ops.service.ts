@@ -181,28 +181,22 @@ function projectSafePumpfunPlanSummary(
   plan: unknown
 ): OpsSafePumpfunPlanSummary | null {
   const envelope = launchPlanEnvelopeV1Schema.safeParse(plan);
-  if (envelope.success) {
-    const platformPlan = envelope.data.platformPlan;
-    return {
-      money: platformPlan.money,
-      wallets: platformPlan.wallets,
-      allocations: platformPlan.allocations,
-      intendedEffects: platformPlan.intendedEffects,
-      recovery: platformPlan.recovery,
-      optionsOutcomes: envelope.data.optionsOutcomes,
-    };
+  if (!envelope.success) {
+    return null;
   }
-
-  const parsed = pumpfunLaunchPlanV1Schema.safeParse(plan);
-  if (!parsed.success) {
+  const platformPlan = pumpfunLaunchPlanV1Schema.safeParse(
+    envelope.data.platformPlan
+  );
+  if (!platformPlan.success) {
     return null;
   }
   return {
-    money: parsed.data.money,
-    wallets: parsed.data.wallets,
-    allocations: parsed.data.allocations,
-    intendedEffects: parsed.data.intendedEffects,
-    recovery: parsed.data.recovery,
+    money: envelope.data.money,
+    wallets: platformPlan.data.wallets,
+    allocations: platformPlan.data.allocations,
+    intendedEffects: platformPlan.data.intendedEffects,
+    recovery: platformPlan.data.recovery,
+    optionsOutcomes: envelope.data.optionsOutcomes,
   };
 }
 

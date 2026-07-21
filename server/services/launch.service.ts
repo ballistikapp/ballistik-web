@@ -26,7 +26,7 @@ import {
   type LaunchOptionsOutcomesV1,
   type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
-import { requireLaunchPlanEnvelope } from "@/server/services/launch-plan-envelope";
+import { requirePumpfunExecuteEnvelope } from "@/server/services/launch-platform-pumpfun-execute";
 import {
   resolveLaunchPlatform,
   type LaunchPlatformExecuteResult,
@@ -1965,6 +1965,58 @@ export async function reserveMintForLaunchOptions(
   return reserveMintIfRequested(launchId, userId, vanityRequested);
 }
 
+/**
+ * Resolve the mint keypair from Launch Options outcomes.
+ * Platforms consume this rather than owning mint-key creation policy.
+ */
+export async function resolveMintKeypairFromOptionsOutcomes(params: {
+  launchId: string;
+  userId: string;
+  optionsOutcomes: LaunchOptionsOutcomesV1;
+}): Promise<{ mintKeypair: Keypair; reservedVanityId: string | null }> {
+  const { optionsOutcomes } = params;
+
+  if (optionsOutcomes.reservedVanityMintId) {
+    const reserved = await prisma.vanityMint.findUnique({
+      where: { id: optionsOutcomes.reservedVanityMintId },
+      select: { id: true, publicKey: true, privateKey: true, usedAt: true },
+    });
+    if (!reserved || reserved.usedAt) {
+      throw new AppError(
+        "Planned vanity mint reservation is no longer available",
+        400
+      );
+    }
+    const mintKeypair = keypairFromPrivateKey(reserved.privateKey);
+    if (
+      mintKeypair.publicKey.toBase58() !== reserved.publicKey ||
+      (optionsOutcomes.reservedVanityMintPublicKey &&
+        mintKeypair.publicKey.toBase58() !==
+          optionsOutcomes.reservedVanityMintPublicKey)
+    ) {
+      throw new AppError("Planned vanity mint reservation is invalid", 500);
+    }
+    return { mintKeypair, reservedVanityId: reserved.id };
+  }
+
+  if (!optionsOutcomes.vanityMint) {
+    const generated = await reserveMintIfRequested(
+      params.launchId,
+      params.userId,
+      false
+    );
+    return {
+      mintKeypair: generated.mintKeypair,
+      reservedVanityId: null,
+    };
+  }
+
+  throw new AppError(
+    "Planned vanity mint reservation is missing from the authoritative plan",
+    500
+  );
+}
+
 async function reserveMintIfRequested(
   launchId: string,
   userId: string,
@@ -3797,6 +3849,10 @@ export async function buildPumpfunAuthoritativePlan(params: {
       kind: "planned",
       planSchemaVersion: PUMPFUN_PLAN_SCHEMA_VERSION_V1,
       plan,
+      money: plan.money,
+      platformFeeWaived: costPreview.platformFeeWaived,
+      platformFeeDiscountRate: costPreview.platformFeeDiscountRate,
+      mainWalletBalanceLamports: costPreview.mainWalletBalanceLamports,
       localResources,
     };
   } catch (error) {
@@ -4539,10 +4595,10 @@ async function runPumpfunLaunchJobByMode(
           500
         );
       }
-      const envelope = requireLaunchPlanEnvelope(
-        launch.plan,
-        launch.planSchemaVersion
-      );
+      const envelope = requirePumpfunExecuteEnvelope({
+        plan: launch.plan,
+        planSchemaVersion: launch.planSchemaVersion,
+      });
       authoritativePlan = envelope.platformPlan;
       optionsOutcomes = envelope.optionsOutcomes;
       if (
@@ -4761,40 +4817,13 @@ async function runPumpfunLaunchJobByMode(
       await setStep(launchId, 30, "mint", "Preparing mint");
       const mintStartedAt = Date.now();
       let mintKeypair: Keypair;
-      if (optionsOutcomes.reservedVanityMintId) {
-        const reserved = await prisma.vanityMint.findUnique({
-          where: { id: optionsOutcomes.reservedVanityMintId },
-          select: { id: true, publicKey: true, privateKey: true, usedAt: true },
-        });
-        if (!reserved || reserved.usedAt) {
-          throw new AppError(
-            "Planned vanity mint reservation is no longer available",
-            400
-          );
-        }
-        mintKeypair = keypairFromPrivateKey(reserved.privateKey);
-        if (
-          mintKeypair.publicKey.toBase58() !== reserved.publicKey ||
-          (optionsOutcomes.reservedVanityMintPublicKey &&
-            mintKeypair.publicKey.toBase58() !==
-              optionsOutcomes.reservedVanityMintPublicKey)
-        ) {
-          throw new AppError(
-            "Planned vanity mint reservation is invalid",
-            500
-          );
-        }
-        reservedVanityId = reserved.id;
-      } else if (!optionsOutcomes.vanityMint) {
-        const generated = await reserveMintIfRequested(launchId, user.id, false);
-        mintKeypair = generated.mintKeypair;
-        reservedVanityId = null;
-      } else {
-        throw new AppError(
-          "Planned vanity mint reservation is missing from the authoritative plan",
-          500
-        );
-      }
+      const resolvedMint = await resolveMintKeypairFromOptionsOutcomes({
+        launchId,
+        userId: user.id,
+        optionsOutcomes,
+      });
+      mintKeypair = resolvedMint.mintKeypair;
+      reservedVanityId = resolvedMint.reservedVanityId;
       await appendLog(launchId, "INFO", "Mint prepared", "mint", {
         durationMs: Date.now() - mintStartedAt,
         mintPublicKey: mintKeypair.publicKey.toBase58(),

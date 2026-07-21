@@ -247,12 +247,14 @@ export type LaunchOptionsOutcomesV1 = z.infer<
 
 /**
  * Persisted Launch.plan envelope. shellVersion is stored on Launch.planSchemaVersion.
- * Platforms validate platformPlan with their own schema whenever it re-enters execute/recover.
+ * `money` is the lifecycle-composed summary (Platform money + Launch Options fees).
+ * `platformPlan` stays opaque here — Platforms validate it with their own schema on execute/recover.
  */
 export const launchPlanEnvelopeV1Schema = z.object({
   shellVersion: z.literal(LAUNCH_PLAN_SHELL_VERSION_V1),
   optionsOutcomes: launchOptionsOutcomesV1Schema,
-  platformPlan: pumpfunLaunchPlanV1Schema,
+  money: normalizedLaunchMoneySummarySchema,
+  platformPlan: z.unknown(),
 });
 export type LaunchPlanEnvelopeV1 = z.infer<typeof launchPlanEnvelopeV1Schema>;
 

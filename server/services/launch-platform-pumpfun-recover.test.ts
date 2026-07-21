@@ -99,6 +99,7 @@ async function buildSamplePlan(): Promise<LaunchPlanEnvelopeV1> {
       reservedVanityMintId: null,
       reservedVanityMintPublicKey: null,
     },
+    money: platformPlan.money,
     platformPlan,
   });
 }

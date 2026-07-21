@@ -164,6 +164,10 @@ test("pump.fun plan returns injected authoritative plan without secrets", async 
       kind: "planned",
       planSchemaVersion: "1",
       plan: planned,
+      money: planned.money,
+      platformFeeWaived: false,
+      platformFeeDiscountRate: 0,
+      mainWalletBalanceLamports: "0",
       localResources: {
         reservedVanityMintId: null,
         createdWalletPublicKeys: [],

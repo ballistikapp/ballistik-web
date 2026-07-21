@@ -13,7 +13,8 @@ export type MaterializeLaunchOptionsResult = {
 
 /**
  * Materialize Launch Options for a plan attempt: reserve a vanity mint when
- * requested. Fresh mint keypairs are created at execute via the shared mint helper.
+ * requested. Fresh mint keypairs are created at execute via the shared mint helper
+ * (no durable secret store for non-vanity keys without a schema change).
  */
 export async function materializeLaunchOptionsOutcomes(params: {
   launchId: string;

@@ -2,9 +2,9 @@ import "server-only";
 
 import { prisma, Prisma } from "@/lib/prisma";
 import { logger } from "@/lib/logger";
+import { isAppError } from "@/server/errors";
 import { usageFeeService } from "@/server/services/usage-fee.service";
 import {
-  pumpfunLaunchPlanV1Schema,
   versionedLaunchInputSchema,
   type VersionedLaunchInput,
 } from "@/server/schemas/launch-platform.schema";
@@ -297,29 +297,6 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           return;
         }
 
-        const platformPlanParsed = pumpfunLaunchPlanV1Schema.safeParse(
-          planResult.plan
-        );
-        if (!platformPlanParsed.success) {
-          await compensateResources(
-            platform,
-            planCtx,
-            planResult.localResources
-          );
-          await deps.appendLog(
-            launch.id,
-            "ERROR",
-            "Platform plan is invalid",
-            "plan"
-          );
-          await deps.updateLaunchStatus(
-            launch.id,
-            "FAILED",
-            "Platform plan is invalid"
-          );
-          return;
-        }
-
         let optionsResources: LaunchPlatformPlanLocalResources = {
           reservedVanityMintId: null,
           createdWalletPublicKeys: [],
@@ -337,19 +314,15 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           };
 
           const optionsFees = quoteLaunchOptionsFees(input.options, {
-            platformFeeWaived:
-              platformPlanParsed.data.opaque.platformFeeWaived,
-            platformFeeDiscountRate:
-              platformPlanParsed.data.opaque.platformFeeDiscountRate,
+            platformFeeWaived: planResult.platformFeeWaived,
+            platformFeeDiscountRate: planResult.platformFeeDiscountRate,
           });
           const money = mergeLaunchOptionsFeesIntoMoney(
-            platformPlanParsed.data.money,
+            planResult.money,
             optionsFees
           );
           const required = BigInt(money.immediateRequiredBalanceLamports);
-          const balance = BigInt(
-            platformPlanParsed.data.opaque.mainWalletBalanceLamports
-          );
+          const balance = BigInt(planResult.mainWalletBalanceLamports);
           if (balance < required) {
             await compensateResources(platform, planCtx, {
               reservedVanityMintId: optionsResources.reservedVanityMintId,
@@ -364,14 +337,8 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
 
           const envelope = assembleLaunchPlanEnvelope({
             optionsOutcomes: materialized.optionsOutcomes,
-            platformPlan: {
-              ...platformPlanParsed.data,
-              money,
-              opaque: {
-                ...platformPlanParsed.data.opaque,
-                hasSufficientMainWallet: true,
-              },
-            },
+            money,
+            platformPlan: planResult.plan,
           });
 
           await deps.persistPlan(
@@ -390,6 +357,9 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           const message =
             (error instanceof Error && error.message) ||
             "Failed to persist authoritative plan";
+          const isOptionsFailure =
+            isAppError(error) ||
+            (error instanceof Error && /vanity mint/i.test(error.message));
           logger.error("Launch plan persistence failed", {
             launchId: launch.id,
             errorMessage: message,
@@ -397,18 +367,14 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           await deps.appendLog(
             launch.id,
             "ERROR",
-            message.includes("vanity")
-              ? message
-              : "Failed to persist authoritative plan",
+            isOptionsFailure ? message : "Failed to persist authoritative plan",
             "plan",
             { errorMessage: message }
           );
           await deps.updateLaunchStatus(
             launch.id,
             "FAILED",
-            message.includes("vanity")
-              ? message
-              : "Failed to persist authoritative plan"
+            isOptionsFailure ? message : "Failed to persist authoritative plan"
           );
           return;
         }

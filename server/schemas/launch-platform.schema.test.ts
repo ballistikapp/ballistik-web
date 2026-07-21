@@ -264,7 +264,7 @@ test("pump.fun plan schema strips vanity reservation ids from opaque", () => {
   assert.equal("reservedVanityMintPublicKey" in parsed.opaque, false);
 });
 
-test("launch plan envelope carries optionsOutcomes and platformPlan", () => {
+test("launch plan envelope carries optionsOutcomes, money, and opaque platformPlan", () => {
   const parsed = launchPlanEnvelopeV1Schema.parse({
     shellVersion: "1",
     optionsOutcomes: {
@@ -273,13 +273,11 @@ test("launch plan envelope carries optionsOutcomes and platformPlan", () => {
       reservedVanityMintId: "vanity-1",
       reservedVanityMintPublicKey: "Mint333333333333333333333333333333333333333",
     },
+    money: validPumpfunPlan.money,
     platformPlan: validPumpfunPlan,
   });
   assert.equal(parsed.shellVersion, "1");
   assert.equal(parsed.optionsOutcomes.reservedVanityMintId, "vanity-1");
-  assert.equal(parsed.platformPlan.platform, "PUMPFUN");
-  assert.equal(
-    "vanityMint" in parsed.platformPlan.intendedEffects,
-    false
-  );
+  assert.equal(parsed.money.usageFeeLamports, "0");
+  assert.deepEqual(parsed.platformPlan, validPumpfunPlan);
 });

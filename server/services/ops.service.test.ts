@@ -302,11 +302,21 @@ async function setupOpsTest(t: TestContext) {
         platform: "PUMPFUN" as const,
         platformVersion: "1",
         plan: {
-          ...SAFE_PUMPFUN_PLAN,
-          opaque: {
-            ...SAFE_PUMPFUN_PLAN.opaque,
-            // Should never appear in Ops projections.
-            privateKey: "plan-opaque-secret",
+          shellVersion: "1" as const,
+          optionsOutcomes: {
+            vanityMint: false,
+            removeAttribution: false,
+            reservedVanityMintId: null,
+            reservedVanityMintPublicKey: null,
+          },
+          money: SAFE_PUMPFUN_PLAN.money,
+          platformPlan: {
+            ...SAFE_PUMPFUN_PLAN,
+            opaque: {
+              ...SAFE_PUMPFUN_PLAN.opaque,
+              // Should never appear in Ops projections.
+              privateKey: "plan-opaque-secret",
+            },
           },
         },
         planSchemaVersion: "1",

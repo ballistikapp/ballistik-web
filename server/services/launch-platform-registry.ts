@@ -5,6 +5,7 @@ import type { ContextUser } from "@/server/schemas/auth.schema";
 import type {
   LaunchPlatformId,
   LaunchPlatformPreviewResult,
+  NormalizedLaunchMoneySummary,
   VersionedLaunchInput,
   VersionedLaunchPreviewInput,
 } from "@/server/schemas/launch-platform.schema";
@@ -97,7 +98,13 @@ export type LaunchPlatformPlanResult =
   | {
       kind: "planned";
       planSchemaVersion: string;
+      /** Opaque Platform plan document — validated only by that Platform. */
       plan: unknown;
+      /** Platform money before Launch Options fee composition. */
+      money: NormalizedLaunchMoneySummary;
+      platformFeeWaived: boolean;
+      platformFeeDiscountRate: number;
+      mainWalletBalanceLamports: string;
       localResources?: LaunchPlatformPlanLocalResources;
     }
   | {

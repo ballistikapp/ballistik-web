@@ -90,14 +90,17 @@ export function buildManagedLaunchWalletRowsFromPumpfunPlan(
   });
 }
 
-/** True when a validated plan requires funded-cap reclaim. */
+/** True when a validated plan envelope's pump.fun plan requires funded-cap reclaim. */
 export function launchUsesPlanFundedCapRecovery(plan: unknown): boolean {
   const envelope = launchPlanEnvelopeV1Schema.safeParse(plan);
-  if (envelope.success) {
-    return envelope.data.platformPlan.recovery.policy === "plan_funded_cap";
+  if (!envelope.success) {
+    return false;
   }
-  const parsed = pumpfunLaunchPlanV1Schema.safeParse(plan);
+  const platformPlan = pumpfunLaunchPlanV1Schema.safeParse(
+    envelope.data.platformPlan
+  );
   return (
-    parsed.success && parsed.data.recovery.policy === "plan_funded_cap"
+    platformPlan.success &&
+    platformPlan.data.recovery.policy === "plan_funded_cap"
   );
 }

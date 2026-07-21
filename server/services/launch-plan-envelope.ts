@@ -6,12 +6,13 @@ import {
   launchPlanEnvelopeV1Schema,
   type LaunchOptionsOutcomesV1,
   type LaunchPlanEnvelopeV1,
-  type PumpfunLaunchPlanV1,
+  type NormalizedLaunchMoneySummary,
 } from "@/server/schemas/launch-platform.schema";
 
 /**
  * Validate persisted Launch.plan as the shared envelope.
  * Launch.planSchemaVersion must match envelope.shellVersion.
+ * Does not validate platformPlan — Platforms do that on execute/recover.
  */
 export function requireLaunchPlanEnvelope(
   plan: unknown,
@@ -49,11 +50,13 @@ export function requireLaunchPlanEnvelope(
 
 export function assembleLaunchPlanEnvelope(params: {
   optionsOutcomes: LaunchOptionsOutcomesV1;
-  platformPlan: PumpfunLaunchPlanV1;
+  money: NormalizedLaunchMoneySummary;
+  platformPlan: unknown;
 }): LaunchPlanEnvelopeV1 {
   return launchPlanEnvelopeV1Schema.parse({
     shellVersion: LAUNCH_PLAN_SHELL_VERSION_V1,
     optionsOutcomes: params.optionsOutcomes,
+    money: params.money,
     platformPlan: params.platformPlan,
   });
 }

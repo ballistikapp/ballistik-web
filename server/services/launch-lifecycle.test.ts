@@ -91,11 +91,18 @@ function createFakePlatform(handlers: {
     preview: async () => emptyPreviewResult(),
     plan:
       handlers.plan ??
-      (async () => ({
-        kind: "planned",
-        planSchemaVersion: "1",
-        plan: samplePumpfunPlatformPlan(),
-      })),
+      (async () => {
+        const planned = samplePumpfunPlatformPlan();
+        return {
+          kind: "planned" as const,
+          planSchemaVersion: "1",
+          plan: planned,
+          money: planned.money,
+          platformFeeWaived: false,
+          platformFeeDiscountRate: 0,
+          mainWalletBalanceLamports: planned.opaque.mainWalletBalanceLamports,
+        };
+      }),
     execute: handlers.execute ?? (async () => ({ kind: "canceled" })),
     recover: async () => ({
       mainWalletPublicKey: "Main111",
@@ -151,6 +158,11 @@ test("lifecycle persists plan before execute and passes exact plan to execute", 
               kind: "planned",
               planSchemaVersion: "1",
               plan: planned,
+              money: planned.money,
+              platformFeeWaived: false,
+              platformFeeDiscountRate: 0,
+              mainWalletBalanceLamports:
+                planned.opaque.mainWalletBalanceLamports,
             };
           },
           execute: async (ctx) => {
@@ -232,15 +244,23 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
     baseDeps({
       resolvePlatform: () =>
         createFakePlatform({
-          plan: async () => ({
-            kind: "planned",
-            planSchemaVersion: "1",
-            plan: samplePumpfunPlatformPlan(),
-            localResources: {
-              reservedVanityMintId: null,
-              createdWalletPublicKeys: ["Wallet111"],
-            },
-          }),
+          plan: async () => {
+            const planned = samplePumpfunPlatformPlan();
+            return {
+              kind: "planned" as const,
+              planSchemaVersion: "1",
+              plan: planned,
+              money: planned.money,
+              platformFeeWaived: false,
+              platformFeeDiscountRate: 0,
+              mainWalletBalanceLamports:
+                planned.opaque.mainWalletBalanceLamports,
+              localResources: {
+                reservedVanityMintId: null,
+                createdWalletPublicKeys: ["Wallet111"],
+              },
+            };
+          },
           execute: async () => {
             events.push("execute");
             return { kind: "canceled" };
@@ -282,10 +302,15 @@ test("lifecycle skips planning when an authoritative plan is already persisted",
         createFakePlatform({
           plan: async () => {
             planCalled = true;
+            const planned = samplePumpfunPlatformPlan();
             return {
-              kind: "planned",
+              kind: "planned" as const,
               planSchemaVersion: "1",
               plan: { shouldNot: "run" },
+              money: planned.money,
+              platformFeeWaived: false,
+              platformFeeDiscountRate: 0,
+              mainWalletBalanceLamports: "0",
             };
           },
           execute: async (ctx) => {

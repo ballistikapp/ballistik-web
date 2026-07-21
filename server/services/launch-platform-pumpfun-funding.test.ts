@@ -161,8 +161,20 @@ test("launchUsesPlanFundedCapRecovery detects plan recovery policy", async () =>
     "./launch-platform-pumpfun-funding"
   );
 
-  const plan = await buildSamplePlan();
-  assert.equal(launchUsesPlanFundedCapRecovery(plan), true);
+  const platformPlan = await buildSamplePlan();
+  const envelope = {
+    shellVersion: "1" as const,
+    optionsOutcomes: {
+      vanityMint: false,
+      removeAttribution: false,
+      reservedVanityMintId: null,
+      reservedVanityMintPublicKey: null,
+    },
+    money: platformPlan.money,
+    platformPlan,
+  };
+  assert.equal(launchUsesPlanFundedCapRecovery(envelope), true);
   assert.equal(launchUsesPlanFundedCapRecovery(null), false);
+  assert.equal(launchUsesPlanFundedCapRecovery(platformPlan), false);
   assert.equal(launchUsesPlanFundedCapRecovery({ recovery: { policy: "other" } }), false);
 });
