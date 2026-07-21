@@ -44,7 +44,19 @@ const BUNDLE_CONFIRM_RPC_SLOW_POLL_MS = 3000;
 const BUNDLE_STATUS_CHECK_INTERVAL_MS = 3_000;
 const BUNDLE_RESEND_INTERVAL_MS = 5_000;
 const BUNDLE_BLOCKHASH_MAX_AGE_MS = 55_000;
+/** Leave this much blockhash lifetime when stopping a regional send walk. */
+const BUNDLE_SEND_WALK_MARGIN_MS = 10_000;
 const MAX_BLOCKHASH_REBUILDS = 2;
+
+function walkDeadlineFromBlockhash(blockhashFetchedAt: number): number {
+  return (
+    blockhashFetchedAt + BUNDLE_BLOCKHASH_MAX_AGE_MS - BUNDLE_SEND_WALK_MARGIN_MS
+  );
+}
+
+function isExpiredBlockhashMessage(message: string): boolean {
+  return /expired blockhash/i.test(message);
+}
 
 // getBundleStatuses returns `err` as a Rust `Result<(), TransactionError>`:
 // `{ Ok: null }` on success, `{ Err: {...} }` on failure. It is never a bare
@@ -467,11 +479,16 @@ async function sendJitoBundleInternal(
   let currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
 
   function createSendBundleWithRetries(bundleToSend: bundle.Bundle) {
-    return async (): Promise<{ bundleId: string; endpoint: string | null }> => {
+    return async (sendOptions?: {
+      walkDeadlineAt?: number;
+    }): Promise<{ bundleId: string; endpoint: string | null }> => {
       let lastError: Error | null = null;
       for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
         try {
-          const result = await resolveSendBundle(bundleToSend, jitoClientLogOptions);
+          const result = await resolveSendBundle(bundleToSend, {
+            ...jitoClientLogOptions,
+            walkDeadlineAt: sendOptions?.walkDeadlineAt,
+          });
           const endpoint =
             typeof result === "object" && result && "endpoint" in result &&
             typeof result.endpoint === "string"
@@ -522,7 +539,9 @@ async function sendJitoBundleInternal(
 
   let sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
-  const initialSend = await sendBundleWithRetries();
+  const initialSend = await sendBundleWithRetries({
+    walkDeadlineAt: walkDeadlineFromBlockhash(blockhashFetchedAt),
+  });
   const initialBundleId = initialSend.bundleId;
   const initialEndpoint = initialSend.endpoint;
   bundleLogger.info("Jito bundle sent", {
@@ -633,7 +652,9 @@ async function sendJitoBundleInternal(
     currentBundle = buildBundleFromVersionedTxs(currentBuild.versionedTxs);
     sendBundleWithRetries = createSendBundleWithRetries(currentBundle);
 
-    const rebuiltSend = await sendBundleWithRetries();
+    const rebuiltSend = await sendBundleWithRetries({
+      walkDeadlineAt: walkDeadlineFromBlockhash(blockhashFetchedAt),
+    });
     const newBundleId = rebuiltSend.bundleId;
     const newEndpoint = rebuiltSend.endpoint;
 
@@ -674,7 +695,7 @@ async function sendJitoBundleInternal(
     initialSignatures: currentBuild.signatures,
     accountKeys: feePayers,
     initialBlockhashFetchedAt: blockhashFetchedAt,
-    sendBundleWithRetries: () => sendBundleWithRetries(),
+    sendBundleWithRetries: (sendOptions) => sendBundleWithRetries(sendOptions),
     bundleId: initialBundleId,
     bundleEndpoint: initialEndpoint,
     rebuildAndResend,
@@ -877,7 +898,9 @@ async function confirmBundleOnChain({
   initialSignatures: string[];
   accountKeys: string[];
   initialBlockhashFetchedAt: number;
-  sendBundleWithRetries: () => Promise<{
+  sendBundleWithRetries: (sendOptions?: {
+    walkDeadlineAt?: number;
+  }) => Promise<{
     bundleId: string;
     endpoint: string | null;
   }>;
@@ -1254,13 +1277,32 @@ async function confirmBundleOnChain({
         const blockhashAge = Date.now() - currentBlockhashFetchedAt;
         const inflightPending = lastInflightStatus?.status === "Pending";
 
-        if (
-          summary.foundCount === 0 &&
-          blockhashAge >= BUNDLE_BLOCKHASH_MAX_AGE_MS &&
-          rebuildAndResend &&
-          !inflightPending
-        ) {
-          bundleLogger.warn("Blockhash expired, rebuilding bundle", {
+        const applyRebuiltBundle = (rebuilt: {
+          bundleId: string;
+          endpoint: string | null;
+          signatures: string[];
+          blockhashFetchedAt: number;
+        }) => {
+          rebuildCount += 1;
+          currentBundleId = rebuilt.bundleId;
+          currentBundleEndpoint = rebuilt.endpoint;
+          currentSignatures = rebuilt.signatures;
+          currentBlockhashFetchedAt = rebuilt.blockhashFetchedAt;
+          lastResendAt = Date.now();
+          lastLoggedSummary = null;
+          lastInflightStatus = null;
+          lastInflightStatusError = null;
+          lastLoggedInflightStatus = null;
+          lastLoggedInflightStatusError = null;
+          consecutiveMatchedInvalidCount = 0;
+        };
+
+        const tryRebuildBundle = async (reason: string): Promise<boolean> => {
+          if (!rebuildAndResend) {
+            return false;
+          }
+          bundleLogger.warn("Rebuilding bundle", {
+            reason,
             bundleId: currentBundleId,
             elapsedMs: Date.now() - startedAt,
             blockhashAgeMs: blockhashAge,
@@ -1268,6 +1310,7 @@ async function confirmBundleOnChain({
           await emitBundleTelemetry(onEvent, {
             type: "bundle_rebuild_triggered",
             data: {
+              reason,
               bundleId: currentBundleId,
               elapsedMs: Date.now() - startedAt,
               blockhashAgeMs: blockhashAge,
@@ -1280,26 +1323,33 @@ async function confirmBundleOnChain({
           });
           try {
             const rebuilt = await rebuildAndResend();
-            rebuildCount += 1;
-            currentBundleId = rebuilt.bundleId;
-            currentBundleEndpoint = rebuilt.endpoint;
-            currentSignatures = rebuilt.signatures;
-            currentBlockhashFetchedAt = rebuilt.blockhashFetchedAt;
-            lastResendAt = Date.now();
-            lastLoggedSummary = null;
-            lastInflightStatus = null;
-            lastInflightStatusError = null;
-            lastLoggedInflightStatus = null;
-            lastLoggedInflightStatusError = null;
-            consecutiveMatchedInvalidCount = 0;
-            continue;
+            applyRebuiltBundle(rebuilt);
+            return true;
           } catch (rebuildError) {
-            const msg = rebuildError instanceof Error ? rebuildError.message : String(rebuildError);
+            const msg =
+              rebuildError instanceof Error
+                ? rebuildError.message
+                : String(rebuildError);
             bundleLogger.warn("Bundle rebuild failed", {
+              reason,
               bundleId: currentBundleId,
               error: msg,
               elapsedMs: Date.now() - startedAt,
             });
+            lastStatusError = msg;
+            return false;
+          }
+        };
+
+        if (
+          summary.foundCount === 0 &&
+          blockhashAge >= BUNDLE_BLOCKHASH_MAX_AGE_MS &&
+          rebuildAndResend &&
+          !inflightPending
+        ) {
+          const rebuilt = await tryRebuildBundle("blockhash_expired");
+          if (rebuilt) {
+            continue;
           }
         }
 
@@ -1365,29 +1415,56 @@ async function confirmBundleOnChain({
           });
           const previousBundleId = currentBundleId;
           const previousEndpoint = currentBundleEndpoint;
-          const resent = await sendBundleWithRetries();
-          resendCount += 1;
-          currentBundleId = resent.bundleId;
-          currentBundleEndpoint = resent.endpoint;
-          bundleLogger.info("Bundle resent", {
-            previousBundleId,
-            previousEndpoint,
-            bundleId: currentBundleId,
-            endpoint: currentBundleEndpoint,
-          });
-          await emitBundleTelemetry(onEvent, {
-            type: "bundle_resent",
-            data: {
+          const walkDeadlineAt = walkDeadlineFromBlockhash(
+            currentBlockhashFetchedAt
+          );
+          try {
+            const resent = await sendBundleWithRetries({ walkDeadlineAt });
+            resendCount += 1;
+            currentBundleId = resent.bundleId;
+            currentBundleEndpoint = resent.endpoint;
+            bundleLogger.info("Bundle resent", {
               previousBundleId,
               previousEndpoint,
               bundleId: currentBundleId,
               endpoint: currentBundleEndpoint,
+            });
+            await emitBundleTelemetry(onEvent, {
+              type: "bundle_resent",
+              data: {
+                previousBundleId,
+                previousEndpoint,
+                bundleId: currentBundleId,
+                endpoint: currentBundleEndpoint,
+                elapsedMs: Date.now() - startedAt,
+                blockhashAgeMs: blockhashAge,
+              },
+            });
+            lastResendAt = Date.now();
+            consecutiveMatchedInvalidCount = 0;
+          } catch (resendError) {
+            const resendMessage =
+              resendError instanceof Error
+                ? resendError.message
+                : String(resendError);
+            bundleLogger.warn("Bundle resend failed", {
+              bundleId: currentBundleId,
+              error: resendMessage,
               elapsedMs: Date.now() - startedAt,
               blockhashAgeMs: blockhashAge,
-            },
-          });
-          lastResendAt = Date.now();
-          consecutiveMatchedInvalidCount = 0;
+              expiredBlockhash: isExpiredBlockhashMessage(resendMessage),
+            });
+            lastStatusError = resendMessage;
+            lastResendAt = Date.now();
+            const rebuilt = await tryRebuildBundle(
+              isExpiredBlockhashMessage(resendMessage)
+                ? "resend_expired_blockhash"
+                : "resend_send_failed"
+            );
+            if (rebuilt) {
+              continue;
+            }
+          }
         }
       } catch (error) {
         const primaryError =

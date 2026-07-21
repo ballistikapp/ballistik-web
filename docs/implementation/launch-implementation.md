@@ -358,6 +358,9 @@ The Launch overview dialog reads these fields from the API envelope rather than 
 - Bundle CREATE confirmation timeout is set to 3 minutes (`180_000ms`) in `server/solana/jito-bundle.ts`.
 - Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
 - Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 3-minute window.
+- Jito regional `sendBundle` calls time out after `4_000ms` per endpoint; transport failures cool that region for `20_000ms`. Send walks also stop before blockhash expiry (`10_000ms` margin) so failover cannot burn the signed txs.
+- If a confirm-loop resend fails entirely (all regions reject/timeout, or `expired blockhash`), the launch rebuilds with a fresh blockhash (adaptive tip escalate when enabled) instead of waiting out the full confirmation timeout on a dead bundle.
+- Launch form default Jito tip is `0.005 SOL`.
 
 ## Bundle Launch
 

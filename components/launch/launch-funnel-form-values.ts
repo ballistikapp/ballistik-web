@@ -108,7 +108,7 @@ export const DEFAULT_PUMPFUN_CONFIG: PumpfunConfigFormValues = {
   devWalletOption: "generate",
   importedDevWalletKey: "",
   devBuyAmountSol: 0.5,
-  jitoTipAmountSol: 0.001,
+  jitoTipAmountSol: 0.005,
   bundleBuyEnabled: true,
   vanityMint: true,
   removeAttribution: false,
