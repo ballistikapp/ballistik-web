@@ -13,8 +13,19 @@ This document describes the current Jito bundle launch flow used by `ballistik-w
 1. Build the token create transaction.
 2. Build buy transactions for each buyer wallet.
 3. Pack transactions into a Jito bundle.
-4. Add a Jito tip transfer to the last transaction (if `jitoTipAmountSol > 0`).
-5. Send the bundle via the Jito block engine.
+4. Submit through the deep Jito transport (`sendJitoBundle` in `server/solana/jito-bundle.ts`). Tip placement, versioning, lookup-table compilation, simulation, endpoint rotation, resend/rebuild, and confirmation stay inside that module.
+5. Callers receive `{ bundleId, signatures, confirmation, telemetry }` and create/settle their own `AppTransaction` rows. Jito never writes Launch or Exit bookkeeping.
+
+### Deep Jito submission interface
+- Public input: legacy `Transaction[]` + per-tx signer groups + tipper + tip lamports, plus narrow options (`enableAdaptiveTip`, `enableGrpc`, `launchId`, `altAccounts`, optional progressive `onEvent`).
+- Adaptive tip multipliers/max escalations, tip account selection, blockhash rebuild bounds, resend intervals, and confirmation polling are owned by Jito (not caller knobs).
+- Authoritative simulation failure (first-tx profile failure, or sequential `simulateBundle` failure when that path is enabled) aborts before `sendBundle`.
+- Result includes:
+  - `signatures` — final landed signature set (order matches packed transactions)
+  - `bundleId` / `confirmation` — accepting endpoint, confirmation source (`grpc` | `inflight` | `rpc_status` | `bundle_statuses`), landed slot when known, status counts, resend/rebuild counts, final tip lamports
+  - `telemetry` — accumulated structured events (also streamed via `onEvent` for live LaunchLog writes)
+- Pump Launch (`createAndBuyInBundle`) and Holding Exit create PENDING AppTransaction rows before submit, then confirm/settle from returned signatures. Mayhem ALT packing uses shared `bundleBuyerTransactionIndex` so buy and tip rows align with the landed bundle structure.
+- Tests inject RPC/Jito boundaries through `sendJitoBundleForTests`; production callers use `sendJitoBundle` only.
 
 ### Transaction Packing Rules
 - The bundle can contain up to 5 transactions.

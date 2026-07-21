@@ -4967,11 +4967,7 @@ async function runPumpfunLaunchJobByMode(
           tipper: mainWalletKeypair,
           tipLamports: baseTipLamports,
           isMayhemMode: authoritativePlan.intendedEffects.mayhemMode,
-          adaptiveTipEscalation: {
-            enabled: baseTipLamports > 0,
-            multiplier: 2,
-            maxEscalations: 1,
-          },
+          enableAdaptiveTip: baseTipLamports > 0,
           enableGrpc: grpcAccessService.getFeatureAccess(
             { plan: requestPlan },
             "bundle-fast-confirmation"
@@ -5019,6 +5015,9 @@ async function runPumpfunLaunchJobByMode(
           bundleId: bundleResult.bundleId,
           signatures: bundleResult.signatures,
           signatureCount: bundleResult.signatures.length,
+          confirmationSource: bundleResult.confirmation.source,
+          landedSlot: bundleResult.confirmation.landedSlot,
+          endpoint: bundleResult.confirmation.endpoint,
           durationMs: Date.now() - createStartedAt,
         });
       } else {

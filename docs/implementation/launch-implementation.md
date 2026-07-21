@@ -363,7 +363,7 @@ When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito b
 
 1. Build the token create transaction as a raw `TransactionInstruction` with the `create` discriminator and Borsh-encoded args (name, symbol, uri, creator pubkey).
 2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
-3. Pack transactions into a bundle and submit through Jito.
+3. Pack transactions into a bundle and submit through the deep Jito transport (`sendJitoBundle`). Tip placement happens inside Jito; Launch owns AppTransaction meanings from the returned signatures/confirmation/telemetry.
 4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
    - Each transaction is first simulated individually (`simulateTransaction`); only the first (create) transaction's result gates the launch, since buy transactions are expected to fail individual simulation before the mint exists.
    - When `HELIUS_RPC_URL` is set, a sequential `simulateBundle` preflight (Jito-Solana RPC method, `server/solana/simulate-bundle.ts`) simulates all 5 transactions against a single bank so buys see the CREATE state. A sequential failure aborts the launch with per-transaction errors and logs. If the env var is unset or the RPC does not support the method, the preflight is skipped (logged as `bundle_sequential_simulation` with status `unsupported`/`error`). The preflight runs on the initial build only; rebuilds reuse the same instructions with a fresh blockhash.
@@ -403,7 +403,8 @@ Note: No off-chain token amount calculation is needed. The program determines to
 
 ### Jito Tip
 
-- If `jitoTipAmountSol > 0`, a SOL transfer is added to the last bundle transaction.
+- If `jitoTipAmountSol > 0`, tip placement is owned by `sendJitoBundle` (appended to the last transaction; tip account selected internally).
+- Callers pass tip lamports and tipper only; adaptive tip policy is enabled with `enableAdaptiveTip` (multipliers/max escalations stay inside Jito).
 - The tip is paid by the main wallet and sent to a Jito tip account.
 
 ### Jito Block Engine

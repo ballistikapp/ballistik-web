@@ -7,6 +7,7 @@ import {
   TransactionMessage,
   VersionedTransaction,
   type AddressLookupTableAccount,
+  type PublicKey,
   type SignatureStatus,
 } from "@solana/web3.js";
 import bs58 from "bs58";
@@ -22,7 +23,10 @@ import {
 } from "@/server/solana/jito-client";
 import { waitForSignaturesViaGrpc } from "@/server/solana/shyft-grpc";
 import { mapPumpError } from "@/server/solana/pump/errors";
-import { simulateBundleSequentially } from "@/server/solana/simulate-bundle";
+import {
+  simulateBundleSequentially,
+  type SimulateBundleResult,
+} from "@/server/solana/simulate-bundle";
 
 const MAX_TRANSACTIONS_PER_BUNDLE = 5;
 const MAX_BUNDLE_SEND_ATTEMPTS = 3;
@@ -96,22 +100,70 @@ export type BundleTelemetryEvent = {
   data: Record<string, unknown>;
 };
 
+export type BundleConfirmationSource =
+  | "grpc"
+  | "inflight"
+  | "rpc_status"
+  | "bundle_statuses";
+
+export type BundleConfirmationEvidence = {
+  bundleId: string;
+  endpoint: string | null;
+  signatures: string[];
+  source: BundleConfirmationSource;
+  landedSlot: number | null;
+  foundCount: number | null;
+  confirmedCount: number | null;
+  failedCount: number | null;
+  notFoundCount: number | null;
+  createStatus: string | null;
+  elapsedMs: number;
+  resendCount: number;
+  rebuildCount: number;
+  tipLamports: number;
+};
+
+export type SendJitoBundleResult = {
+  bundleId: string;
+  signatures: string[];
+  confirmation: BundleConfirmationEvidence;
+  telemetry: BundleTelemetryEvent[];
+};
+
+/**
+ * Injectable external boundaries for tests. Production callers omit this —
+ * tip placement, versioning, simulation, resend/rebuild, endpoint rotation,
+ * and confirmation stay behind `sendJitoBundle`.
+ */
+export type JitoSubmissionAdapters = {
+  getConnection?: () => Connection;
+  getTipAccount?: (options?: { launchId?: string }) => Promise<PublicKey>;
+  sendBundle?: typeof sendBundle;
+  getInflightBundleStatuses?: typeof getInflightBundleStatuses;
+  getBundleStatuses?: typeof getBundleStatuses;
+  rotatePreferredEndpointAwayFrom?: typeof rotatePreferredEndpointAwayFrom;
+  simulateBundleSequentially?: (
+    versionedTxs: VersionedTransaction[],
+    options?: { launchId?: string }
+  ) => Promise<SimulateBundleResult>;
+  waitForSignaturesViaGrpc?: typeof waitForSignaturesViaGrpc;
+};
+
 type BundleTelemetryHandler = (
   event: BundleTelemetryEvent
 ) => void | Promise<void>;
 
-type AdaptiveTipEscalationOptions = {
-  enabled?: boolean;
-  multiplier?: number;
-  maxEscalations?: number;
-};
-
-type SendJitoBundleOptions = {
+export type SendJitoBundleOptions = {
   onEvent?: BundleTelemetryHandler;
-  adaptiveTipEscalation?: AdaptiveTipEscalationOptions;
+  /** When true, Jito may escalate tip on rebuild using its internal policy. */
+  enableAdaptiveTip?: boolean;
   enableGrpc?: boolean;
   launchId?: string;
   altAccounts?: AddressLookupTableAccount[];
+};
+
+type SendJitoBundleInternalOptions = SendJitoBundleOptions & {
+  adapters?: JitoSubmissionAdapters;
 };
 
 type SimulateTransactionResult = {
@@ -159,23 +211,49 @@ export async function sendJitoBundle(
   tipper: Keypair,
   tipLamports: number,
   options?: SendJitoBundleOptions
-) {
-  const telemetry = options?.onEvent;
+): Promise<SendJitoBundleResult> {
+  return sendJitoBundleInternal(txs, signers, tipper, tipLamports, options);
+}
+
+/** Test entry that injects external boundaries. Not for production callers. */
+export async function sendJitoBundleForTests(
+  txs: Transaction[],
+  signers: Keypair[][],
+  tipper: Keypair,
+  tipLamports: number,
+  options: SendJitoBundleInternalOptions
+): Promise<SendJitoBundleResult> {
+  return sendJitoBundleInternal(txs, signers, tipper, tipLamports, options);
+}
+
+async function sendJitoBundleInternal(
+  txs: Transaction[],
+  signers: Keypair[][],
+  tipper: Keypair,
+  tipLamports: number,
+  options?: SendJitoBundleInternalOptions
+): Promise<SendJitoBundleResult> {
+  const telemetryEvents: BundleTelemetryEvent[] = [];
+  const callerTelemetry = options?.onEvent;
+  const telemetry: BundleTelemetryHandler = async (event) => {
+    telemetryEvents.push(event);
+    await emitBundleTelemetry(callerTelemetry, event);
+  };
   const enableGrpc = options?.enableGrpc ?? true;
   const launchId = options?.launchId;
+  const adapters = options?.adapters ?? {};
+  const resolveConnection = adapters.getConnection ?? getSolanaConnection;
+  const resolveTipAccount = adapters.getTipAccount ?? getTipAccount;
+  const resolveSendBundle = adapters.sendBundle ?? sendBundle;
+  const resolveSimulateBundle =
+    adapters.simulateBundleSequentially ?? simulateBundleSequentially;
   const bundleLogger = launchId
     ? logger.child({ launchId, subsystem: "jito-bundle" })
     : logger.child({ subsystem: "jito-bundle" });
   const jitoClientLogOptions = launchId ? { launchId } : undefined;
-  const adaptiveTipEnabled = options?.adaptiveTipEscalation?.enabled ?? false;
-  const tipEscalationMultiplier = Math.max(
-    1,
-    options?.adaptiveTipEscalation?.multiplier ?? 2
-  );
-  const maxTipEscalations = Math.max(
-    1,
-    options?.adaptiveTipEscalation?.maxEscalations ?? 1
-  );
+  const adaptiveTipEnabled = options?.enableAdaptiveTip ?? false;
+  const tipEscalationMultiplier = 2;
+  const maxTipEscalations = 1;
 
   if (txs.length === 0) {
     throw new Error("No transactions provided for bundle");
@@ -190,7 +268,7 @@ export async function sendJitoBundle(
       `Bundle signer mismatch: ${signers.length} signer groups for ${txs.length} transactions`
     );
   }
-  const connection = getSolanaConnection();
+  const connection = resolveConnection();
   bundleLogger.info("Jito bundle send start", {
     txCount: txs.length,
     signerGroupCount: signers.length,
@@ -211,7 +289,7 @@ export async function sendJitoBundle(
       maxTipEscalations,
     },
   });
-  const tipAccount = await getTipAccount(jitoClientLogOptions);
+  const tipAccount = await resolveTipAccount(jitoClientLogOptions);
   bundleLogger.info("Jito tip account resolved", {
     tipAccount: tipAccount.toBase58(),
   });
@@ -319,7 +397,7 @@ export async function sendJitoBundle(
   // pre-create (mint doesn't exist yet), so only a sequential bundle
   // simulation can validate the buys. Runs on the initial build only —
   // rebuilds keep the same instructions and only refresh the blockhash.
-  const sequentialSimulation = await simulateBundleSequentially(
+  const sequentialSimulation = await resolveSimulateBundle(
     currentBuild.versionedTxs,
     launchId ? { launchId } : undefined
   );
@@ -393,7 +471,7 @@ export async function sendJitoBundle(
       let lastError: Error | null = null;
       for (let attempt = 1; attempt <= MAX_BUNDLE_SEND_ATTEMPTS; attempt += 1) {
         try {
-          const result = await sendBundle(bundleToSend, jitoClientLogOptions);
+          const result = await resolveSendBundle(bundleToSend, jitoClientLogOptions);
           const endpoint =
             typeof result === "object" && result && "endpoint" in result &&
             typeof result.endpoint === "string"
@@ -589,7 +667,7 @@ export async function sendJitoBundle(
     };
   };
 
-  const confirmedBundleId = await confirmBundleOnChain({
+  const confirmation = await confirmBundleOnChain({
     connection,
     onEvent: telemetry,
     enableGrpc,
@@ -602,8 +680,15 @@ export async function sendJitoBundle(
     rebuildAndResend,
     bundleLogger,
     jitoClientLogOptions,
+    tipLamports: () => currentTipLamports,
+    adapters,
   });
-  return { bundleId: confirmedBundleId, signatures: currentBuild.signatures };
+  return {
+    bundleId: confirmation.bundleId,
+    signatures: confirmation.signatures,
+    confirmation,
+    telemetry: telemetryEvents,
+  };
 }
 
 function dedupeSigners(signers: Keypair[]) {
@@ -690,7 +775,7 @@ function sanitizeSimulationLogs(
   ];
 }
 
-export async function profileVersionedTransactions({
+async function profileVersionedTransactions({
   versionedTxs,
   signatures,
   simulateTransaction,
@@ -783,8 +868,10 @@ async function confirmBundleOnChain({
   rebuildAndResend,
   bundleLogger,
   jitoClientLogOptions,
+  tipLamports,
+  adapters,
 }: {
-  connection: ReturnType<typeof getSolanaConnection>;
+  connection: Connection;
   onEvent?: BundleTelemetryHandler;
   enableGrpc: boolean;
   initialSignatures: string[];
@@ -804,7 +891,17 @@ async function confirmBundleOnChain({
   }>;
   bundleLogger: typeof logger;
   jitoClientLogOptions?: { launchId: string };
-}) {
+  tipLamports: () => number;
+  adapters: JitoSubmissionAdapters;
+}): Promise<BundleConfirmationEvidence> {
+  const resolveInflight =
+    adapters.getInflightBundleStatuses ?? getInflightBundleStatuses;
+  const resolveBundleStatuses = adapters.getBundleStatuses ?? getBundleStatuses;
+  const resolveRotate =
+    adapters.rotatePreferredEndpointAwayFrom ??
+    rotatePreferredEndpointAwayFrom;
+  const resolveGrpcWait =
+    adapters.waitForSignaturesViaGrpc ?? waitForSignaturesViaGrpc;
   const startedAt = Date.now();
   let lastResendAt = startedAt;
   let currentBundleId = bundleId;
@@ -820,7 +917,32 @@ async function confirmBundleOnChain({
   let consecutiveMatchedInvalidCount = 0;
   let lastLoggedInflightStatus: string | null = null;
   let lastLoggedInflightStatusError: string | null = null;
+  let resendCount = 0;
+  let rebuildCount = 0;
   const fallbackConnection = getFallbackConnection();
+
+  function buildConfirmation(
+    source: BundleConfirmationSource,
+    landedSlot: number | null = null
+  ): BundleConfirmationEvidence {
+    return {
+      bundleId: currentBundleId,
+      endpoint: currentBundleEndpoint,
+      signatures: currentSignatures,
+      source,
+      landedSlot,
+      foundCount: lastSummary?.foundCount ?? null,
+      confirmedCount: lastSummary?.confirmedCount ?? null,
+      failedCount: lastSummary?.failedCount ?? null,
+      notFoundCount: lastSummary?.notFoundCount ?? null,
+      createStatus: lastSummary?.createStatus ?? null,
+      elapsedMs: Date.now() - startedAt,
+      resendCount,
+      rebuildCount,
+      tipLamports: tipLamports(),
+    };
+  }
+
   bundleLogger.info("Bundle confirmation start", {
     bundleId,
     bundleEndpoint,
@@ -853,7 +975,7 @@ async function confirmBundleOnChain({
   };
 
   const grpcPromise = enableGrpc
-    ? waitForSignaturesViaGrpc({
+    ? resolveGrpcWait({
         signatures: currentSignatures,
         accountKeys,
         timeoutMs: BUNDLE_CONFIRM_TIMEOUT_MS,
@@ -895,7 +1017,7 @@ async function confirmBundleOnChain({
         signature: currentSignatures[0],
         elapsedMs: Date.now() - startedAt,
       });
-      return currentBundleId;
+      return buildConfirmation("grpc");
     }
 
     if (
@@ -903,7 +1025,7 @@ async function confirmBundleOnChain({
       BUNDLE_STATUS_CHECK_INTERVAL_MS
     ) {
       lastBundleStatusCheckAt = Date.now();
-      const bundleStatusResult = await getBundleStatuses([currentBundleId], {
+      const bundleStatusResult = await resolveBundleStatuses([currentBundleId], {
         ...jitoClientLogOptions,
       });
       if (bundleStatusResult.ok) {
@@ -939,7 +1061,7 @@ async function confirmBundleOnChain({
             match.confirmationStatus === "finalized"
           ) {
             bundleLogger.info("Bundle landed via getBundleStatuses", eventData);
-            return currentBundleId;
+            return buildConfirmation("bundle_statuses", match.slot);
           }
         }
       } else {
@@ -980,7 +1102,7 @@ async function confirmBundleOnChain({
         const summary = summarizeBundleStatuses(statuses);
         lastSummary = summary;
         lastStatusError = null;
-        const inflightResult = await getInflightBundleStatuses(
+        const inflightResult = await resolveInflight(
           [currentBundleId],
           {
             preferEndpoint: currentBundleEndpoint,
@@ -1111,7 +1233,10 @@ async function confirmBundleOnChain({
             landedSlot: lastInflightStatus.landedSlot,
             elapsedMs: Date.now() - startedAt,
           });
-          return currentBundleId;
+          return buildConfirmation(
+            "inflight",
+            lastInflightStatus.landedSlot ?? null
+          );
         }
         if (summary.createError) {
           bundleLogger.warn("Bundle create failed", {
@@ -1124,7 +1249,7 @@ async function confirmBundleOnChain({
           );
         }
         if (summary.createConfirmed) {
-          return currentBundleId;
+          return buildConfirmation("rpc_status");
         }
         const blockhashAge = Date.now() - currentBlockhashFetchedAt;
         const inflightPending = lastInflightStatus?.status === "Pending";
@@ -1155,6 +1280,7 @@ async function confirmBundleOnChain({
           });
           try {
             const rebuilt = await rebuildAndResend();
+            rebuildCount += 1;
             currentBundleId = rebuilt.bundleId;
             currentBundleEndpoint = rebuilt.endpoint;
             currentSignatures = rebuilt.signatures;
@@ -1185,7 +1311,7 @@ async function confirmBundleOnChain({
 
         if (droppedByEngine) {
           const rotatedEndpoint = currentBundleEndpoint
-            ? rotatePreferredEndpointAwayFrom(currentBundleEndpoint)
+            ? resolveRotate(currentBundleEndpoint)
             : null;
           bundleLogger.warn("Bundle dropped by block engine", {
             bundleId: currentBundleId,
@@ -1240,6 +1366,7 @@ async function confirmBundleOnChain({
           const previousBundleId = currentBundleId;
           const previousEndpoint = currentBundleEndpoint;
           const resent = await sendBundleWithRetries();
+          resendCount += 1;
           currentBundleId = resent.bundleId;
           currentBundleEndpoint = resent.endpoint;
           bundleLogger.info("Bundle resent", {

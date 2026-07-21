@@ -1114,6 +1114,7 @@ async function runExitFlow(exitId: string) {
               seller: seller.publicKey,
               bundleId: bundleResult.bundleId,
               signatures: bundleResult.signatures,
+              confirmation: bundleResult.confirmation,
             },
           });
           await appendExitLog(
@@ -1125,6 +1126,9 @@ async function runExitFlow(exitId: string) {
               seller: seller.publicKey,
               bundleId: bundleResult.bundleId,
               signatures: bundleResult.signatures,
+              confirmationSource: bundleResult.confirmation.source,
+              landedSlot: bundleResult.confirmation.landedSlot,
+              endpoint: bundleResult.confirmation.endpoint,
             }
           );
           return {

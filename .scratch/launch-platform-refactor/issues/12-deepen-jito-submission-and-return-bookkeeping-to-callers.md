@@ -4,11 +4,11 @@
 
 **Blocked by:** 10 — Execute bundled and Mayhem Launches through one raw pump path
 
-**Status:** ready-for-agent
+**Status:** done
 
-- [ ] The public Jito submission interface is narrow and hides tip placement, versioning, simulation, resend, rebuild bounds, and confirmation mechanics from callers.
-- [ ] No bundle is sent after authoritative simulation failure when simulation is enabled for the submission path.
-- [ ] Jito returns signatures, bundle identity, confirmation evidence, and structured telemetry without writing Launch or Exit bookkeeping rows itself.
-- [ ] Pump Launch callers create and settle their own AppTransaction records from Jito results.
-- [ ] Holding Exit callers continue to create and settle their own AppTransaction records from Jito results after the transport refactor.
-- [ ] Mayhem bundled buy signature-to-transaction mapping stays consistent with actual packing rules so trade and tip rows align with landed bundle structure.
+- [x] The public Jito submission interface is narrow and hides tip placement, versioning, simulation, resend, rebuild bounds, and confirmation mechanics from callers.
+- [x] No bundle is sent after authoritative simulation failure when simulation is enabled for the submission path.
+- [x] Jito returns signatures, bundle identity, confirmation evidence, and structured telemetry without writing Launch or Exit bookkeeping rows itself.
+- [x] Pump Launch callers create and settle their own AppTransaction records from Jito results.
+- [x] Holding Exit callers continue to create and settle their own AppTransaction records from Jito results after the transport refactor.
+- [x] Mayhem bundled buy signature-to-transaction mapping stays consistent with actual packing rules so trade and tip rows align with landed bundle structure.

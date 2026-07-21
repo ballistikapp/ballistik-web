@@ -104,6 +104,8 @@ For launch funding, those `TRANSFER_FUND` rows remain the operational ledger of 
 
 One row per (transaction in the bundle × user-owned wallet). All rows share the same `bundleId`. The tip-bearing signature gets a `JITO_TIP` row on the tipper wallet whenever the tipper does not otherwise have a row on that signature; if it would conflict, the tip is naturally captured in the tipper's existing row's wallet delta.
 
+Jito transport (`sendJitoBundle`) returns signatures, bundle identity, confirmation evidence, and telemetry only. Pump Launch and Holding Exit callers create and settle these AppTransaction rows themselves — including Mayhem ALT-aware buyer→signature index mapping from `bundle-transaction-builder`.
+
 ## Context via `referenceId`
 
 The `referenceId` field is a soft polymorphic link. Interpret it using `source`:

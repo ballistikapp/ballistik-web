@@ -43,11 +43,7 @@ type BundleLaunchInput = {
   enableGrpc?: boolean;
   isMayhemMode?: boolean;
   onBundleEvent?: (event: BundleTelemetryEvent) => void | Promise<void>;
-  adaptiveTipEscalation?: {
-    enabled?: boolean;
-    multiplier?: number;
-    maxEscalations?: number;
-  };
+  enableAdaptiveTip?: boolean;
   onBuyBuildFailures?: (
     failures: BundleBuyBuildFailure[]
   ) => void | Promise<void>;
@@ -311,7 +307,7 @@ export async function createAndBuyInBundle(input: BundleLaunchInput) {
       {
         enableGrpc: input.enableGrpc,
         onEvent: input.onBundleEvent,
-        adaptiveTipEscalation: input.adaptiveTipEscalation,
+        enableAdaptiveTip: input.enableAdaptiveTip,
         launchId: input.launchId,
         altAccounts,
       }
