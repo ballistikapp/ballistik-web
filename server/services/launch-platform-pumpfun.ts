@@ -18,6 +18,10 @@ import type {
   LaunchPlatformPlanLocalResources,
   LaunchPlatformPlanResult,
 } from "@/server/services/launch-platform-registry";
+import {
+  requirePumpfunExecutePlan,
+  runPumpfunNonBundledExecuteDefault,
+} from "@/server/services/launch-platform-pumpfun-execute";
 
 type RequestUser = Pick<ContextUser, "id" | "plan">;
 
@@ -66,6 +70,10 @@ export type PumpfunPlatformModuleDeps = {
     ctx: LaunchLifecycleContext,
     resources: LaunchPlatformPlanLocalResources
   ) => Promise<void>;
+  /** Bundled path — still the compat launch job until ticket 10. */
+  runBundledCompat: (launchId: string) => Promise<void>;
+  /** Non-bundled path — Platform-owned raw create / create+dev-buy. */
+  runNonBundledExecute: (ctx: LaunchLifecycleContext) => Promise<void>;
 };
 
 function lineItem(label: string, sol: number) {
@@ -182,11 +190,15 @@ function notExtractedYet(operation: string): never {
   );
 }
 
+async function defaultRunBundledCompat(launchId: string): Promise<void> {
+  await runPumpfunLaunchJobCompat(launchId);
+}
+
 /**
  * pump.fun Platform module.
  * preview and plan are implemented; recover deepens later.
- * execute still delegates to the existing launch job (compat), which reads the
- * persisted plan for wallet identities and vanity reservations when present.
+ * execute validates the persisted plan, then routes non-bundled launches to the
+ * Platform-owned raw path and bundled launches to the compat job (ticket 10).
  */
 export function createPumpfunPlatformModule(
   deps: Partial<PumpfunPlatformModuleDeps> = {}
@@ -196,6 +208,9 @@ export function createPumpfunPlatformModule(
   const buildPlan = deps.buildPlan ?? defaultBuildPlan;
   const compensatePlanResources =
     deps.compensatePlanResources ?? defaultCompensatePlanResources;
+  const runBundledCompat = deps.runBundledCompat ?? defaultRunBundledCompat;
+  const runNonBundledExecute =
+    deps.runNonBundledExecute ?? runPumpfunNonBundledExecuteDefault;
 
   return {
     id: "PUMPFUN",
@@ -211,7 +226,12 @@ export function createPumpfunPlatformModule(
     },
     plan: async (ctx, input) => buildPlan(ctx, input),
     execute: async (ctx: LaunchLifecycleContext) => {
-      await runPumpfunLaunchJobCompat(ctx.launchId);
+      const plan = requirePumpfunExecutePlan(ctx);
+      if (plan.intendedEffects.bundleBuyEnabled) {
+        await runBundledCompat(ctx.launchId);
+      } else {
+        await runNonBundledExecute(ctx);
+      }
       return { kind: "compat" } satisfies LaunchPlatformExecuteResult;
     },
     recover: async () => notExtractedYet("recover"),
@@ -220,10 +240,8 @@ export function createPumpfunPlatformModule(
 }
 
 /**
- * pump.fun Platform compatibility entry points.
- * Execute still delegates to the existing launch job. The job reuses persisted
- * plan identities/vanity when present; funding amounts may still be recomputed
- * until Managed Launch Wallet funding extraction (ticket 08).
+ * Bundled pump.fun compatibility entry — delegates to the existing launch job.
+ * Non-bundled launches must not use this path (Platform execute routes them).
  */
 export async function runPumpfunLaunchJobCompat(launchId: string): Promise<void> {
   const { launchService } = await import("./launch.service");

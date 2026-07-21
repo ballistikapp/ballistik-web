@@ -50,8 +50,6 @@ import {
   discountLaunchUsageFees,
 } from "@/lib/config/usage-fees.config";
 import { getEnv } from "@/lib/config/env";
-import { AnchorProvider } from "@coral-xyz/anchor";
-import NodeWallet from "@coral-xyz/anchor/dist/cjs/nodewallet";
 import {
   Keypair,
   LAMPORTS_PER_SOL,
@@ -67,7 +65,6 @@ import {
   getAssociatedTokenAddress,
 } from "@solana/spl-token";
 import bs58 from "bs58";
-import { PumpFunSDK } from "pumpdotfun-sdk";
 import { createAndBuyInBundle } from "@/server/solana/bundle-create-and-buy";
 import type { BundleTelemetryEvent } from "@/server/solana/jito-bundle";
 import {
@@ -624,14 +621,6 @@ async function normalizeLaunchInputMediaForStorage(
   }
 
   return normalizedInput;
-}
-
-async function createPumpSdk(creator: Keypair) {
-  const wallet = new NodeWallet(creator);
-  const provider = new AnchorProvider(getSolanaConnection(), wallet, {
-    commitment: "finalized",
-  });
-  return new PumpFunSDK(provider);
 }
 
 async function appendLog(
@@ -4346,7 +4335,31 @@ export const launchService = {
     return updated;
   },
 
+  /**
+   * Bundled launch job (compat until ticket 10).
+   * Non-bundled launches must use `runNonBundledPumpfunLaunchJob` via Platform execute.
+   */
   async runLaunchJob(launchId: string) {
+    await runPumpfunLaunchJobByMode(launchId, "bundled");
+  },
+};
+
+/**
+ * Non-bundled pump.fun launch job owned by Platform execute.
+ * Requires a persisted authoritative plan and uses raw create / create+dev-buy only.
+ */
+export async function runNonBundledPumpfunLaunchJob(
+  launchId: string
+): Promise<void> {
+  await runPumpfunLaunchJobByMode(launchId, "non_bundled");
+}
+
+type PumpfunLaunchExecutionMode = "bundled" | "non_bundled";
+
+async function runPumpfunLaunchJobByMode(
+  launchId: string,
+  mode: PumpfunLaunchExecutionMode
+) {
     const launch = await prisma.launch.findUnique({
       where: { id: launchId },
     });
@@ -4359,13 +4372,6 @@ export const launchService = {
       return;
     }
 
-    await updateLaunchRecord(launchId, {
-      status: "RUNNING",
-      startedAt: new Date(),
-      progress: 2,
-    });
-
-    const launchStartedAt = Date.now();
     const resolvedInput = resolveStoredLaunchInput(launch.input);
     if (!resolvedInput) {
       await updateLaunchRecord(launchId, {
@@ -4382,11 +4388,36 @@ export const launchService = {
       return;
     }
     const input = toStoredLaunchInput(resolvedInput);
+    if (mode === "bundled" && !input.bundleBuyEnabled) {
+      throw new AppError(
+        "Non-bundled launches must execute through the pump.fun Platform module",
+        500
+      );
+    }
+    if (mode === "non_bundled" && input.bundleBuyEnabled) {
+      throw new AppError(
+        "Bundled launches must execute through the bundled launch job",
+        500
+      );
+    }
+    if (mode === "non_bundled" && input.devWalletOption === "system") {
+      throw new AppError(
+        "The platform dev wallet is no longer available for new launches",
+        400
+      );
+    }
+
+    await updateLaunchRecord(launchId, {
+      status: "RUNNING",
+      startedAt: new Date(),
+      progress: 2,
+    });
+
+    const launchStartedAt = Date.now();
     const requestPlan = input.entitlementSnapshot?.plan ?? UserPlan.FREE;
     const {
       createFeeBufferLamports: CREATE_FEE_BUFFER_LAMPORTS,
       minCreatorBalanceLamports: MIN_CREATOR_BALANCE_LAMPORTS,
-      slippageBasisPoints: SLIPPAGE_BASIS_POINTS,
     } = getLaunchConfig();
     let reservedVanityId: string | null = null;
     let vanityConsumed = false;
@@ -4487,6 +4518,20 @@ export const launchService = {
           );
         }
         authoritativePlan = persistedPlan.data;
+      }
+      if (mode === "non_bundled") {
+        if (!authoritativePlan) {
+          throw new AppError(
+            "Non-bundled execute requires a persisted authoritative plan",
+            500
+          );
+        }
+        if (authoritativePlan.intendedEffects.bundleBuyEnabled) {
+          throw new AppError(
+            "Persisted plan is bundled but non-bundled Platform execute was invoked",
+            500
+          );
+        }
       }
 
       let devWalletKeypair: Keypair;
@@ -4883,10 +4928,14 @@ export const launchService = {
 
       await setStep(launchId, 45, "create", "Creating token");
       const createStartedAt = Date.now();
-      const pumpSdk = await createPumpSdk(devWalletKeypair);
       let createSignature: string | null = null;
       let bundleId: string | null = null;
-      if (input.bundleBuyEnabled) {
+      const creatorBuyLamports =
+        authoritativePlan != null
+          ? BigInt(authoritativePlan.allocations.creatorBuyLamports)
+          : toLamports(devBuyAmountSol);
+      const creatorBuySol = Number(creatorBuyLamports) / 1_000_000_000;
+      if (mode === "bundled") {
         const buyerWallets = bundlerBuyAllocation.targets.map(
           (target) => target.wallet
         );
@@ -4910,7 +4959,7 @@ export const launchService = {
           creator: devWalletKeypair,
           mint: mintKeypair,
           metadata,
-          creatorBuyAmountLamport: toLamports(devBuyAmountSol),
+          creatorBuyAmountLamport: creatorBuyLamports,
           buyerWallets,
           buyAmountsLamport,
           tipper: mainWalletKeypair,
@@ -4930,7 +4979,7 @@ export const launchService = {
           },
           onBuyBuildFailures: async (failures) => {
             const configuredBuyers =
-              buyerWallets.length + (devBuyAmountSol > 0 ? 1 : 0);
+              buyerWallets.length + (creatorBuyLamports > BigInt(0) ? 1 : 0);
             const allFailed = failures.length >= configuredBuyers;
             await appendLog(
               launchId,
@@ -4971,26 +5020,32 @@ export const launchService = {
           durationMs: Date.now() - createStartedAt,
         });
       } else {
+        // Non-bundled Platform path: raw create / create+dev-buy only (no PumpFunSDK).
         const connection = getSolanaConnection();
         const devPk = devWalletKeypair.publicKey.toBase58();
+        const isMayhemMode =
+          authoritativePlan?.intendedEffects.mayhemMode ??
+          input.mayhemMode ??
+          false;
         // One row per (signature × user-owned wallet). When create + dev buy
         // share a single tx, the TRADE_BUY row owns the entire wallet delta.
         // Pure-create path uses a single TRADE_CREATE row instead.
         const createOrBuyTrackId = await appTransactionService
           .create({
             userId: user.id,
-            type: devBuyAmountSol > 0 ? "TRADE_BUY" : "TRADE_CREATE",
+            type: creatorBuyLamports > BigInt(0) ? "TRADE_BUY" : "TRADE_CREATE",
             source: "LAUNCH",
             tokenPublicKey: mintPublicKey,
             walletPublicKey: devPk,
             fromAddress: devPk,
-            intentSolAmount: devBuyAmountSol > 0 ? -devBuyAmountSol : null,
+            intentSolAmount:
+              creatorBuyLamports > BigInt(0) ? -creatorBuySol : null,
             referenceId: launchId,
           })
           .then((r) => r.id)
           .catch(() => null);
 
-        if (devBuyAmountSol > 0) {
+        if (creatorBuyLamports > BigInt(0)) {
           // Combined CREATE + dev BUY in a single versioned (v0) transaction
           // backed by an Address Lookup Table to stay under the 1232-byte limit.
           const { tx: versionedTx, blockhash, lastValidBlockHeight } =
@@ -4998,9 +5053,9 @@ export const launchService = {
               devWalletKeypair,
               mintKeypair,
               metadata,
-              toLamports(devBuyAmountSol),
+              creatorBuyLamports,
               BigInt(1),
-              { isMayhemMode: input.mayhemMode ?? false }
+              { isMayhemMode }
             );
           createSignature = await connection.sendRawTransaction(
             versionedTx.serialize(),
@@ -5015,7 +5070,7 @@ export const launchService = {
             devWalletKeypair,
             mintKeypair,
             metadata,
-            { isMayhemMode: input.mayhemMode ?? false }
+            { isMayhemMode }
           );
           if (!createTx.feePayer) {
             createTx.feePayer = devWalletKeypair.publicKey;
@@ -5054,6 +5109,8 @@ export const launchService = {
         await appendLog(launchId, "INFO", "Create submitted", "create", {
           signature: createSignature,
           durationMs: Date.now() - createStartedAt,
+          creatorBuyLamports: creatorBuyLamports.toString(),
+          executionMode: mode,
         });
       }
 
@@ -5078,100 +5135,8 @@ export const launchService = {
         reservedVanityId,
       });
 
-      if (!input.bundleBuyEnabled) {
-        await updateProgress(launchId, 65, "buys");
-        await appendLog(launchId, "STEP", "Executing bundle buys", "buys");
-        if (bundlerWalletKeypairs.length > 0) {
-          const connection = getSolanaConnection();
-          const buysStartedAt = Date.now();
-          let executedCount = 0;
-          let totalBuyLamports = BigInt(0);
-          const buySignatures: string[] = [];
-          for (let i = 0; i < bundlerWalletKeypairs.length; i += 1) {
-            if (await isCancelRequested(launchId)) {
-              await appendLog(
-                launchId,
-                "WARN",
-                "Launch canceled before bundle buys completed",
-                "cancel"
-              );
-              break;
-            }
-            const buyer = bundlerWalletKeypairs[i];
-            const amountLamports =
-              bundlerBuyAllocation.targets[i]?.amountLamports ?? BigInt(0);
-            if (amountLamports <= BigInt(0)) {
-              continue;
-            }
-            const tx = await pumpSdk.getBuyInstructionsBySolAmount(
-              buyer.publicKey,
-              mintKeypair.publicKey,
-              amountLamports,
-              SLIPPAGE_BASIS_POINTS,
-              "confirmed"
-            );
-            tx.feePayer = buyer.publicKey;
-            const latestBlockhash =
-              await connection.getLatestBlockhash("confirmed");
-            tx.recentBlockhash = latestBlockhash.blockhash;
-            const buyerPk = buyer.publicKey.toBase58();
-            const buyTrackId = await appTransactionService
-              .create({
-                userId: user.id,
-                type: "TRADE_BUY",
-                source: "LAUNCH",
-                tokenPublicKey: mintPublicKey,
-                walletPublicKey: buyerPk,
-                fromAddress: buyerPk,
-                intentSolAmount: -(Number(amountLamports) / 1_000_000_000),
-                referenceId: launchId,
-              })
-              .then((r) => r.id)
-              .catch(() => null);
-            const signature = await sendAndConfirmTransaction(
-              connection,
-              tx,
-              [buyer],
-              {
-                commitment: "confirmed",
-              }
-            );
-            if (buyTrackId) {
-              await appTransactionService
-                .confirm(buyTrackId, { signature })
-                .catch(() => {});
-              await settleSignature({
-                signature,
-                rows: [{ id: buyTrackId, walletPublicKey: buyerPk }],
-                connection,
-              }).catch(() => {});
-            }
-            await testRunLogService.appendServerEvent({
-              eventType: "wallet_transaction",
-              source: "launch.service",
-              action: "launch.bundleBuy",
-              launchId,
-              tokenPublicKey: mintPublicKey,
-              wallets: [buyer.publicKey.toBase58()],
-              signature,
-              status: "submitted",
-              expectedValue: {
-                amountLamports: amountLamports.toString(),
-              },
-            });
-            buySignatures.push(signature);
-            executedCount += 1;
-            totalBuyLamports += amountLamports;
-          }
-          await appendLog(launchId, "INFO", "Bundle buys executed", "buys", {
-            executedCount,
-            totalBuySol: lamportsToSol(totalBuyLamports).toFixed(4),
-            totalBuyLamports: totalBuyLamports.toString(),
-            signatures: buySignatures,
-            durationMs: Date.now() - buysStartedAt,
-          });
-        }
-      }
+      // Sequential post-create bundler buys (PumpFunSDK) removed: non-bundled
+      // Platform execute is create/dev-buy only; bundled buys stay on Jito path.
 
       if (distributionWallets.length > 0) {
         await setStep(launchId, 72, "distribution", "Distributing tokens");
@@ -5335,5 +5300,4 @@ export const launchService = {
         userId: launch.userId,
       });
     }
-  },
-};
+}
