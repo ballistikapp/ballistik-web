@@ -19,6 +19,7 @@ import { mapFlatInitialToLaunchFunnelValues } from "@/components/launch/platform
 import { LaunchReviewSection } from "@/components/launch/shared/launch-review-section";
 import { PlatformSelector } from "@/components/launch/shared/platform-selector";
 import { TokenMetadataFields } from "@/components/launch/shared/token-metadata-fields";
+import { getLaunchAttributionDescription } from "@/components/launch/launch-attribution";
 import {
   useLaunchFunnelForm,
   type FunnelFieldState,
@@ -37,7 +38,6 @@ const BANNER_IMAGE_MIME_TYPES = ["image/jpeg", "image/png", "image/gif"];
 const MAIN_IMAGE_MAX_BYTES = 15 * 1024 * 1024;
 const MAIN_VIDEO_MAX_BYTES = 30 * 1024 * 1024;
 const BANNER_MAX_BYTES = Math.floor(4.3 * 1024 * 1024);
-const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
 
 const readImageDimensions = (file: File) =>
   new Promise<{ width: number; height: number }>((resolve, reject) => {
@@ -70,19 +70,9 @@ const readVideoDimensions = (file: File) =>
     video.src = url;
   });
 
-function getReviewDescription(
-  description: string,
-  removeAttribution: boolean
-): string {
-  const baseDescription = description.trim();
-  if (removeAttribution) return baseDescription || "-";
-  return baseDescription
-    ? `${baseDescription}\n\n${LAUNCH_ATTRIBUTION_TEXT}`
-    : LAUNCH_ATTRIBUTION_TEXT;
-}
-
 type LaunchFunnelShellProps = {
-  initialValues?: Record<string, unknown> | null;
+  /** Nested funnel values, or a flat preset/clone bag (legacy page path). */
+  initialValues?: LaunchFunnelFormValues | Record<string, unknown> | null;
 };
 
 function FunnelReview({
@@ -117,7 +107,7 @@ function FunnelReview({
       previewError={previewCostsQuery.error?.message ?? null}
       imagePreview={imagePreview}
       bannerPreview={bannerPreview}
-      description={getReviewDescription(
+      description={getLaunchAttributionDescription(
         values.metadata.description,
         values.config.removeAttribution
       )}
@@ -141,14 +131,21 @@ export function LaunchFunnelShell({
   const mainMediaInputRef = React.useRef<HTMLInputElement>(null);
   const bannerInputRef = React.useRef<HTMLInputElement>(null);
 
-  const defaultValues = React.useMemo(
-    () =>
-      mapFlatInitialToLaunchFunnelValues(
-        initialValues,
-        createDefaultLaunchFunnelFormValues()
-      ),
-    [initialValues]
-  );
+  const defaultValues = React.useMemo(() => {
+    if (
+      initialValues &&
+      typeof initialValues === "object" &&
+      "platform" in initialValues &&
+      "metadata" in initialValues &&
+      "config" in initialValues
+    ) {
+      return initialValues as LaunchFunnelFormValues;
+    }
+    return mapFlatInitialToLaunchFunnelValues(
+      initialValues as Record<string, unknown> | null | undefined,
+      createDefaultLaunchFunnelFormValues()
+    );
+  }, [initialValues]);
   const form = useLaunchFunnelForm(defaultValues, () =>
     setShowLaunchDialog(true)
   );
@@ -487,10 +484,7 @@ export function LaunchFunnelShell({
         open={showLaunchDialog}
         onOpenChange={setShowLaunchDialog}
         onConfirm={handleConfirmLaunch}
-        launchInput={{
-          metadata: values.metadata,
-          config: values.config,
-        }}
+        launchInput={values}
         imagePreview={imagePreview}
         bannerPreview={bannerPreview}
         isLoading={startLaunchMutation.isPending}

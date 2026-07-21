@@ -4,6 +4,11 @@ import * as React from "react";
 import { Copy, Loader2 } from "lucide-react";
 import { LaunchForm } from "./launch-form";
 import { CloneTokenDialog } from "./clone-token-dialog";
+import { createDefaultLaunchFunnelFormValues } from "@/components/launch/launch-funnel-form-values";
+import {
+  applyPumpfunPresetToConfig,
+  mapFlatInitialToLaunchFunnelValues,
+} from "@/components/launch/platforms/pumpfun/map-flat-initial-values";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,10 +53,11 @@ export default function LaunchPage() {
     setCloneValues(input);
     setFormKey((k) => k + 1);
   };
-  const initialValues = React.useMemo(
-    () => ({ ...presetValues, ...(cloneValues ?? {}) }),
-    [presetValues, cloneValues]
-  );
+  const initialValues = React.useMemo(() => {
+    const base = createDefaultLaunchFunnelFormValues();
+    base.config = applyPumpfunPresetToConfig(base.config, presetValues);
+    return mapFlatInitialToLaunchFunnelValues(cloneValues, base);
+  }, [presetValues, cloneValues]);
 
   return (
     <div className="flex flex-col gap-12">
@@ -92,7 +98,10 @@ export default function LaunchPage() {
         }
       />
 
-      <LaunchForm key={`${presetName}-${formKey}`} initialValues={initialValues} />
+      <LaunchForm
+        key={`${presetName}-${formKey}`}
+        initialValues={initialValues}
+      />
 
       <CloneTokenDialog
         open={cloneDialogOpen}

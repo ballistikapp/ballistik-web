@@ -126,39 +126,6 @@ export function createDefaultLaunchFunnelFormValues(
   };
 }
 
-export function devBuyAmountSolValidatorMessage(
-  value: unknown
-): string | undefined {
-  const parsed = z
-    .number()
-    .min(DEV_BUY_SOL_MIN, `Dev buy must be at least ${DEV_BUY_SOL_MIN} SOL.`)
-    .max(DEV_BUY_SOL_MAX, `Dev buy cannot exceed ${DEV_BUY_SOL_MAX} SOL.`)
-    .safeParse(value);
-  if (!parsed.success) {
-    return (
-      parsed.error.issues[0]?.message ?? "Enter a valid dev buy amount (SOL)."
-    );
-  }
-}
-
-export function bundlerBuyAmountSolValidatorMessage(
-  value: unknown
-): string | undefined {
-  const parsed = z
-    .number()
-    .min(
-      BUNDLER_BUY_PER_WALLET_MIN,
-      `Buy amount per wallet must be at least ${BUNDLER_BUY_PER_WALLET_MIN} SOL.`
-    )
-    .safeParse(value);
-  if (!parsed.success) {
-    return (
-      parsed.error.issues[0]?.message ??
-      "Enter a valid buy amount per wallet (SOL)."
-    );
-  }
-}
-
 export function bundlerWalletCountValidatorMessage(
   value: unknown
 ): string | undefined {

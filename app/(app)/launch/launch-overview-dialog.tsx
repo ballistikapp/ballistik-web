@@ -4,10 +4,8 @@ import * as React from "react";
 import {
   buildVersionedLaunchPreviewInput,
 } from "@/components/launch/build-versioned-launch-payload";
-import type {
-  PumpfunConfigFormValues,
-  SharedTokenMetadataFormValues,
-} from "@/components/launch/launch-funnel-form-values";
+import { getLaunchAttributionDescription } from "@/components/launch/launch-attribution";
+import type { LaunchFunnelFormValues } from "@/components/launch/launch-funnel-form-values";
 import { LaunchReviewSection } from "@/components/launch/shared/launch-review-section";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,26 +23,10 @@ interface LaunchOverviewDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   onConfirm: () => void;
-  launchInput: {
-    metadata: SharedTokenMetadataFormValues;
-    config: PumpfunConfigFormValues;
-  };
+  launchInput: LaunchFunnelFormValues;
   imagePreview: string | null;
   bannerPreview: string | null;
   isLoading?: boolean;
-}
-
-const LAUNCH_ATTRIBUTION_TEXT = "Launched with ballistik.app";
-
-function getDescription(
-  description: string,
-  removeAttribution: boolean
-): string {
-  const trimmed = description.trim();
-  if (removeAttribution) return trimmed || "-";
-  return trimmed
-    ? `${trimmed}\n\n${LAUNCH_ATTRIBUTION_TEXT}`
-    : LAUNCH_ATTRIBUTION_TEXT;
 }
 
 export function LaunchOverviewDialog({
@@ -59,10 +41,10 @@ export function LaunchOverviewDialog({
   const previewInput = React.useMemo(
     () =>
       buildVersionedLaunchPreviewInput({
-        platform: "PUMPFUN",
+        platform: launchInput.platform,
         config: launchInput.config,
       }),
-    [launchInput.config]
+    [launchInput.platform, launchInput.config]
   );
   const previewCostsQuery = trpc.launch.previewCosts.useQuery(previewInput!, {
     enabled: open && Boolean(previewInput),
@@ -85,17 +67,13 @@ export function LaunchOverviewDialog({
         </DialogHeader>
         <Separator />
         <LaunchReviewSection
-          values={{
-            platform: "PUMPFUN",
-            metadata: launchInput.metadata,
-            config: launchInput.config,
-          }}
+          values={launchInput}
           preview={preview}
           previewLoading={quoteLoading}
           previewError={previewCostsQuery.error?.message ?? null}
           imagePreview={imagePreview}
           bannerPreview={bannerPreview}
-          description={getDescription(
+          description={getLaunchAttributionDescription(
             launchInput.metadata.description,
             launchInput.config.removeAttribution
           )}

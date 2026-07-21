@@ -229,7 +229,7 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - Launch form starts via `launch.start` and polls `launch.status`.
 - The launch funnel is owned by the shared `components/launch/launch-funnel-shell.tsx` shell, with shared metadata/review UI under `components/launch/shared/` and pump.fun configuration under `components/launch/platforms/pumpfun/`.
 - Funnel form state is nested as `{ platform, metadata, config }`; flat preset and clone inputs are mapped into that shape at initialization.
-- Both the inline Review and the overview dialog use `launch.previewCosts` through `toPreviewMoneyDisplay`; neither computes launch usage fees locally.
+- Both the inline Review and the overview dialog use `launch.previewCosts` through `toPreviewMoneyDisplay` for active fee/reserve amounts. Inactive toggles may still show nominal catalog fee amounts (struck through) from `usage-fees.config` for UX continuity.
 - Progress dialog renders launch status and logs.
 - The app header shows active launch progress beside the sidebar trigger via `activeProcess.list`; clicking the header pill opens the same launch progress dialog.
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
