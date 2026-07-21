@@ -227,6 +227,9 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## UI Integration
 
 - Launch form starts via `launch.start` and polls `launch.status`.
+- The launch funnel is owned by the shared `components/launch/launch-funnel-shell.tsx` shell, with shared metadata/review UI under `components/launch/shared/` and pump.fun configuration under `components/launch/platforms/pumpfun/`.
+- Funnel form state is nested as `{ platform, metadata, config }`; flat preset and clone inputs are mapped into that shape at initialization.
+- Both the inline Review and the overview dialog use `launch.previewCosts` through `toPreviewMoneyDisplay`; neither computes launch usage fees locally.
 - Progress dialog renders launch status and logs.
 - The app header shows active launch progress beside the sidebar trigger via `activeProcess.list`; clicking the header pill opens the same launch progress dialog.
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
@@ -284,7 +287,10 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `server/solana/pump/transactions.ts`
 - `app/(app)/launch/launch-progress-dialog.tsx`
 - `app/(app)/launch/launch-overview-dialog.tsx`
-- `app/(app)/launch/launch-form.tsx`
+- `components/launch/launch-funnel-shell.tsx` (shared funnel shell)
+- `components/launch/shared/` (platform selector, shared metadata, normalized review)
+- `components/launch/platforms/pumpfun/` (pump.fun config fields + flat→nested mapping)
+- `app/(app)/launch/launch-form.tsx` (re-exports shell as `LaunchForm`)
 
 ## Environment Requirements
 
