@@ -4,9 +4,9 @@
 
 **Blocked by:** None — can start immediately (most useful after 01 so `/referrals` accept Applications).
 
-**Status:** ready-for-agent
+**Status:** ready-for-human
 
-- [ ] Landing has a short affiliate/referral program section (not a separate long page)
-- [ ] FAQ covers program basics and in-app apply; does not advertise a specific share %
-- [ ] CTA routes through auth with return to `/referrals` when a return path is supported
-- [ ] Copy does not invent new domain terms for Ops/product surfaces
+- [x] Landing has a short affiliate/referral program section (not a separate long page)
+- [x] FAQ covers program basics and in-app apply; does not advertise a specific share %
+- [x] CTA routes through auth with return to `/referrals` when a return path is supported
+- [x] Copy does not invent new domain terms for Ops/product surfaces

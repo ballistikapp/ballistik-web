@@ -46,4 +46,16 @@ export const LANDING_FAQ_ITEMS: readonly LandingFaqItem[] = [
     question: "Does a Pro subscription cover every on-chain cost?",
     answer: `No. Pro removes platform fees on supported launch and volume-bot flows. You still pay Solana network fees, Jito tips where used, account rent, and any third-party or protocol fees.`,
   },
+  {
+    question: "What is the Ballistik affiliate program?",
+    answer: `The affiliate program lets approved Marketers earn a share of platform spend from Users they refer. Share rates are set by Operators and are not published here. Interested Users apply in the app after signing in.`,
+  },
+  {
+    question: "How do I apply to the affiliate program?",
+    answer: `Sign in to ${SITE_BRAND_NAME}, open Referrals, and submit a Marketer Application. Operators review Applications and designate Marketers.`,
+  },
+  {
+    question: "How do Marketers earn from referrals?",
+    answer: `Marketers earn a share of referred Users' platform payments (usage fees and subscriptions), sent to a fee-collector wallet the Marketer configures. Exact share rates stay Operator-owned and are not listed on this page.`,
+  },
 ];
