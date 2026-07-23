@@ -4,7 +4,6 @@ import {
   router,
 } from "../trpc";
 import { opsService } from "@/server/services/ops.service";
-import { marketerApplicationService } from "@/server/services/marketer-application.service";
 import {
   opsCreateMarketerSchema,
   opsGetLaunchAutopsySchema,
@@ -153,27 +152,18 @@ export const opsRouter = router({
   listMarketerApplications: operatorProcedure
     .input(opsListMarketerApplicationsSchema)
     .query(async ({ input, ctx }) => {
-      return await marketerApplicationService.listApplications(
-        ctx.user.id,
-        input
-      );
+      return await opsService.listMarketerApplications(ctx.user.id, input);
     }),
 
   getMarketerApplication: operatorProcedure
     .input(opsGetMarketerApplicationSchema)
     .query(async ({ input, ctx }) => {
-      return await marketerApplicationService.getApplication(
-        ctx.user.id,
-        input
-      );
+      return await opsService.getMarketerApplication(ctx.user.id, input);
     }),
 
   rejectMarketerApplication: operatorProcedure
     .input(opsRejectMarketerApplicationSchema)
     .mutation(async ({ input, ctx }) => {
-      return await marketerApplicationService.rejectApplication(
-        ctx.user.id,
-        input
-      );
+      return await opsService.rejectMarketerApplication(ctx.user.id, input);
     }),
 });

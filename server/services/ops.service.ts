@@ -21,6 +21,11 @@ import type {
   OpsRevealPrivateKeyInput,
   OpsUpdateMarketerInput,
 } from "@/server/schemas/ops.schema";
+import type {
+  OpsGetMarketerApplicationInput,
+  OpsListMarketerApplicationsInput,
+  OpsRejectMarketerApplicationInput,
+} from "@/server/schemas/marketer-application.schema";
 import {
   isLegacyPlatformRecord,
   launchPlanEnvelopeV1Schema,
@@ -1596,5 +1601,35 @@ export const opsService = {
       }
       throw error;
     }
+  },
+
+  async listMarketerApplications(
+    callerUserId: string,
+    input: OpsListMarketerApplicationsInput
+  ) {
+    return await marketerApplicationService.listApplications(
+      callerUserId,
+      input
+    );
+  },
+
+  async getMarketerApplication(
+    callerUserId: string,
+    input: OpsGetMarketerApplicationInput
+  ) {
+    return await marketerApplicationService.getApplication(
+      callerUserId,
+      input
+    );
+  },
+
+  async rejectMarketerApplication(
+    callerUserId: string,
+    input: OpsRejectMarketerApplicationInput
+  ) {
+    return await marketerApplicationService.rejectApplication(
+      callerUserId,
+      input
+    );
   },
 };

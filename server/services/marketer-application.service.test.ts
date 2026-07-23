@@ -118,7 +118,10 @@ test("submitApplication rejects when a pending Application already exists", asyn
     t,
     prisma.marketerApplication,
     "findFirst",
-    (async () => ({ id: APPLICATION_ID })) as unknown as typeof prisma.marketerApplication.findFirst
+    (async () => ({
+      id: APPLICATION_ID,
+      status: "PENDING",
+    })) as unknown as typeof prisma.marketerApplication.findFirst
   );
 
   await assert.rejects(

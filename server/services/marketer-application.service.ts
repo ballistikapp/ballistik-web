@@ -53,22 +53,28 @@ export const marketerApplicationService = {
     userId: string,
     input: SubmitMarketerApplicationInput
   ) {
-    const [marketer, pending] = await Promise.all([
+    const [marketer, blockingApplication] = await Promise.all([
       prisma.marketer.findUnique({
         where: { userId },
         select: { id: true },
       }),
       prisma.marketerApplication.findFirst({
-        where: { userId, status: "PENDING" },
-        select: { id: true },
+        where: {
+          userId,
+          status: { in: ["PENDING", "APPROVED"] },
+        },
+        select: { id: true, status: true },
       }),
     ]);
 
     if (marketer) {
       throw new AppError("Already a Marketer", 400);
     }
-    if (pending) {
+    if (blockingApplication?.status === "PENDING") {
       throw new AppError("A Marketer Application is already pending", 400);
+    }
+    if (blockingApplication?.status === "APPROVED") {
+      throw new AppError("Marketer Application already approved", 400);
     }
 
     const created = await prisma.marketerApplication.create({

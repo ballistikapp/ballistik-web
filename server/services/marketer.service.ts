@@ -119,8 +119,15 @@ export const marketerService = {
       };
     }
 
-    // Approved without a Marketer row is unexpected; treat as can_apply.
-    return { status: "can_apply" };
+    // APPROVED without a Marketer row: designation in progress — not re-apply.
+    return {
+      status: "pending",
+      application: {
+        id: application.id,
+        message: application.message,
+        createdAt: application.createdAt,
+      },
+    };
   },
 
   async updateSetup(userId: string, input: MarketerUpdateSetupInput) {
