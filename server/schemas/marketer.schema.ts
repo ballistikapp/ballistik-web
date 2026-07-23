@@ -47,6 +47,9 @@ export type MarketerReferredUser = {
   name: string;
   mainWalletPublicKey: string;
   joinedAt: Date;
+  totalEarnedLamports: bigint;
+  lastPayoutAt: Date | null;
+  payoutCount: number;
 };
 
 export type MarketerReferralPayout = {

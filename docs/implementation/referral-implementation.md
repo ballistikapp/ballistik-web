@@ -35,7 +35,7 @@ Ops designation and Applications inbox live in [Ops Console](./ops-console-imple
   - `disabled` — disabled Marketer with setup (read-only history)
 - `marketer.submitApplication` — `protectedRateLimitedProcedure`; required length-capped message; at most one pending; blocked if already a Marketer
 - `marketer.updateSetup` — `protectedRateLimitedProcedure`; set/change `referralCode` and/or `feeCollectorPublicKey`; requires **enabled** Marketer; disabled / non-Marketer → not-found
-- `marketer.listReferredUsers` — `protectedRateLimitedProcedure`; sticky Referrals for the current Marketer (enabled or disabled); newest first; non-Marketer → not-found
+- `marketer.listReferredUsers` — `protectedRateLimitedProcedure`; sticky Referrals for the current Marketer (enabled or disabled); newest first; each row includes payout-ledger aggregates (`totalEarnedLamports`, `lastPayoutAt`, `payoutCount` — zeros/null when never paid); non-Marketer → not-found
 - `marketer.listPayouts` — `protectedRateLimitedProcedure`; Referral Payouts for the current Marketer (enabled or disabled); newest first
 - `marketer.getAggregates` — `protectedRateLimitedProcedure`; total earned, referral count, last payout time (enabled or disabled)
 
@@ -86,7 +86,7 @@ Pro-waived (zero) fees still skip collection entirely — no transfers and no Re
 
 ## Product UI
 
-- `/referrals` — Application intake (can apply / pending / rejected+resubmit), or Marketer setup + Referred Users + Payouts; disabled Marketers see read-only setup/history
+- `/referrals` — Application intake (can apply / pending / rejected+resubmit), or Marketer setup + Referred Users (identity + payout-ledger earned/last/count) + Payouts; disabled Marketers see read-only setup/history
 - Account nav **Referrals** link always shown for authenticated Users
 - Intake only — no User-facing rate or self-designation
 
@@ -94,3 +94,4 @@ Pro-waived (zero) fees still skip collection entirely — no transfers and no Re
 
 - `server/services/usage-fee.service.test.ts` — fee-collection seam (no Referral, qualifying split + payout, missing collector, disabled Marketer, zero/sub-lamport share, live rate)
 - `server/services/marketer-application.service.test.ts` — Application submit rules, reject, approve-pending, and `ops.createMarketer` auto-approve / no-op when none pending
+- `server/services/marketer.service.test.ts` — referred-Users projection with per-User Referral Payout aggregates (zeros when never paid; disabled Marketer read-only)

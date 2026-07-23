@@ -165,6 +165,7 @@ export const marketerService = {
 
   /**
    * Users attributed to this Marketer (sticky Referrals), newest first.
+   * Includes light money monitoring from Referral Payouts only.
    * Readable for disabled Marketers (historical view).
    */
   async listReferredUsers(userId: string): Promise<MarketerReferredUser[]> {
@@ -173,29 +174,55 @@ export const marketerService = {
       throw new AppError("Not found", 404);
     }
 
-    const referrals = await prisma.referral.findMany({
-      where: { marketerId: marketer.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            mainWalletPublicKey: true,
+    const [referrals, payoutStats] = await Promise.all([
+      prisma.referral.findMany({
+        where: { marketerId: marketer.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mainWalletPublicKey: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.referralPayout.groupBy({
+        by: ["referredUserId"],
+        where: { marketerId: marketer.id },
+        _sum: { marketerAmountLamports: true },
+        _count: { _all: true },
+        _max: { createdAt: true },
+      }),
+    ]);
 
-    return referrals.map((referral) => ({
-      referralId: referral.id,
-      userId: referral.user.id,
-      name: referral.user.name,
-      mainWalletPublicKey: referral.user.mainWalletPublicKey,
-      joinedAt: referral.createdAt,
-    }));
+    const statsByUserId = new Map(
+      payoutStats.map((row) => [
+        row.referredUserId,
+        {
+          totalEarnedLamports: row._sum.marketerAmountLamports ?? BigInt(0),
+          lastPayoutAt: row._max.createdAt,
+          payoutCount: row._count._all,
+        },
+      ])
+    );
+
+    return referrals.map((referral) => {
+      const stats = statsByUserId.get(referral.user.id);
+      return {
+        referralId: referral.id,
+        userId: referral.user.id,
+        name: referral.user.name,
+        mainWalletPublicKey: referral.user.mainWalletPublicKey,
+        joinedAt: referral.createdAt,
+        totalEarnedLamports: stats?.totalEarnedLamports ?? BigInt(0),
+        lastPayoutAt: stats?.lastPayoutAt ?? null,
+        payoutCount: stats?.payoutCount ?? 0,
+      };
+    });
   },
 
   /**
