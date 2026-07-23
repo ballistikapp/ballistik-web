@@ -52,7 +52,7 @@ export function MarketerApplicationForm({
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex max-w-xl flex-col gap-4">
+    <form onSubmit={onSubmit} className="flex max-w-xl flex-col gap-4 pt-6">
       <div className="flex flex-col gap-1">
         <h2 className="text-base font-medium">{heading}</h2>
         <p className="text-muted-foreground text-sm">{description}</p>
@@ -73,7 +73,9 @@ export function MarketerApplicationForm({
         </p>
       </div>
 
-      {formError ? <p className="text-destructive text-sm">{formError}</p> : null}
+      {formError ? (
+        <p className="text-destructive text-sm">{formError}</p>
+      ) : null}
 
       <div>
         <Button type="submit" disabled={submitMutation.isPending}>
