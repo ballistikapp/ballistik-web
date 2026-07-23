@@ -233,13 +233,17 @@ export type PumpfunLaunchPlanV1 = z.infer<typeof pumpfunLaunchPlanV1Schema>;
 
 /**
  * Launch Options outcomes materialized by the shared lifecycle before execute.
- * Public mint identity / vanity reservation fields only — never private keys.
+ * Public mint identity fields only — never private keys (those live on LaunchPlannedMint).
  */
 export const launchOptionsOutcomesV1Schema = z.object({
   vanityMint: z.boolean(),
   removeAttribution: z.boolean(),
+  /** Always set — public key of the planned mint for this Launch. */
+  mintPublicKey: z.string().min(1),
+  /** Always set — LaunchPlannedMint id used by execute to resolve the secret. */
+  plannedMintId: z.string().min(1),
+  /** Present when vanity pool sourcing was used; null for fresh planned mints. */
   reservedVanityMintId: z.string().nullable(),
-  reservedVanityMintPublicKey: z.string().nullable(),
 });
 export type LaunchOptionsOutcomesV1 = z.infer<
   typeof launchOptionsOutcomesV1Schema

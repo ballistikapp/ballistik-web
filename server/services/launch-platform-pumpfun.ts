@@ -19,10 +19,6 @@ import type {
   LaunchPlatformPlanResult,
 } from "@/server/services/launch-platform-registry";
 import {
-  mergeLaunchOptionsFeesIntoMoney,
-  quoteLaunchOptionsFees,
-} from "@/server/services/launch-options-money";
-import {
   requirePumpfunExecutePlan,
   runPumpfunBundledExecuteDefault,
   runPumpfunNonBundledExecuteDefault,
@@ -218,21 +214,10 @@ export function createPumpfunPlatformModule(
           parsed.error.issues[0]?.message ?? "Invalid launch preview input";
         throw new AppError(message, 400, { issues: parsed.error.issues });
       }
-      // Pump money excludes Launch Options fees; shared composition adds them.
+      // Platform-only money. Launch Options fees are composed above the Platform
+      // module (previewCosts / lifecycle) via shared options-money helpers.
       const preview = await calculateCostPreview(parsed.data.config, ctx.user);
-      const result = toPreviewResult(preview);
-      const optionsFees = quoteLaunchOptionsFees(parsed.data.options, {
-        platformFeeWaived: result.platformFeeWaived,
-        platformFeeDiscountRate: result.platformFeeDiscountRate,
-      });
-      const money = mergeLaunchOptionsFeesIntoMoney(result.money, optionsFees);
-      const required = BigInt(money.immediateRequiredBalanceLamports);
-      const balance = BigInt(result.mainWalletBalanceLamports);
-      return {
-        ...result,
-        money,
-        hasSufficientMainWallet: balance >= required,
-      };
+      return toPreviewResult(preview);
     },
     plan: async (ctx, input) => buildPlan(ctx, input),
     execute: async (ctx: LaunchLifecycleContext) => {

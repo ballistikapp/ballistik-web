@@ -361,10 +361,30 @@ model Launch {
   errorMessage String?
   logs LaunchLog[] @relation("LaunchLogs")
   recoveryWallets LaunchRecoveryWallet[] @relation("LaunchRecoveryWalletRecordLaunch")
+  /// Plan-time mint identity (vanity pool or fresh key). Secrets stay here, never in Launch.plan.
+  plannedMint LaunchPlannedMint? @relation("LaunchPlannedMintLaunch")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([retriedFromLaunchId])
   @@map("Launch")
+}
+
+/// Durable mint identity materialized at plan time for every Launch.
+/// VanityMint remains the pool source; this row is the per-Launch planned secret store.
+model LaunchPlannedMint {
+  id String @id @default(cuid())
+  launchId String @unique
+  launch Launch @relation("LaunchPlannedMintLaunch", fields: [launchId], references: [id])
+  publicKey String
+  privateKey String
+  vanityMintId String?
+  vanityMint VanityMint? @relation("LaunchPlannedMintVanityMint", fields: [vanityMintId], references: [id])
+  consumedAt DateTime?
+  abandonedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([vanityMintId])
+  @@map("LaunchPlannedMint")
 }
 
 model LaunchLog {
@@ -530,6 +550,7 @@ model VanityMint {
   token Token? @relation(fields: [tokenPublicKey], references: [publicKey])
   userId String?
   user User? @relation("VanityMintUser", fields: [userId], references: [id])
+  plannedMints LaunchPlannedMint[] @relation("LaunchPlannedMintVanityMint")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("VanityMint")

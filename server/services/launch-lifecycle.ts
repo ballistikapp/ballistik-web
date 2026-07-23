@@ -17,7 +17,11 @@ import {
   mergeLaunchOptionsFeesIntoMoney,
   quoteLaunchOptionsFees,
 } from "@/server/services/launch-options-money";
-import { materializeLaunchOptionsOutcomes } from "@/server/services/launch-options-outcomes";
+import {
+  compensateLaunchOptionsResources,
+  materializeLaunchOptionsOutcomes,
+  type LaunchOptionsLocalResources,
+} from "@/server/services/launch-options-outcomes";
 import {
   resolveLaunchPlatform,
   type LaunchLifecycleContext,
@@ -77,6 +81,8 @@ export type LaunchLifecycleDeps = {
   collectUsageFee: (
     input: CollectUsageFeeInput
   ) => ReturnType<typeof usageFeeService.collectFromMainWallet>;
+  materializeLaunchOptionsOutcomes?: typeof materializeLaunchOptionsOutcomes;
+  compensateLaunchOptionsResources?: typeof compensateLaunchOptionsResources;
 };
 
 function createLifecycleContext(
@@ -213,21 +219,24 @@ async function applyPlatformExecuteResult(
   });
 }
 
-async function compensateResources(
+async function compensatePlatformResources(
   platform: LaunchPlatformModule,
   ctx: LaunchLifecycleContext,
   resources: LaunchPlatformPlanLocalResources | undefined
 ): Promise<void> {
-  if (!resources) {
-    return;
-  }
-  if (
-    !resources.reservedVanityMintId &&
-    resources.createdWalletPublicKeys.length === 0
-  ) {
+  if (!resources || resources.createdWalletPublicKeys.length === 0) {
     return;
   }
   await platform.compensatePlanResources(ctx, resources);
+}
+
+async function compensateOptionsResources(
+  deps: LaunchLifecycleDeps,
+  resources: LaunchOptionsLocalResources | undefined
+): Promise<void> {
+  const compensate =
+    deps.compensateLaunchOptionsResources ?? compensateLaunchOptionsResources;
+  await compensate(resources);
 }
 
 export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
@@ -278,7 +287,7 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
         const planResult = await platform.plan(planCtx, input);
 
         if (planResult.kind === "failed") {
-          await compensateResources(
+          await compensatePlatformResources(
             platform,
             planCtx,
             planResult.localResources
@@ -297,21 +306,20 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           return;
         }
 
-        let optionsResources: LaunchPlatformPlanLocalResources = {
+        let optionsResources: LaunchOptionsLocalResources = {
+          plannedMintId: null,
           reservedVanityMintId: null,
-          createdWalletPublicKeys: [],
         };
+        const materialize =
+          deps.materializeLaunchOptionsOutcomes ??
+          materializeLaunchOptionsOutcomes;
         try {
-          const materialized = await materializeLaunchOptionsOutcomes({
+          const materialized = await materialize({
             launchId: launch.id,
             userId: launch.userId,
             options: input.options,
           });
-          optionsResources = {
-            reservedVanityMintId:
-              materialized.localResources.reservedVanityMintId,
-            createdWalletPublicKeys: [],
-          };
+          optionsResources = materialized.localResources;
 
           const optionsFees = quoteLaunchOptionsFees(input.options, {
             platformFeeWaived: planResult.platformFeeWaived,
@@ -324,11 +332,12 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           const required = BigInt(money.immediateRequiredBalanceLamports);
           const balance = BigInt(planResult.mainWalletBalanceLamports);
           if (balance < required) {
-            await compensateResources(platform, planCtx, {
-              reservedVanityMintId: optionsResources.reservedVanityMintId,
-              createdWalletPublicKeys:
-                planResult.localResources?.createdWalletPublicKeys ?? [],
-            });
+            await compensateOptionsResources(deps, optionsResources);
+            await compensatePlatformResources(
+              platform,
+              planCtx,
+              planResult.localResources
+            );
             const message = `Main wallet requires ${(Number(required) / 1_000_000_000).toFixed(4)} SOL to fund launch wallets and usage fees`;
             await deps.appendLog(launch.id, "ERROR", message, "plan");
             await deps.updateLaunchStatus(launch.id, "FAILED", message);
@@ -349,11 +358,12 @@ export function createLaunchLifecycle(deps: LaunchLifecycleDeps) {
           plan = envelope;
           planSchemaVersion = LAUNCH_PLAN_SHELL_VERSION_V1;
         } catch (error) {
-          await compensateResources(platform, planCtx, {
-            reservedVanityMintId: optionsResources.reservedVanityMintId,
-            createdWalletPublicKeys:
-              planResult.localResources?.createdWalletPublicKeys ?? [],
-          });
+          await compensateOptionsResources(deps, optionsResources);
+          await compensatePlatformResources(
+            platform,
+            planCtx,
+            planResult.localResources
+          );
           const message =
             (error instanceof Error && error.message) ||
             "Failed to persist authoritative plan";

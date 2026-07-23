@@ -952,6 +952,13 @@ async function releaseReservedVanityMint(vanityMintId: string) {
   });
 }
 
+/** Lifecycle-owned Launch Options compensation releases vanity via this export. */
+export async function releaseReservedVanityMintForLaunchOptions(
+  vanityMintId: string
+) {
+  await releaseReservedVanityMint(vanityMintId);
+}
+
 async function setStep(
   launchId: string,
   progress: number,
@@ -1966,20 +1973,49 @@ export async function reserveMintForLaunchOptions(
 }
 
 /**
- * Resolve the mint keypair from Launch Options outcomes.
- * Platforms consume this rather than owning mint-key creation policy.
+ * Resolve the mint keypair from Launch Options outcomes via plannedMintId only.
+ * No generate-at-execute — plan time already wrote LaunchPlannedMint.
  */
 export async function resolveMintKeypairFromOptionsOutcomes(params: {
   launchId: string;
   userId: string;
   optionsOutcomes: LaunchOptionsOutcomesV1;
 }): Promise<{ mintKeypair: Keypair; reservedVanityId: string | null }> {
+  void params.userId;
   const { optionsOutcomes } = params;
+  const { requireActiveLaunchPlannedMint } = await import(
+    "./launch-planned-mint"
+  );
+  const planned = await requireActiveLaunchPlannedMint(
+    optionsOutcomes.plannedMintId
+  );
 
-  if (optionsOutcomes.reservedVanityMintId) {
+  if (planned.launchId !== params.launchId) {
+    throw new AppError("Planned mint does not belong to this Launch", 500);
+  }
+
+  const mintKeypair = keypairFromPrivateKey(planned.privateKey);
+  const resolvedPublicKey = mintKeypair.publicKey.toBase58();
+  if (
+    resolvedPublicKey !== planned.publicKey ||
+    resolvedPublicKey !== optionsOutcomes.mintPublicKey
+  ) {
+    throw new AppError("Planned mint public key mismatch", 500);
+  }
+
+  if (optionsOutcomes.vanityMint) {
+    if (
+      !planned.vanityMintId ||
+      planned.vanityMintId !== optionsOutcomes.reservedVanityMintId
+    ) {
+      throw new AppError(
+        "Planned vanity mint reservation is missing from the authoritative plan",
+        500
+      );
+    }
     const reserved = await prisma.vanityMint.findUnique({
-      where: { id: optionsOutcomes.reservedVanityMintId },
-      select: { id: true, publicKey: true, privateKey: true, usedAt: true },
+      where: { id: planned.vanityMintId },
+      select: { id: true, publicKey: true, usedAt: true },
     });
     if (!reserved || reserved.usedAt) {
       throw new AppError(
@@ -1987,34 +2023,13 @@ export async function resolveMintKeypairFromOptionsOutcomes(params: {
         400
       );
     }
-    const mintKeypair = keypairFromPrivateKey(reserved.privateKey);
-    if (
-      mintKeypair.publicKey.toBase58() !== reserved.publicKey ||
-      (optionsOutcomes.reservedVanityMintPublicKey &&
-        mintKeypair.publicKey.toBase58() !==
-          optionsOutcomes.reservedVanityMintPublicKey)
-    ) {
+    if (reserved.publicKey !== resolvedPublicKey) {
       throw new AppError("Planned vanity mint reservation is invalid", 500);
     }
     return { mintKeypair, reservedVanityId: reserved.id };
   }
 
-  if (!optionsOutcomes.vanityMint) {
-    const generated = await reserveMintIfRequested(
-      params.launchId,
-      params.userId,
-      false
-    );
-    return {
-      mintKeypair: generated.mintKeypair,
-      reservedVanityId: null,
-    };
-  }
-
-  throw new AppError(
-    "Planned vanity mint reservation is missing from the authoritative plan",
-    500
-  );
+  return { mintKeypair, reservedVanityId: null };
 }
 
 async function reserveMintIfRequested(
@@ -3634,15 +3649,12 @@ async function loadWalletKeypairByPublicKey(publicKey: string): Promise<Keypair>
 }
 
 /**
- * Release vanity reservations and delete unfunded generated wallets created
- * during planning when the plan cannot be used (failure or persist error).
+ * Delete unfunded generated wallets created during Platform planning when the
+ * plan cannot be used. Launch Options mint/vanity compensation is lifecycle-owned.
  */
 export async function compensatePumpfunPlanResources(
   resources: LaunchPlatformPlanLocalResources
 ): Promise<void> {
-  if (resources.reservedVanityMintId) {
-    await releaseReservedVanityMint(resources.reservedVanityMintId);
-  }
   if (resources.createdWalletPublicKeys.length === 0) {
     return;
   }
@@ -3659,8 +3671,8 @@ export async function compensatePumpfunPlanResources(
 
 /**
  * Build the secret-free authoritative pump.fun plan for a Launch.
- * May create unfunded Wallet key refs and vanity reservations; must not fund
- * or submit on-chain work. Expected operational failures return `failed`.
+ * May create unfunded Wallet key refs; must not fund, submit on-chain, or own
+ * mint/vanity materialization. Expected operational failures return `failed`.
  */
 export async function buildPumpfunAuthoritativePlan(params: {
   launchId: string;
@@ -3672,7 +3684,6 @@ export async function buildPumpfunAuthoritativePlan(params: {
   );
   const config = params.input.config;
   const localResources: LaunchPlatformPlanLocalResources = {
-    reservedVanityMintId: null,
     createdWalletPublicKeys: [],
   };
 
@@ -3784,7 +3795,6 @@ export async function buildPumpfunAuthoritativePlan(params: {
         kind: "failed",
         errorMessage: `Main wallet requires ${costPreview.requiredMainWalletSol.toFixed(4)} SOL to fund launch wallets and usage fees`,
         localResources: {
-          reservedVanityMintId: null,
           createdWalletPublicKeys: [],
         },
       };
@@ -3871,7 +3881,6 @@ export async function buildPumpfunAuthoritativePlan(params: {
       kind: "failed",
       errorMessage: message,
       localResources: {
-        reservedVanityMintId: null,
         createdWalletPublicKeys: [],
       },
     };
@@ -3884,7 +3893,23 @@ export const launchService = {
     user: RequestUser
   ) {
     const platform = resolveLaunchPlatform(input.platform);
-    return await platform.preview(input, { user });
+    const result = await platform.preview(input, { user });
+    const {
+      mergeLaunchOptionsFeesIntoMoney,
+      quoteLaunchOptionsFees,
+    } = await import("./launch-options-money");
+    const optionsFees = quoteLaunchOptionsFees(input.options, {
+      platformFeeWaived: result.platformFeeWaived,
+      platformFeeDiscountRate: result.platformFeeDiscountRate,
+    });
+    const money = mergeLaunchOptionsFeesIntoMoney(result.money, optionsFees);
+    const required = BigInt(money.immediateRequiredBalanceLamports);
+    const balance = BigInt(result.mainWalletBalanceLamports);
+    return {
+      ...result,
+      money,
+      hasSufficientMainWallet: balance >= required,
+    };
   },
 
   async getCloneInput(
@@ -5079,6 +5104,10 @@ async function runPumpfunLaunchJobByMode(
         await consumeReservedVanityMint(reservedVanityId, mintPublicKey);
         vanityConsumed = true;
       }
+      const { markLaunchPlannedMintConsumed } = await import(
+        "./launch-planned-mint"
+      );
+      await markLaunchPlannedMintConsumed(optionsOutcomes.plannedMintId);
       await appendLog(launchId, "INFO", "Token confirmed", "confirm", {
         createSignature,
         bundleId,

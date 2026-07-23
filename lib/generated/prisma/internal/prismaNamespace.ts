@@ -397,6 +397,7 @@ export const ModelName = {
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
+  LaunchPlannedMint: 'LaunchPlannedMint',
   LaunchLog: 'LaunchLog',
   LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
@@ -430,7 +431,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "marketer" | "referral" | "referralPayout" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
+    modelProps: "testTable" | "user" | "marketer" | "referral" | "referralPayout" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchPlannedMint" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -1393,6 +1394,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.LaunchCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.LaunchCountAggregateOutputType> | number
+        }
+      }
+    }
+    LaunchPlannedMint: {
+      payload: Prisma.$LaunchPlannedMintPayload<ExtArgs>
+      fields: Prisma.LaunchPlannedMintFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LaunchPlannedMintFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LaunchPlannedMintFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        findFirst: {
+          args: Prisma.LaunchPlannedMintFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LaunchPlannedMintFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        findMany: {
+          args: Prisma.LaunchPlannedMintFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        create: {
+          args: Prisma.LaunchPlannedMintCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        createMany: {
+          args: Prisma.LaunchPlannedMintCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LaunchPlannedMintCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        delete: {
+          args: Prisma.LaunchPlannedMintDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        update: {
+          args: Prisma.LaunchPlannedMintUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        deleteMany: {
+          args: Prisma.LaunchPlannedMintDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LaunchPlannedMintUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LaunchPlannedMintUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        upsert: {
+          args: Prisma.LaunchPlannedMintUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        aggregate: {
+          args: Prisma.LaunchPlannedMintAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLaunchPlannedMint>
+        }
+        groupBy: {
+          args: Prisma.LaunchPlannedMintGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchPlannedMintGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LaunchPlannedMintCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchPlannedMintCountAggregateOutputType> | number
         }
       }
     }
@@ -2965,6 +3040,21 @@ export const LaunchScalarFieldEnum = {
 export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
 
 
+export const LaunchPlannedMintScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  vanityMintId: 'vanityMintId',
+  consumedAt: 'consumedAt',
+  abandonedAt: 'abandonedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchPlannedMintScalarFieldEnum = (typeof LaunchPlannedMintScalarFieldEnum)[keyof typeof LaunchPlannedMintScalarFieldEnum]
+
+
 export const LaunchLogScalarFieldEnum = {
   id: 'id',
   launchId: 'launchId',
@@ -3830,6 +3920,7 @@ export type GlobalOmitConfig = {
   token?: Prisma.TokenOmit
   tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
+  launchPlannedMint?: Prisma.LaunchPlannedMintOmit
   launchLog?: Prisma.LaunchLogOmit
   launchRecoveryWallet?: Prisma.LaunchRecoveryWalletOmit
   holdingExit?: Prisma.HoldingExitOmit

@@ -342,6 +342,7 @@ export type LaunchWhereInput = {
   token?: Prisma.XOR<Prisma.TokenNullableScalarRelationFilter, Prisma.TokenWhereInput> | null
   logs?: Prisma.LaunchLogListRelationFilter
   recoveryWallets?: Prisma.LaunchRecoveryWalletListRelationFilter
+  plannedMint?: Prisma.XOR<Prisma.LaunchPlannedMintNullableScalarRelationFilter, Prisma.LaunchPlannedMintWhereInput> | null
 }
 
 export type LaunchOrderByWithRelationInput = {
@@ -373,6 +374,7 @@ export type LaunchOrderByWithRelationInput = {
   token?: Prisma.TokenOrderByWithRelationInput
   logs?: Prisma.LaunchLogOrderByRelationAggregateInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletOrderByRelationAggregateInput
+  plannedMint?: Prisma.LaunchPlannedMintOrderByWithRelationInput
 }
 
 export type LaunchWhereUniqueInput = Prisma.AtLeast<{
@@ -407,6 +409,7 @@ export type LaunchWhereUniqueInput = Prisma.AtLeast<{
   token?: Prisma.XOR<Prisma.TokenNullableScalarRelationFilter, Prisma.TokenWhereInput> | null
   logs?: Prisma.LaunchLogListRelationFilter
   recoveryWallets?: Prisma.LaunchRecoveryWalletListRelationFilter
+  plannedMint?: Prisma.XOR<Prisma.LaunchPlannedMintNullableScalarRelationFilter, Prisma.LaunchPlannedMintWhereInput> | null
 }, "id">
 
 export type LaunchOrderByWithAggregationInput = {
@@ -493,6 +496,7 @@ export type LaunchCreateInput = {
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateInput = {
@@ -521,6 +525,7 @@ export type LaunchUncheckedCreateInput = {
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUpdateInput = {
@@ -549,6 +554,7 @@ export type LaunchUpdateInput = {
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateInput = {
@@ -577,6 +583,7 @@ export type LaunchUncheckedUpdateInput = {
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchCreateManyInput = {
@@ -900,6 +907,20 @@ export type LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput = {
   deleteMany?: Prisma.LaunchScalarWhereInput | Prisma.LaunchScalarWhereInput[]
 }
 
+export type LaunchCreateNestedOneWithoutPlannedMintInput = {
+  create?: Prisma.XOR<Prisma.LaunchCreateWithoutPlannedMintInput, Prisma.LaunchUncheckedCreateWithoutPlannedMintInput>
+  connectOrCreate?: Prisma.LaunchCreateOrConnectWithoutPlannedMintInput
+  connect?: Prisma.LaunchWhereUniqueInput
+}
+
+export type LaunchUpdateOneRequiredWithoutPlannedMintNestedInput = {
+  create?: Prisma.XOR<Prisma.LaunchCreateWithoutPlannedMintInput, Prisma.LaunchUncheckedCreateWithoutPlannedMintInput>
+  connectOrCreate?: Prisma.LaunchCreateOrConnectWithoutPlannedMintInput
+  upsert?: Prisma.LaunchUpsertWithoutPlannedMintInput
+  connect?: Prisma.LaunchWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.LaunchUpdateToOneWithWhereWithoutPlannedMintInput, Prisma.LaunchUpdateWithoutPlannedMintInput>, Prisma.LaunchUncheckedUpdateWithoutPlannedMintInput>
+}
+
 export type LaunchCreateNestedOneWithoutLogsInput = {
   create?: Prisma.XOR<Prisma.LaunchCreateWithoutLogsInput, Prisma.LaunchUncheckedCreateWithoutLogsInput>
   connectOrCreate?: Prisma.LaunchCreateOrConnectWithoutLogsInput
@@ -953,6 +974,7 @@ export type LaunchCreateWithoutUserInput = {
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutUserInput = {
@@ -980,6 +1002,7 @@ export type LaunchUncheckedCreateWithoutUserInput = {
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutUserInput = {
@@ -1061,6 +1084,7 @@ export type LaunchCreateWithoutTokenInput = {
   retryAttempts?: Prisma.LaunchCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutTokenInput = {
@@ -1088,6 +1112,7 @@ export type LaunchUncheckedCreateWithoutTokenInput = {
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutTokenInput = {
@@ -1141,6 +1166,7 @@ export type LaunchCreateWithoutRetryAttemptsInput = {
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutRetryAttemptsInput = {
@@ -1168,6 +1194,7 @@ export type LaunchUncheckedCreateWithoutRetryAttemptsInput = {
   updatedAt?: Date | string
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutRetryAttemptsInput = {
@@ -1200,6 +1227,7 @@ export type LaunchCreateWithoutRetriedFromLaunchInput = {
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutRetriedFromLaunchInput = {
@@ -1227,6 +1255,7 @@ export type LaunchUncheckedCreateWithoutRetriedFromLaunchInput = {
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutRetriedFromLaunchInput = {
@@ -1275,6 +1304,7 @@ export type LaunchUpdateWithoutRetryAttemptsInput = {
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutRetryAttemptsInput = {
@@ -1302,6 +1332,7 @@ export type LaunchUncheckedUpdateWithoutRetryAttemptsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUpsertWithWhereUniqueWithoutRetriedFromLaunchInput = {
@@ -1318,6 +1349,134 @@ export type LaunchUpdateWithWhereUniqueWithoutRetriedFromLaunchInput = {
 export type LaunchUpdateManyWithWhereWithoutRetriedFromLaunchInput = {
   where: Prisma.LaunchScalarWhereInput
   data: Prisma.XOR<Prisma.LaunchUpdateManyMutationInput, Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchInput>
+}
+
+export type LaunchCreateWithoutPlannedMintInput = {
+  id?: string
+  status?: $Enums.LaunchStatus
+  progress?: number
+  currentStep?: string | null
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
+  input: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  plan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  planSchemaVersion?: string | null
+  planPersistedAt?: Date | string | null
+  outcomeKind?: string | null
+  outcomeDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  result?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  cancelRequestedAt?: Date | string | null
+  errorMessage?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  user: Prisma.UserCreateNestedOneWithoutLaunchesInput
+  retriedFromLaunch?: Prisma.LaunchCreateNestedOneWithoutRetryAttemptsInput
+  retryAttempts?: Prisma.LaunchCreateNestedManyWithoutRetriedFromLaunchInput
+  token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
+  logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
+  recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+}
+
+export type LaunchUncheckedCreateWithoutPlannedMintInput = {
+  id?: string
+  userId: string
+  retriedFromLaunchId?: string | null
+  status?: $Enums.LaunchStatus
+  progress?: number
+  currentStep?: string | null
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
+  input: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  plan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  planSchemaVersion?: string | null
+  planPersistedAt?: Date | string | null
+  outcomeKind?: string | null
+  outcomeDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  result?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  tokenPublicKey?: string | null
+  startedAt?: Date | string | null
+  completedAt?: Date | string | null
+  cancelRequestedAt?: Date | string | null
+  errorMessage?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
+  logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
+  recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+}
+
+export type LaunchCreateOrConnectWithoutPlannedMintInput = {
+  where: Prisma.LaunchWhereUniqueInput
+  create: Prisma.XOR<Prisma.LaunchCreateWithoutPlannedMintInput, Prisma.LaunchUncheckedCreateWithoutPlannedMintInput>
+}
+
+export type LaunchUpsertWithoutPlannedMintInput = {
+  update: Prisma.XOR<Prisma.LaunchUpdateWithoutPlannedMintInput, Prisma.LaunchUncheckedUpdateWithoutPlannedMintInput>
+  create: Prisma.XOR<Prisma.LaunchCreateWithoutPlannedMintInput, Prisma.LaunchUncheckedCreateWithoutPlannedMintInput>
+  where?: Prisma.LaunchWhereInput
+}
+
+export type LaunchUpdateToOneWithWhereWithoutPlannedMintInput = {
+  where?: Prisma.LaunchWhereInput
+  data: Prisma.XOR<Prisma.LaunchUpdateWithoutPlannedMintInput, Prisma.LaunchUncheckedUpdateWithoutPlannedMintInput>
+}
+
+export type LaunchUpdateWithoutPlannedMintInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  status?: Prisma.EnumLaunchStatusFieldUpdateOperationsInput | $Enums.LaunchStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
+  currentStep?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  input?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  plan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  planSchemaVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planPersistedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  outcomeKind?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outcomeDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  result?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  user?: Prisma.UserUpdateOneRequiredWithoutLaunchesNestedInput
+  retriedFromLaunch?: Prisma.LaunchUpdateOneWithoutRetryAttemptsNestedInput
+  retryAttempts?: Prisma.LaunchUpdateManyWithoutRetriedFromLaunchNestedInput
+  token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
+  logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
+  recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+}
+
+export type LaunchUncheckedUpdateWithoutPlannedMintInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  userId?: Prisma.StringFieldUpdateOperationsInput | string
+  retriedFromLaunchId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  status?: Prisma.EnumLaunchStatusFieldUpdateOperationsInput | $Enums.LaunchStatus
+  progress?: Prisma.IntFieldUpdateOperationsInput | number
+  currentStep?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  input?: Prisma.JsonNullValueInput | runtime.InputJsonValue
+  plan?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  planSchemaVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  planPersistedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  outcomeKind?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  outcomeDetails?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  result?: Prisma.NullableJsonNullValueInput | runtime.InputJsonValue
+  tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  startedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  completedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  cancelRequestedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  errorMessage?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
+  logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
+  recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
 }
 
 export type LaunchCreateWithoutLogsInput = {
@@ -1345,6 +1504,7 @@ export type LaunchCreateWithoutLogsInput = {
   retryAttempts?: Prisma.LaunchCreateNestedManyWithoutRetriedFromLaunchInput
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutLogsInput = {
@@ -1372,6 +1532,7 @@ export type LaunchUncheckedCreateWithoutLogsInput = {
   updatedAt?: Date | string
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutLogsInput = {
@@ -1415,6 +1576,7 @@ export type LaunchUpdateWithoutLogsInput = {
   retryAttempts?: Prisma.LaunchUpdateManyWithoutRetriedFromLaunchNestedInput
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutLogsInput = {
@@ -1442,6 +1604,7 @@ export type LaunchUncheckedUpdateWithoutLogsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchCreateWithoutRecoveryWalletsInput = {
@@ -1469,6 +1632,7 @@ export type LaunchCreateWithoutRecoveryWalletsInput = {
   retryAttempts?: Prisma.LaunchCreateNestedManyWithoutRetriedFromLaunchInput
   token?: Prisma.TokenCreateNestedOneWithoutLaunchesInput
   logs?: Prisma.LaunchLogCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchUncheckedCreateWithoutRecoveryWalletsInput = {
@@ -1496,6 +1660,7 @@ export type LaunchUncheckedCreateWithoutRecoveryWalletsInput = {
   updatedAt?: Date | string
   retryAttempts?: Prisma.LaunchUncheckedCreateNestedManyWithoutRetriedFromLaunchInput
   logs?: Prisma.LaunchLogUncheckedCreateNestedManyWithoutLaunchInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedCreateNestedOneWithoutLaunchInput
 }
 
 export type LaunchCreateOrConnectWithoutRecoveryWalletsInput = {
@@ -1539,6 +1704,7 @@ export type LaunchUpdateWithoutRecoveryWalletsInput = {
   retryAttempts?: Prisma.LaunchUpdateManyWithoutRetriedFromLaunchNestedInput
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutRecoveryWalletsInput = {
@@ -1566,6 +1732,7 @@ export type LaunchUncheckedUpdateWithoutRecoveryWalletsInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchCreateManyUserInput = {
@@ -1617,6 +1784,7 @@ export type LaunchUpdateWithoutUserInput = {
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutUserInput = {
@@ -1644,6 +1812,7 @@ export type LaunchUncheckedUpdateWithoutUserInput = {
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateManyWithoutUserInput = {
@@ -1719,6 +1888,7 @@ export type LaunchUpdateWithoutTokenInput = {
   retryAttempts?: Prisma.LaunchUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutTokenInput = {
@@ -1746,6 +1916,7 @@ export type LaunchUncheckedUpdateWithoutTokenInput = {
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateManyWithoutTokenInput = {
@@ -1821,6 +1992,7 @@ export type LaunchUpdateWithoutRetriedFromLaunchInput = {
   token?: Prisma.TokenUpdateOneWithoutLaunchesNestedInput
   logs?: Prisma.LaunchLogUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateWithoutRetriedFromLaunchInput = {
@@ -1848,6 +2020,7 @@ export type LaunchUncheckedUpdateWithoutRetriedFromLaunchInput = {
   retryAttempts?: Prisma.LaunchUncheckedUpdateManyWithoutRetriedFromLaunchNestedInput
   logs?: Prisma.LaunchLogUncheckedUpdateManyWithoutLaunchNestedInput
   recoveryWallets?: Prisma.LaunchRecoveryWalletUncheckedUpdateManyWithoutLaunchNestedInput
+  plannedMint?: Prisma.LaunchPlannedMintUncheckedUpdateOneWithoutLaunchNestedInput
 }
 
 export type LaunchUncheckedUpdateManyWithoutRetriedFromLaunchInput = {
@@ -1952,6 +2125,7 @@ export type LaunchSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs =
   token?: boolean | Prisma.Launch$tokenArgs<ExtArgs>
   logs?: boolean | Prisma.Launch$logsArgs<ExtArgs>
   recoveryWallets?: boolean | Prisma.Launch$recoveryWalletsArgs<ExtArgs>
+  plannedMint?: boolean | Prisma.Launch$plannedMintArgs<ExtArgs>
   _count?: boolean | Prisma.LaunchCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["launch"]>
 
@@ -2044,6 +2218,7 @@ export type LaunchInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs 
   token?: boolean | Prisma.Launch$tokenArgs<ExtArgs>
   logs?: boolean | Prisma.Launch$logsArgs<ExtArgs>
   recoveryWallets?: boolean | Prisma.Launch$recoveryWalletsArgs<ExtArgs>
+  plannedMint?: boolean | Prisma.Launch$plannedMintArgs<ExtArgs>
   _count?: boolean | Prisma.LaunchCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type LaunchIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
@@ -2066,6 +2241,10 @@ export type $LaunchPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs
     token: Prisma.$TokenPayload<ExtArgs> | null
     logs: Prisma.$LaunchLogPayload<ExtArgs>[]
     recoveryWallets: Prisma.$LaunchRecoveryWalletPayload<ExtArgs>[]
+    /**
+     * Plan-time mint identity (vanity pool or fresh key). Secrets stay here, never in Launch.plan.
+     */
+    plannedMint: Prisma.$LaunchPlannedMintPayload<ExtArgs> | null
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -2499,6 +2678,7 @@ export interface Prisma__LaunchClient<T, Null = never, ExtArgs extends runtime.T
   token<T extends Prisma.Launch$tokenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Launch$tokenArgs<ExtArgs>>): Prisma.Prisma__TokenClient<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   logs<T extends Prisma.Launch$logsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Launch$logsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchLogPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   recoveryWallets<T extends Prisma.Launch$recoveryWalletsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Launch$recoveryWalletsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchRecoveryWalletPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
+  plannedMint<T extends Prisma.Launch$plannedMintArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.Launch$plannedMintArgs<ExtArgs>>): Prisma.Prisma__LaunchPlannedMintClient<runtime.Types.Result.GetResult<Prisma.$LaunchPlannedMintPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -3053,6 +3233,25 @@ export type Launch$recoveryWalletsArgs<ExtArgs extends runtime.Types.Extensions.
   take?: number
   skip?: number
   distinct?: Prisma.LaunchRecoveryWalletScalarFieldEnum | Prisma.LaunchRecoveryWalletScalarFieldEnum[]
+}
+
+/**
+ * Launch.plannedMint
+ */
+export type Launch$plannedMintArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LaunchPlannedMint
+   */
+  select?: Prisma.LaunchPlannedMintSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LaunchPlannedMint
+   */
+  omit?: Prisma.LaunchPlannedMintOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LaunchPlannedMintInclude<ExtArgs> | null
+  where?: Prisma.LaunchPlannedMintWhereInput
 }
 
 /**

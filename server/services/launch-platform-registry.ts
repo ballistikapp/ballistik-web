@@ -84,9 +84,8 @@ export type LaunchPlatformRecoverResult = {
   }>;
 };
 
-/** Local reservations / key refs created during planning that need compensation. */
+/** Platform-local key refs created during planning that need compensation. */
 export type LaunchPlatformPlanLocalResources = {
-  reservedVanityMintId: string | null;
   createdWalletPublicKeys: string[];
 };
 

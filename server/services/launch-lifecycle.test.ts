@@ -113,6 +113,24 @@ function createFakePlatform(handlers: {
   };
 }
 
+function stubMaterializeOptions(): NonNullable<
+  LaunchLifecycleDeps["materializeLaunchOptionsOutcomes"]
+> {
+  return async ({ options }) => ({
+    optionsOutcomes: {
+      vanityMint: options.vanityMint,
+      removeAttribution: options.removeAttribution,
+      mintPublicKey: "Mint111111111111111111111111111111111111111",
+      plannedMintId: "planned-mint-1",
+      reservedVanityMintId: null,
+    },
+    localResources: {
+      plannedMintId: "planned-mint-1",
+      reservedVanityMintId: null,
+    },
+  });
+}
+
 function baseDeps(
   overrides: Partial<LaunchLifecycleDeps> & {
     resolvePlatform: LaunchLifecycleDeps["resolvePlatform"];
@@ -137,6 +155,8 @@ function baseDeps(
     collectUsageFee: async () => {
       throw new Error("fees should not run");
     },
+    materializeLaunchOptionsOutcomes: stubMaterializeOptions(),
+    compensateLaunchOptionsResources: async () => undefined,
     ...overrides,
   };
 }
@@ -239,6 +259,10 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
 
   const events: string[] = [];
   let finalStatus: string | null = null;
+  let compensatedOptions: {
+    plannedMintId: string | null;
+    reservedVanityMintId: string | null;
+  } | null = null;
 
   const lifecycle = createLaunchLifecycle(
     baseDeps({
@@ -256,7 +280,6 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
               mainWalletBalanceLamports:
                 planned.opaque.mainWalletBalanceLamports,
               localResources: {
-                reservedVanityMintId: null,
                 createdWalletPublicKeys: ["Wallet111"],
               },
             };
@@ -266,11 +289,14 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
             return { kind: "canceled" };
           },
           compensatePlanResources: async (_ctx, resources) => {
-            events.push("compensate");
-            assert.equal(resources.reservedVanityMintId, null);
+            events.push("compensate-platform");
             assert.deepEqual(resources.createdWalletPublicKeys, ["Wallet111"]);
           },
         }),
+      compensateLaunchOptionsResources: async (resources) => {
+        events.push("compensate-options");
+        compensatedOptions = resources ?? null;
+      },
       persistPlan: async () => {
         events.push("persist");
         throw new Error("db write failed");
@@ -283,7 +309,15 @@ test("lifecycle compensates and marks FAILED when plan persistence fails", async
 
   await lifecycle.runPlatformExecution("launch-1");
 
-  assert.deepEqual(events, ["persist", "compensate"]);
+  assert.deepEqual(events, [
+    "persist",
+    "compensate-options",
+    "compensate-platform",
+  ]);
+  assert.deepEqual(compensatedOptions, {
+    plannedMintId: "planned-mint-1",
+    reservedVanityMintId: null,
+  });
   assert.equal(finalStatus, "FAILED");
 });
 

@@ -25,6 +25,59 @@ function stubServerOnlyModule() {
   } as unknown as NodeJS.Module;
 }
 
+function sampleCostPreview(overrides: {
+  platformFeeWaived?: boolean;
+  platformFeeDiscountRate?: number;
+  requiredMainWalletLamports?: string;
+  usageFeesSol?: number;
+} = {}) {
+  return {
+    platformFeeWaived: overrides.platformFeeWaived ?? true,
+    platformFeeDiscountRate: overrides.platformFeeDiscountRate ?? 1,
+    mainWalletBalanceSol: 5,
+    mainWalletBalanceLamports: "5000000000",
+    requiredMainWalletSol: 1,
+    requiredMainWalletLamports:
+      overrides.requiredMainWalletLamports ?? "1000000000",
+    hasSufficientMainWallet: true,
+    chargedNowSol: 1,
+    temporaryFundingSol: 0.4,
+    expectedReturnSol: 0.25,
+    permanentSpendSol: 0.75,
+    netMainWalletDeltaNowSol: 1,
+    netMainWalletDeltaAfterCleanupSol: 0.75,
+    lineItems: {
+      usageFeesSol: overrides.usageFeesSol ?? 0,
+      descriptionAttributionRemovalFeeSol: 0,
+      bundleBuyFeeSol: 0,
+      vanityMintFeeSol: 0,
+      generatedWalletCount: 0,
+      generatedWalletsBilledForFeeCount: 0,
+      generatedWalletFeeSol: 0,
+      nonSystemDevWalletFeeSol: 0,
+      devBuySol: 0.5,
+      bundleBuyBaseSol: 0,
+      bundleBuyMaxSol: 0,
+      bundleBuyVarianceReserveSol: 0,
+      creatorReserveSol: 0.1,
+      jitoTipSol: 0,
+      walletFundingTopUpSol: 0.4,
+      mainReserveSol: 0.5,
+      buyWalletReserveSol: 0,
+      creatorTargetSol: 0.6,
+      devFundingSol: 0,
+      bundlerFundingPerWalletSol: 0,
+      totalBundlerFundingSol: 0,
+      transferReserveSol: 0.01,
+      ataRentSol: 0.002,
+      userVolumeAccumulatorRentSol: 0.001,
+      buyRentPerWalletSol: 0.003,
+      distributionAtaPerBundlerSol: 0,
+      totalDistributionAtaSol: 0,
+    },
+  };
+}
+
 test("previewCosts routes through Platform preview and returns the review envelope", async () => {
   stubServerOnlyModule();
   const { createPumpfunPlatformModule } = await import(
@@ -37,50 +90,7 @@ test("previewCosts routes through Platform preview and returns the review envelo
 
   __setLaunchPlatformRegistryForTests({
     PUMPFUN: createPumpfunPlatformModule({
-      calculateCostPreview: async () => ({
-        platformFeeWaived: true,
-        platformFeeDiscountRate: 1,
-        mainWalletBalanceSol: 5,
-        mainWalletBalanceLamports: "5000000000",
-        requiredMainWalletSol: 1,
-        requiredMainWalletLamports: "1000000000",
-        hasSufficientMainWallet: true,
-        chargedNowSol: 1,
-        temporaryFundingSol: 0.4,
-        expectedReturnSol: 0.25,
-        permanentSpendSol: 0.75,
-        netMainWalletDeltaNowSol: 1,
-        netMainWalletDeltaAfterCleanupSol: 0.75,
-        lineItems: {
-          usageFeesSol: 0,
-          descriptionAttributionRemovalFeeSol: 0,
-          bundleBuyFeeSol: 0,
-          vanityMintFeeSol: 0,
-          generatedWalletCount: 0,
-          generatedWalletsBilledForFeeCount: 0,
-          generatedWalletFeeSol: 0,
-          nonSystemDevWalletFeeSol: 0,
-          devBuySol: 0.5,
-          bundleBuyBaseSol: 0,
-          bundleBuyMaxSol: 0,
-          bundleBuyVarianceReserveSol: 0,
-          creatorReserveSol: 0.1,
-          jitoTipSol: 0,
-          walletFundingTopUpSol: 0.4,
-          mainReserveSol: 0.5,
-          buyWalletReserveSol: 0,
-          creatorTargetSol: 0.6,
-          devFundingSol: 0,
-          bundlerFundingPerWalletSol: 0,
-          totalBundlerFundingSol: 0,
-          transferReserveSol: 0.01,
-          ataRentSol: 0.002,
-          userVolumeAccumulatorRentSol: 0.001,
-          buyRentPerWalletSol: 0.003,
-          distributionAtaPerBundlerSol: 0,
-          totalDistributionAtaSol: 0,
-        },
-      }),
+      calculateCostPreview: async () => sampleCostPreview(),
     }),
   });
 
@@ -115,6 +125,96 @@ test("previewCosts routes through Platform preview and returns the review envelo
     assert.equal(parsed.hasSufficientMainWallet, true);
     assert.equal(parsed.money.immediateRequiredBalanceLamports, "1000000000");
     assert.equal(parsed.money.usageFeeLamports, "0");
+  } finally {
+    __setLaunchPlatformRegistryForTests(null);
+  }
+});
+
+test("previewCosts composes Launch Options fees above Platform preview", async () => {
+  stubServerOnlyModule();
+  const { vanityMintFeeSol } = await import("@/lib/config/usage-fees.config");
+  const { solToLamportsString } = await import("@/lib/launch/lamports");
+  const { PUMPFUN_MONEY_LINE_LABELS } = await import(
+    "@/lib/launch/money-labels"
+  );
+  const { createPumpfunPlatformModule } = await import(
+    "./launch-platform-pumpfun"
+  );
+  const { __setLaunchPlatformRegistryForTests } = await import(
+    "./launch-platform-registry"
+  );
+  const { launchService } = await import("./launch.service");
+
+  __setLaunchPlatformRegistryForTests({
+    PUMPFUN: createPumpfunPlatformModule({
+      calculateCostPreview: async () =>
+        sampleCostPreview({
+          platformFeeWaived: false,
+          platformFeeDiscountRate: 0,
+          requiredMainWalletLamports: "1000000000",
+          usageFeesSol: 0,
+        }),
+    }),
+  });
+
+  try {
+    const input = versionedLaunchPreviewInputSchema.parse({
+      schemaVersion: LAUNCH_INPUT_SCHEMA_VERSION_V1,
+      platform: "PUMPFUN",
+      options: {
+        vanityMint: true,
+        removeAttribution: false,
+      },
+      config: {
+        devWalletOption: "generate",
+        devBuyAmountSol: 0.5,
+        jitoTipAmountSol: 0,
+        bundleBuyEnabled: false,
+        mayhemMode: false,
+        bundlerWalletCount: 0,
+        bundlerBuyAmountSol: 0.05,
+        bundlerBuyVariancePercent: 0,
+        distributionWalletMultiplier: 1,
+      },
+    });
+
+    const platformOnly = await createPumpfunPlatformModule({
+      calculateCostPreview: async () =>
+        sampleCostPreview({
+          platformFeeWaived: false,
+          platformFeeDiscountRate: 0,
+          requiredMainWalletLamports: "1000000000",
+          usageFeesSol: 0,
+        }),
+    }).preview(input, { user: { id: "user-1", plan: "FREE" } });
+
+    assert.equal(
+      platformOnly.money.immediateRequiredBalanceLamports,
+      "1000000000"
+    );
+    assert.equal(
+      platformOnly.money.lineItems.some(
+        (item) => item.label === PUMPFUN_MONEY_LINE_LABELS.vanityMintFee
+      ),
+      false
+    );
+
+    const result = await launchService.previewCosts(input, {
+      id: "user-1",
+      plan: "FREE",
+    });
+    const vanityLamports = solToLamportsString(vanityMintFeeSol);
+    assert.equal(
+      result.money.immediateRequiredBalanceLamports,
+      (BigInt("1000000000") + BigInt(vanityLamports)).toString()
+    );
+    assert.ok(
+      result.money.lineItems.some(
+        (item) =>
+          item.label === PUMPFUN_MONEY_LINE_LABELS.vanityMintFee &&
+          item.amountLamports === vanityLamports
+      )
+    );
   } finally {
     __setLaunchPlatformRegistryForTests(null);
   }

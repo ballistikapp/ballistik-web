@@ -270,14 +270,35 @@ test("launch plan envelope carries optionsOutcomes, money, and opaque platformPl
     optionsOutcomes: {
       vanityMint: true,
       removeAttribution: false,
+      mintPublicKey: "Mint333333333333333333333333333333333333333",
+      plannedMintId: "planned-mint-1",
       reservedVanityMintId: "vanity-1",
-      reservedVanityMintPublicKey: "Mint333333333333333333333333333333333333333",
     },
     money: validPumpfunPlan.money,
     platformPlan: validPumpfunPlan,
   });
   assert.equal(parsed.shellVersion, "1");
+  assert.equal(parsed.optionsOutcomes.plannedMintId, "planned-mint-1");
+  assert.equal(
+    parsed.optionsOutcomes.mintPublicKey,
+    "Mint333333333333333333333333333333333333333"
+  );
   assert.equal(parsed.optionsOutcomes.reservedVanityMintId, "vanity-1");
   assert.equal(parsed.money.usageFeeLamports, "0");
   assert.deepEqual(parsed.platformPlan, validPumpfunPlan);
+});
+
+test("optionsOutcomes requires mintPublicKey and plannedMintId", () => {
+  assert.throws(() =>
+    launchPlanEnvelopeV1Schema.parse({
+      shellVersion: "1",
+      optionsOutcomes: {
+        vanityMint: false,
+        removeAttribution: false,
+        reservedVanityMintId: null,
+      },
+      money: validPumpfunPlan.money,
+      platformPlan: validPumpfunPlan,
+    })
+  );
 });

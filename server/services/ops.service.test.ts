@@ -306,8 +306,9 @@ async function setupOpsTest(t: TestContext) {
           optionsOutcomes: {
             vanityMint: false,
             removeAttribution: false,
+            mintPublicKey: "Mint111111111111111111111111111111111111111",
+            plannedMintId: "planned-mint-1",
             reservedVanityMintId: null,
-            reservedVanityMintPublicKey: null,
           },
           money: SAFE_PUMPFUN_PLAN.money,
           platformPlan: {

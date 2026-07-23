@@ -1,8 +1,8 @@
 # Launch Platform Architecture Refactor
 
-Status: complete for tickets 01–17 (including Launch Options extraction) before production ship
+Status: complete for tickets 01–18 (including Launch Options extraction and planned-mint / fee locality finish) before production ship
 
-Ship rule: tickets `01`–`16` form the Platform refactor core. Ticket `17` corrects Launch Options / shared mint-identity locality before production. Intermediate tickets were allowed to break Launch; only the finished effort (including `17`) must be production-safe.
+Ship rule: tickets `01`–`16` form the Platform refactor core. Tickets `17`–`18` finish Launch Options / shared mint-identity locality (planned mint for every Launch, fee composition above Platform, envelope `money` authority) before production. Intermediate tickets were allowed to break Launch; only the finished effort (including `18`) must be production-safe.
 
 ## Problem Statement
 
@@ -117,13 +117,13 @@ SPL launching is not implemented by this effort. The backend will accept only th
 - **Explicit identity and versions**: Launch and Token records gain explicit Platform identity and nullable Platform/version markers. Existing records retain null versions and are legacy. New records use the first explicit version. Persisted input and plan payloads also carry schema versions owned by their Platform.
 - **Legacy policy**: Legacy Launches and Tokens are custody-safe read-only. History/detail reads, exits, reclaim, and permitted key access remain. Retry, clone, new buys, and automation are denied at a single eligibility seam with a user-safe explanation.
 - **Launch input**: New input is a discriminated structure with shared Token metadata, shared Launch Options (`vanityMint`, `removeAttribution`), a Platform discriminator, and a Platform-specific configuration object. Launch Options are Platform-agnostic and owned by the shared lifecycle. The pump.fun configuration holds venue settings only (creator wallet, buys, tips, Mayhem, distribution) and excludes the system dev-wallet option. Schema version `1` is revised in place for this shape (clean cut; refactor not yet in production).
-- **Launch Options ownership**: The shared lifecycle materializes mint identity for every Launch (vanity pool reserve or fresh mint key), applies Launch Attribution at publish over the user-authored description, and prices vanity/attribution usage fees into normalized money. Platforms consume those outcomes; they do not own those flags in Platform `config`.
-- **Plan envelope**: `Launch.plan` persists `{ shellVersion, optionsOutcomes, platformPlan }`. Vanity reservation ids and attribution policy live in `optionsOutcomes`, not in the pump plan `intendedEffects` / `opaque` payload.
+- **Launch Options ownership**: The shared lifecycle materializes mint identity for every Launch into `LaunchPlannedMint` (vanity pool reserve or fresh mint key at plan time), applies Launch Attribution at publish over the user-authored description, and prices vanity/attribution usage fees into normalized money via shared helpers above the Platform module. Platforms consume those outcomes; they do not own those flags in Platform `config` or compose options fees in Platform `preview`.
+- **Plan envelope**: `Launch.plan` persists `{ shellVersion, optionsOutcomes, money, platformPlan }`. `optionsOutcomes` always carries `mintPublicKey` + `plannedMintId` (plus vanity/attribution flags and nullable `reservedVanityMintId`). Envelope `money` is the only authoritative monetary summary; `platformPlan.money` is Platform-internal. Secrets never enter the envelope.
+- **Planning compensation**: Lifecycle abandons planned mints and releases vanity reservations on plan persist / insufficient-funds failure. Platform `compensatePlanResources` owns only Platform-local wallet key refs.
 - **Shared Platform interface**: The external Platform module interface has four independent operations: preview, plan, execute, and recover.
 - **Preview semantics**: Preview is side-effect-free, non-authoritative, and intended for funnel display. It returns a normalized monetary summary and line items.
 - **Planning semantics**: Planning validates Platform configuration, snapshots pricing/entitlements needed for the attempt, resolves exact allocations and identities, and produces a versioned immutable plan. It may create only unfunded local key references and reservations. It may not publish venue metadata, fund Wallets, or submit on-chain.
-- **Planning compensation**: If the plan cannot be durably persisted, any local key references/reservations created during planning are released or marked abandoned through Platform-owned compensation.
-- **Plan contents**: The persisted plan envelope contains Launch Options outcomes (mint identity / vanity reservation public fields, attribution policy), plus a Platform plan with public identities, Platform-specific role identifiers, exact allocations, normalized money, intended effects, recovery caps/policy, and opaque Platform payload. It never contains private keys or raw secret material.
+- **Plan contents**: The persisted plan envelope contains Launch Options outcomes (always `mintPublicKey` / `plannedMintId`, vanity/attribution policy), lifecycle-composed `money`, plus a Platform plan with public identities, Platform-specific role identifiers, exact allocations, Platform-internal money, intended effects, recovery caps/policy, and opaque Platform payload. It never contains private keys or raw secret material. Execute resolves mint secrets only via `plannedMintId`.
 - **Plan validation**: The shared lifecycle treats the Platform payload as opaque. The Platform implementation validates its versioned plan schema whenever persisted data re-enters execute or recover.
 - **Execution invariant**: The shared lifecycle persists the exact plan before execution. Execute cannot silently replan or alter allocations. Resource materialization must complete before funding, and funding must complete before venue submission according to Platform policy.
 - **Recovery invariant**: Recover reconstructs behavior from the persisted plan and persisted transaction evidence. It is not dependent on the original process or an in-memory capability object.
@@ -153,7 +153,7 @@ SPL launching is not implemented by this effort. The backend will accept only th
 - **Shared interface evolution**: Adding SPL is not required to leave every shared type untouched. It may sharpen normalized summaries, outcomes, or lifecycle contracts when concrete differences are known, but it must not reintroduce pump assumptions into the shared lifecycle.
 - **Implementation documentation**: Launch, bundle/Jito, pricing, Ops, Wallet/recovery, and project overview documentation must be updated with the new terms, lifecycle, invariants, and removed system path.
 - **Database rollout**: Agents modify the Prisma schema and regenerate the client when implementation reaches that stage. A human creates/runs/reviews migrations and any required data backfill.
-- **Production ship gate**: No application code from this effort is pushed to production until tickets `01`–`16` and follow-up `17` are complete. Intermediate tickets may leave Launch broken, half-routed, or dependent on transitional delegates. Do not add compatibility scaffolding, dual-path keepalives, or “keep main green” work solely to preserve production readiness between tickets. Staging/review branches may break; only the finished effort must be production-safe.
+- **Production ship gate**: No application code from this effort is pushed to production until tickets `01`–`18` are complete. Intermediate tickets may leave Launch broken, half-routed, or dependent on transitional delegates. Do not add compatibility scaffolding, dual-path keepalives, or “keep main green” work solely to preserve production readiness between tickets. Staging/review branches may break; only the finished effort must be production-safe.
 - **Delivery stages**:
   1. Add Platform/version/input contracts, legacy gating, normalized money types, and persistence fields without changing execution.
   2. Introduce shared lifecycle and Platform registry, then route current pump behavior through compatibility delegates.
@@ -163,6 +163,7 @@ SPL launching is not implemented by this effort. The backend will accept only th
   6. Split the funnel into shared and pump modules; separate Launch history from My Tokens and enforce legacy capabilities.
   7. Remove obsolete delegates/dead modules, update Ops projections and implementation documentation.
   8. Extract Launch Options from pump config; lifecycle-owned mint identity and plan envelope (ticket `17`).
+  9. Finish planned-mint entity for every Launch, execute-via-`plannedMintId`, lifecycle options compensation, and fee composition above Platform (ticket `18`).
 
 ## Testing Decisions
 

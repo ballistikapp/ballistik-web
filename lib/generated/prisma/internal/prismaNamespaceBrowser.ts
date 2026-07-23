@@ -64,6 +64,7 @@ export const ModelName = {
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
+  LaunchPlannedMint: 'LaunchPlannedMint',
   LaunchLog: 'LaunchLog',
   LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
@@ -296,6 +297,21 @@ export const LaunchScalarFieldEnum = {
 } as const
 
 export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
+
+
+export const LaunchPlannedMintScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  vanityMintId: 'vanityMintId',
+  consumedAt: 'consumedAt',
+  abandonedAt: 'abandonedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchPlannedMintScalarFieldEnum = (typeof LaunchPlannedMintScalarFieldEnum)[keyof typeof LaunchPlannedMintScalarFieldEnum]
 
 
 export const LaunchLogScalarFieldEnum = {

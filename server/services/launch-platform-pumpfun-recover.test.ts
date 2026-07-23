@@ -96,8 +96,9 @@ async function buildSamplePlan(): Promise<LaunchPlanEnvelopeV1> {
     optionsOutcomes: {
       vanityMint: false,
       removeAttribution: false,
+      mintPublicKey: "Mint111111111111111111111111111111111111111",
+      plannedMintId: "planned-mint-1",
       reservedVanityMintId: null,
-      reservedVanityMintPublicKey: null,
     },
     money: platformPlan.money,
     platformPlan,

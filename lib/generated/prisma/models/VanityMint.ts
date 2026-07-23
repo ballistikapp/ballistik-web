@@ -216,6 +216,7 @@ export type VanityMintWhereInput = {
   updatedAt?: Prisma.DateTimeFilter<"VanityMint"> | Date | string
   token?: Prisma.XOR<Prisma.TokenNullableScalarRelationFilter, Prisma.TokenWhereInput> | null
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
+  plannedMints?: Prisma.LaunchPlannedMintListRelationFilter
 }
 
 export type VanityMintOrderByWithRelationInput = {
@@ -230,6 +231,7 @@ export type VanityMintOrderByWithRelationInput = {
   updatedAt?: Prisma.SortOrder
   token?: Prisma.TokenOrderByWithRelationInput
   user?: Prisma.UserOrderByWithRelationInput
+  plannedMints?: Prisma.LaunchPlannedMintOrderByRelationAggregateInput
 }
 
 export type VanityMintWhereUniqueInput = Prisma.AtLeast<{
@@ -247,6 +249,7 @@ export type VanityMintWhereUniqueInput = Prisma.AtLeast<{
   updatedAt?: Prisma.DateTimeFilter<"VanityMint"> | Date | string
   token?: Prisma.XOR<Prisma.TokenNullableScalarRelationFilter, Prisma.TokenWhereInput> | null
   user?: Prisma.XOR<Prisma.UserNullableScalarRelationFilter, Prisma.UserWhereInput> | null
+  plannedMints?: Prisma.LaunchPlannedMintListRelationFilter
 }, "id" | "publicKey" | "privateKey">
 
 export type VanityMintOrderByWithAggregationInput = {
@@ -289,6 +292,7 @@ export type VanityMintCreateInput = {
   updatedAt?: Date | string
   token?: Prisma.TokenCreateNestedOneWithoutVanityMintsInput
   user?: Prisma.UserCreateNestedOneWithoutVanityMintsInput
+  plannedMints?: Prisma.LaunchPlannedMintCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintUncheckedCreateInput = {
@@ -301,6 +305,7 @@ export type VanityMintUncheckedCreateInput = {
   userId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintUpdateInput = {
@@ -313,6 +318,7 @@ export type VanityMintUpdateInput = {
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   token?: Prisma.TokenUpdateOneWithoutVanityMintsNestedInput
   user?: Prisma.UserUpdateOneWithoutVanityMintsNestedInput
+  plannedMints?: Prisma.LaunchPlannedMintUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintUncheckedUpdateInput = {
@@ -325,6 +331,7 @@ export type VanityMintUncheckedUpdateInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintCreateManyInput = {
@@ -369,6 +376,11 @@ export type VanityMintListRelationFilter = {
 
 export type VanityMintOrderByRelationAggregateInput = {
   _count?: Prisma.SortOrder
+}
+
+export type VanityMintNullableScalarRelationFilter = {
+  is?: Prisma.VanityMintWhereInput | null
+  isNot?: Prisma.VanityMintWhereInput | null
 }
 
 export type VanityMintCountOrderByAggregateInput = {
@@ -491,6 +503,22 @@ export type VanityMintUncheckedUpdateManyWithoutTokenNestedInput = {
   deleteMany?: Prisma.VanityMintScalarWhereInput | Prisma.VanityMintScalarWhereInput[]
 }
 
+export type VanityMintCreateNestedOneWithoutPlannedMintsInput = {
+  create?: Prisma.XOR<Prisma.VanityMintCreateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedCreateWithoutPlannedMintsInput>
+  connectOrCreate?: Prisma.VanityMintCreateOrConnectWithoutPlannedMintsInput
+  connect?: Prisma.VanityMintWhereUniqueInput
+}
+
+export type VanityMintUpdateOneWithoutPlannedMintsNestedInput = {
+  create?: Prisma.XOR<Prisma.VanityMintCreateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedCreateWithoutPlannedMintsInput>
+  connectOrCreate?: Prisma.VanityMintCreateOrConnectWithoutPlannedMintsInput
+  upsert?: Prisma.VanityMintUpsertWithoutPlannedMintsInput
+  disconnect?: Prisma.VanityMintWhereInput | boolean
+  delete?: Prisma.VanityMintWhereInput | boolean
+  connect?: Prisma.VanityMintWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.VanityMintUpdateToOneWithWhereWithoutPlannedMintsInput, Prisma.VanityMintUpdateWithoutPlannedMintsInput>, Prisma.VanityMintUncheckedUpdateWithoutPlannedMintsInput>
+}
+
 export type VanityMintCreateWithoutUserInput = {
   id?: string
   publicKey: string
@@ -500,6 +528,7 @@ export type VanityMintCreateWithoutUserInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   token?: Prisma.TokenCreateNestedOneWithoutVanityMintsInput
+  plannedMints?: Prisma.LaunchPlannedMintCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintUncheckedCreateWithoutUserInput = {
@@ -511,6 +540,7 @@ export type VanityMintUncheckedCreateWithoutUserInput = {
   tokenPublicKey?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintCreateOrConnectWithoutUserInput = {
@@ -563,6 +593,7 @@ export type VanityMintCreateWithoutTokenInput = {
   createdAt?: Date | string
   updatedAt?: Date | string
   user?: Prisma.UserCreateNestedOneWithoutVanityMintsInput
+  plannedMints?: Prisma.LaunchPlannedMintCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintUncheckedCreateWithoutTokenInput = {
@@ -574,6 +605,7 @@ export type VanityMintUncheckedCreateWithoutTokenInput = {
   userId?: string | null
   createdAt?: Date | string
   updatedAt?: Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedCreateNestedManyWithoutVanityMintInput
 }
 
 export type VanityMintCreateOrConnectWithoutTokenInput = {
@@ -602,6 +634,70 @@ export type VanityMintUpdateManyWithWhereWithoutTokenInput = {
   data: Prisma.XOR<Prisma.VanityMintUpdateManyMutationInput, Prisma.VanityMintUncheckedUpdateManyWithoutTokenInput>
 }
 
+export type VanityMintCreateWithoutPlannedMintsInput = {
+  id?: string
+  publicKey: string
+  privateKey: string
+  reservedAt?: Date | string | null
+  usedAt?: Date | string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  token?: Prisma.TokenCreateNestedOneWithoutVanityMintsInput
+  user?: Prisma.UserCreateNestedOneWithoutVanityMintsInput
+}
+
+export type VanityMintUncheckedCreateWithoutPlannedMintsInput = {
+  id?: string
+  publicKey: string
+  privateKey: string
+  reservedAt?: Date | string | null
+  usedAt?: Date | string | null
+  tokenPublicKey?: string | null
+  userId?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+}
+
+export type VanityMintCreateOrConnectWithoutPlannedMintsInput = {
+  where: Prisma.VanityMintWhereUniqueInput
+  create: Prisma.XOR<Prisma.VanityMintCreateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedCreateWithoutPlannedMintsInput>
+}
+
+export type VanityMintUpsertWithoutPlannedMintsInput = {
+  update: Prisma.XOR<Prisma.VanityMintUpdateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedUpdateWithoutPlannedMintsInput>
+  create: Prisma.XOR<Prisma.VanityMintCreateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedCreateWithoutPlannedMintsInput>
+  where?: Prisma.VanityMintWhereInput
+}
+
+export type VanityMintUpdateToOneWithWhereWithoutPlannedMintsInput = {
+  where?: Prisma.VanityMintWhereInput
+  data: Prisma.XOR<Prisma.VanityMintUpdateWithoutPlannedMintsInput, Prisma.VanityMintUncheckedUpdateWithoutPlannedMintsInput>
+}
+
+export type VanityMintUpdateWithoutPlannedMintsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  reservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  usedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  token?: Prisma.TokenUpdateOneWithoutVanityMintsNestedInput
+  user?: Prisma.UserUpdateOneWithoutVanityMintsNestedInput
+}
+
+export type VanityMintUncheckedUpdateWithoutPlannedMintsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  publicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  privateKey?: Prisma.StringFieldUpdateOperationsInput | string
+  reservedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  usedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+}
+
 export type VanityMintCreateManyUserInput = {
   id?: string
   publicKey: string
@@ -622,6 +718,7 @@ export type VanityMintUpdateWithoutUserInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   token?: Prisma.TokenUpdateOneWithoutVanityMintsNestedInput
+  plannedMints?: Prisma.LaunchPlannedMintUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintUncheckedUpdateWithoutUserInput = {
@@ -633,6 +730,7 @@ export type VanityMintUncheckedUpdateWithoutUserInput = {
   tokenPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintUncheckedUpdateManyWithoutUserInput = {
@@ -666,6 +764,7 @@ export type VanityMintUpdateWithoutTokenInput = {
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   user?: Prisma.UserUpdateOneWithoutVanityMintsNestedInput
+  plannedMints?: Prisma.LaunchPlannedMintUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintUncheckedUpdateWithoutTokenInput = {
@@ -677,6 +776,7 @@ export type VanityMintUncheckedUpdateWithoutTokenInput = {
   userId?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
   updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  plannedMints?: Prisma.LaunchPlannedMintUncheckedUpdateManyWithoutVanityMintNestedInput
 }
 
 export type VanityMintUncheckedUpdateManyWithoutTokenInput = {
@@ -691,6 +791,35 @@ export type VanityMintUncheckedUpdateManyWithoutTokenInput = {
 }
 
 
+/**
+ * Count Type VanityMintCountOutputType
+ */
+
+export type VanityMintCountOutputType = {
+  plannedMints: number
+}
+
+export type VanityMintCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  plannedMints?: boolean | VanityMintCountOutputTypeCountPlannedMintsArgs
+}
+
+/**
+ * VanityMintCountOutputType without action
+ */
+export type VanityMintCountOutputTypeDefaultArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the VanityMintCountOutputType
+   */
+  select?: Prisma.VanityMintCountOutputTypeSelect<ExtArgs> | null
+}
+
+/**
+ * VanityMintCountOutputType without action
+ */
+export type VanityMintCountOutputTypeCountPlannedMintsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.LaunchPlannedMintWhereInput
+}
+
 
 export type VanityMintSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
   id?: boolean
@@ -704,6 +833,8 @@ export type VanityMintSelect<ExtArgs extends runtime.Types.Extensions.InternalAr
   updatedAt?: boolean
   token?: boolean | Prisma.VanityMint$tokenArgs<ExtArgs>
   user?: boolean | Prisma.VanityMint$userArgs<ExtArgs>
+  plannedMints?: boolean | Prisma.VanityMint$plannedMintsArgs<ExtArgs>
+  _count?: boolean | Prisma.VanityMintCountOutputTypeDefaultArgs<ExtArgs>
 }, ExtArgs["result"]["vanityMint"]>
 
 export type VanityMintSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetSelect<{
@@ -750,6 +881,8 @@ export type VanityMintOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs
 export type VanityMintInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   token?: boolean | Prisma.VanityMint$tokenArgs<ExtArgs>
   user?: boolean | Prisma.VanityMint$userArgs<ExtArgs>
+  plannedMints?: boolean | Prisma.VanityMint$plannedMintsArgs<ExtArgs>
+  _count?: boolean | Prisma.VanityMintCountOutputTypeDefaultArgs<ExtArgs>
 }
 export type VanityMintIncludeCreateManyAndReturn<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   token?: boolean | Prisma.VanityMint$tokenArgs<ExtArgs>
@@ -765,6 +898,7 @@ export type $VanityMintPayload<ExtArgs extends runtime.Types.Extensions.Internal
   objects: {
     token: Prisma.$TokenPayload<ExtArgs> | null
     user: Prisma.$UserPayload<ExtArgs> | null
+    plannedMints: Prisma.$LaunchPlannedMintPayload<ExtArgs>[]
   }
   scalars: runtime.Types.Extensions.GetPayloadResult<{
     id: string
@@ -1172,6 +1306,7 @@ export interface Prisma__VanityMintClient<T, Null = never, ExtArgs extends runti
   readonly [Symbol.toStringTag]: "PrismaPromise"
   token<T extends Prisma.VanityMint$tokenArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.VanityMint$tokenArgs<ExtArgs>>): Prisma.Prisma__TokenClient<runtime.Types.Result.GetResult<Prisma.$TokenPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   user<T extends Prisma.VanityMint$userArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.VanityMint$userArgs<ExtArgs>>): Prisma.Prisma__UserClient<runtime.Types.Result.GetResult<Prisma.$UserPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  plannedMints<T extends Prisma.VanityMint$plannedMintsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.VanityMint$plannedMintsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$LaunchPlannedMintPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
    * Attaches callbacks for the resolution and/or rejection of the Promise.
    * @param onfulfilled The callback to execute when the Promise is resolved.
@@ -1641,6 +1776,30 @@ export type VanityMint$userArgs<ExtArgs extends runtime.Types.Extensions.Interna
    */
   include?: Prisma.UserInclude<ExtArgs> | null
   where?: Prisma.UserWhereInput
+}
+
+/**
+ * VanityMint.plannedMints
+ */
+export type VanityMint$plannedMintsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the LaunchPlannedMint
+   */
+  select?: Prisma.LaunchPlannedMintSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the LaunchPlannedMint
+   */
+  omit?: Prisma.LaunchPlannedMintOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.LaunchPlannedMintInclude<ExtArgs> | null
+  where?: Prisma.LaunchPlannedMintWhereInput
+  orderBy?: Prisma.LaunchPlannedMintOrderByWithRelationInput | Prisma.LaunchPlannedMintOrderByWithRelationInput[]
+  cursor?: Prisma.LaunchPlannedMintWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.LaunchPlannedMintScalarFieldEnum | Prisma.LaunchPlannedMintScalarFieldEnum[]
 }
 
 /**

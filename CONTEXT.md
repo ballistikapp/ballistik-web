@@ -49,8 +49,12 @@ The Ballistik product line appended to a Token description at publish time unles
 _Avoid_: Attribution (alone), pump attribution, description footer
 
 **Vanity Mint**:
-A mint keypair reserved from Ballistik’s pool so the Token address matches a vanity pattern. Requested through Launch Options; mint identity is chosen by the shared lifecycle for every Launch (pool reserve or a fresh key), then consumed by the selected Platform.
+A mint keypair reserved from Ballistik’s pool so the Token address matches a vanity pattern. Requested through Launch Options; the shared lifecycle materializes mint identity for every Launch into a planned-mint record (pool reserve or a fresh key at plan time), then Platforms consume that planned identity at execute.
 _Avoid_: custom mint, grinded address, pump vanity (when referring to the cross-Platform intent)
+
+**Planned Mint**:
+The durable per-Launch mint identity materialized at plan time (`LaunchPlannedMint`), holding the secret key and optional vanity-pool link. Public fields appear in plan `optionsOutcomes` (`mintPublicKey`, `plannedMintId`); secrets never enter the plan envelope.
+_Avoid_: Wallet (for mint secrets), VanityMint (when referring to the per-Launch planned row rather than the pool)
 
 **Marketer**:
 A User designated by an Operator in the Ops Console with a fee-share rate (0–1) that applies to every User they refer. The live rate at each fee collection is what matters — not the rate at signup. The Marketer chooses and may change their referral code; a code change invalidates prior share links, but existing Referrals stay attached. An Operator-only nickname labels the Marketer for Ops memory; it is not the referral code. When an Operator disables a Marketer, their code stops attributing new Users and existing Referrals stop producing Referral Payouts; past payouts remain.
