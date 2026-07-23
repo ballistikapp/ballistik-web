@@ -56,6 +56,6 @@ export const LANDING_FAQ_ITEMS: readonly LandingFaqItem[] = [
   },
   {
     question: "How do Marketers earn from referrals?",
-    answer: `Marketers earn a share of referred Users' platform payments (usage fees and subscriptions), sent to a fee-collector wallet the Marketer configures. Exact share rates stay Operator-owned and are not listed on this page.`,
+    answer: `Marketers earn a share of referred Users' platform payments (usage fees and subscriptions). Exact share rates stay Operator-owned and are not listed on this page.`,
   },
 ];

@@ -449,9 +449,10 @@ export function LandingPage() {
             viewport={{ once: true, margin: "-100px" }}
             transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
           >
-            Refer new Users to {SITE_BRAND_NAME}. Approved Marketers earn a share
-            of referred Users&apos; platform spend. Apply in the app after you
-            sign in — Operators set share rates; they are not listed here.
+            The {SITE_BRAND_NAME} affiliate program lets approved Marketers earn
+            a share of referred Users&apos; platform spend. Sign in, open
+            Referrals, and submit a Marketer Application — Operators set share
+            rates; they are not listed here.
           </motion.p>
           <motion.div
             className="flex justify-center"
@@ -549,12 +550,6 @@ export function LandingPage() {
               className="hover:text-neutral-300 transition-colors"
             >
               Pricing
-            </Link>
-            <Link
-              href="#affiliate"
-              className="hover:text-neutral-300 transition-colors"
-            >
-              Affiliate
             </Link>
             <Link
               href="#faq"
