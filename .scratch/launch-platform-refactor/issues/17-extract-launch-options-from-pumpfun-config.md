@@ -19,6 +19,9 @@
 
 ## Comments
 
+### Follow-up (UI 2026-07-23)
+- Funnel UI later moved Mayhem under **Launch Options** via a platform-options slot and removed the standalone “pump.fun Configuration” section. Domain/API split unchanged: vanity/attribution stay in `options`; Mayhem stays in pump `config`. Dev Wallet / Bundler remain separate sections.
+
 ### Decisions (grilling 2026-07-21)
 - Domain + UI + contract (not UI-only).
 - Attribution is its own product concern (not metadata, not vanity); both live in one pragmatic `options` bag named **Launch Options**.

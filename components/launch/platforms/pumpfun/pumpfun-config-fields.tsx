@@ -1,6 +1,5 @@
 "use client";
 
-import type { ReactNode } from "react";
 import {
   ChevronRight,
   Import,
@@ -22,6 +21,7 @@ import type {
   FunnelFieldState,
   LaunchFunnelFormApi,
 } from "@/components/launch/use-launch-funnel-form";
+import { LaunchFeeBadge } from "@/components/launch/shared/launch-fee-badge";
 import {
   Collapsible,
   CollapsibleContent,
@@ -34,13 +34,16 @@ import {
   FieldLabel,
 } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import {
   Tooltip,
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  bundleBuyFeeSol,
+  generatedWalletFeeSol,
+} from "@/lib/config/usage-fees.config";
 import { cn } from "@/lib/utils";
 
 type PumpfunConfigFieldsProps = {
@@ -48,72 +51,12 @@ type PumpfunConfigFieldsProps = {
   getIsInvalid: (field: FunnelFieldState) => boolean;
 };
 
-function ConfigToggle({
-  id,
-  label,
-  tooltip,
-  children,
-}: {
-  id: string;
-  label: string;
-  tooltip: ReactNode;
-  children: ReactNode;
-}) {
-  return (
-    <div className="flex items-center space-x-3 pt-1">
-      {children}
-      <div className="flex items-center gap-2">
-        <Label htmlFor={id}>{label}</Label>
-        <Tooltip>
-          <TooltipTrigger type="button">
-            <Info className="h-4 w-4 text-muted-foreground" />
-          </TooltipTrigger>
-          <TooltipContent className="max-w-xs">{tooltip}</TooltipContent>
-        </Tooltip>
-      </div>
-    </div>
-  );
-}
-
 export function PumpfunConfigFields({
   form,
   getIsInvalid,
 }: PumpfunConfigFieldsProps) {
   return (
     <>
-      <section id="pumpfun-configuration" className="scroll-mt-4">
-        <PageSection>
-          <PageSectionHeader title="pump.fun Configuration" />
-          <div className="space-y-3">
-            <form.Field name="config.mayhemMode">
-              {(field) => (
-                <ConfigToggle
-                  id="mayhem-mode"
-                  label="Mayhem Mode"
-                  tooltip={
-                    <>
-                      Adds a pump.fun AI trading agent for the token&apos;s first
-                      24 hours. Uses Token-2022 and is immutable once launched.{" "}
-                      <span className="font-medium text-amber-500">
-                        Beta; pump.fun may disable it at any time.
-                      </span>
-                    </>
-                  }
-                >
-                  <Switch
-                    id="mayhem-mode"
-                    checked={field.state.value}
-                    onCheckedChange={field.handleChange}
-                  />
-                </ConfigToggle>
-              )}
-            </form.Field>
-          </div>
-        </PageSection>
-      </section>
-
-      <PageSectionDivider />
-
       <section id="launch-settings" className="scroll-mt-4">
         <PageSection>
           <PageSectionHeader title="Dev Wallet Settings" />
@@ -245,6 +188,7 @@ export function PumpfunConfigFields({
             className="flex-row items-center justify-between gap-3"
             meta={
               <div className="flex items-center gap-2">
+                <LaunchFeeBadge amountSol={bundleBuyFeeSol} />
                 <Tooltip>
                   <TooltipTrigger type="button">
                     <Info className="h-4 w-4 text-muted-foreground" />
@@ -289,9 +233,15 @@ export function PumpfunConfigFields({
                         const isInvalid = getIsInvalid(field);
                         return (
                           <Field data-invalid={isInvalid}>
-                            <FieldLabel htmlFor={field.name}>
-                              Number of Wallets
-                            </FieldLabel>
+                            <div className="flex items-center gap-2">
+                              <FieldLabel htmlFor={field.name}>
+                                Number of Wallets
+                              </FieldLabel>
+                              <LaunchFeeBadge
+                                amountSol={generatedWalletFeeSol}
+                                per="wallet"
+                              />
+                            </div>
                             <Input
                               id={field.name}
                               type="number"

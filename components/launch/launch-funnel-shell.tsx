@@ -15,6 +15,7 @@ import {
   buildVersionedLaunchPreviewInput,
 } from "@/components/launch/build-versioned-launch-payload";
 import { PumpfunConfigFields } from "@/components/launch/platforms/pumpfun/pumpfun-config-fields";
+import { PumpfunMayhemField } from "@/components/launch/platforms/pumpfun/pumpfun-mayhem-field";
 import { mapFlatInitialToLaunchFunnelValues } from "@/components/launch/platforms/pumpfun/map-flat-initial-values";
 import { LaunchOptionsFields } from "@/components/launch/shared/launch-options-fields";
 import { LaunchReviewSection } from "@/components/launch/shared/launch-review-section";
@@ -462,7 +463,14 @@ export function LaunchFunnelShell({
         </section>
         <PageSectionDivider />
 
-        <LaunchOptionsFields form={form} />
+        <LaunchOptionsFields
+          form={form}
+          platformOptions={
+            values.platform === "PUMPFUN" ? (
+              <PumpfunMayhemField form={form} />
+            ) : undefined
+          }
+        />
         <PageSectionDivider />
 
         {values.platform === "PUMPFUN" && (

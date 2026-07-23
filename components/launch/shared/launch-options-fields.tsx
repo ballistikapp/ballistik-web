@@ -2,10 +2,8 @@
 
 import type { ReactNode } from "react";
 import { Info } from "lucide-react";
-import {
-  PageSection,
-  PageSectionHeader,
-} from "@/components/layout/sections";
+import { PageSection, PageSectionHeader } from "@/components/layout/sections";
+import { LaunchFeeBadge } from "@/components/launch/shared/launch-fee-badge";
 import type {
   FunnelFieldState,
   LaunchFunnelFormApi,
@@ -17,21 +15,29 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  descriptionAttributionRemovalFeeSol,
+  vanityMintFeeSol,
+} from "@/lib/config/usage-fees.config";
 
 type LaunchOptionsFieldsProps = {
   form: LaunchFunnelFormApi;
   getIsInvalid?: (field: FunnelFieldState) => boolean;
+  /** Platform-specific toggles rendered after shared Launch Options. */
+  platformOptions?: ReactNode;
 };
 
 function OptionsToggle({
   id,
   label,
   tooltip,
+  feeSol,
   children,
 }: {
   id: string;
   label: string;
   tooltip: ReactNode;
+  feeSol?: number;
   children: ReactNode;
 }) {
   return (
@@ -39,6 +45,7 @@ function OptionsToggle({
       {children}
       <div className="flex items-center gap-2">
         <Label htmlFor={id}>{label}</Label>
+        {feeSol != null && <LaunchFeeBadge amountSol={feeSol} />}
         <Tooltip>
           <TooltipTrigger type="button">
             <Info className="h-4 w-4 text-muted-foreground" />
@@ -51,7 +58,10 @@ function OptionsToggle({
 }
 
 /** Shared Launch Options — vanity mint and Launch Attribution removal. */
-export function LaunchOptionsFields({ form }: LaunchOptionsFieldsProps) {
+export function LaunchOptionsFields({
+  form,
+  platformOptions,
+}: LaunchOptionsFieldsProps) {
   return (
     <section id="launch-options" className="scroll-mt-4">
       <PageSection>
@@ -62,6 +72,7 @@ export function LaunchOptionsFields({ form }: LaunchOptionsFieldsProps) {
               <OptionsToggle
                 id="vanity-mint"
                 label="Vanity Token Address"
+                feeSol={vanityMintFeeSol}
                 tooltip='Generate a custom token address ending with "pump".'
               >
                 <Switch
@@ -76,7 +87,8 @@ export function LaunchOptionsFields({ form }: LaunchOptionsFieldsProps) {
             {(field) => (
               <OptionsToggle
                 id="remove-attribution"
-                label="Remove Ballistik attribution (+0.1 SOL)"
+                label="Remove Ballistik attribution"
+                feeSol={descriptionAttributionRemovalFeeSol}
                 tooltip='By default, token descriptions include "Launched with ballistik.app". Enable this to remove it.'
               >
                 <Switch
@@ -87,6 +99,7 @@ export function LaunchOptionsFields({ form }: LaunchOptionsFieldsProps) {
               </OptionsToggle>
             )}
           </form.Field>
+          {platformOptions}
         </div>
       </PageSection>
     </section>
