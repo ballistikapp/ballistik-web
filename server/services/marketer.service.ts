@@ -74,6 +74,42 @@ async function requireEnabledMarketer(userId: string) {
   return marketer;
 }
 
+type ReferredUserPayoutRow = {
+  referredUserId: string;
+  marketerAmountLamports: bigint;
+  createdAt: Date;
+};
+
+function payoutStatsByReferredUser(payouts: ReferredUserPayoutRow[]) {
+  const statsByUserId = new Map<
+    string,
+    {
+      totalEarnedLamports: bigint;
+      lastPayoutAt: Date;
+      payoutCount: number;
+    }
+  >();
+
+  for (const payout of payouts) {
+    const existing = statsByUserId.get(payout.referredUserId);
+    if (!existing) {
+      statsByUserId.set(payout.referredUserId, {
+        totalEarnedLamports: payout.marketerAmountLamports,
+        lastPayoutAt: payout.createdAt,
+        payoutCount: 1,
+      });
+      continue;
+    }
+    existing.totalEarnedLamports += payout.marketerAmountLamports;
+    existing.payoutCount += 1;
+    if (payout.createdAt > existing.lastPayoutAt) {
+      existing.lastPayoutAt = payout.createdAt;
+    }
+  }
+
+  return statsByUserId;
+}
+
 export const marketerService = {
   /**
    * Referrals page / nav status for the current User.
@@ -174,7 +210,7 @@ export const marketerService = {
       throw new AppError("Not found", 404);
     }
 
-    const [referrals, payoutStats] = await Promise.all([
+    const [referrals, payouts] = await Promise.all([
       prisma.referral.findMany({
         where: { marketerId: marketer.id },
         orderBy: { createdAt: "desc" },
@@ -190,25 +226,17 @@ export const marketerService = {
           },
         },
       }),
-      prisma.referralPayout.groupBy({
-        by: ["referredUserId"],
+      prisma.referralPayout.findMany({
         where: { marketerId: marketer.id },
-        _sum: { marketerAmountLamports: true },
-        _count: { _all: true },
-        _max: { createdAt: true },
+        select: {
+          referredUserId: true,
+          marketerAmountLamports: true,
+          createdAt: true,
+        },
       }),
     ]);
 
-    const statsByUserId = new Map(
-      payoutStats.map((row) => [
-        row.referredUserId,
-        {
-          totalEarnedLamports: row._sum.marketerAmountLamports ?? BigInt(0),
-          lastPayoutAt: row._max.createdAt,
-          payoutCount: row._count._all,
-        },
-      ])
-    );
+    const statsByUserId = payoutStatsByReferredUser(payouts);
 
     return referrals.map((referral) => {
       const stats = statsByUserId.get(referral.user.id);

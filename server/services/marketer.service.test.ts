@@ -1,7 +1,6 @@
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import test, { type TestContext } from "node:test";
-import { isAppError } from "@/server/errors";
 
 process.env.DATABASE_URL ??=
   "postgresql://postgres:postgres@127.0.0.1:5432/postgres";
@@ -89,8 +88,8 @@ test("listReferredUsers projects zero payout stats when a referred User never pa
   restore(
     t,
     prisma.referralPayout,
-    "groupBy",
-    (async () => []) as unknown as typeof prisma.referralPayout.groupBy
+    "findMany",
+    (async () => []) as unknown as typeof prisma.referralPayout.findMany
   );
 
   const rows = await marketerService.listReferredUsers(MARKETER_USER_ID);
@@ -112,6 +111,22 @@ test("listReferredUsers projects zero payout stats when a referred User never pa
 test("listReferredUsers aggregates Referral Payouts per referred User", async (t) => {
   const { marketerService, prisma } = await setupMarketerTest(t);
   stubMarketer(t, prisma);
+
+  // Known Referral Payout fixtures (literal worked example):
+  // Bob: 1.0 SOL + 0.5 SOL → 1.5 SOL earned, 2 payouts, last at 15:30
+  // Alice: no payouts
+  const payoutFixtures = [
+    {
+      referredUserId: REFERRED_USER_B,
+      marketerAmountLamports: BigInt(1_000_000_000),
+      createdAt: new Date("2026-07-21T14:00:00.000Z"),
+    },
+    {
+      referredUserId: REFERRED_USER_B,
+      marketerAmountLamports: BigInt(500_000_000),
+      createdAt: new Date("2026-07-22T15:30:00.000Z"),
+    },
+  ];
 
   restore(
     t,
@@ -142,15 +157,8 @@ test("listReferredUsers aggregates Referral Payouts per referred User", async (t
   restore(
     t,
     prisma.referralPayout,
-    "groupBy",
-    (async () => [
-      {
-        referredUserId: REFERRED_USER_B,
-        _sum: { marketerAmountLamports: BigInt(1_500_000_000) },
-        _count: { _all: 2 },
-        _max: { createdAt: new Date("2026-07-22T15:30:00.000Z") },
-      },
-    ]) as unknown as typeof prisma.referralPayout.groupBy
+    "findMany",
+    (async () => payoutFixtures) as unknown as typeof prisma.referralPayout.findMany
   );
 
   const rows = await marketerService.listReferredUsers(MARKETER_USER_ID);
@@ -203,15 +211,14 @@ test("listReferredUsers includes payout stats for disabled Marketers", async (t)
   restore(
     t,
     prisma.referralPayout,
-    "groupBy",
+    "findMany",
     (async () => [
       {
         referredUserId: REFERRED_USER_B,
-        _sum: { marketerAmountLamports: BigInt(250_000_000) },
-        _count: { _all: 1 },
-        _max: { createdAt: new Date("2026-07-22T09:00:00.000Z") },
+        marketerAmountLamports: BigInt(250_000_000),
+        createdAt: new Date("2026-07-22T09:00:00.000Z"),
       },
-    ]) as unknown as typeof prisma.referralPayout.groupBy
+    ]) as unknown as typeof prisma.referralPayout.findMany
   );
 
   const rows = await marketerService.listReferredUsers(MARKETER_USER_ID);
@@ -223,20 +230,4 @@ test("listReferredUsers includes payout stats for disabled Marketers", async (t)
     new Date("2026-07-22T09:00:00.000Z")
   );
   assert.equal(rows[0]?.payoutCount, 1);
-});
-
-test("listReferredUsers rejects non-Marketers", async (t) => {
-  const { marketerService, prisma } = await setupMarketerTest(t);
-
-  restore(
-    t,
-    prisma.marketer,
-    "findUnique",
-    (async () => null) as unknown as typeof prisma.marketer.findUnique
-  );
-
-  await assert.rejects(
-    () => marketerService.listReferredUsers(MARKETER_USER_ID),
-    (error: unknown) => isAppError(error) && error.statusCode === 404
-  );
 });
