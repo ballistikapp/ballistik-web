@@ -26,6 +26,15 @@ export const AuthChallengePurpose = {
 export type AuthChallengePurpose = (typeof AuthChallengePurpose)[keyof typeof AuthChallengePurpose]
 
 
+export const MarketerApplicationStatus = {
+  PENDING: 'PENDING',
+  APPROVED: 'APPROVED',
+  REJECTED: 'REJECTED'
+} as const
+
+export type MarketerApplicationStatus = (typeof MarketerApplicationStatus)[keyof typeof MarketerApplicationStatus]
+
+
 export const WalletType = {
   MAIN_WALLET: 'MAIN_WALLET',
   DEV: 'DEV',

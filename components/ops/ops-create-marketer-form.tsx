@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -10,7 +10,9 @@ import { trpc } from "@/lib/trpc/client";
 
 export function OpsCreateMarketerForm() {
   const router = useRouter();
-  const [userId, setUserId] = useState("");
+  const searchParams = useSearchParams();
+  const prefilledUserId = searchParams.get("userId")?.trim() ?? "";
+  const [userId, setUserId] = useState(prefilledUserId);
   const [nickname, setNickname] = useState("");
   const [feeSharePercent, setFeeSharePercent] = useState("10");
   const [isEnabled, setIsEnabled] = useState(true);

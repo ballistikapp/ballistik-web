@@ -48,11 +48,33 @@ model User {
   refreshCaches RefreshCache[]
   appTransactions AppTransaction[] @relation("AppTransactionUser")
   marketer Marketer? @relation("MarketerUser")
+  marketerApplications MarketerApplication[] @relation("MarketerApplicationUser")
   referral Referral? @relation("ReferralUser")
   referralPayoutsAsReferred ReferralPayout[] @relation("ReferralPayoutReferredUser")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
+}
+
+enum MarketerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MarketerApplication {
+  id           String                     @id @default(cuid())
+  userId       String
+  user         User                       @relation("MarketerApplicationUser", fields: [userId], references: [id])
+  message      String
+  operatorNote String?
+  status       MarketerApplicationStatus  @default(PENDING)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@map("MarketerApplication")
 }
 
 model Marketer {

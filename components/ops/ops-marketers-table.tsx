@@ -169,12 +169,20 @@ export function OpsMarketersTable() {
             Designate Users as Marketers and manage fee-share terms.
           </p>
         </div>
-        <Link
-          href="/ops/marketers/new"
-          className="text-sm underline-offset-4 hover:underline"
-        >
-          Designate Marketer
-        </Link>
+        <div className="flex flex-col gap-1 sm:items-end">
+          <Link
+            href="/ops/marketers/applications"
+            className="text-sm underline-offset-4 hover:underline"
+          >
+            Applications inbox
+          </Link>
+          <Link
+            href="/ops/marketers/new"
+            className="text-sm underline-offset-4 hover:underline"
+          >
+            Designate Marketer
+          </Link>
+        </div>
       </div>
 
       {error ? (

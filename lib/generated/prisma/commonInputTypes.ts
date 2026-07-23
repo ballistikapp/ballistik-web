@@ -165,6 +165,23 @@ export type StringNullableWithAggregatesFilter<$PrismaModel = never> = {
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
 }
 
+export type EnumMarketerApplicationStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketerApplicationStatus | Prisma.EnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel> | $Enums.MarketerApplicationStatus
+}
+
+export type EnumMarketerApplicationStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketerApplicationStatus | Prisma.EnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketerApplicationStatusWithAggregatesFilter<$PrismaModel> | $Enums.MarketerApplicationStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel>
+}
+
 export type DecimalFilter<$PrismaModel = never> = {
   equals?: runtime.Decimal | runtime.DecimalJsLike | number | string | Prisma.DecimalFieldRefInput<$PrismaModel>
   in?: runtime.Decimal[] | runtime.DecimalJsLike[] | number[] | string[] | Prisma.ListDecimalFieldRefInput<$PrismaModel>
@@ -931,6 +948,23 @@ export type NestedStringNullableWithAggregatesFilter<$PrismaModel = never> = {
   _count?: Prisma.NestedIntNullableFilter<$PrismaModel>
   _min?: Prisma.NestedStringNullableFilter<$PrismaModel>
   _max?: Prisma.NestedStringNullableFilter<$PrismaModel>
+}
+
+export type NestedEnumMarketerApplicationStatusFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketerApplicationStatus | Prisma.EnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel> | $Enums.MarketerApplicationStatus
+}
+
+export type NestedEnumMarketerApplicationStatusWithAggregatesFilter<$PrismaModel = never> = {
+  equals?: $Enums.MarketerApplicationStatus | Prisma.EnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  in?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  notIn?: $Enums.MarketerApplicationStatus[] | Prisma.ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel>
+  not?: Prisma.NestedEnumMarketerApplicationStatusWithAggregatesFilter<$PrismaModel> | $Enums.MarketerApplicationStatus
+  _count?: Prisma.NestedIntFilter<$PrismaModel>
+  _min?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel>
+  _max?: Prisma.NestedEnumMarketerApplicationStatusFilter<$PrismaModel>
 }
 
 export type NestedDecimalFilter<$PrismaModel = never> = {

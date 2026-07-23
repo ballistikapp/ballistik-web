@@ -1,11 +1,25 @@
 import { protectedRateLimitedProcedure, router } from "../trpc";
-import { marketerUpdateSetupSchema } from "@/server/schemas";
-import { marketerService } from "@/server/services";
+import {
+  marketerUpdateSetupSchema,
+  submitMarketerApplicationSchema,
+} from "@/server/schemas";
+import {
+  marketerApplicationService,
+  marketerService,
+} from "@/server/services";
 
 export const marketerRouter = router({
   getMe: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await marketerService.getMe(ctx.user.id);
   }),
+  submitApplication: protectedRateLimitedProcedure
+    .input(submitMarketerApplicationSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await marketerApplicationService.submitApplication(
+        ctx.user.id,
+        input
+      );
+    }),
   updateSetup: protectedRateLimitedProcedure
     .input(marketerUpdateSetupSchema)
     .mutation(async ({ input, ctx }) => {

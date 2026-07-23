@@ -28,6 +28,11 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model MarketerApplication
+ * 
+ */
+export type MarketerApplication = Prisma.MarketerApplicationModel
+/**
  * Model Marketer
  * 
  */

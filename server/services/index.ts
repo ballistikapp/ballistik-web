@@ -19,3 +19,4 @@ export * from "./test-run-log.service";
 export * from "./creator-rewards.service";
 export * from "./ops.service";
 export * from "./marketer.service";
+export * from "./marketer-application.service";

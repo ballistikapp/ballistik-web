@@ -28,6 +28,7 @@ import {
   type LaunchOptionsOutcomesV1,
   type PumpfunLaunchPlanV1,
 } from "@/server/schemas/launch-platform.schema";
+import { marketerApplicationService } from "@/server/services/marketer-application.service";
 import { appTransactionService } from "@/server/services/app-transaction.service";
 import { walletService } from "@/server/services/wallet.service";
 
@@ -1485,31 +1486,40 @@ export const opsService = {
     }
 
     try {
-      const created = await prisma.marketer.create({
-        data: {
-          userId: input.userId,
-          nickname: input.nickname,
-          feeShareRate: input.feeShareRate,
-          isEnabled: input.isEnabled ?? true,
-        },
-        select: {
-          id: true,
-          userId: true,
-          nickname: true,
-          feeShareRate: true,
-          isEnabled: true,
-          referralCode: true,
-          feeCollectorPublicKey: true,
-          createdAt: true,
-          updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              mainWalletPublicKey: true,
+      const created = await prisma.$transaction(async (tx) => {
+        const marketer = await tx.marketer.create({
+          data: {
+            userId: input.userId,
+            nickname: input.nickname,
+            feeShareRate: input.feeShareRate,
+            isEnabled: input.isEnabled ?? true,
+          },
+          select: {
+            id: true,
+            userId: true,
+            nickname: true,
+            feeShareRate: true,
+            isEnabled: true,
+            referralCode: true,
+            feeCollectorPublicKey: true,
+            createdAt: true,
+            updatedAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                mainWalletPublicKey: true,
+              },
             },
           },
-        },
+        });
+
+        await marketerApplicationService.approvePendingForUser(
+          input.userId,
+          tx
+        );
+
+        return marketer;
       });
 
       const result = projectMarketer(created);

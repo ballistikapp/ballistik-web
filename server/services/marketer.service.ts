@@ -4,10 +4,12 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import type {
   MarketerAggregates,
+  MarketerMe,
   MarketerReferralPayout,
   MarketerReferredUser,
   MarketerUpdateSetupInput,
 } from "@/server/schemas/marketer.schema";
+import { marketerApplicationService } from "@/server/services/marketer-application.service";
 
 const marketerSetupSelect = {
   id: true,
@@ -51,30 +53,74 @@ function referralCodeConflictMessage(error: unknown): string | null {
   return null;
 }
 
-async function requireEnabledMarketer(userId: string) {
+async function requireMarketer(userId: string) {
   const marketer = await prisma.marketer.findUnique({
     where: { userId },
     select: marketerSetupSelect,
   });
 
-  if (!marketer || !marketer.isEnabled) {
+  if (!marketer) {
     return null;
   }
 
   return marketer;
 }
 
+async function requireEnabledMarketer(userId: string) {
+  const marketer = await requireMarketer(userId);
+  if (!marketer || !marketer.isEnabled) {
+    return null;
+  }
+  return marketer;
+}
+
 export const marketerService = {
   /**
-   * Returns the current User's enabled Marketer setup, or null when they are
-   * not an enabled Marketer (nav / page gating).
+   * Referrals page / nav status for the current User.
    */
-  async getMe(userId: string) {
-    const marketer = await requireEnabledMarketer(userId);
-    if (!marketer) {
-      return null;
+  async getMe(userId: string): Promise<MarketerMe> {
+    const marketer = await requireMarketer(userId);
+
+    if (marketer) {
+      const setup = projectMarketerSetup(marketer);
+      return marketer.isEnabled
+        ? { status: "enabled", setup }
+        : { status: "disabled", setup };
     }
-    return projectMarketerSetup(marketer);
+
+    const application =
+      await marketerApplicationService.getLatestForUser(userId);
+
+    if (!application) {
+      return { status: "can_apply" };
+    }
+
+    if (application.status === "PENDING") {
+      return {
+        status: "pending",
+        application: {
+          id: application.id,
+          message: application.message,
+          createdAt: application.createdAt,
+        },
+      };
+    }
+
+    if (application.status === "REJECTED") {
+      return {
+        status: "rejected",
+        application: {
+          id: application.id,
+          message: application.message,
+          operatorNote: application.operatorNote,
+          createdAt: application.createdAt,
+          updatedAt: application.updatedAt,
+        },
+      };
+    }
+
+    // Approved without a Marketer row is unexpected; treat as can_apply.
+    return { status: "can_apply" };
   },
 
   async updateSetup(userId: string, input: MarketerUpdateSetupInput) {
@@ -112,9 +158,10 @@ export const marketerService = {
 
   /**
    * Users attributed to this Marketer (sticky Referrals), newest first.
+   * Readable for disabled Marketers (historical view).
    */
   async listReferredUsers(userId: string): Promise<MarketerReferredUser[]> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }
@@ -146,9 +193,10 @@ export const marketerService = {
 
   /**
    * Referral Payouts for this Marketer, newest first.
+   * Readable for disabled Marketers (historical view).
    */
   async listPayouts(userId: string): Promise<MarketerReferralPayout[]> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }
@@ -190,9 +238,10 @@ export const marketerService = {
 
   /**
    * Light aggregates for the Marketer surface (total earned, referral count, last payout).
+   * Readable for disabled Marketers (historical view).
    */
   async getAggregates(userId: string): Promise<MarketerAggregates> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }

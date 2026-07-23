@@ -117,7 +117,7 @@ export const accountRoutes: NavMainItem[] = [
   },
 ];
 
-/** Shown in Account nav only for enabled Marketers (gated in AppSidebar). */
+/** Shown in Account nav for all authenticated Users. */
 export const marketerRoute: NavMainItem = {
   title: "Referrals",
   url: "/referrals",

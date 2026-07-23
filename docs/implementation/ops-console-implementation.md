@@ -22,9 +22,9 @@ See ADRs:
 
 | Layer | Path |
 | --- | --- |
-| Schema | `prisma/schema.prisma` (`User.isOperator`, `Marketer`, `Referral`, `ReferralPayout`) |
-| Zod | `server/schemas/ops.schema.ts` |
-| Service | `server/services/ops.service.ts` |
+| Schema | `prisma/schema.prisma` (`User.isOperator`, `Marketer`, `MarketerApplication`, `Referral`, `ReferralPayout`) |
+| Zod | `server/schemas/ops.schema.ts`, `server/schemas/marketer-application.schema.ts` |
+| Service | `server/services/ops.service.ts`, `server/services/marketer-application.service.ts` |
 | Router | `server/trpc/routers/ops.router.ts` (`ops` on app router) |
 | UI | `app/ops/**`, `components/ops/**` |
 
@@ -57,12 +57,15 @@ Launch inspection follows the shared lifecycle + Platform architecture:
 - **Removed system creator path**: new Launches cannot select or execute with the system creator Wallet; legacy system-wallet custody may still appear on Wallet browse (`isSystemWallet`) for exits/reclaim inspection.
 - `ops.listMarketers` — `operatorProcedure`; paginated Marketers browse (`page`/`pageSize`/`search`/`sortBy`/`sortDir`/`isEnabled`); shows nickname, rate, enabled, and whether referral code / fee-collector are configured (not the values); no private keys
 - `ops.getMarketer` — `operatorProcedure`; Marketer detail including read-only referral code and fee-collector public key when set
-- `ops.createMarketer` — `operatorProcedure`; designate an existing User as Marketer (`userId`, Ops `nickname`, `feeShareRate` in `[0, 1]`, optional `isEnabled`); nickname unique; User must not already be a Marketer
+- `ops.createMarketer` — `operatorProcedure`; designate an existing User as Marketer (`userId`, Ops `nickname`, `feeShareRate` in `[0, 1]`, optional `isEnabled`); nickname unique; User must not already be a Marketer; auto-approves that User’s pending Marketer Application when present (same transaction); no Application side effects when none pending
 - `ops.updateMarketer` — `operatorProcedure`; edit nickname, fee-share rate, and/or enabled; Ops never writes referral code or fee-collector
+- `ops.listMarketerApplications` — `operatorProcedure`; paginated Applications inbox (`page`/`pageSize`/`status`/`sortDir`); default newest first
+- `ops.getMarketerApplication` — `operatorProcedure`; Application detail with User identity + whether already a Marketer
+- `ops.rejectMarketerApplication` — `operatorProcedure`; reject a pending Application with optional Operator note
 
 List search is case-insensitive contains. Users search: `id`, `name`, `mainWalletPublicKey`. Marketers search: `id`, `nickname`, `userId`, `referralCode`, User `name`, User `mainWalletPublicKey`. Launches search: `id`, `tokenPublicKey`, `userId`, `currentStep`, and any `LaunchStatus` whose name contains the query (enum fields cannot use SQL `contains`). Tokens search: `publicKey`, `name`, `symbol`, `userId`, and any `TokenStatus` whose name contains the query. Wallets search: `publicKey`, `userId`, `tokenPublicKey`, and any `WalletType` whose name contains the query. Allowed sorts — Users: `createdAt`/`name`/`plan`; Marketers: `createdAt`/`nickname`/`feeShareRate`/`isEnabled`; Launches: `createdAt`/`startedAt`/`status`; Tokens: `createdAt`/`name`/`symbol`/`status`; Wallets: `createdAt`/`type`/`balanceSol`. Default sort: `createdAt desc`. Default page size 25 (max 100).
 
-Marketer management is Ops-only. A Marketer is a 1:1 designation on an existing User (`Marketer.userId` unique). Ops owns `nickname`, `feeShareRate`, and `isEnabled`. The Marketer sets `referralCode` and `feeCollectorPublicKey` from the product surface at `/referrals` (see [Referral Implementation](./referral-implementation.md)); Ops shows those as read-only. `Referral` and `ReferralPayout` models exist in schema for later attribution and payout slices. See `CONTEXT.md` and ADRs `0004` / `0005`.
+Marketer management is Ops-only. A Marketer is a 1:1 designation on an existing User (`Marketer.userId` unique). Ops owns `nickname`, `feeShareRate`, and `isEnabled`. Users may submit a Marketer Application from `/referrals`; Ops reviews Applications and designates via create Marketer (which approves a pending Application). The Marketer sets `referralCode` and `feeCollectorPublicKey` from the product surface at `/referrals` (see [Referral Implementation](./referral-implementation.md)); Ops shows those as read-only. See `CONTEXT.md` and ADRs `0004` / `0005`.
 
 Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol` + `balanceRefreshedAt` only). Selection cap is `OPS_WALLET_BALANCE_REFRESH_SELECTION_CAP` in `lib/config/ops.config.ts` (100). Filter-wide refresh safety is confirm-dialog count + server chunking, not a hard refuse.
 
@@ -72,8 +75,10 @@ Wallet balance refresh is an allowed Ops side-effect (updates `Wallet.balanceSol
 
 - `/ops` — Ops Overview (summary tiles) + jump box
 - `/ops/users` — Users browse (dense table; row → User spine)
-- `/ops/marketers` — Marketers browse (dense table + enabled filter; row → Marketer detail)
-- `/ops/marketers/new` — Designate Marketer (User id + nickname + fee-share rate)
+- `/ops/marketers` — Marketers browse (dense table + enabled filter; row → Marketer detail; link to Applications inbox)
+- `/ops/marketers/applications` — Marketer Applications inbox (status filter; row → detail)
+- `/ops/marketers/applications/[applicationId]` — Application detail; reject with optional note; Create Marketer prefills `?userId=`
+- `/ops/marketers/new` — Designate Marketer (User id + nickname + fee-share rate; optional `userId` query prefill)
 - `/ops/marketers/[marketerId]` — Marketer detail/edit (Ops fields) + read-only code/collector
 - `/ops/wallets` — Wallets browse (dense table + type/system filters; selected-row + filter-wide balance refresh; row → Wallet detail)
 - `/ops/tokens` — Tokens browse (dense table; row → Token detail)
@@ -87,8 +92,10 @@ Ops uses a minimal dedicated layout with an Ops sidebar (Overview, Users, Market
 
 ## Migration note
 
-Agents edit the Prisma schema only. Humans run migrations. Relevant schema additions: `User.isOperator`, and referral tables `Marketer` / `Referral` / `ReferralPayout`. After migrate, set Operator flags for the tiny Operator set in staging/production.
+Agents edit the Prisma schema only. Humans run migrations. Relevant schema additions: `User.isOperator`, referral tables `Marketer` / `Referral` / `ReferralPayout`, and `MarketerApplication` (+ `MarketerApplicationStatus`). After migrate, set Operator flags for the tiny Operator set in staging/production.
 
 ## Tests
 
 `server/services/ops.service.test.ts` covers Operator vs non-Operator denial, Ops Overview tile counts, Users/Launches/Tokens/Wallets list pagination/search/sort (+ Wallet type/system filters + optional `userId` scope) + private-key omission, Token/Wallet detail reads, lookup/jump hits/misses (User main → Wallet → Token), private-key omission on spine/autopsy/detail, Launch Platform diagnostics (Platform/version, plan presence, safe plan summary without opaque payload, outcome classification, Jito telemetry projection, legacy retry/clone flags), reveal + audit log behavior, and Wallet balance refresh (single/selected/filter-wide, selection cap, non-Operator not-found, no private keys) at the ops service seam.
+
+`server/services/marketer-application.service.test.ts` covers Marketer Application submit rules, reject, and create-Marketer auto-approve / no-op side effects.

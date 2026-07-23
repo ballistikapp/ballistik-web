@@ -235,6 +235,7 @@ export type UserWhereInput = {
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   appTransactions?: Prisma.AppTransactionListRelationFilter
   marketer?: Prisma.XOR<Prisma.MarketerNullableScalarRelationFilter, Prisma.MarketerWhereInput> | null
+  marketerApplications?: Prisma.MarketerApplicationListRelationFilter
   referral?: Prisma.XOR<Prisma.ReferralNullableScalarRelationFilter, Prisma.ReferralWhereInput> | null
   referralPayoutsAsReferred?: Prisma.ReferralPayoutListRelationFilter
 }
@@ -263,6 +264,7 @@ export type UserOrderByWithRelationInput = {
   refreshCaches?: Prisma.RefreshCacheOrderByRelationAggregateInput
   appTransactions?: Prisma.AppTransactionOrderByRelationAggregateInput
   marketer?: Prisma.MarketerOrderByWithRelationInput
+  marketerApplications?: Prisma.MarketerApplicationOrderByRelationAggregateInput
   referral?: Prisma.ReferralOrderByWithRelationInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutOrderByRelationAggregateInput
 }
@@ -294,6 +296,7 @@ export type UserWhereUniqueInput = Prisma.AtLeast<{
   refreshCaches?: Prisma.RefreshCacheListRelationFilter
   appTransactions?: Prisma.AppTransactionListRelationFilter
   marketer?: Prisma.XOR<Prisma.MarketerNullableScalarRelationFilter, Prisma.MarketerWhereInput> | null
+  marketerApplications?: Prisma.MarketerApplicationListRelationFilter
   referral?: Prisma.XOR<Prisma.ReferralNullableScalarRelationFilter, Prisma.ReferralWhereInput> | null
   referralPayoutsAsReferred?: Prisma.ReferralPayoutListRelationFilter
 }, "id" | "mainWalletPublicKey" | "authWalletPublicKey">
@@ -353,6 +356,7 @@ export type UserCreateInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -380,6 +384,7 @@ export type UserUncheckedCreateInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -407,6 +412,7 @@ export type UserUpdateInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -434,6 +440,7 @@ export type UserUncheckedUpdateInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -539,6 +546,20 @@ export type BoolFieldUpdateOperationsInput = {
 
 export type NullableStringFieldUpdateOperationsInput = {
   set?: string | null
+}
+
+export type UserCreateNestedOneWithoutMarketerApplicationsInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMarketerApplicationsInput, Prisma.UserUncheckedCreateWithoutMarketerApplicationsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMarketerApplicationsInput
+  connect?: Prisma.UserWhereUniqueInput
+}
+
+export type UserUpdateOneRequiredWithoutMarketerApplicationsNestedInput = {
+  create?: Prisma.XOR<Prisma.UserCreateWithoutMarketerApplicationsInput, Prisma.UserUncheckedCreateWithoutMarketerApplicationsInput>
+  connectOrCreate?: Prisma.UserCreateOrConnectWithoutMarketerApplicationsInput
+  upsert?: Prisma.UserUpsertWithoutMarketerApplicationsInput
+  connect?: Prisma.UserWhereUniqueInput
+  update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutMarketerApplicationsInput, Prisma.UserUpdateWithoutMarketerApplicationsInput>, Prisma.UserUncheckedUpdateWithoutMarketerApplicationsInput>
 }
 
 export type UserCreateNestedOneWithoutMarketerInput = {
@@ -773,6 +794,130 @@ export type UserUpdateOneRequiredWithoutAppTransactionsNestedInput = {
   update?: Prisma.XOR<Prisma.XOR<Prisma.UserUpdateToOneWithWhereWithoutAppTransactionsInput, Prisma.UserUpdateWithoutAppTransactionsInput>, Prisma.UserUncheckedUpdateWithoutAppTransactionsInput>
 }
 
+export type UserCreateWithoutMarketerApplicationsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  mainWallet: Prisma.WalletCreateNestedOneWithoutMainWalletUserInput
+  wallets?: Prisma.WalletCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserUncheckedCreateWithoutMarketerApplicationsInput = {
+  id?: string
+  name: string
+  plan?: $Enums.UserPlan
+  paidPlanStartedAt?: Date | string | null
+  paidPlanExpiresAt?: Date | string | null
+  isOperator?: boolean
+  mainWalletPublicKey: string
+  authWalletPublicKey?: string | null
+  createdAt?: Date | string
+  updatedAt?: Date | string
+  wallets?: Prisma.WalletUncheckedCreateNestedManyWithoutUserInput
+  authSessions?: Prisma.AuthSessionUncheckedCreateNestedManyWithoutUserInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedCreateNestedManyWithoutUserInput
+  tokens?: Prisma.TokenUncheckedCreateNestedManyWithoutUserInput
+  launches?: Prisma.LaunchUncheckedCreateNestedManyWithoutUserInput
+  holdingExits?: Prisma.HoldingExitUncheckedCreateNestedManyWithoutUserInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedCreateNestedManyWithoutUserInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedCreateNestedManyWithoutUserInput
+  vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
+  appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
+}
+
+export type UserCreateOrConnectWithoutMarketerApplicationsInput = {
+  where: Prisma.UserWhereUniqueInput
+  create: Prisma.XOR<Prisma.UserCreateWithoutMarketerApplicationsInput, Prisma.UserUncheckedCreateWithoutMarketerApplicationsInput>
+}
+
+export type UserUpsertWithoutMarketerApplicationsInput = {
+  update: Prisma.XOR<Prisma.UserUpdateWithoutMarketerApplicationsInput, Prisma.UserUncheckedUpdateWithoutMarketerApplicationsInput>
+  create: Prisma.XOR<Prisma.UserCreateWithoutMarketerApplicationsInput, Prisma.UserUncheckedCreateWithoutMarketerApplicationsInput>
+  where?: Prisma.UserWhereInput
+}
+
+export type UserUpdateToOneWithWhereWithoutMarketerApplicationsInput = {
+  where?: Prisma.UserWhereInput
+  data: Prisma.XOR<Prisma.UserUpdateWithoutMarketerApplicationsInput, Prisma.UserUncheckedUpdateWithoutMarketerApplicationsInput>
+}
+
+export type UserUpdateWithoutMarketerApplicationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  mainWallet?: Prisma.WalletUpdateOneRequiredWithoutMainWalletUserNestedInput
+  wallets?: Prisma.WalletUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
+}
+
+export type UserUncheckedUpdateWithoutMarketerApplicationsInput = {
+  id?: Prisma.StringFieldUpdateOperationsInput | string
+  name?: Prisma.StringFieldUpdateOperationsInput | string
+  plan?: Prisma.EnumUserPlanFieldUpdateOperationsInput | $Enums.UserPlan
+  paidPlanStartedAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  paidPlanExpiresAt?: Prisma.NullableDateTimeFieldUpdateOperationsInput | Date | string | null
+  isOperator?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  mainWalletPublicKey?: Prisma.StringFieldUpdateOperationsInput | string
+  authWalletPublicKey?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
+  createdAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  updatedAt?: Prisma.DateTimeFieldUpdateOperationsInput | Date | string
+  wallets?: Prisma.WalletUncheckedUpdateManyWithoutUserNestedInput
+  authSessions?: Prisma.AuthSessionUncheckedUpdateManyWithoutUserNestedInput
+  subscriptionPayments?: Prisma.SubscriptionPaymentUncheckedUpdateManyWithoutUserNestedInput
+  tokens?: Prisma.TokenUncheckedUpdateManyWithoutUserNestedInput
+  launches?: Prisma.LaunchUncheckedUpdateManyWithoutUserNestedInput
+  holdingExits?: Prisma.HoldingExitUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotSessions?: Prisma.VolumeBotSessionUncheckedUpdateManyWithoutUserNestedInput
+  volumeBotPresets?: Prisma.VolumeBotPresetUncheckedUpdateManyWithoutUserNestedInput
+  vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
+  refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
+  appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
+  referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
+}
+
 export type UserCreateWithoutMarketerInput = {
   id?: string
   name: string
@@ -795,6 +940,7 @@ export type UserCreateWithoutMarketerInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -821,6 +967,7 @@ export type UserUncheckedCreateWithoutMarketerInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -863,6 +1010,7 @@ export type UserUpdateWithoutMarketerInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -889,6 +1037,7 @@ export type UserUncheckedUpdateWithoutMarketerInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -916,6 +1065,7 @@ export type UserCreateWithoutReferralInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
 
@@ -942,6 +1092,7 @@ export type UserUncheckedCreateWithoutReferralInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
 
@@ -984,6 +1135,7 @@ export type UserUpdateWithoutReferralInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
 
@@ -1010,6 +1162,7 @@ export type UserUncheckedUpdateWithoutReferralInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
 
@@ -1036,6 +1189,7 @@ export type UserCreateWithoutReferralPayoutsAsReferredInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
 }
 
@@ -1062,6 +1216,7 @@ export type UserUncheckedCreateWithoutReferralPayoutsAsReferredInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
 }
 
@@ -1104,6 +1259,7 @@ export type UserUpdateWithoutReferralPayoutsAsReferredInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
 }
 
@@ -1130,6 +1286,7 @@ export type UserUncheckedUpdateWithoutReferralPayoutsAsReferredInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
 }
 
@@ -1155,6 +1312,7 @@ export type UserCreateWithoutSubscriptionPaymentsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1181,6 +1339,7 @@ export type UserUncheckedCreateWithoutSubscriptionPaymentsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1223,6 +1382,7 @@ export type UserUpdateWithoutSubscriptionPaymentsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1249,6 +1409,7 @@ export type UserUncheckedUpdateWithoutSubscriptionPaymentsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1275,6 +1436,7 @@ export type UserCreateWithoutAuthSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1301,6 +1463,7 @@ export type UserUncheckedCreateWithoutAuthSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1343,6 +1506,7 @@ export type UserUpdateWithoutAuthSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1369,6 +1533,7 @@ export type UserUncheckedUpdateWithoutAuthSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1395,6 +1560,7 @@ export type UserCreateWithoutWalletsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1421,6 +1587,7 @@ export type UserUncheckedCreateWithoutWalletsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1452,6 +1619,7 @@ export type UserCreateWithoutMainWalletInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1478,6 +1646,7 @@ export type UserUncheckedCreateWithoutMainWalletInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1520,6 +1689,7 @@ export type UserUpdateWithoutWalletsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1546,6 +1716,7 @@ export type UserUncheckedUpdateWithoutWalletsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1583,6 +1754,7 @@ export type UserUpdateWithoutMainWalletInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1609,6 +1781,7 @@ export type UserUncheckedUpdateWithoutMainWalletInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1635,6 +1808,7 @@ export type UserCreateWithoutTokensInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1661,6 +1835,7 @@ export type UserUncheckedCreateWithoutTokensInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1703,6 +1878,7 @@ export type UserUpdateWithoutTokensInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1729,6 +1905,7 @@ export type UserUncheckedUpdateWithoutTokensInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1755,6 +1932,7 @@ export type UserCreateWithoutLaunchesInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1781,6 +1959,7 @@ export type UserUncheckedCreateWithoutLaunchesInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1823,6 +2002,7 @@ export type UserUpdateWithoutLaunchesInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1849,6 +2029,7 @@ export type UserUncheckedUpdateWithoutLaunchesInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1875,6 +2056,7 @@ export type UserCreateWithoutHoldingExitsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -1901,6 +2083,7 @@ export type UserUncheckedCreateWithoutHoldingExitsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -1943,6 +2126,7 @@ export type UserUpdateWithoutHoldingExitsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -1969,6 +2153,7 @@ export type UserUncheckedUpdateWithoutHoldingExitsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -1995,6 +2180,7 @@ export type UserCreateWithoutVolumeBotSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -2021,6 +2207,7 @@ export type UserUncheckedCreateWithoutVolumeBotSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -2063,6 +2250,7 @@ export type UserUpdateWithoutVolumeBotSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -2089,6 +2277,7 @@ export type UserUncheckedUpdateWithoutVolumeBotSessionsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -2115,6 +2304,7 @@ export type UserCreateWithoutVolumeBotPresetsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -2141,6 +2331,7 @@ export type UserUncheckedCreateWithoutVolumeBotPresetsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -2183,6 +2374,7 @@ export type UserUpdateWithoutVolumeBotPresetsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -2209,6 +2401,7 @@ export type UserUncheckedUpdateWithoutVolumeBotPresetsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -2235,6 +2428,7 @@ export type UserCreateWithoutVanityMintsInput = {
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -2261,6 +2455,7 @@ export type UserUncheckedCreateWithoutVanityMintsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -2303,6 +2498,7 @@ export type UserUpdateWithoutVanityMintsInput = {
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -2329,6 +2525,7 @@ export type UserUncheckedUpdateWithoutVanityMintsInput = {
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -2355,6 +2552,7 @@ export type UserCreateWithoutRefreshCachesInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -2381,6 +2579,7 @@ export type UserUncheckedCreateWithoutRefreshCachesInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   appTransactions?: Prisma.AppTransactionUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -2423,6 +2622,7 @@ export type UserUpdateWithoutRefreshCachesInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -2449,6 +2649,7 @@ export type UserUncheckedUpdateWithoutRefreshCachesInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   appTransactions?: Prisma.AppTransactionUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -2475,6 +2676,7 @@ export type UserCreateWithoutAppTransactionsInput = {
   vanityMints?: Prisma.VanityMintCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutCreateNestedManyWithoutReferredUserInput
 }
@@ -2501,6 +2703,7 @@ export type UserUncheckedCreateWithoutAppTransactionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedCreateNestedManyWithoutUserInput
   refreshCaches?: Prisma.RefreshCacheUncheckedCreateNestedManyWithoutUserInput
   marketer?: Prisma.MarketerUncheckedCreateNestedOneWithoutUserInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedCreateNestedManyWithoutUserInput
   referral?: Prisma.ReferralUncheckedCreateNestedOneWithoutUserInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedCreateNestedManyWithoutReferredUserInput
 }
@@ -2543,6 +2746,7 @@ export type UserUpdateWithoutAppTransactionsInput = {
   vanityMints?: Prisma.VanityMintUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUpdateManyWithoutReferredUserNestedInput
 }
@@ -2569,6 +2773,7 @@ export type UserUncheckedUpdateWithoutAppTransactionsInput = {
   vanityMints?: Prisma.VanityMintUncheckedUpdateManyWithoutUserNestedInput
   refreshCaches?: Prisma.RefreshCacheUncheckedUpdateManyWithoutUserNestedInput
   marketer?: Prisma.MarketerUncheckedUpdateOneWithoutUserNestedInput
+  marketerApplications?: Prisma.MarketerApplicationUncheckedUpdateManyWithoutUserNestedInput
   referral?: Prisma.ReferralUncheckedUpdateOneWithoutUserNestedInput
   referralPayoutsAsReferred?: Prisma.ReferralPayoutUncheckedUpdateManyWithoutReferredUserNestedInput
 }
@@ -2590,6 +2795,7 @@ export type UserCountOutputType = {
   vanityMints: number
   refreshCaches: number
   appTransactions: number
+  marketerApplications: number
   referralPayoutsAsReferred: number
 }
 
@@ -2605,6 +2811,7 @@ export type UserCountOutputTypeSelect<ExtArgs extends runtime.Types.Extensions.I
   vanityMints?: boolean | UserCountOutputTypeCountVanityMintsArgs
   refreshCaches?: boolean | UserCountOutputTypeCountRefreshCachesArgs
   appTransactions?: boolean | UserCountOutputTypeCountAppTransactionsArgs
+  marketerApplications?: boolean | UserCountOutputTypeCountMarketerApplicationsArgs
   referralPayoutsAsReferred?: boolean | UserCountOutputTypeCountReferralPayoutsAsReferredArgs
 }
 
@@ -2698,6 +2905,13 @@ export type UserCountOutputTypeCountAppTransactionsArgs<ExtArgs extends runtime.
 /**
  * UserCountOutputType without action
  */
+export type UserCountOutputTypeCountMarketerApplicationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  where?: Prisma.MarketerApplicationWhereInput
+}
+
+/**
+ * UserCountOutputType without action
+ */
 export type UserCountOutputTypeCountReferralPayoutsAsReferredArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   where?: Prisma.ReferralPayoutWhereInput
 }
@@ -2727,6 +2941,7 @@ export type UserSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = r
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
   appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
   marketer?: boolean | Prisma.User$marketerArgs<ExtArgs>
+  marketerApplications?: boolean | Prisma.User$marketerApplicationsArgs<ExtArgs>
   referral?: boolean | Prisma.User$referralArgs<ExtArgs>
   referralPayoutsAsReferred?: boolean | Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -2788,6 +3003,7 @@ export type UserInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   refreshCaches?: boolean | Prisma.User$refreshCachesArgs<ExtArgs>
   appTransactions?: boolean | Prisma.User$appTransactionsArgs<ExtArgs>
   marketer?: boolean | Prisma.User$marketerArgs<ExtArgs>
+  marketerApplications?: boolean | Prisma.User$marketerApplicationsArgs<ExtArgs>
   referral?: boolean | Prisma.User$referralArgs<ExtArgs>
   referralPayoutsAsReferred?: boolean | Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>
   _count?: boolean | Prisma.UserCountOutputTypeDefaultArgs<ExtArgs>
@@ -2815,6 +3031,7 @@ export type $UserPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs =
     refreshCaches: Prisma.$RefreshCachePayload<ExtArgs>[]
     appTransactions: Prisma.$AppTransactionPayload<ExtArgs>[]
     marketer: Prisma.$MarketerPayload<ExtArgs> | null
+    marketerApplications: Prisma.$MarketerApplicationPayload<ExtArgs>[]
     referral: Prisma.$ReferralPayload<ExtArgs> | null
     referralPayoutsAsReferred: Prisma.$ReferralPayoutPayload<ExtArgs>[]
   }
@@ -3236,6 +3453,7 @@ export interface Prisma__UserClient<T, Null = never, ExtArgs extends runtime.Typ
   refreshCaches<T extends Prisma.User$refreshCachesArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$refreshCachesArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$RefreshCachePayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   appTransactions<T extends Prisma.User$appTransactionsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$appTransactionsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$AppTransactionPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   marketer<T extends Prisma.User$marketerArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketerArgs<ExtArgs>>): Prisma.Prisma__MarketerClient<runtime.Types.Result.GetResult<Prisma.$MarketerPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
+  marketerApplications<T extends Prisma.User$marketerApplicationsArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$marketerApplicationsArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$MarketerApplicationPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   referral<T extends Prisma.User$referralArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$referralArgs<ExtArgs>>): Prisma.Prisma__ReferralClient<runtime.Types.Result.GetResult<Prisma.$ReferralPayload<ExtArgs>, T, "findUniqueOrThrow", GlobalOmitOptions> | null, null, ExtArgs, GlobalOmitOptions>
   referralPayoutsAsReferred<T extends Prisma.User$referralPayoutsAsReferredArgs<ExtArgs> = {}>(args?: Prisma.Subset<T, Prisma.User$referralPayoutsAsReferredArgs<ExtArgs>>): Prisma.PrismaPromise<runtime.Types.Result.GetResult<Prisma.$ReferralPayoutPayload<ExtArgs>, T, "findMany", GlobalOmitOptions> | Null>
   /**
@@ -3953,6 +4171,30 @@ export type User$marketerArgs<ExtArgs extends runtime.Types.Extensions.InternalA
    */
   include?: Prisma.MarketerInclude<ExtArgs> | null
   where?: Prisma.MarketerWhereInput
+}
+
+/**
+ * User.marketerApplications
+ */
+export type User$marketerApplicationsArgs<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
+  /**
+   * Select specific fields to fetch from the MarketerApplication
+   */
+  select?: Prisma.MarketerApplicationSelect<ExtArgs> | null
+  /**
+   * Omit specific fields from the MarketerApplication
+   */
+  omit?: Prisma.MarketerApplicationOmit<ExtArgs> | null
+  /**
+   * Choose, which related nodes to fetch as well
+   */
+  include?: Prisma.MarketerApplicationInclude<ExtArgs> | null
+  where?: Prisma.MarketerApplicationWhereInput
+  orderBy?: Prisma.MarketerApplicationOrderByWithRelationInput | Prisma.MarketerApplicationOrderByWithRelationInput[]
+  cursor?: Prisma.MarketerApplicationWhereUniqueInput
+  take?: number
+  skip?: number
+  distinct?: Prisma.MarketerApplicationScalarFieldEnum | Prisma.MarketerApplicationScalarFieldEnum[]
 }
 
 /**

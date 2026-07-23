@@ -10,6 +10,7 @@
  */
 export type * from './models/TestTable'
 export type * from './models/User'
+export type * from './models/MarketerApplication'
 export type * from './models/Marketer'
 export type * from './models/Referral'
 export type * from './models/ReferralPayout'

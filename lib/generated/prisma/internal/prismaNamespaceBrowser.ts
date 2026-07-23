@@ -53,6 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  MarketerApplication: 'MarketerApplication',
   Marketer: 'Marketer',
   Referral: 'Referral',
   ReferralPayout: 'ReferralPayout',
@@ -124,6 +125,19 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const MarketerApplicationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  message: 'message',
+  operatorNote: 'operatorNote',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketerApplicationScalarFieldEnum = (typeof MarketerApplicationScalarFieldEnum)[keyof typeof MarketerApplicationScalarFieldEnum]
 
 
 export const MarketerScalarFieldEnum = {

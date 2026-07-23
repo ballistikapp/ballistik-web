@@ -2,39 +2,56 @@
 
 ## Purpose
 
-Product-facing Marketer setup, register-time Referral attribution, fee-collection dual-transfer splits, and Referral Payout tracking. Ops designates Marketers; this surface lets an enabled Marketer configure their shareable code and fee-collector wallet, see attributed Users, and reconcile Referral Payouts with light aggregates.
+Product-facing Referrals surface for all authenticated Users: Marketer Application intake for non-Marketers, setup + referred Users + payouts for enabled Marketers, and read-only history for disabled Marketers. Register-time Referral attribution and fee-collection dual-transfer splits are unchanged. Ops designates Marketers and reviews Applications; rates and designation stay Operator-owned.
 
 See `CONTEXT.md` and ADRs:
 
 - `docs/adr/0004-referral-atomic-fee-split.md`
 - `docs/adr/0005-referral-register-only-live-rate.md`
 
-Ops designation lives in [Ops Console](./ops-console-implementation.md). Fee collection details also live in [Pricing](./pricing-implementation.md).
+Ops designation and Applications inbox live in [Ops Console](./ops-console-implementation.md). Fee collection details also live in [Pricing](./pricing-implementation.md).
 
 ## Layers
 
 | Layer | Path |
 | --- | --- |
-| Schema | `prisma/schema.prisma` (`Marketer`, `Referral`, `ReferralPayout`) |
-| Zod | `server/schemas/marketer.schema.ts`, optional `referralCode` on `loginWithWalletSignatureSchema` |
-| Service | `server/services/marketer.service.ts`; Referral create in `auth.service` register path; fee split in `usage-fee.service` |
-| Router | `server/trpc/routers/marketer.router.ts` (`marketer` on app router) |
+| Schema | `prisma/schema.prisma` (`Marketer`, `MarketerApplication`, `Referral`, `ReferralPayout`) |
+| Config | `lib/config/marketer.config.ts` (Application message max length) |
+| Zod | `server/schemas/marketer.schema.ts`, `server/schemas/marketer-application.schema.ts`, optional `referralCode` on `loginWithWalletSignatureSchema` |
+| Service | `server/services/marketer.service.ts`, `server/services/marketer-application.service.ts`; Referral create in `auth.service` register path; fee split in `usage-fee.service`; Ops create Marketer auto-approves pending Application |
+| Router | `server/trpc/routers/marketer.router.ts` (`marketer` on app router); Ops Application procedures on `ops` |
 | UI | `app/(app)/referrals/page.tsx`, `components/marketer/**` |
-| Nav | Account group item gated in `components/layout/sidebar/app-sidebar.tsx` |
+| Nav | Account **Referrals** for all authenticated Users (`components/layout/sidebar/app-sidebar.tsx`) |
 | Auth entry | `/auth?ref=<code>` → `WalletAuthActions` → `auth.loginWithWalletSignature` |
 | Fee seam | `usageFeeService.collectFromMainWallet` (usage fees + subscription charges) |
 
 ## Procedures
 
-- `marketer.getMe` — `protectedRateLimitedProcedure`; returns the current User’s Marketer setup when they are an **enabled** Marketer; otherwise `null` (used for nav visibility and page gate)
-- `marketer.updateSetup` — `protectedRateLimitedProcedure`; set/change `referralCode` and/or `feeCollectorPublicKey`; requires enabled Marketer; disabled / non-Marketer → not-found
-- `marketer.listReferredUsers` — `protectedRateLimitedProcedure`; sticky Referrals for the current enabled Marketer (name, main wallet, join time); newest first; disabled / non-Marketer → not-found
-- `marketer.listPayouts` — `protectedRateLimitedProcedure`; Referral Payouts for the current enabled Marketer (amount, rate, reason, signature, referred User); newest first
-- `marketer.getAggregates` — `protectedRateLimitedProcedure`; total earned (Marketer lamports sum), referral count, last payout time
+- `marketer.getMe` — `protectedRateLimitedProcedure`; discriminated status for the current User:
+  - `can_apply` — not a Marketer, no pending Application (never applied or last was approved without a row edge-case)
+  - `pending` — latest Application is pending
+  - `rejected` — latest Application is rejected (includes optional Operator note); User may submit a new Application
+  - `enabled` — enabled Marketer with setup
+  - `disabled` — disabled Marketer with setup (read-only history)
+- `marketer.submitApplication` — `protectedRateLimitedProcedure`; required length-capped message; at most one pending; blocked if already a Marketer
+- `marketer.updateSetup` — `protectedRateLimitedProcedure`; set/change `referralCode` and/or `feeCollectorPublicKey`; requires **enabled** Marketer; disabled / non-Marketer → not-found
+- `marketer.listReferredUsers` — `protectedRateLimitedProcedure`; sticky Referrals for the current Marketer (enabled or disabled); newest first; non-Marketer → not-found
+- `marketer.listPayouts` — `protectedRateLimitedProcedure`; Referral Payouts for the current Marketer (enabled or disabled); newest first
+- `marketer.getAggregates` — `protectedRateLimitedProcedure`; total earned, referral count, last payout time (enabled or disabled)
+
+## Marketer Application
+
+- Message required, max `MARKETER_APPLICATION_MESSAGE_MAX_LENGTH` (1000).
+- Status: `PENDING` | `APPROVED` | `REJECTED`.
+- At most one pending Application per User (enforced in service).
+- Reject (Ops) may include an optional Operator note shown to the User.
+- After reject, User may submit a **new** Application row.
+- Creating a Marketer for that User auto-approves their pending Application (same transaction). Creating a Marketer with no pending Application has no Application side effects.
+- Disabled Marketers cannot apply again (already designated).
 
 ## Marketer-owned fields
 
-- **referralCode** — optional until set; unique when set; mutable. Slug: lowercase letters, numbers, hyphens; 3–32 chars; normalized to lowercase on save. Changing the code stops old links from resolving for **new** registrations; existing Referrals stay attached (ADR 0005).
+- **referralCode** — optional until set; unique when set; mutable. Slug: lowercase letters, numbers, and hyphens; 3–32 chars; normalized to lowercase on save. Changing the code stops old links from resolving for **new** registrations; existing Referrals stay attached (ADR 0005).
 - **feeCollectorPublicKey** — optional until set; mutable; validated Solana public key. Required at collection time before a Referral Payout can be sent.
 
 Ops-owned fields (`nickname`, `feeShareRate`, `isEnabled`) are not writable here.
@@ -69,10 +86,11 @@ Pro-waived (zero) fees still skip collection entirely — no transfers and no Re
 
 ## Product UI
 
-- `/referrals` — setup form (code, fee-collector, copyable `/auth?ref=<code>` link), Referred Users table, Referral Payouts table + aggregates (total earned, referral count, last payout)
-- Account nav **Referrals** link appears only when `marketer.getMe` is non-null
-- Non-Marketers and disabled Marketers: no nav link; visiting `/referrals` redirects to `/account`; write/list APIs return not-found
+- `/referrals` — Application intake (can apply / pending / rejected+resubmit), or Marketer setup + Referred Users + Payouts; disabled Marketers see read-only setup/history
+- Account nav **Referrals** link always shown for authenticated Users
+- Intake only — no User-facing rate or self-designation
 
 ## Seam tests
 
-`server/services/usage-fee.service.test.ts` covers the agreed fee-collection seam behaviors from the referral spec (no Referral, qualifying split + payout, missing collector, disabled Marketer, zero/sub-lamport share, live rate).
+- `server/services/usage-fee.service.test.ts` — fee-collection seam (no Referral, qualifying split + payout, missing collector, disabled Marketer, zero/sub-lamport share, live rate)
+- `server/services/marketer-application.service.test.ts` — Application submit rules, reject, approve-pending, and `ops.createMarketer` auto-approve / no-op when none pending

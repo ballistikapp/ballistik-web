@@ -60,6 +60,10 @@ _Avoid_: Wallet (for mint secrets), VanityMint (when referring to the per-Launch
 A User designated by an Operator in the Ops Console with a fee-share rate (0–1) that applies to every User they refer. The live rate at each fee collection is what matters — not the rate at signup. The Marketer chooses and may change their referral code; a code change invalidates prior share links, but existing Referrals stay attached. An Operator-only nickname labels the Marketer for Ops memory; it is not the referral code. When an Operator disables a Marketer, their code stops attributing new Users and existing Referrals stop producing Referral Payouts; past payouts remain.
 _Avoid_: Referrer, affiliate, partner (when referring to the designated User role)
 
+**Marketer Application**:
+A User’s request to become a Marketer, carrying a message for Operators and optionally an Operator reject note. Status is pending, approved, or rejected. A User may have at most one pending Application; designation still happens only when an Operator creates the Marketer, which approves the pending Application.
+_Avoid_: Affiliate application, partner request, referral signup
+
 **Referral**:
 The lasting attribution of a User to a Marketer, created only when that User first registers with a valid referral code. Later logins with a code do not create or change a Referral.
 _Avoid_: Invite, affiliate link, signup attribution

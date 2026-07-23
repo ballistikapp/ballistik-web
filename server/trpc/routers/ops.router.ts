@@ -4,6 +4,7 @@ import {
   router,
 } from "../trpc";
 import { opsService } from "@/server/services/ops.service";
+import { marketerApplicationService } from "@/server/services/marketer-application.service";
 import {
   opsCreateMarketerSchema,
   opsGetLaunchAutopsySchema,
@@ -25,6 +26,11 @@ import {
   opsRevealPrivateKeySchema,
   opsUpdateMarketerSchema,
 } from "@/server/schemas/ops.schema";
+import {
+  opsGetMarketerApplicationSchema,
+  opsListMarketerApplicationsSchema,
+  opsRejectMarketerApplicationSchema,
+} from "@/server/schemas/marketer-application.schema";
 
 export const opsRouter = router({
   getOverview: operatorProcedure
@@ -142,5 +148,32 @@ export const opsRouter = router({
     .input(opsUpdateMarketerSchema)
     .mutation(async ({ input, ctx }) => {
       return await opsService.updateMarketer(ctx.user.id, input);
+    }),
+
+  listMarketerApplications: operatorProcedure
+    .input(opsListMarketerApplicationsSchema)
+    .query(async ({ input, ctx }) => {
+      return await marketerApplicationService.listApplications(
+        ctx.user.id,
+        input
+      );
+    }),
+
+  getMarketerApplication: operatorProcedure
+    .input(opsGetMarketerApplicationSchema)
+    .query(async ({ input, ctx }) => {
+      return await marketerApplicationService.getApplication(
+        ctx.user.id,
+        input
+      );
+    }),
+
+  rejectMarketerApplication: operatorProcedure
+    .input(opsRejectMarketerApplicationSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await marketerApplicationService.rejectApplication(
+        ctx.user.id,
+        input
+      );
     }),
 });
