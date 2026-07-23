@@ -13,10 +13,14 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { truncateAddress } from "@/lib/utils/format";
+import { formatSol, truncateAddress } from "@/lib/utils/format";
 import { trpc } from "@/lib/trpc/client";
 
-function formatJoinedAt(value: Date) {
+function lamportsToSol(lamports: bigint | number): number {
+  return Number(lamports) / 1_000_000_000;
+}
+
+function formatWhen(value: Date) {
   return new Date(value).toLocaleString();
 }
 
@@ -48,6 +52,9 @@ export function ReferredUsersSection() {
               <TableHead>User</TableHead>
               <TableHead>Main Wallet</TableHead>
               <TableHead>Joined</TableHead>
+              <TableHead>Earned</TableHead>
+              <TableHead>Last payout</TableHead>
+              <TableHead>Payouts</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -60,7 +67,16 @@ export function ReferredUsersSection() {
                   </span>
                 </TableCell>
                 <TableCell className="text-muted-foreground text-sm">
-                  {formatJoinedAt(row.joinedAt)}
+                  {formatWhen(row.joinedAt)}
+                </TableCell>
+                <TableCell className="font-medium">
+                  {formatSol(lamportsToSol(row.totalEarnedLamports))} SOL
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {row.lastPayoutAt ? formatWhen(row.lastPayoutAt) : "—"}
+                </TableCell>
+                <TableCell className="text-muted-foreground text-sm">
+                  {row.payoutCount}
                 </TableCell>
               </TableRow>
             ))}

@@ -29,6 +29,8 @@ export type TokenMinAggregateOutputType = {
   privateKey: string | null
   status: $Enums.TokenStatus | null
   isMayhemMode: boolean | null
+  platform: $Enums.LaunchPlatform | null
+  platformVersion: string | null
   name: string | null
   symbol: string | null
   description: string | null
@@ -46,6 +48,8 @@ export type TokenMaxAggregateOutputType = {
   privateKey: string | null
   status: $Enums.TokenStatus | null
   isMayhemMode: boolean | null
+  platform: $Enums.LaunchPlatform | null
+  platformVersion: string | null
   name: string | null
   symbol: string | null
   description: string | null
@@ -63,6 +67,8 @@ export type TokenCountAggregateOutputType = {
   privateKey: number
   status: number
   isMayhemMode: number
+  platform: number
+  platformVersion: number
   name: number
   symbol: number
   description: number
@@ -82,6 +88,8 @@ export type TokenMinAggregateInputType = {
   privateKey?: true
   status?: true
   isMayhemMode?: true
+  platform?: true
+  platformVersion?: true
   name?: true
   symbol?: true
   description?: true
@@ -99,6 +107,8 @@ export type TokenMaxAggregateInputType = {
   privateKey?: true
   status?: true
   isMayhemMode?: true
+  platform?: true
+  platformVersion?: true
   name?: true
   symbol?: true
   description?: true
@@ -116,6 +126,8 @@ export type TokenCountAggregateInputType = {
   privateKey?: true
   status?: true
   isMayhemMode?: true
+  platform?: true
+  platformVersion?: true
   name?: true
   symbol?: true
   description?: true
@@ -206,6 +218,8 @@ export type TokenGroupByOutputType = {
   privateKey: string
   status: $Enums.TokenStatus
   isMayhemMode: boolean
+  platform: $Enums.LaunchPlatform | null
+  platformVersion: string | null
   name: string
   symbol: string
   description: string | null
@@ -244,6 +258,8 @@ export type TokenWhereInput = {
   privateKey?: Prisma.StringFilter<"Token"> | string
   status?: Prisma.EnumTokenStatusFilter<"Token"> | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFilter<"Token"> | boolean
+  platform?: Prisma.EnumLaunchPlatformNullableFilter<"Token"> | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.StringNullableFilter<"Token"> | string | null
   name?: Prisma.StringFilter<"Token"> | string
   symbol?: Prisma.StringFilter<"Token"> | string
   description?: Prisma.StringNullableFilter<"Token"> | string | null
@@ -273,6 +289,8 @@ export type TokenOrderByWithRelationInput = {
   privateKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isMayhemMode?: Prisma.SortOrder
+  platform?: Prisma.SortOrderInput | Prisma.SortOrder
+  platformVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   symbol?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -305,6 +323,8 @@ export type TokenWhereUniqueInput = Prisma.AtLeast<{
   NOT?: Prisma.TokenWhereInput | Prisma.TokenWhereInput[]
   status?: Prisma.EnumTokenStatusFilter<"Token"> | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFilter<"Token"> | boolean
+  platform?: Prisma.EnumLaunchPlatformNullableFilter<"Token"> | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.StringNullableFilter<"Token"> | string | null
   name?: Prisma.StringFilter<"Token"> | string
   symbol?: Prisma.StringFilter<"Token"> | string
   description?: Prisma.StringNullableFilter<"Token"> | string | null
@@ -334,6 +354,8 @@ export type TokenOrderByWithAggregationInput = {
   privateKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isMayhemMode?: Prisma.SortOrder
+  platform?: Prisma.SortOrderInput | Prisma.SortOrder
+  platformVersion?: Prisma.SortOrderInput | Prisma.SortOrder
   name?: Prisma.SortOrder
   symbol?: Prisma.SortOrder
   description?: Prisma.SortOrderInput | Prisma.SortOrder
@@ -357,6 +379,8 @@ export type TokenScalarWhereWithAggregatesInput = {
   privateKey?: Prisma.StringWithAggregatesFilter<"Token"> | string
   status?: Prisma.EnumTokenStatusWithAggregatesFilter<"Token"> | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolWithAggregatesFilter<"Token"> | boolean
+  platform?: Prisma.EnumLaunchPlatformNullableWithAggregatesFilter<"Token"> | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.StringNullableWithAggregatesFilter<"Token"> | string | null
   name?: Prisma.StringWithAggregatesFilter<"Token"> | string
   symbol?: Prisma.StringWithAggregatesFilter<"Token"> | string
   description?: Prisma.StringNullableWithAggregatesFilter<"Token"> | string | null
@@ -374,6 +398,8 @@ export type TokenCreateInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -402,6 +428,8 @@ export type TokenUncheckedCreateInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -430,6 +458,8 @@ export type TokenUpdateInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -458,6 +488,8 @@ export type TokenUncheckedUpdateInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -486,6 +518,8 @@ export type TokenCreateManyInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -503,6 +537,8 @@ export type TokenUpdateManyMutationInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -519,6 +555,8 @@ export type TokenUncheckedUpdateManyInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -551,6 +589,8 @@ export type TokenCountOrderByAggregateInput = {
   privateKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isMayhemMode?: Prisma.SortOrder
+  platform?: Prisma.SortOrder
+  platformVersion?: Prisma.SortOrder
   name?: Prisma.SortOrder
   symbol?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -568,6 +608,8 @@ export type TokenMaxOrderByAggregateInput = {
   privateKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isMayhemMode?: Prisma.SortOrder
+  platform?: Prisma.SortOrder
+  platformVersion?: Prisma.SortOrder
   name?: Prisma.SortOrder
   symbol?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -585,6 +627,8 @@ export type TokenMinOrderByAggregateInput = {
   privateKey?: Prisma.SortOrder
   status?: Prisma.SortOrder
   isMayhemMode?: Prisma.SortOrder
+  platform?: Prisma.SortOrder
+  platformVersion?: Prisma.SortOrder
   name?: Prisma.SortOrder
   symbol?: Prisma.SortOrder
   description?: Prisma.SortOrder
@@ -662,6 +706,10 @@ export type TokenUpdateOneWithoutOperationalWalletsNestedInput = {
 
 export type EnumTokenStatusFieldUpdateOperationsInput = {
   set?: $Enums.TokenStatus
+}
+
+export type NullableEnumLaunchPlatformFieldUpdateOperationsInput = {
+  set?: $Enums.LaunchPlatform | null
 }
 
 export type TokenCreateNestedOneWithoutDevWalletsInput = {
@@ -817,6 +865,8 @@ export type TokenCreateWithoutUserInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -844,6 +894,8 @@ export type TokenUncheckedCreateWithoutUserInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -900,6 +952,8 @@ export type TokenScalarWhereInput = {
   privateKey?: Prisma.StringFilter<"Token"> | string
   status?: Prisma.EnumTokenStatusFilter<"Token"> | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFilter<"Token"> | boolean
+  platform?: Prisma.EnumLaunchPlatformNullableFilter<"Token"> | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.StringNullableFilter<"Token"> | string | null
   name?: Prisma.StringFilter<"Token"> | string
   symbol?: Prisma.StringFilter<"Token"> | string
   description?: Prisma.StringNullableFilter<"Token"> | string | null
@@ -917,6 +971,8 @@ export type TokenCreateWithoutOperationalWalletsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -944,6 +1000,8 @@ export type TokenUncheckedCreateWithoutOperationalWalletsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -987,6 +1045,8 @@ export type TokenUpdateWithoutOperationalWalletsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1014,6 +1074,8 @@ export type TokenUncheckedUpdateWithoutOperationalWalletsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1041,6 +1103,8 @@ export type TokenCreateWithoutDevWalletsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1068,6 +1132,8 @@ export type TokenUncheckedCreateWithoutDevWalletsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1111,6 +1177,8 @@ export type TokenUpdateWithoutDevWalletsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1138,6 +1206,8 @@ export type TokenUncheckedUpdateWithoutDevWalletsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1165,6 +1235,8 @@ export type TokenCreateWithoutLaunchesInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1192,6 +1264,8 @@ export type TokenUncheckedCreateWithoutLaunchesInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1235,6 +1309,8 @@ export type TokenUpdateWithoutLaunchesInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1262,6 +1338,8 @@ export type TokenUncheckedUpdateWithoutLaunchesInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1289,6 +1367,8 @@ export type TokenCreateWithoutHoldingExitsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1316,6 +1396,8 @@ export type TokenUncheckedCreateWithoutHoldingExitsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1359,6 +1441,8 @@ export type TokenUpdateWithoutHoldingExitsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1386,6 +1470,8 @@ export type TokenUncheckedUpdateWithoutHoldingExitsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1413,6 +1499,8 @@ export type TokenCreateWithoutVolumeBotSessionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1440,6 +1528,8 @@ export type TokenUncheckedCreateWithoutVolumeBotSessionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1483,6 +1573,8 @@ export type TokenUpdateWithoutVolumeBotSessionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1510,6 +1602,8 @@ export type TokenUncheckedUpdateWithoutVolumeBotSessionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1537,6 +1631,8 @@ export type TokenCreateWithoutVanityMintsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1564,6 +1660,8 @@ export type TokenUncheckedCreateWithoutVanityMintsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1607,6 +1705,8 @@ export type TokenUpdateWithoutVanityMintsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1634,6 +1734,8 @@ export type TokenUncheckedUpdateWithoutVanityMintsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1661,6 +1763,8 @@ export type TokenCreateWithoutHoldingsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1688,6 +1792,8 @@ export type TokenUncheckedCreateWithoutHoldingsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1731,6 +1837,8 @@ export type TokenUpdateWithoutHoldingsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1758,6 +1866,8 @@ export type TokenUncheckedUpdateWithoutHoldingsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1785,6 +1895,8 @@ export type TokenCreateWithoutTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1812,6 +1924,8 @@ export type TokenUncheckedCreateWithoutTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1855,6 +1969,8 @@ export type TokenUpdateWithoutTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1882,6 +1998,8 @@ export type TokenUncheckedUpdateWithoutTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -1909,6 +2027,8 @@ export type TokenCreateWithoutTokenTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1936,6 +2056,8 @@ export type TokenUncheckedCreateWithoutTokenTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -1979,6 +2101,8 @@ export type TokenUpdateWithoutTokenTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2006,6 +2130,8 @@ export type TokenUncheckedUpdateWithoutTokenTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2033,6 +2159,8 @@ export type TokenCreateWithoutRefreshCachesInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -2060,6 +2188,8 @@ export type TokenUncheckedCreateWithoutRefreshCachesInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -2103,6 +2233,8 @@ export type TokenUpdateWithoutRefreshCachesInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2130,6 +2262,8 @@ export type TokenUncheckedUpdateWithoutRefreshCachesInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2157,6 +2291,8 @@ export type TokenCreateWithoutAppTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -2184,6 +2320,8 @@ export type TokenUncheckedCreateWithoutAppTransactionsInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -2227,6 +2365,8 @@ export type TokenUpdateWithoutAppTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2254,6 +2394,8 @@ export type TokenUncheckedUpdateWithoutAppTransactionsInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2281,6 +2423,8 @@ export type TokenCreateManyUserInput = {
   privateKey: string
   status?: $Enums.TokenStatus
   isMayhemMode?: boolean
+  platform?: $Enums.LaunchPlatform | null
+  platformVersion?: string | null
   name: string
   symbol: string
   description?: string | null
@@ -2297,6 +2441,8 @@ export type TokenUpdateWithoutUserInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2324,6 +2470,8 @@ export type TokenUncheckedUpdateWithoutUserInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2351,6 +2499,8 @@ export type TokenUncheckedUpdateManyWithoutUserInput = {
   privateKey?: Prisma.StringFieldUpdateOperationsInput | string
   status?: Prisma.EnumTokenStatusFieldUpdateOperationsInput | $Enums.TokenStatus
   isMayhemMode?: Prisma.BoolFieldUpdateOperationsInput | boolean
+  platform?: Prisma.NullableEnumLaunchPlatformFieldUpdateOperationsInput | $Enums.LaunchPlatform | null
+  platformVersion?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
   name?: Prisma.StringFieldUpdateOperationsInput | string
   symbol?: Prisma.StringFieldUpdateOperationsInput | string
   description?: Prisma.NullableStringFieldUpdateOperationsInput | string | null
@@ -2488,6 +2638,8 @@ export type TokenSelect<ExtArgs extends runtime.Types.Extensions.InternalArgs = 
   privateKey?: boolean
   status?: boolean
   isMayhemMode?: boolean
+  platform?: boolean
+  platformVersion?: boolean
   name?: boolean
   symbol?: boolean
   description?: boolean
@@ -2518,6 +2670,8 @@ export type TokenSelectCreateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   privateKey?: boolean
   status?: boolean
   isMayhemMode?: boolean
+  platform?: boolean
+  platformVersion?: boolean
   name?: boolean
   symbol?: boolean
   description?: boolean
@@ -2536,6 +2690,8 @@ export type TokenSelectUpdateManyAndReturn<ExtArgs extends runtime.Types.Extensi
   privateKey?: boolean
   status?: boolean
   isMayhemMode?: boolean
+  platform?: boolean
+  platformVersion?: boolean
   name?: boolean
   symbol?: boolean
   description?: boolean
@@ -2554,6 +2710,8 @@ export type TokenSelectScalar = {
   privateKey?: boolean
   status?: boolean
   isMayhemMode?: boolean
+  platform?: boolean
+  platformVersion?: boolean
   name?: boolean
   symbol?: boolean
   description?: boolean
@@ -2566,7 +2724,7 @@ export type TokenSelectScalar = {
   userId?: boolean
 }
 
-export type TokenOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"publicKey" | "privateKey" | "status" | "isMayhemMode" | "name" | "symbol" | "description" | "imageUrl" | "websiteUrl" | "twitterUrl" | "telegramUrl" | "createdAt" | "updatedAt" | "userId", ExtArgs["result"]["token"]>
+export type TokenOmit<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = runtime.Types.Extensions.GetOmit<"publicKey" | "privateKey" | "status" | "isMayhemMode" | "platform" | "platformVersion" | "name" | "symbol" | "description" | "imageUrl" | "websiteUrl" | "twitterUrl" | "telegramUrl" | "createdAt" | "updatedAt" | "userId", ExtArgs["result"]["token"]>
 export type TokenInclude<ExtArgs extends runtime.Types.Extensions.InternalArgs = runtime.Types.Extensions.DefaultArgs> = {
   user?: boolean | Prisma.UserDefaultArgs<ExtArgs>
   operationalWallets?: boolean | Prisma.Token$operationalWalletsArgs<ExtArgs>
@@ -2610,6 +2768,11 @@ export type $TokenPayload<ExtArgs extends runtime.Types.Extensions.InternalArgs 
     privateKey: string
     status: $Enums.TokenStatus
     isMayhemMode: boolean
+    /**
+     * Null Platform / version marks a legacy Token; do not infer from JSON shape.
+     */
+    platform: $Enums.LaunchPlatform | null
+    platformVersion: string | null
     name: string
     symbol: string
     description: string | null
@@ -3059,6 +3222,8 @@ export interface TokenFieldRefs {
   readonly privateKey: Prisma.FieldRef<"Token", 'String'>
   readonly status: Prisma.FieldRef<"Token", 'TokenStatus'>
   readonly isMayhemMode: Prisma.FieldRef<"Token", 'Boolean'>
+  readonly platform: Prisma.FieldRef<"Token", 'LaunchPlatform'>
+  readonly platformVersion: Prisma.FieldRef<"Token", 'String'>
   readonly name: Prisma.FieldRef<"Token", 'String'>
   readonly symbol: Prisma.FieldRef<"Token", 'String'>
   readonly description: Prisma.FieldRef<"Token", 'String'>

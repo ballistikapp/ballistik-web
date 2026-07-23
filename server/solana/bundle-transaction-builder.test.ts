@@ -1,4 +1,5 @@
 import assert from "node:assert/strict";
+import { createRequire } from "node:module";
 import test from "node:test";
 import {
   ComputeBudgetProgram,
@@ -14,7 +15,29 @@ import {
   getAssociatedTokenAddressSync,
   TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { buildBundleTransactionsForCreateAndBuys } from "./bundle-transaction-builder";
+
+const require = createRequire(import.meta.url);
+
+function stubServerOnlyModule() {
+  const serverOnlyPath = require.resolve("server-only");
+  require.cache[serverOnlyPath] = {
+    id: serverOnlyPath,
+    filename: serverOnlyPath,
+    loaded: true,
+    exports: {},
+    children: [],
+    path: serverOnlyPath,
+    paths: [],
+    isPreloading: false,
+    parent: undefined,
+    require,
+  } as unknown as NodeJS.Module;
+}
+
+async function loadBundleTransactionBuilder() {
+  stubServerOnlyModule();
+  return import("./bundle-transaction-builder");
+}
 
 const BUY_PROGRAM_ID = Keypair.generate().publicKey;
 
@@ -92,6 +115,8 @@ function buildBuyTransaction({
 }
 
 test("hoists follow-up ATA creation into the first bundle transaction", async () => {
+  const { buildBundleTransactionsForCreateAndBuys } =
+    await loadBundleTransactionBuilder();
   const creator = Keypair.generate();
   const mint = Keypair.generate();
   const secondBuyer = Keypair.generate();
@@ -164,6 +189,10 @@ test("hoists follow-up ATA creation into the first bundle transaction", async ()
 });
 
 test("caps ATA hoisting so high-buyer bundles still serialize", async () => {
+  const {
+    MAX_RAW_TRANSACTION_BYTES,
+    buildBundleTransactionsForCreateAndBuys,
+  } = await loadBundleTransactionBuilder();
   const creator = Keypair.generate();
   const mint = Keypair.generate();
   const bundlers = Array.from({ length: 10 }, () => Keypair.generate());
@@ -187,7 +216,8 @@ test("caps ATA hoisting so high-buyer bundles still serialize", async () => {
     }
   );
 
-  assert.equal(transactions.length, 5);
+  // 11 buyers → create+first buy, then 5 follow-up txs × 2 buys (no ALT).
+  assert.equal(transactions.length, 6);
 
   const firstTxAtaCount =
     transactions[0]?.instructions.filter((ix) =>
@@ -212,6 +242,40 @@ test("caps ATA hoisting so high-buyer bundles still serialize", async () => {
         requiredSignerKeys.has(signer.publicKey.toBase58())
       )
     );
-    assert.ok(versionedTx.serialize().length <= 1232);
+    assert.ok(versionedTx.serialize().length <= MAX_RAW_TRANSACTION_BYTES);
   }
+});
+
+test("bundle packing helpers share one source of truth for buyer→tx mapping", async () => {
+  const {
+    BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITH_ALT,
+    BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITHOUT_ALT,
+    MAX_RAW_TRANSACTION_BYTES,
+    bundleBuyerTransactionIndex,
+    bundleBuysPerFollowUpTransaction,
+  } = await loadBundleTransactionBuilder();
+
+  assert.equal(
+    bundleBuysPerFollowUpTransaction(false),
+    BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITHOUT_ALT
+  );
+  assert.equal(
+    bundleBuysPerFollowUpTransaction(true),
+    BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITH_ALT
+  );
+  assert.equal(BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITHOUT_ALT, 2);
+  assert.equal(BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITH_ALT, 4);
+  assert.equal(MAX_RAW_TRANSACTION_BYTES, 1232);
+
+  const withoutAlt = bundleBuysPerFollowUpTransaction(false);
+  assert.equal(bundleBuyerTransactionIndex(0, withoutAlt), 0);
+  assert.equal(bundleBuyerTransactionIndex(1, withoutAlt), 1);
+  assert.equal(bundleBuyerTransactionIndex(2, withoutAlt), 1);
+  assert.equal(bundleBuyerTransactionIndex(3, withoutAlt), 2);
+
+  const withAlt = bundleBuysPerFollowUpTransaction(true);
+  assert.equal(bundleBuyerTransactionIndex(0, withAlt), 0);
+  assert.equal(bundleBuyerTransactionIndex(1, withAlt), 1);
+  assert.equal(bundleBuyerTransactionIndex(4, withAlt), 1);
+  assert.equal(bundleBuyerTransactionIndex(5, withAlt), 2);
 });

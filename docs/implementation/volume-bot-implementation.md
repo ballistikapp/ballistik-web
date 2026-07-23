@@ -13,6 +13,7 @@
 - gRPC-backed volume-bot acceleration is a Pro feature.
 - Free users must stay on the non-gRPC interval profile (minimum 5 seconds).
 - Pro users can use sub-5-second intervals and RabbitStream-backed balance/transaction acceleration when infrastructure is enabled.
+- Legacy Tokens (`platformVersion == null`) cannot start new sessions (`volumeBot.start` denied via `assertNonLegacyPlatformCapability` "automation"). Stop, reclaim, close-accounts, and session reads remain available. See launch-implementation.md legacy policy.
 
 ## Recent Changes: Removed Execution Probability
 

@@ -28,6 +28,9 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { LANDING_FAQ_ITEMS } from "@/lib/config/landing-faq";
+import { buildAuthRedirectPath } from "@/lib/utils/auth-redirect";
+
+const AFFILIATE_APPLY_HREF = buildAuthRedirectPath("/referrals");
 
 export function LandingPage() {
   return (
@@ -424,6 +427,51 @@ export function LandingPage() {
             wallets you own, and Pro adds faster live features with zero
             platform fees on supported flows.
           </motion.p>
+        </section>
+
+        <section
+          id="affiliate"
+          className="flex flex-col gap-10 w-full py-20 md:py-32 px-4 md:px-6"
+        >
+          <motion.h2
+            className="text-[2rem] md:text-[3rem] w-full text-center bg-clip-text text-transparent bg-linear-to-b from-neutral-50 to-neutral-400 bg-opacity-50"
+            initial={{ opacity: 0, y: 30 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut" }}
+          >
+            Affiliate program.
+          </motion.h2>
+          <motion.p
+            className="mx-auto max-w-2xl text-center text-neutral-500 text-lg -mt-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.2 }}
+          >
+            The {SITE_BRAND_NAME} affiliate program lets approved Marketers earn
+            a share of referred Users&apos; platform spend. Sign in, open
+            Referrals, and submit a Marketer Application — Operators set share
+            rates; they are not listed here.
+          </motion.p>
+          <motion.div
+            className="flex justify-center"
+            initial={{ opacity: 0, y: 24 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true, margin: "-100px" }}
+            transition={{ duration: 0.8, ease: "easeOut", delay: 0.35 }}
+          >
+            <HoverBorderGradient
+              as={Link}
+              href={AFFILIATE_APPLY_HREF}
+              containerClassName="group rounded-lg"
+              className="bg-background flex items-center gap-5 px-4 py-2 text-lg md:text-xl font-medium text-foreground"
+              highlight="radial-gradient(75% 181.15942028985506% at 50% 50%, hsl(0, 0%, 100%) 0%, rgba(255, 255, 255, 0) 100%)"
+            >
+              <span>Apply in the App</span>
+              <ChevronRightIcon className="h-6 w-6" />
+            </HoverBorderGradient>
+          </motion.div>
         </section>
 
         <section

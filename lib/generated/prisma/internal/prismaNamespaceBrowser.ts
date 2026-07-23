@@ -53,6 +53,7 @@ export const AnyNull = runtime.AnyNull
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  MarketerApplication: 'MarketerApplication',
   Marketer: 'Marketer',
   Referral: 'Referral',
   ReferralPayout: 'ReferralPayout',
@@ -64,6 +65,7 @@ export const ModelName = {
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
+  LaunchPlannedMint: 'LaunchPlannedMint',
   LaunchLog: 'LaunchLog',
   LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
@@ -123,6 +125,19 @@ export const UserScalarFieldEnum = {
 } as const
 
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
+
+
+export const MarketerApplicationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  message: 'message',
+  operatorNote: 'operatorNote',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketerApplicationScalarFieldEnum = (typeof MarketerApplicationScalarFieldEnum)[keyof typeof MarketerApplicationScalarFieldEnum]
 
 
 export const MarketerScalarFieldEnum = {
@@ -245,6 +260,8 @@ export const TokenScalarFieldEnum = {
   privateKey: 'privateKey',
   status: 'status',
   isMayhemMode: 'isMayhemMode',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   name: 'name',
   symbol: 'symbol',
   description: 'description',
@@ -275,7 +292,14 @@ export const LaunchScalarFieldEnum = {
   status: 'status',
   progress: 'progress',
   currentStep: 'currentStep',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   input: 'input',
+  plan: 'plan',
+  planSchemaVersion: 'planSchemaVersion',
+  planPersistedAt: 'planPersistedAt',
+  outcomeKind: 'outcomeKind',
+  outcomeDetails: 'outcomeDetails',
   result: 'result',
   tokenPublicKey: 'tokenPublicKey',
   startedAt: 'startedAt',
@@ -287,6 +311,21 @@ export const LaunchScalarFieldEnum = {
 } as const
 
 export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
+
+
+export const LaunchPlannedMintScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  vanityMintId: 'vanityMintId',
+  consumedAt: 'consumedAt',
+  abandonedAt: 'abandonedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchPlannedMintScalarFieldEnum = (typeof LaunchPlannedMintScalarFieldEnum)[keyof typeof LaunchPlannedMintScalarFieldEnum]
 
 
 export const LaunchLogScalarFieldEnum = {
@@ -308,6 +347,7 @@ export const LaunchRecoveryWalletScalarFieldEnum = {
   walletPublicKey: 'walletPublicKey',
   walletType: 'walletType',
   role: 'role',
+  platformRole: 'platformRole',
   isManaged: 'isManaged',
   fundedLamports: 'fundedLamports',
   reclaimStatus: 'reclaimStatus',

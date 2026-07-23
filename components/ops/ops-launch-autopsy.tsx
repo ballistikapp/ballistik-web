@@ -53,6 +53,39 @@ export function OpsLaunchAutopsy({ launchId }: OpsLaunchAutopsyProps) {
             <dd>{data.status}</dd>
           </div>
           <div>
+            <dt className="text-muted-foreground">platform</dt>
+            <dd>{data.platform ?? "—"}</dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">platform version</dt>
+            <dd>
+              {data.platformVersion ?? "—"}
+              {data.isLegacy ? (
+                <span className="text-muted-foreground ml-2 text-xs">
+                  legacy
+                </span>
+              ) : null}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">plan</dt>
+            <dd>
+              {data.hasPlan
+                ? `present${data.planSchemaVersion ? ` (schema ${data.planSchemaVersion})` : ""}`
+                : "none"}
+            </dd>
+          </div>
+          <div>
+            <dt className="text-muted-foreground">outcome</dt>
+            <dd>{data.outcomeKind ?? "—"}</dd>
+          </div>
+          {data.isLegacy ? (
+            <div>
+              <dt className="text-muted-foreground">retry / clone</dt>
+              <dd>unavailable (legacy)</dd>
+            </div>
+          ) : null}
+          <div>
             <dt className="text-muted-foreground">progress</dt>
             <dd>{data.progress}%</dd>
           </div>
@@ -92,6 +125,98 @@ export function OpsLaunchAutopsy({ launchId }: OpsLaunchAutopsyProps) {
             <dd className="whitespace-pre-wrap">{data.errorMessage ?? "—"}</dd>
           </div>
         </dl>
+      </section>
+
+      {data.hasPlan && !data.planSummaryAvailable ? (
+        <section className="flex flex-col gap-2">
+          <h2 className="text-base font-semibold">Plan summary</h2>
+          <p className="text-muted-foreground text-sm">
+            A plan is persisted but could not be projected safely (invalid or
+            unsupported schema). Opaque payload is omitted.
+          </p>
+        </section>
+      ) : null}
+
+      {data.planSummary ? (
+        <section className="flex flex-col gap-3">
+          <h2 className="text-base font-semibold">Plan summary</h2>
+          <p className="text-muted-foreground text-xs">
+            Normalized monetary summary and Platform operational details.
+            Opaque plan payload is omitted.
+            {data.planPersistedAt
+              ? ` Persisted ${formatDate(data.planPersistedAt)}.`
+              : ""}
+          </p>
+          <pre className="bg-muted overflow-x-auto rounded-md p-3 text-xs">
+            {JSON.stringify(data.planSummary, null, 2)}
+          </pre>
+        </section>
+      ) : null}
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Jito diagnostics</h2>
+        {data.jitoDiagnostics.eventCount === 0 ? (
+          <p className="text-muted-foreground text-sm">
+            No Jito telemetry on this Launch.
+          </p>
+        ) : (
+          <dl className="grid gap-2 text-sm sm:grid-cols-2">
+            <div>
+              <dt className="text-muted-foreground">events</dt>
+              <dd>{data.jitoDiagnostics.eventCount}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">last event</dt>
+              <dd>{data.jitoDiagnostics.lastEventType ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">last failure</dt>
+              <dd>{data.jitoDiagnostics.lastFailureType ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">tip lamports</dt>
+              <dd>{data.jitoDiagnostics.tipLamports ?? "—"}</dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">resends / rebuilds</dt>
+              <dd>
+                {data.jitoDiagnostics.resendCount} /{" "}
+                {data.jitoDiagnostics.rebuildCount}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-muted-foreground">bundle ids</dt>
+              <dd className="font-mono break-all">
+                {data.jitoDiagnostics.bundleIds.length > 0
+                  ? data.jitoDiagnostics.bundleIds.join(", ")
+                  : "—"}
+              </dd>
+            </div>
+            <div className="sm:col-span-2">
+              <dt className="text-muted-foreground">endpoints</dt>
+              <dd className="font-mono break-all text-xs">
+                {data.jitoDiagnostics.endpoints.length > 0
+                  ? data.jitoDiagnostics.endpoints.join(", ")
+                  : "—"}
+              </dd>
+            </div>
+            {data.jitoDiagnostics.confirmation ? (
+              <div className="sm:col-span-2">
+                <dt className="text-muted-foreground">confirmation</dt>
+                <dd className="font-mono text-xs">
+                  found={data.jitoDiagnostics.confirmation.foundCount ?? "—"}{" "}
+                  confirmed=
+                  {data.jitoDiagnostics.confirmation.confirmedCount ?? "—"}{" "}
+                  failed={data.jitoDiagnostics.confirmation.failedCount ?? "—"}{" "}
+                  notFound=
+                  {data.jitoDiagnostics.confirmation.notFoundCount ?? "—"}{" "}
+                  createStatus=
+                  {data.jitoDiagnostics.confirmation.createStatus ?? "—"}
+                </dd>
+              </div>
+            ) : null}
+          </dl>
+        )}
       </section>
 
       <section className="flex flex-col gap-3">

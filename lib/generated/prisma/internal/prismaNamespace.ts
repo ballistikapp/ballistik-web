@@ -386,6 +386,7 @@ type FieldRefInputType<Model, FieldType> = Model extends never ? never : FieldRe
 export const ModelName = {
   TestTable: 'TestTable',
   User: 'User',
+  MarketerApplication: 'MarketerApplication',
   Marketer: 'Marketer',
   Referral: 'Referral',
   ReferralPayout: 'ReferralPayout',
@@ -397,6 +398,7 @@ export const ModelName = {
   Token: 'Token',
   TokenDevWallet: 'TokenDevWallet',
   Launch: 'Launch',
+  LaunchPlannedMint: 'LaunchPlannedMint',
   LaunchLog: 'LaunchLog',
   LaunchRecoveryWallet: 'LaunchRecoveryWallet',
   HoldingExit: 'HoldingExit',
@@ -430,7 +432,7 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
     omit: GlobalOmitOptions
   }
   meta: {
-    modelProps: "testTable" | "user" | "marketer" | "referral" | "referralPayout" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
+    modelProps: "testTable" | "user" | "marketerApplication" | "marketer" | "referral" | "referralPayout" | "subscriptionPayment" | "authSession" | "refreshToken" | "authChallenge" | "wallet" | "token" | "tokenDevWallet" | "launch" | "launchPlannedMint" | "launchLog" | "launchRecoveryWallet" | "holdingExit" | "holdingExitLog" | "volumeBotSession" | "volumeBotPreset" | "volumeBotWallet" | "volumeBotLog" | "vanityMint" | "holding" | "transaction" | "tokenTransaction" | "refreshCache" | "shyftCallback" | "appTransaction" | "creatorRewardBalance" | "creatorRewardWalletSettlement" | "creatorRewardAccrual"
     txIsolationLevel: TransactionIsolationLevel
   }
   model: {
@@ -579,6 +581,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.UserCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.UserCountAggregateOutputType> | number
+        }
+      }
+    }
+    MarketerApplication: {
+      payload: Prisma.$MarketerApplicationPayload<ExtArgs>
+      fields: Prisma.MarketerApplicationFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.MarketerApplicationFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.MarketerApplicationFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        findFirst: {
+          args: Prisma.MarketerApplicationFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.MarketerApplicationFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        findMany: {
+          args: Prisma.MarketerApplicationFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>[]
+        }
+        create: {
+          args: Prisma.MarketerApplicationCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        createMany: {
+          args: Prisma.MarketerApplicationCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.MarketerApplicationCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>[]
+        }
+        delete: {
+          args: Prisma.MarketerApplicationDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        update: {
+          args: Prisma.MarketerApplicationUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        deleteMany: {
+          args: Prisma.MarketerApplicationDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.MarketerApplicationUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.MarketerApplicationUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>[]
+        }
+        upsert: {
+          args: Prisma.MarketerApplicationUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$MarketerApplicationPayload>
+        }
+        aggregate: {
+          args: Prisma.MarketerApplicationAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateMarketerApplication>
+        }
+        groupBy: {
+          args: Prisma.MarketerApplicationGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketerApplicationGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.MarketerApplicationCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.MarketerApplicationCountAggregateOutputType> | number
         }
       }
     }
@@ -1393,6 +1469,80 @@ export type TypeMap<ExtArgs extends runtime.Types.Extensions.InternalArgs = runt
         count: {
           args: Prisma.LaunchCountArgs<ExtArgs>
           result: runtime.Types.Utils.Optional<Prisma.LaunchCountAggregateOutputType> | number
+        }
+      }
+    }
+    LaunchPlannedMint: {
+      payload: Prisma.$LaunchPlannedMintPayload<ExtArgs>
+      fields: Prisma.LaunchPlannedMintFieldRefs
+      operations: {
+        findUnique: {
+          args: Prisma.LaunchPlannedMintFindUniqueArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload> | null
+        }
+        findUniqueOrThrow: {
+          args: Prisma.LaunchPlannedMintFindUniqueOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        findFirst: {
+          args: Prisma.LaunchPlannedMintFindFirstArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload> | null
+        }
+        findFirstOrThrow: {
+          args: Prisma.LaunchPlannedMintFindFirstOrThrowArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        findMany: {
+          args: Prisma.LaunchPlannedMintFindManyArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        create: {
+          args: Prisma.LaunchPlannedMintCreateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        createMany: {
+          args: Prisma.LaunchPlannedMintCreateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        createManyAndReturn: {
+          args: Prisma.LaunchPlannedMintCreateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        delete: {
+          args: Prisma.LaunchPlannedMintDeleteArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        update: {
+          args: Prisma.LaunchPlannedMintUpdateArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        deleteMany: {
+          args: Prisma.LaunchPlannedMintDeleteManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateMany: {
+          args: Prisma.LaunchPlannedMintUpdateManyArgs<ExtArgs>
+          result: BatchPayload
+        }
+        updateManyAndReturn: {
+          args: Prisma.LaunchPlannedMintUpdateManyAndReturnArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>[]
+        }
+        upsert: {
+          args: Prisma.LaunchPlannedMintUpsertArgs<ExtArgs>
+          result: runtime.Types.Utils.PayloadToResult<Prisma.$LaunchPlannedMintPayload>
+        }
+        aggregate: {
+          args: Prisma.LaunchPlannedMintAggregateArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.AggregateLaunchPlannedMint>
+        }
+        groupBy: {
+          args: Prisma.LaunchPlannedMintGroupByArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchPlannedMintGroupByOutputType>[]
+        }
+        count: {
+          args: Prisma.LaunchPlannedMintCountArgs<ExtArgs>
+          result: runtime.Types.Utils.Optional<Prisma.LaunchPlannedMintCountAggregateOutputType> | number
         }
       }
     }
@@ -2792,6 +2942,19 @@ export const UserScalarFieldEnum = {
 export type UserScalarFieldEnum = (typeof UserScalarFieldEnum)[keyof typeof UserScalarFieldEnum]
 
 
+export const MarketerApplicationScalarFieldEnum = {
+  id: 'id',
+  userId: 'userId',
+  message: 'message',
+  operatorNote: 'operatorNote',
+  status: 'status',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type MarketerApplicationScalarFieldEnum = (typeof MarketerApplicationScalarFieldEnum)[keyof typeof MarketerApplicationScalarFieldEnum]
+
+
 export const MarketerScalarFieldEnum = {
   id: 'id',
   userId: 'userId',
@@ -2912,6 +3075,8 @@ export const TokenScalarFieldEnum = {
   privateKey: 'privateKey',
   status: 'status',
   isMayhemMode: 'isMayhemMode',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   name: 'name',
   symbol: 'symbol',
   description: 'description',
@@ -2942,7 +3107,14 @@ export const LaunchScalarFieldEnum = {
   status: 'status',
   progress: 'progress',
   currentStep: 'currentStep',
+  platform: 'platform',
+  platformVersion: 'platformVersion',
   input: 'input',
+  plan: 'plan',
+  planSchemaVersion: 'planSchemaVersion',
+  planPersistedAt: 'planPersistedAt',
+  outcomeKind: 'outcomeKind',
+  outcomeDetails: 'outcomeDetails',
   result: 'result',
   tokenPublicKey: 'tokenPublicKey',
   startedAt: 'startedAt',
@@ -2954,6 +3126,21 @@ export const LaunchScalarFieldEnum = {
 } as const
 
 export type LaunchScalarFieldEnum = (typeof LaunchScalarFieldEnum)[keyof typeof LaunchScalarFieldEnum]
+
+
+export const LaunchPlannedMintScalarFieldEnum = {
+  id: 'id',
+  launchId: 'launchId',
+  publicKey: 'publicKey',
+  privateKey: 'privateKey',
+  vanityMintId: 'vanityMintId',
+  consumedAt: 'consumedAt',
+  abandonedAt: 'abandonedAt',
+  createdAt: 'createdAt',
+  updatedAt: 'updatedAt'
+} as const
+
+export type LaunchPlannedMintScalarFieldEnum = (typeof LaunchPlannedMintScalarFieldEnum)[keyof typeof LaunchPlannedMintScalarFieldEnum]
 
 
 export const LaunchLogScalarFieldEnum = {
@@ -2975,6 +3162,7 @@ export const LaunchRecoveryWalletScalarFieldEnum = {
   walletPublicKey: 'walletPublicKey',
   walletType: 'walletType',
   role: 'role',
+  platformRole: 'platformRole',
   isManaged: 'isManaged',
   fundedLamports: 'fundedLamports',
   reclaimStatus: 'reclaimStatus',
@@ -3378,6 +3566,20 @@ export type BooleanFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel,
 
 
 /**
+ * Reference to a field of type 'MarketerApplicationStatus'
+ */
+export type EnumMarketerApplicationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketerApplicationStatus'>
+    
+
+
+/**
+ * Reference to a field of type 'MarketerApplicationStatus[]'
+ */
+export type ListEnumMarketerApplicationStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'MarketerApplicationStatus[]'>
+    
+
+
+/**
  * Reference to a field of type 'Decimal'
  */
 export type DecimalFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'Decimal'>
@@ -3444,6 +3646,20 @@ export type EnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$Pris
  * Reference to a field of type 'TokenStatus[]'
  */
 export type ListEnumTokenStatusFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'TokenStatus[]'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchPlatform'
+ */
+export type EnumLaunchPlatformFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchPlatform'>
+    
+
+
+/**
+ * Reference to a field of type 'LaunchPlatform[]'
+ */
+export type ListEnumLaunchPlatformFieldRefInput<$PrismaModel> = FieldRefInputType<$PrismaModel, 'LaunchPlatform[]'>
     
 
 
@@ -3795,6 +4011,7 @@ export type PrismaClientOptions = ({
 export type GlobalOmitConfig = {
   testTable?: Prisma.TestTableOmit
   user?: Prisma.UserOmit
+  marketerApplication?: Prisma.MarketerApplicationOmit
   marketer?: Prisma.MarketerOmit
   referral?: Prisma.ReferralOmit
   referralPayout?: Prisma.ReferralPayoutOmit
@@ -3806,6 +4023,7 @@ export type GlobalOmitConfig = {
   token?: Prisma.TokenOmit
   tokenDevWallet?: Prisma.TokenDevWalletOmit
   launch?: Prisma.LaunchOmit
+  launchPlannedMint?: Prisma.LaunchPlannedMintOmit
   launchLog?: Prisma.LaunchLogOmit
   launchRecoveryWallet?: Prisma.LaunchRecoveryWalletOmit
   holdingExit?: Prisma.HoldingExitOmit

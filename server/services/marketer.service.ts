@@ -4,10 +4,12 @@ import { prisma, Prisma } from "@/lib/prisma";
 import { AppError } from "@/server/errors";
 import type {
   MarketerAggregates,
+  MarketerMe,
   MarketerReferralPayout,
   MarketerReferredUser,
   MarketerUpdateSetupInput,
 } from "@/server/schemas/marketer.schema";
+import { marketerApplicationService } from "@/server/services/marketer-application.service";
 
 const marketerSetupSelect = {
   id: true,
@@ -51,30 +53,117 @@ function referralCodeConflictMessage(error: unknown): string | null {
   return null;
 }
 
-async function requireEnabledMarketer(userId: string) {
+async function requireMarketer(userId: string) {
   const marketer = await prisma.marketer.findUnique({
     where: { userId },
     select: marketerSetupSelect,
   });
 
-  if (!marketer || !marketer.isEnabled) {
+  if (!marketer) {
     return null;
   }
 
   return marketer;
 }
 
+async function requireEnabledMarketer(userId: string) {
+  const marketer = await requireMarketer(userId);
+  if (!marketer || !marketer.isEnabled) {
+    return null;
+  }
+  return marketer;
+}
+
+type ReferredUserPayoutRow = {
+  referredUserId: string;
+  marketerAmountLamports: bigint;
+  createdAt: Date;
+};
+
+function payoutStatsByReferredUser(payouts: ReferredUserPayoutRow[]) {
+  const statsByUserId = new Map<
+    string,
+    {
+      totalEarnedLamports: bigint;
+      lastPayoutAt: Date;
+      payoutCount: number;
+    }
+  >();
+
+  for (const payout of payouts) {
+    const existing = statsByUserId.get(payout.referredUserId);
+    if (!existing) {
+      statsByUserId.set(payout.referredUserId, {
+        totalEarnedLamports: payout.marketerAmountLamports,
+        lastPayoutAt: payout.createdAt,
+        payoutCount: 1,
+      });
+      continue;
+    }
+    existing.totalEarnedLamports += payout.marketerAmountLamports;
+    existing.payoutCount += 1;
+    if (payout.createdAt > existing.lastPayoutAt) {
+      existing.lastPayoutAt = payout.createdAt;
+    }
+  }
+
+  return statsByUserId;
+}
+
 export const marketerService = {
   /**
-   * Returns the current User's enabled Marketer setup, or null when they are
-   * not an enabled Marketer (nav / page gating).
+   * Referrals page / nav status for the current User.
    */
-  async getMe(userId: string) {
-    const marketer = await requireEnabledMarketer(userId);
-    if (!marketer) {
-      return null;
+  async getMe(userId: string): Promise<MarketerMe> {
+    const marketer = await requireMarketer(userId);
+
+    if (marketer) {
+      const setup = projectMarketerSetup(marketer);
+      return marketer.isEnabled
+        ? { status: "enabled", setup }
+        : { status: "disabled", setup };
     }
-    return projectMarketerSetup(marketer);
+
+    const application =
+      await marketerApplicationService.getLatestForUser(userId);
+
+    if (!application) {
+      return { status: "can_apply" };
+    }
+
+    if (application.status === "PENDING") {
+      return {
+        status: "pending",
+        application: {
+          id: application.id,
+          message: application.message,
+          createdAt: application.createdAt,
+        },
+      };
+    }
+
+    if (application.status === "REJECTED") {
+      return {
+        status: "rejected",
+        application: {
+          id: application.id,
+          message: application.message,
+          operatorNote: application.operatorNote,
+          createdAt: application.createdAt,
+          updatedAt: application.updatedAt,
+        },
+      };
+    }
+
+    // APPROVED without a Marketer row: designation in progress — not re-apply.
+    return {
+      status: "pending",
+      application: {
+        id: application.id,
+        message: application.message,
+        createdAt: application.createdAt,
+      },
+    };
   },
 
   async updateSetup(userId: string, input: MarketerUpdateSetupInput) {
@@ -112,43 +201,64 @@ export const marketerService = {
 
   /**
    * Users attributed to this Marketer (sticky Referrals), newest first.
+   * Includes light money monitoring from Referral Payouts only.
+   * Readable for disabled Marketers (historical view).
    */
   async listReferredUsers(userId: string): Promise<MarketerReferredUser[]> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }
 
-    const referrals = await prisma.referral.findMany({
-      where: { marketerId: marketer.id },
-      orderBy: { createdAt: "desc" },
-      select: {
-        id: true,
-        createdAt: true,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            mainWalletPublicKey: true,
+    const [referrals, payouts] = await Promise.all([
+      prisma.referral.findMany({
+        where: { marketerId: marketer.id },
+        orderBy: { createdAt: "desc" },
+        select: {
+          id: true,
+          createdAt: true,
+          user: {
+            select: {
+              id: true,
+              name: true,
+              mainWalletPublicKey: true,
+            },
           },
         },
-      },
-    });
+      }),
+      prisma.referralPayout.findMany({
+        where: { marketerId: marketer.id },
+        select: {
+          referredUserId: true,
+          marketerAmountLamports: true,
+          createdAt: true,
+        },
+      }),
+    ]);
 
-    return referrals.map((referral) => ({
-      referralId: referral.id,
-      userId: referral.user.id,
-      name: referral.user.name,
-      mainWalletPublicKey: referral.user.mainWalletPublicKey,
-      joinedAt: referral.createdAt,
-    }));
+    const statsByUserId = payoutStatsByReferredUser(payouts);
+
+    return referrals.map((referral) => {
+      const stats = statsByUserId.get(referral.user.id);
+      return {
+        referralId: referral.id,
+        userId: referral.user.id,
+        name: referral.user.name,
+        mainWalletPublicKey: referral.user.mainWalletPublicKey,
+        joinedAt: referral.createdAt,
+        totalEarnedLamports: stats?.totalEarnedLamports ?? BigInt(0),
+        lastPayoutAt: stats?.lastPayoutAt ?? null,
+        payoutCount: stats?.payoutCount ?? 0,
+      };
+    });
   },
 
   /**
    * Referral Payouts for this Marketer, newest first.
+   * Readable for disabled Marketers (historical view).
    */
   async listPayouts(userId: string): Promise<MarketerReferralPayout[]> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }
@@ -190,9 +300,10 @@ export const marketerService = {
 
   /**
    * Light aggregates for the Marketer surface (total earned, referral count, last payout).
+   * Readable for disabled Marketers (historical view).
    */
   async getAggregates(userId: string): Promise<MarketerAggregates> {
-    const marketer = await requireEnabledMarketer(userId);
+    const marketer = await requireMarketer(userId);
     if (!marketer) {
       throw new AppError("Not found", 404);
     }

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { IconRefresh } from "@tabler/icons-react";
 import { toast } from "sonner";
 import { OpsRevealButton } from "@/components/ops/ops-reveal-button";
+import { OpsWalletAppTransactionsTable } from "@/components/ops/ops-wallet-app-transactions-table";
 import { Button } from "@/components/ui/button";
 import { Spinner } from "@/components/ui/spinner";
 import { trpc } from "@/lib/trpc/client";
@@ -167,6 +168,11 @@ export function OpsWalletDetail({ publicKey }: OpsWalletDetailProps) {
             <dd>{data.tokenSymbol ?? "—"}</dd>
           </div>
         </dl>
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <h2 className="text-base font-semibold">Transactions</h2>
+        <OpsWalletAppTransactionsTable walletPublicKey={data.publicKey} />
       </section>
     </div>
   );

@@ -1,4 +1,8 @@
 import { z } from "zod";
+import {
+  MAX_BUNDLE_WALLETS,
+  MIN_BUY_AMOUNT_SOL,
+} from "@/lib/config/launch.config";
 
 const launchFieldsBase = {
   tokenName: z
@@ -22,7 +26,7 @@ const launchFieldsBase = {
   importedDevWalletKey: z.string().optional(),
   devBuyAmountSol: z
     .number()
-    .min(0.05, "Dev buy must be at least 0.05 SOL.")
+    .min(MIN_BUY_AMOUNT_SOL, `Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`)
     .max(100, "Dev buy cannot exceed 100 SOL."),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
@@ -34,10 +38,16 @@ const launchFieldsBase = {
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(8, "Bundler wallet count must be 8 or less"),
+    .max(
+      MAX_BUNDLE_WALLETS,
+      `Bundler wallet count must be ${MAX_BUNDLE_WALLETS} or less`
+    ),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),
+    .min(
+      MIN_BUY_AMOUNT_SOL,
+      `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`
+    ),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")
@@ -73,7 +83,7 @@ const launchPreviewFields = {
   importedDevWalletKey: z.string().optional(),
   devBuyAmountSol: z
     .number()
-    .min(0.05, "Dev buy must be at least 0.05 SOL.")
+    .min(MIN_BUY_AMOUNT_SOL, `Dev buy must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`)
     .max(100, "Dev buy cannot exceed 100 SOL."),
   jitoTipAmountSol: z.number().min(0, "Jito tip amount must be 0 or more"),
   bundleBuyEnabled: z.boolean(),
@@ -84,10 +94,16 @@ const launchPreviewFields = {
     .number()
     .int()
     .min(0, "Bundler wallet count must be 0 or more")
-    .max(8, "Bundler wallet count must be 8 or less"),
+    .max(
+      MAX_BUNDLE_WALLETS,
+      `Bundler wallet count must be ${MAX_BUNDLE_WALLETS} or less`
+    ),
   bundlerBuyAmountSol: z
     .number()
-    .min(0.05, "Buy amount per wallet must be at least 0.05 SOL."),
+    .min(
+      MIN_BUY_AMOUNT_SOL,
+      `Buy amount per wallet must be at least ${MIN_BUY_AMOUNT_SOL} SOL.`
+    ),
   bundlerBuyVariancePercent: z
     .number()
     .min(0, "Bundler buy variance must be 0 or more")

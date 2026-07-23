@@ -67,6 +67,8 @@ const baseLaunchConfig = {
 
 /** Safe to import from client components — does not read env. */
 export const MAX_BUNDLE_WALLETS = baseLaunchConfig.maxBundleWallets;
+/** Safe to import from client components — does not read env. */
+export const MIN_BUY_AMOUNT_SOL = baseLaunchConfig.minBuyAmountSol;
 
 let cachedLaunchConfig: LaunchConfig | null = null;
 

@@ -28,6 +28,11 @@ export type TestTable = Prisma.TestTableModel
  */
 export type User = Prisma.UserModel
 /**
+ * Model MarketerApplication
+ * 
+ */
+export type MarketerApplication = Prisma.MarketerApplicationModel
+/**
  * Model Marketer
  * 
  */
@@ -82,6 +87,12 @@ export type TokenDevWallet = Prisma.TokenDevWalletModel
  * 
  */
 export type Launch = Prisma.LaunchModel
+/**
+ * Model LaunchPlannedMint
+ * Durable mint identity materialized at plan time for every Launch.
+ * VanityMint remains the pool source; this row is the per-Launch planned secret store.
+ */
+export type LaunchPlannedMint = Prisma.LaunchPlannedMintModel
 /**
  * Model LaunchLog
  * 

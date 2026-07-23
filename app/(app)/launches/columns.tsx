@@ -22,31 +22,23 @@ import {
   IconBrandTelegram,
   IconWorld,
   IconRecycle,
-  IconKey,
 } from "@tabler/icons-react";
 import { GalleryVerticalEnd, RotateCcw } from "lucide-react";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
+import {
+  formatLaunchLineageLabel,
+  type LaunchHistoryRow,
+  type LaunchHistoryStatus,
+} from "./launch-history-rows";
 
-export type TokenRowStatus = "PENDING" | "ACTIVE" | "FAILED";
-
-export type TokenTableRow = {
-  id: string;
-  name: string;
-  symbol: string;
-  status: TokenRowStatus;
-  publicKey: string | null;
-  imageUrl?: string | null;
-  websiteUrl?: string | null;
-  twitterUrl?: string | null;
-  telegramUrl?: string | null;
-  createdAt: Date | string;
-  launchId: string;
-  errorMessage?: string | null;
-};
-
-type TokenColumnsOptions = {
-  onReclaim?: (row: TokenTableRow) => void;
-  onShowPrivateKey?: (row: TokenTableRow) => void;
-  onRetry?: (row: TokenTableRow) => void;
+type LaunchHistoryColumnsOptions = {
+  onReclaim?: (row: LaunchHistoryRow) => void;
+  onRetry?: (row: LaunchHistoryRow) => void;
 };
 
 function truncateAddress(address: string) {
@@ -68,22 +60,29 @@ function formatExactTime(dateValue?: Date | string | null) {
   return format(date, "MMM d, yyyy");
 }
 
-function statusBadgeClass(status: TokenRowStatus) {
+function statusBadgeClass(status: LaunchHistoryStatus) {
   switch (status) {
-    case "ACTIVE":
+    case "SUCCEEDED":
       return "bg-emerald-500/10 text-emerald-700 border-emerald-500/20";
     case "PENDING":
+    case "RUNNING":
       return "bg-amber-500/10 text-amber-700 border-amber-500/20";
     case "FAILED":
       return "bg-red-500/10 text-red-700 border-red-500/20";
+    case "CANCELED":
+      return "bg-muted text-muted-foreground border-border";
     default:
       return "";
   }
 }
 
-export const createColumns = (
-  options: TokenColumnsOptions = {}
-): ColumnDef<TokenTableRow>[] => [
+function canReclaim(status: LaunchHistoryStatus) {
+  return status === "FAILED" || status === "CANCELED";
+}
+
+export const createLaunchHistoryColumns = (
+  options: LaunchHistoryColumnsOptions = {}
+): ColumnDef<LaunchHistoryRow>[] => [
   {
     id: "token",
     accessorFn: (row) => `${row.name} ${row.symbol}`,
@@ -120,9 +119,7 @@ export const createColumns = (
         </div>
       );
       if (hasLink) {
-        return (
-          <Link href={`/${item.publicKey}/dashboard`}>{content}</Link>
-        );
+        return <Link href={`/${item.publicKey}/dashboard`}>{content}</Link>;
       }
       return content;
     },
@@ -140,9 +137,7 @@ export const createColumns = (
     cell: ({ row }) => {
       const item = row.original;
       if (!item.publicKey) {
-        return (
-          <span className="text-sm text-muted-foreground">—</span>
-        );
+        return <span className="text-sm text-muted-foreground">—</span>;
       }
       return (
         <div className="flex items-center gap-1.5">
@@ -186,6 +181,27 @@ export const createColumns = (
     filterFn: "textArray",
     meta: {
       filter: { filterType: "text" as const },
+    },
+  },
+  {
+    id: "lineage",
+    accessorFn: (row) =>
+      formatLaunchLineageLabel({
+        retriedFromLaunchId: row.retriedFromLaunchId,
+        hasRetryAttempts: row.hasRetryAttempts,
+      }) ?? "",
+    header: ({ column }) => (
+      <DataTableColumnHeader column={column} title="Lineage" />
+    ),
+    cell: ({ row }) => {
+      const label = formatLaunchLineageLabel({
+        retriedFromLaunchId: row.original.retriedFromLaunchId,
+        hasRetryAttempts: row.original.hasRetryAttempts,
+      });
+      if (!label) {
+        return <span className="text-sm text-muted-foreground">—</span>;
+      }
+      return <span className="text-sm text-muted-foreground">{label}</span>;
     },
   },
   {
@@ -280,8 +296,9 @@ export const createColumns = (
     id: "actions",
     cell: ({ row }) => {
       const item = row.original;
-      const isFailed = item.status === "FAILED";
+      const reclaimable = canReclaim(item.status);
       const hasPublicKey = Boolean(item.publicKey);
+      const retryable = item.status === "FAILED";
       return (
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
@@ -305,35 +322,38 @@ export const createColumns = (
             )}
             {hasPublicKey && (
               <DropdownMenuItem
-                onClick={() =>
-                  navigator.clipboard.writeText(item.publicKey!)
-                }
+                onClick={() => navigator.clipboard.writeText(item.publicKey!)}
               >
                 <IconCopy className="size-4" />
                 Copy Address
               </DropdownMenuItem>
             )}
-            {hasPublicKey && options.onShowPrivateKey && (
-              <DropdownMenuItem
-                onClick={() => options.onShowPrivateKey?.(item)}
-              >
-                <IconKey className="size-4" />
-                Show Private Key
-              </DropdownMenuItem>
-            )}
-            {isFailed && options.onReclaim && (
-              <DropdownMenuItem
-                onClick={() => options.onReclaim?.(item)}
-              >
+            {reclaimable && options.onReclaim && (
+              <DropdownMenuItem onClick={() => options.onReclaim?.(item)}>
                 <IconRecycle className="size-4" />
                 Reclaim SOL
               </DropdownMenuItem>
             )}
-            {isFailed && options.onRetry && (
+            {retryable && options.onRetry && !item.isLegacy && (
               <DropdownMenuItem onClick={() => options.onRetry?.(item)}>
                 <RotateCcw className="size-4" />
                 Retry launch
               </DropdownMenuItem>
+            )}
+            {retryable && options.onRetry && item.isLegacy && (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div>
+                    <DropdownMenuItem disabled>
+                      <RotateCcw className="size-4" />
+                      Retry launch
+                    </DropdownMenuItem>
+                  </div>
+                </TooltipTrigger>
+                <TooltipContent side="left">
+                  {legacyCapabilityDeniedMessage("retry")}
+                </TooltipContent>
+              </Tooltip>
             )}
             {hasPublicKey && (
               <>

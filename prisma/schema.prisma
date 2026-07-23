@@ -48,11 +48,33 @@ model User {
   refreshCaches RefreshCache[]
   appTransactions AppTransaction[] @relation("AppTransactionUser")
   marketer Marketer? @relation("MarketerUser")
+  marketerApplications MarketerApplication[] @relation("MarketerApplicationUser")
   referral Referral? @relation("ReferralUser")
   referralPayoutsAsReferred ReferralPayout[] @relation("ReferralPayoutReferredUser")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("User")
+}
+
+enum MarketerApplicationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model MarketerApplication {
+  id           String                     @id @default(cuid())
+  userId       String
+  user         User                       @relation("MarketerApplicationUser", fields: [userId], references: [id])
+  message      String
+  operatorNote String?
+  status       MarketerApplicationStatus  @default(PENDING)
+  createdAt    DateTime                   @default(now())
+  updatedAt    DateTime                   @updatedAt
+
+  @@index([status, createdAt])
+  @@index([userId, status])
+  @@map("MarketerApplication")
 }
 
 model Marketer {
@@ -218,6 +240,9 @@ model Token {
   privateKey String @unique
   status TokenStatus @default(PENDING)
   isMayhemMode Boolean @default(false)
+  /// Null Platform / version marks a legacy Token; do not infer from JSON shape.
+  platform LaunchPlatform?
+  platformVersion String?
   name String
   symbol String
   description String?
@@ -251,6 +276,10 @@ model TokenDevWallet {
   wallet Wallet @relation("DevWalletTokens", fields: [walletPublicKey], references: [publicKey])
   @@id([tokenPublicKey, walletPublicKey])
   @@map("TokenDevWallet")
+}
+
+enum LaunchPlatform {
+  PUMPFUN
 }
 
 enum LaunchStatus {
@@ -334,7 +363,17 @@ model Launch {
   status LaunchStatus @default(PENDING)
   progress Int @default(0)
   currentStep String?
+  /// Null Platform / version marks a legacy Launch; do not infer from JSON shape.
+  platform LaunchPlatform?
+  platformVersion String?
   input Json
+  /// Secret-free authoritative Platform plan. Validated by the Platform on read.
+  plan Json?
+  planSchemaVersion String?
+  planPersistedAt DateTime?
+  /// Platform-owned outcome classification (e.g. success, canceled, failed, partial).
+  outcomeKind String?
+  outcomeDetails Json?
   result Json?
   tokenPublicKey String?
   token Token? @relation("LaunchToken", fields: [tokenPublicKey], references: [publicKey])
@@ -344,10 +383,30 @@ model Launch {
   errorMessage String?
   logs LaunchLog[] @relation("LaunchLogs")
   recoveryWallets LaunchRecoveryWallet[] @relation("LaunchRecoveryWalletRecordLaunch")
+  /// Plan-time mint identity (vanity pool or fresh key). Secrets stay here, never in Launch.plan.
+  plannedMint LaunchPlannedMint? @relation("LaunchPlannedMintLaunch")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@index([retriedFromLaunchId])
   @@map("Launch")
+}
+
+/// Durable mint identity materialized at plan time for every Launch.
+/// VanityMint remains the pool source; this row is the per-Launch planned secret store.
+model LaunchPlannedMint {
+  id String @id @default(cuid())
+  launchId String @unique
+  launch Launch @relation("LaunchPlannedMintLaunch", fields: [launchId], references: [id])
+  publicKey String
+  privateKey String
+  vanityMintId String?
+  vanityMint VanityMint? @relation("LaunchPlannedMintVanityMint", fields: [vanityMintId], references: [id])
+  consumedAt DateTime?
+  abandonedAt DateTime?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([vanityMintId])
+  @@map("LaunchPlannedMint")
 }
 
 model LaunchLog {
@@ -371,6 +430,8 @@ model LaunchRecoveryWallet {
   wallet Wallet @relation("LaunchRecoveryWalletRecordWallet", fields: [walletPublicKey], references: [publicKey])
   walletType WalletType
   role LaunchRecoveryWalletRole
+  /// Platform-defined Managed Launch Wallet role identifier (not a global enum).
+  platformRole String?
   isManaged Boolean @default(true)
   fundedLamports Decimal @default(0) @db.Decimal(20, 0)
   reclaimStatus LaunchRecoveryWalletStatus @default(ELIGIBLE)
@@ -511,6 +572,7 @@ model VanityMint {
   token Token? @relation(fields: [tokenPublicKey], references: [publicKey])
   userId String?
   user User? @relation("VanityMintUser", fields: [userId], references: [id])
+  plannedMints LaunchPlannedMint[] @relation("LaunchPlannedMintVanityMint")
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   @@map("VanityMint")
@@ -696,6 +758,7 @@ model AppTransaction {
   @@index([userId, tokenPublicKey, createdAt])
   @@index([userId, source, createdAt])
   @@index([userId, type, createdAt])
+  @@index([walletPublicKey, createdAt])
   @@unique([transactionSignature, walletPublicKey])
   @@index([transactionSignature])
   @@index([bundleId])

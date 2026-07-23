@@ -104,6 +104,8 @@ For launch funding, those `TRANSFER_FUND` rows remain the operational ledger of 
 
 One row per (transaction in the bundle × user-owned wallet). All rows share the same `bundleId`. The tip-bearing signature gets a `JITO_TIP` row on the tipper wallet whenever the tipper does not otherwise have a row on that signature; if it would conflict, the tip is naturally captured in the tipper's existing row's wallet delta.
 
+Jito transport (`sendJitoBundle`) returns signatures, bundle identity, confirmation evidence, and telemetry only. Pump Launch and Holding Exit callers create and settle these AppTransaction rows themselves — including Mayhem ALT-aware buyer→signature index mapping from `bundle-transaction-builder`.
+
 ## Context via `referenceId`
 
 The `referenceId` field is a soft polymorphic link. Interpret it using `source`:
@@ -135,6 +137,16 @@ Protected procedure. Returns offset-based paginated results ordered by `createdA
 
 **Returns**: `{ items: AppTransaction[], totalCount: number }`
 
+### Ops: `ops.listWalletAppTransactions`
+
+Operator procedure. Returns offset-based paginated AppTransaction rows for a Wallet, ordered by `createdAt DESC`. Filters by exact actor `walletPublicKey` (not `fromAddress`/`toAddress`). Returns 404 if the Wallet does not exist.
+
+**Input**: `{ walletPublicKey, page?, pageSize? }` (defaults 1 / 25, max 100)
+
+**Returns**: `{ items: { id, type, status, solAmount, transactionSignature, description, createdAt }[], totalCount }`
+
+Service path: `opsService.listWalletAppTransactions` → `appTransactionService.listByWallet`.
+
 ### `appTransaction.costBreakdown`
 
 Protected procedure. Aggregates confirmed `AppTransaction` data for a token, grouped by `type` and `source`. Used by the P&L details dialog.
@@ -149,6 +161,7 @@ Protected procedure. Aggregates confirmed `AppTransaction` data for a token, gro
 - `[userId, tokenPublicKey, createdAt]` — per-token filtered view
 - `[userId, source, createdAt]` — feature-scoped queries
 - `[userId, type, createdAt]` — type-filtered queries
+- `[walletPublicKey, createdAt]` — Ops / actor-wallet history
 - `[transactionSignature]` — signature lookup and multi-instruction grouping
 - `[bundleId]` — Jito bundle grouping
 - `[referenceId]` — join to related records

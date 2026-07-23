@@ -47,6 +47,9 @@ export type MarketerReferredUser = {
   name: string;
   mainWalletPublicKey: string;
   joinedAt: Date;
+  totalEarnedLamports: bigint;
+  lastPayoutAt: Date | null;
+  payoutCount: number;
 };
 
 export type MarketerReferralPayout = {
@@ -70,3 +73,31 @@ export type MarketerAggregates = {
   referralCount: number;
   lastPayoutAt: Date | null;
 };
+
+export type MarketerSetup = {
+  referralCode: string | null;
+  feeCollectorPublicKey: string | null;
+};
+
+export type MarketerMe =
+  | { status: "can_apply" }
+  | {
+      status: "pending";
+      application: {
+        id: string;
+        message: string;
+        createdAt: Date;
+      };
+    }
+  | {
+      status: "rejected";
+      application: {
+        id: string;
+        message: string;
+        operatorNote: string | null;
+        createdAt: Date;
+        updatedAt: Date;
+      };
+    }
+  | { status: "enabled"; setup: MarketerSetup }
+  | { status: "disabled"; setup: MarketerSetup };

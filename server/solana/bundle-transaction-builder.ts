@@ -19,8 +19,31 @@ const filterComputeBudget = (ixs: TransactionInstruction[]) =>
 // txs) with generous margin. Lower requested CU improves Jito auction
 // priority: bundles are ranked by tip / requested CU.
 const BUNDLE_COMPUTE_UNITS = 400_000;
-const MAX_RAW_TRANSACTION_BYTES = 1232;
+/** Solana raw transaction size limit; packing and AppTransaction mapping share this. */
+export const MAX_RAW_TRANSACTION_BYTES = 1232;
+/** Follow-up (non-create) buys per tx without an address lookup table. */
+export const BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITHOUT_ALT = 2;
+/** Follow-up buys per tx when a launch ALT compresses shared accounts. */
+export const BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITH_ALT = 4;
 const SIZE_ESTIMATE_BLOCKHASH = "11111111111111111111111111111111";
+
+export function bundleBuysPerFollowUpTransaction(hasAlt: boolean): number {
+  return hasAlt
+    ? BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITH_ALT
+    : BUNDLE_BUYS_PER_FOLLOW_UP_TX_WITHOUT_ALT;
+}
+
+/**
+ * Bundle layout: tx[0] = create + first buyer; later txs pack
+ * `buysPerFollowUpTransaction` buyers each.
+ */
+export function bundleBuyerTransactionIndex(
+  buyerIndex: number,
+  buysPerFollowUpTransaction: number
+): number {
+  if (buyerIndex === 0) return 0;
+  return 1 + Math.floor((buyerIndex - 1) / buysPerFollowUpTransaction);
+}
 
 function addBundleComputeBudget(tx: Transaction) {
   tx.add(ComputeBudgetProgram.setComputeUnitLimit({ units: BUNDLE_COMPUTE_UNITS }));
@@ -172,17 +195,14 @@ export async function buildBundleTransactionsForCreateAndBuys(
   const bundleTransactions: Transaction[] = [];
   const bundleSigners: Keypair[][] = [];
   const firstTransactionBuyCount = Math.min(1, wallets.length);
-  // Capped at 2 buys per non-creator transaction because the new pump IDL's
-  // buy_exact_sol_in uses 18 accounts per buy, which overflows the 1232-byte
-  // versioned tx limit at 3 buys/tx without an address lookup table.
-  // Combined with Jito's 5-tx bundle limit, this allows up to 9 buyer wallets
-  // (1 creator + 4 follow-up txs × 2 buys).
-  // When a launch-specific ALT is supplied (see server/solana/pump/launch-alt.ts),
-  // most of the 18 accounts per buy are shared/static and become 1-byte table
-  // lookups instead of 32-byte inline keys, so more buys fit per transaction.
-  // The real serialized size is still validated below before committing to
-  // this grouping.
-  const buysPerTransaction = altAccounts.length > 0 ? 4 : 2;
+  // Capped without ALT because buy_exact_sol_in uses 18 accounts per buy and
+  // overflows the 1232-byte versioned tx limit at 3 buys/tx. Combined with
+  // Jito's 5-tx bundle limit, this allows up to 9 buyer wallets
+  // (1 creator + 4 follow-up txs × 2 buys). With a launch ALT, more buys fit.
+  // Serialized size is still validated below before committing to this grouping.
+  const buysPerTransaction = bundleBuysPerFollowUpTransaction(
+    altAccounts.length > 0
+  );
 
   const firstWallets = wallets.slice(0, firstTransactionBuyCount);
   const firstAmounts = buyAmountsLamport.slice(0, firstTransactionBuyCount);

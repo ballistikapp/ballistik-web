@@ -13,6 +13,7 @@ import type {
   OpsListMarketersInput,
   OpsListTokensInput,
   OpsListUsersInput,
+  OpsListWalletAppTransactionsInput,
   OpsListWalletsInput,
   OpsLookupInput,
   OpsRefreshMatchingWalletBalancesInput,
@@ -20,7 +21,67 @@ import type {
   OpsRevealPrivateKeyInput,
   OpsUpdateMarketerInput,
 } from "@/server/schemas/ops.schema";
+import type {
+  OpsGetMarketerApplicationInput,
+  OpsListMarketerApplicationsInput,
+  OpsRejectMarketerApplicationInput,
+} from "@/server/schemas/marketer-application.schema";
+import {
+  isLegacyPlatformRecord,
+  launchPlanEnvelopeV1Schema,
+  pumpfunLaunchPlanV1Schema,
+  type LaunchOptionsOutcomesV1,
+  type PumpfunLaunchPlanV1,
+} from "@/server/schemas/launch-platform.schema";
+import { marketerApplicationService } from "@/server/services/marketer-application.service";
+import { appTransactionService } from "@/server/services/app-transaction.service";
 import { walletService } from "@/server/services/wallet.service";
+
+type OpsLaunchPlatformIdentity = {
+  platform: "PUMPFUN" | null;
+  platformVersion: string | null;
+  hasPlan: boolean;
+  outcomeKind: string | null;
+  isLegacy: boolean;
+  /** Product policy: legacy records cannot retry/clone. Ops itself has no retry/clone actions. */
+  retrySupported: boolean;
+  cloneSupported: boolean;
+};
+
+type OpsSafePumpfunPlanSummary = {
+  money: PumpfunLaunchPlanV1["money"];
+  wallets: PumpfunLaunchPlanV1["wallets"];
+  allocations: PumpfunLaunchPlanV1["allocations"];
+  intendedEffects: PumpfunLaunchPlanV1["intendedEffects"];
+  recovery: PumpfunLaunchPlanV1["recovery"];
+  optionsOutcomes?: LaunchOptionsOutcomesV1;
+};
+
+type OpsJitoDiagnostics = {
+  eventCount: number;
+  bundleIds: string[];
+  endpoints: string[];
+  resendCount: number;
+  rebuildCount: number;
+  lastEventType: string | null;
+  lastFailureType: string | null;
+  tipLamports: number | null;
+  confirmation: {
+    foundCount: number | null;
+    confirmedCount: number | null;
+    failedCount: number | null;
+    notFoundCount: number | null;
+    createStatus: string | null;
+  } | null;
+};
+
+const JITO_FAILURE_EVENT_TYPES = new Set([
+  "bundle_dropped_by_engine",
+  "bundle_send_rejections",
+  "bundle_status_check_error",
+  "bundle_confirm_timeout",
+  "bundle_sequential_simulation",
+]);
 
 const NOT_FOUND = "Not found";
 
@@ -84,6 +145,185 @@ function containsPrivateKeyField(value: unknown): boolean {
     ([key, nested]) =>
       key === "privateKey" || containsPrivateKeyField(nested)
   );
+}
+
+function omitPrivateKeyFields(value: unknown): unknown {
+  if (value == null || typeof value !== "object") {
+    return value;
+  }
+  if (Array.isArray(value)) {
+    return value.map(omitPrivateKeyFields);
+  }
+  const result: Record<string, unknown> = {};
+  for (const [key, nested] of Object.entries(
+    value as Record<string, unknown>
+  )) {
+    if (key === "privateKey") continue;
+    result[key] = omitPrivateKeyFields(nested);
+  }
+  return result;
+}
+
+function projectOpsLaunchPlatformIdentity(launch: {
+  platform: "PUMPFUN" | null;
+  platformVersion: string | null;
+  hasPlan: boolean;
+  outcomeKind: string | null;
+}): OpsLaunchPlatformIdentity {
+  const isLegacy = isLegacyPlatformRecord(launch);
+  return {
+    platform: launch.platform,
+    platformVersion: launch.platformVersion,
+    hasPlan: launch.hasPlan,
+    outcomeKind: launch.outcomeKind,
+    isLegacy,
+    // Product eligibility only — Ops does not perform retry/clone.
+    retrySupported: !isLegacy,
+    cloneSupported: !isLegacy,
+  };
+}
+
+function projectSafePumpfunPlanSummary(
+  plan: unknown
+): OpsSafePumpfunPlanSummary | null {
+  const envelope = launchPlanEnvelopeV1Schema.safeParse(plan);
+  if (!envelope.success) {
+    return null;
+  }
+  const platformPlan = pumpfunLaunchPlanV1Schema.safeParse(
+    envelope.data.platformPlan
+  );
+  if (!platformPlan.success) {
+    return null;
+  }
+  return {
+    money: envelope.data.money,
+    wallets: platformPlan.data.wallets,
+    allocations: platformPlan.data.allocations,
+    intendedEffects: platformPlan.data.intendedEffects,
+    recovery: platformPlan.data.recovery,
+    optionsOutcomes: envelope.data.optionsOutcomes,
+  };
+}
+
+function readStringField(
+  data: Record<string, unknown>,
+  key: string
+): string | null {
+  const value = data[key];
+  return typeof value === "string" && value.length > 0 ? value : null;
+}
+
+function readNumberField(
+  data: Record<string, unknown>,
+  key: string
+): number | null {
+  const value = data[key];
+  return typeof value === "number" && Number.isFinite(value) ? value : null;
+}
+
+function projectJitoDiagnosticsFromLogs(
+  logs: Array<{ data: unknown }>
+): OpsJitoDiagnostics {
+  const bundleIds: string[] = [];
+  const endpoints: string[] = [];
+  const seenBundleIds = new Set<string>();
+  const seenEndpoints = new Set<string>();
+  let eventCount = 0;
+  let resendCount = 0;
+  let rebuildCount = 0;
+  let lastEventType: string | null = null;
+  let lastFailureType: string | null = null;
+  let tipLamports: number | null = null;
+  let confirmation: OpsJitoDiagnostics["confirmation"] = null;
+
+  for (const log of logs) {
+    if (log.data == null || typeof log.data !== "object" || Array.isArray(log.data)) {
+      continue;
+    }
+    const data = log.data as Record<string, unknown>;
+    if (data.source !== "jito-bundle") {
+      continue;
+    }
+    const eventType = readStringField(data, "eventType");
+    if (!eventType) {
+      continue;
+    }
+
+    eventCount += 1;
+    lastEventType = eventType;
+
+    const bundleId = readStringField(data, "bundleId");
+    if (bundleId && !seenBundleIds.has(bundleId)) {
+      seenBundleIds.add(bundleId);
+      bundleIds.push(bundleId);
+    }
+
+    const endpoint =
+      readStringField(data, "endpoint") ??
+      readStringField(data, "bundleEndpoint");
+    if (endpoint && !seenEndpoints.has(endpoint)) {
+      seenEndpoints.add(endpoint);
+      endpoints.push(endpoint);
+    }
+
+    const eventTip = readNumberField(data, "tipLamports");
+    if (eventTip != null) {
+      tipLamports = eventTip;
+    }
+
+    const explicitResendCount = readNumberField(data, "resendCount");
+    if (explicitResendCount != null) {
+      resendCount = Math.max(resendCount, explicitResendCount);
+    } else if (eventType === "bundle_resend_triggered") {
+      resendCount += 1;
+    }
+
+    const explicitRebuildCount = readNumberField(data, "rebuildCount");
+    if (explicitRebuildCount != null) {
+      rebuildCount = Math.max(rebuildCount, explicitRebuildCount);
+    } else if (eventType === "bundle_rebuild_triggered") {
+      rebuildCount += 1;
+    }
+
+    if (
+      eventType === "bundle_confirm_summary" ||
+      eventType === "bundle_confirm_timeout"
+    ) {
+      confirmation = {
+        foundCount: readNumberField(data, "foundCount"),
+        confirmedCount: readNumberField(data, "confirmedCount"),
+        failedCount: readNumberField(data, "failedCount"),
+        notFoundCount: readNumberField(data, "notFoundCount"),
+        createStatus: readStringField(data, "createStatus"),
+      };
+    }
+
+    if (JITO_FAILURE_EVENT_TYPES.has(eventType)) {
+      if (eventType === "bundle_sequential_simulation") {
+        const failed =
+          data.status === "ok" &&
+          (data.summaryError != null || data.failingTxIndex != null);
+        if (failed) {
+          lastFailureType = eventType;
+        }
+      } else {
+        lastFailureType = eventType;
+      }
+    }
+  }
+
+  return {
+    eventCount,
+    bundleIds,
+    endpoints,
+    resendCount,
+    rebuildCount,
+    lastEventType,
+    lastFailureType,
+    tipLamports,
+    confirmation,
+  };
 }
 
 function buildUserSearchWhere(
@@ -410,6 +650,10 @@ export const opsService = {
           status: true,
           progress: true,
           currentStep: true,
+          platform: true,
+          platformVersion: true,
+          planPersistedAt: true,
+          outcomeKind: true,
           tokenPublicKey: true,
           userId: true,
           startedAt: true,
@@ -425,17 +669,26 @@ export const opsService = {
     ]);
 
     const result = {
-      items: rows.map((launch) => ({
-        id: launch.id,
-        status: launch.status,
-        progress: launch.progress,
-        currentStep: launch.currentStep,
-        tokenPublicKey: launch.tokenPublicKey,
-        userId: launch.userId,
-        userName: launch.user.name,
-        startedAt: launch.startedAt,
-        createdAt: launch.createdAt,
-      })),
+      items: rows.map((launch) => {
+        const identity = projectOpsLaunchPlatformIdentity({
+          platform: launch.platform,
+          platformVersion: launch.platformVersion,
+          hasPlan: launch.planPersistedAt != null,
+          outcomeKind: launch.outcomeKind,
+        });
+        return {
+          id: launch.id,
+          status: launch.status,
+          progress: launch.progress,
+          currentStep: launch.currentStep,
+          tokenPublicKey: launch.tokenPublicKey,
+          userId: launch.userId,
+          userName: launch.user.name,
+          startedAt: launch.startedAt,
+          createdAt: launch.createdAt,
+          ...identity,
+        };
+      }),
       totalCount,
     };
 
@@ -695,6 +948,28 @@ export const opsService = {
     }
 
     return result;
+  },
+
+  async listWalletAppTransactions(
+    callerUserId: string,
+    input: OpsListWalletAppTransactionsInput
+  ) {
+    await requireOperator(callerUserId);
+
+    const wallet = await prisma.wallet.findUnique({
+      where: { publicKey: input.walletPublicKey },
+      select: { publicKey: true },
+    });
+
+    if (!wallet) {
+      throwNotFound();
+    }
+
+    return await appTransactionService.listByWallet({
+      walletPublicKey: input.walletPublicKey,
+      page: input.page,
+      pageSize: input.pageSize,
+    });
   },
 
   async refreshWalletBalances(
@@ -960,6 +1235,12 @@ export const opsService = {
         status: true,
         progress: true,
         currentStep: true,
+        platform: true,
+        platformVersion: true,
+        plan: true,
+        planSchemaVersion: true,
+        planPersistedAt: true,
+        outcomeKind: true,
         startedAt: true,
         completedAt: true,
         cancelRequestedAt: true,
@@ -983,6 +1264,16 @@ export const opsService = {
       throwNotFound();
     }
 
+    const identity = projectOpsLaunchPlatformIdentity({
+      platform: launch.platform,
+      platformVersion: launch.platformVersion,
+      hasPlan: launch.planPersistedAt != null,
+      outcomeKind: launch.outcomeKind,
+    });
+    const planSummary = identity.hasPlan
+      ? projectSafePumpfunPlanSummary(launch.plan)
+      : null;
+
     const autopsy = {
       id: launch.id,
       userId: launch.userId,
@@ -994,12 +1285,18 @@ export const opsService = {
       cancelRequestedAt: launch.cancelRequestedAt,
       errorMessage: launch.errorMessage,
       tokenPublicKey: launch.tokenPublicKey,
+      ...identity,
+      planSchemaVersion: launch.planSchemaVersion,
+      planPersistedAt: launch.planPersistedAt,
+      planSummary,
+      planSummaryAvailable: planSummary != null,
+      jitoDiagnostics: projectJitoDiagnosticsFromLogs(launch.logs),
       logs: launch.logs.map((log) => ({
         id: log.id,
         level: log.level,
         message: log.message,
         step: log.step,
-        data: log.data,
+        data: omitPrivateKeyFields(log.data),
         createdAt: log.createdAt,
       })),
     };
@@ -1194,31 +1491,40 @@ export const opsService = {
     }
 
     try {
-      const created = await prisma.marketer.create({
-        data: {
-          userId: input.userId,
-          nickname: input.nickname,
-          feeShareRate: input.feeShareRate,
-          isEnabled: input.isEnabled ?? true,
-        },
-        select: {
-          id: true,
-          userId: true,
-          nickname: true,
-          feeShareRate: true,
-          isEnabled: true,
-          referralCode: true,
-          feeCollectorPublicKey: true,
-          createdAt: true,
-          updatedAt: true,
-          user: {
-            select: {
-              id: true,
-              name: true,
-              mainWalletPublicKey: true,
+      const created = await prisma.$transaction(async (tx) => {
+        const marketer = await tx.marketer.create({
+          data: {
+            userId: input.userId,
+            nickname: input.nickname,
+            feeShareRate: input.feeShareRate,
+            isEnabled: input.isEnabled ?? true,
+          },
+          select: {
+            id: true,
+            userId: true,
+            nickname: true,
+            feeShareRate: true,
+            isEnabled: true,
+            referralCode: true,
+            feeCollectorPublicKey: true,
+            createdAt: true,
+            updatedAt: true,
+            user: {
+              select: {
+                id: true,
+                name: true,
+                mainWalletPublicKey: true,
+              },
             },
           },
-        },
+        });
+
+        await marketerApplicationService.approvePendingForUser(
+          input.userId,
+          tx
+        );
+
+        return marketer;
       });
 
       const result = projectMarketer(created);
@@ -1295,5 +1601,35 @@ export const opsService = {
       }
       throw error;
     }
+  },
+
+  async listMarketerApplications(
+    callerUserId: string,
+    input: OpsListMarketerApplicationsInput
+  ) {
+    return await marketerApplicationService.listApplications(
+      callerUserId,
+      input
+    );
+  },
+
+  async getMarketerApplication(
+    callerUserId: string,
+    input: OpsGetMarketerApplicationInput
+  ) {
+    return await marketerApplicationService.getApplication(
+      callerUserId,
+      input
+    );
+  },
+
+  async rejectMarketerApplication(
+    callerUserId: string,
+    input: OpsRejectMarketerApplicationInput
+  ) {
+    return await marketerApplicationService.rejectApplication(
+      callerUserId,
+      input
+    );
   },
 };

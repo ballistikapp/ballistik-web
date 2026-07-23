@@ -11,27 +11,35 @@
 
 ## Core Flow
 
-1. UI submits launch input via `trpc.launch.start`.
-2. Server performs synchronous input and funding preflight checks before queueing.
-3. If the main wallet cannot cover required launch funding, `launch.start` throws the exact user-facing error and no `Launch` record is created.
-4. When preflight passes, server creates a `Launch` record and starts an async job.
-5. Job writes structured logs to `LaunchLog` and updates `Launch.progress`.
-6. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
-7. Cancellation sets `cancelRequestedAt`; job checks between steps.
+1. UI submits versioned pump.fun launch input via `trpc.launch.start` (`versionedLaunchInputSchema`).
+2. If the external input schema rejects the request, no `Launch` record is created.
+3. Schema-valid submissions create a `Launch` with `platform=PUMPFUN`, `platformVersion="1"`, versioned `input` JSON **before** Platform planning, then schedule the shared lifecycle.
+4. Lifecycle resolves pump.fun via `resolveLaunchPlatform`, calls `platform.plan`, materializes Launch Options into a `LaunchPlannedMint` for every Launch (vanity pool reserve or fresh key), composes options fees into envelope `money`, persists the plan envelope (`shellVersion` / `optionsOutcomes` / `money` / `platformPlan` on `plan` + `planSchemaVersion` / `planPersistedAt`), then calls `platform.execute` with that exact envelope on the lifecycle context.
+5. Planning validation failures and insufficient main-Wallet funds transition the Launch to visible, retryable `FAILED` history (no silent discard). If plan persistence or composed-funds checks fail, the lifecycle abandons the planned mint and releases any vanity reservation; pump.fun compensates only Platform-local unfunded wallet key refs.
+6. Execute validates the persisted pump.fun plan (`pumpfunLaunchPlanV1Schema`) and branches:
+   - **Non-bundled** (`!intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunNonBundledExecute` → `runNonBundledPumpfunLaunchJob`). Uses plan identities/funding, pump venue metadata upload via raw `buildCreateTokenTransaction` / `buildCreateAndDevBuyVersionedTransaction`, Launch-owned AppTransaction bookkeeping, confirm/activate/cleanup. No PumpFunSDK. System creator Wallet is rejected. Returns a typed execute outcome (not `compat`).
+   - **Bundled** (`intendedEffects.bundleBuyEnabled`): Platform-owned path (`runPumpfunBundledExecute` → `runBundledPumpfunLaunchJob` → `createAndBuyInBundle`). Executes the exact persisted plan (wallets, allocations, tip, Mayhem flag, vanity reservation). Raw create/buy builders + Jito; Mayhem uses Token-2022 / dynamic ALT packing. Shared packing constants live in `bundle-transaction-builder`. No PumpFunSDK. System creator Wallet is rejected. Returns a typed execute outcome.
+7. Platform success is confirmed plan-intended create/buy landing (non-bundled create or create+dev-buy; bundled Jito create+buys). Distribution, Token activate, SOL cleanup, and Launch row persistence are post-success control-plane steps: degradation keeps `succeeded` and never falsely cancels after irreversible submit.
+8. Typed outcomes (`succeeded` / `canceled` / `failed` / `partial` / `indeterminate`) are mapped by the shared lifecycle to `Launch.status` plus `outcomeKind` / `outcomeDetails`. `partial` and `indeterminate` map to `FAILED` with those kinds. Fee collection runs only on `succeeded`.
+9. Job writes structured logs and progress; terminal status is owned by the lifecycle after execute returns.
+10. UI polls `trpc.launch.status` and renders progress with shadcn/ui.
+11. Cancellation sets `cancelRequestedAt` through the lifecycle entrypoint. Cooperative cancel stops only at safe points before irreversible submission; after submit, outcomes are classified from chain evidence.
 
 ## tRPC Endpoints
 
-- `launch.start` (mutation): runs synchronous validation/funding preflight, then creates launch and starts async job.
-  - Insufficient-funds failures return immediately and do not enqueue a launch.
-- `launch.previewCosts` (query): returns a live pre-operation quote for launch costs and expected wallet impact.
+- `launch.start` / `status` / `cancel` / `retry` / `getActive` route through `launchLifecycle` (`server/services/launch-lifecycle.ts`). Recovery, clone, and history remain on `launchService`.
+- `launch.start` (mutation): accepts `versionedLaunchInputSchema` (pump.fun only; system creator Wallet / SPL / EVM rejected). Creates the Launch row first (versioned input + media normalize on metadata), then schedules lifecycle plan → persist → execute.
+  - Schema-invalid requests never create a Launch row.
+  - Insufficient-funds and other planning failures become visible retryable `FAILED` Launch history after the row exists.
+- `launch.previewCosts` (query): accepts `versionedLaunchPreviewInputSchema` (Platform + Launch Options + config, no Token metadata). Calls Platform `preview` for Platform-only money, then composes vanity/attribution fees from Launch Options above the Platform module, and returns the review envelope: `money` (`normalizedLaunchMoneySummarySchema` lamport strings + labeled line items) plus `mainWalletBalanceLamports`, `hasSufficientMainWallet`, `platformFeeWaived`, and `platformFeeDiscountRate`. Side-effect-free (read-only RPC/balance); does not persist plans, fund Wallets, publish metadata, or submit on-chain.
 - `launch.status` (query): returns launch + logs for polling.
 - `launch.cancel` (mutation): requests cancellation.
 - `launch.getActive` (query): resume latest running/pending launch.
 - `launch.recoveryWallets` (query): returns wallets eligible for SOL recovery after launch runs.
-- `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet.
+- `launch.recoverSol` (mutation): transfers recoverable SOL from launch wallets back to main wallet via Platform `recover` (validates persisted plan when present; funded-cap drain).
   - Idempotent behavior: when no eligible wallets are found, it returns an empty result set instead of throwing.
 - `launch.recoveryWalletsByToken` (query): resolves failed/canceled launch by token and returns wallets eligible for recovery.
-- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for Manage Tokens row actions.
+- `launch.recoverSolByToken` (mutation): token-scoped reclaim entrypoint for My Tokens and Launch history row actions when a Token mint exists (also via Platform `recover`).
 - `launch.status` also surfaces failed-launch auto reclaim activity through launch logs and `Launch.result`.
 - `launch.getUserLaunches` (query): returns all user launches with token join for the clone token dialog.
 
@@ -44,7 +52,10 @@ Tracks state and progress.
 - `status`: PENDING | RUNNING | SUCCEEDED | FAILED | CANCELED
 - `progress`: 0–100
 - `currentStep`: string
-- `input`: original launch payload (JSON)
+- `platform` / `platformVersion`: nullable Platform identity. Null version marks a legacy Launch (do not infer from JSON shape). New records use `PUMPFUN` + version `"1"`.
+- `input`: original launch payload (JSON). Legacy rows keep the flat shape; new submissions store the discriminated versioned contract (`server/schemas/launch-platform.schema.ts`). Plan/start use versioned `metadata`/`config` directly. Retry/clone/legacy reads resolve both shapes via `resolveStoredLaunchInput` without migrating legacy JSON. Execute still resolves stored input for media/fees/logs while wallets and funding come from the persisted plan.
+- `plan` / `planSchemaVersion` / `planPersistedAt`: secret-free authoritative Launch plan envelope. Written after `platform.plan` succeeds and before `platform.execute`. `planSchemaVersion` is the shell version (`"1"`). Envelope shape: `{ shellVersion, optionsOutcomes, money, platformPlan }` (`launchPlanEnvelopeV1Schema`). Envelope `money` is the only authoritative monetary summary (Platform money + Launch Options fees); `platformPlan.money` is Platform-internal. `optionsOutcomes` always includes `mintPublicKey`, `plannedMintId`, vanity/attribution flags, and nullable `reservedVanityMintId`. `platformPlan` is opaque at the shell — pump.fun validates it with `pumpfunLaunchPlanV1Schema` on execute/recover (wallets, allocations, intended effects for bundle/Mayhem/distribution, recovery caps, opaque pump fields; never vanity/attribution flags or reservation ids; never private keys).
+- `outcomeKind` / `outcomeDetails`: Platform-owned outcome classification persisted by the shared lifecycle (`succeeded`, `canceled`, `failed`, `partial`, `indeterminate`).
 - `result`: output metadata (JSON)
 - `tokenPublicKey`: token link when available
 - `cancelRequestedAt`: used for safe cancellation
@@ -60,16 +71,29 @@ Structured log entries per launch.
 
 ### LaunchRecoveryWallet
 
-Per-launch recovery tracking for managed wallets.
+Per-launch recovery tracking for managed wallets (cross-Platform term: Managed Launch Wallet).
 
-- One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION`)
+- One row per recovery wallet (`DEV`, `BUNDLER`, `DISTRIBUTION` via legacy `role` enum)
+- `platformRole`: optional Platform-defined role identifier string (not a global enum of every future role)
 - `isManaged`: whether launch cleanup is allowed to operate on the wallet automatically
-- `fundedLamports`: the actual SOL top-up this launch funded into that wallet
+- `fundedLamports`: the actual SOL top-up this launch funded into that wallet (recovery cap; not the plan required-balance target)
 - `reclaimStatus`, `reclaimTxSignature`, `reclaimError`, `lastAttemptAt`, `reclaimedAt`: reclaim bookkeeping for auto and manual recovery flows
+- New-version launches persist MLW rows from the authoritative plan before funding (`platformRole` + exact public keys). Execute requires a persisted plan; there is no flat-input wallet-row fallback on the Platform path.
+
+### LaunchPlannedMint
+
+Durable per-Launch mint identity materialized at plan time for every Launch (vanity pool or fresh key). Secrets live here; the plan envelope stays secret-free.
+
+- `launchId`: unique — one planned mint per Launch.
+- `publicKey` / `privateKey`: planned mint identity.
+- `vanityMintId`: optional link when sourced from the vanity pool.
+- `consumedAt`: set after confirmed on-chain create.
+- `abandonedAt`: set when lifecycle compensates a failed plan persist / insufficient-funds path.
+- Execute resolves the mint only via `optionsOutcomes.plannedMintId` (verify public key); no generate-at-execute for non-vanity.
 
 ### VanityMint
 
-Pool of pre-generated vanity mints (reserve first, consume after on-chain confirmation).
+Pool of pre-generated vanity mints (reserve first, consume after on-chain confirmation). Sourcing only — per-Launch identity is `LaunchPlannedMint`.
 
 - `reservedAt`: set when a mint is reserved for a launch attempt before create submission.
 - `usedAt`: set only after the mint is confirmed on-chain.
@@ -92,9 +116,42 @@ Pool of pre-generated vanity mints (reserve first, consume after on-chain confir
 Token records are created before on-chain submission to avoid wallet orphaning.
 
 - `status`: PENDING | ACTIVE | FAILED
+- `platform` / `platformVersion`: nullable Platform identity matching the Launch that created the Token. Null version marks a legacy Token.
 - `PENDING`: token and wallet links are persisted before create transaction is submitted
 - `ACTIVE`: set after on-chain confirmation/distribution completes
 - `FAILED`: set when launch errors after token persistence
+
+### Platform contracts
+
+- `versionedLaunchInputSchema`: external `launch.start` input — shared Token metadata + Launch Options (`vanityMint`, `removeAttribution`) + pump.fun `config`. Only `PUMPFUN` is accepted; SPL/EVM and system creator Wallet are rejected at validation. Buy/bundle limits (`MIN_BUY_AMOUNT_SOL`, `MAX_BUNDLE_WALLETS`) are owned by `lib/config/launch.config.ts` and imported by schemas/service.
+- New Launch/Token rows persist `platform=PUMPFUN` and `platformVersion="1"`. Tokens inherit Platform identity from the Launch at pending-token persistence. Token `description` stores the user-authored text; Launch Attribution is applied at pump metadata publish from metadata + Launch Options.
+- `launch-input-compat`: `resolveStoredLaunchInput` / `toVersionedLaunchInput` / `flattenVersionedLaunchInput` / `buildNewLaunchPersistence` support legacy flat rows, clone bags, and retry bridging without rewriting legacy JSON. Flat bags keep vanity/attribution at the top level; versioned shape puts them under `options`. New plan/start paths do not flatten as their working model.
+- Funnel Platform picker exposes pump.fun (working) and SPL (coming soon); EVM is removed from selection. Client funnel is a shared shell (metadata + Launch Options with a platform-options slot for pump fields like Mayhem) plus remaining pump sections in `components/launch/platforms/pumpfun/` (Dev Wallet / Bundler). Mayhem stays on pump `config`; it is only shown under Launch Options in the UI.
+- `normalizedLaunchMoneySummarySchema`: shared preview/plan money summary (immediate required balance, temporary funding, permanent spend, expected return, main-Wallet deltas, usage fees, labeled line items). Amounts are integer lamport decimal strings so they survive Prisma `Json` plan storage. Signed main-Wallet deltas are outflows (negative). Vanity and attribution fees are composed by shared Launch Options money helpers; pump preview/plan money does not invent those line items.
+- `versionedLaunchPreviewInputSchema` / `launchPlatformPreviewResultSchema`: preview input (Platform + Launch Options + config) and API envelope (`money` + wallet/policy fields). Stable pump.fun line labels live in `lib/launch/money-labels.ts`.
+- `resolveLaunchPlatform`: typed registry resolves pump.fun only; unsupported Platforms throw before record creation. Each module exposes `preview` / `plan` / `execute` / `recover` / `compensatePlanResources`. pump.fun `preview` returns Platform-only money via the cost calculator (does not compose Launch Options fees); `plan` builds the secret-free pump `platformPlan` from versioned `config` (may create unfunded Wallet key refs; must not fund, submit on-chain, or own mint/vanity materialization); `execute` validates the persisted envelope then routes non-bundled launches to `runPumpfunNonBundledExecute` and bundled launches to `runPumpfunBundledExecute`, returning typed outcomes; `recover` validates the envelope when present and reclaims SOL from persisted Managed Launch Wallet evidence with funded caps (`recoverSol` routes through it). Platform `compensatePlanResources` deletes unfunded generated wallet refs only.
+- Shared lifecycle (`launchLifecycle`): router entry for start/status/cancel/retry/getActive; owns Launch Options materialization (`LaunchPlannedMint` for every Launch), lifecycle options compensation (abandon planned mint + release vanity), options fee composition above Platform, plan envelope durability (platform plan → options outcomes → persist envelope → execute); provides lifecycle contexts including the persisted envelope; maps typed Platform outcomes to `status` + `outcomeKind` / `outcomeDetails`; owns the post-success usage-fee helper. Start/cancel/retry orchestration helpers and Platform-owned execute job bodies still live in `launch.service.ts`. Fee collection runs only after Platform success and never downgrades a successful Launch when collection fails. Transitional lifecycle/execute compatibility delegates and the system creator Launch path are removed.
+- Retry creates a new Launch linked to the failed attempt, reuses saved new-version input, and produces a fresh plan; the prior Launch and plan remain immutable.
+- `isLegacyPlatformRecord` / `isLegacyPlatformVersion`: null `platformVersion` ⇒ legacy (never inferred from JSON input shape).
+
+### Legacy custody-safe capability policy
+
+Null `platformVersion` Launch/Token records are custody-safe read-only for new operations. Enforcement is a single seam: `assertNonLegacyPlatformCapability` (`server/services/launch-capability.ts`), with shared copy in `lib/launch/legacy-capability.ts`.
+
+| Capability | Legacy (`platformVersion == null`) | Version `"1"` |
+|---|---|---|
+| History / detail reads | Allowed | Allowed |
+| Exit / sell | Allowed | Allowed |
+| SOL reclaim (launch + volume-bot) | Allowed | Allowed |
+| Key access | Allowed | Allowed |
+| Retry | Denied | Allowed (existing rules) |
+| Clone | Denied (`launch.getCloneInput` assert + `getUserLaunches` omits clone `input`) | Allowed |
+| New buys / create buyer wallets | Denied | Allowed |
+| Volume bot start | Denied | Allowed |
+
+Denied paths return a consistent user-safe `AppError` (400). UI hides/disables retry, clone, buy, and new volume-bot sessions using `isLegacy` / `platformVersion` from launch and token reads.
+
+Database migrations remain human-owned (do not agent-run `prisma migrate`).
 
 ## Wallet Handling
 
@@ -102,20 +159,17 @@ Token records are created before on-chain submission to avoid wallet orphaning.
 
 Used as the funding wallet (no selection in UI).
 
-### Dev Wallet
+### Dev Wallet (creator Wallet)
 
-Based on `devWalletOption`:
+New launches accept only:
 
-- `system`: platform-provided dev wallet from `SYSTEM_DEV_WALLET_PRIVATE_KEY` env var. The DB stores a metadata-only `Wallet` row (`privateKey: ""` placeholder, `isSystemWallet: true`). Available to all plans with no extra dev-wallet usage fee.
-- `use_main`: main wallet
+- `use_main`: main wallet as creator
 - `generate`: server creates a new `DEV` wallet
 - `import`: server validates and stores imported key as `DEV`
 
-Any plan may choose `use_main`, `generate`, or `import`. Choosing a non-system dev wallet adds a **0.1 SOL** launch usage fee (`nonSystemDevWalletFeeSol` in `lib/config/usage-fees.config.ts`), subject to the same platform fee policy as other launch usage fees (Pro: waived; Developer: discount applies to `totalFeeSol`). The server does not coerce `devWalletOption` by plan; `previewCosts`, `startLaunch`, and `retryLaunch` use the submitted value.
+The system creator Wallet option is removed from new Launch input, planning, and execute. Legacy rows that still store `devWalletOption: "system"` remain readable under the legacy custody-safe policy; retry/clone of those rows is denied with a user-safe explanation. `nonSystemDevWalletFeeSol` is `0` (legacy fee line retained for display compatibility).
 
 When `use_main` is selected, the launch still persists the token's dev-wallet link, but the linked address is the user's main wallet. Downstream wallet UI should present this as one shared wallet labeled `Main Wallet (used as dev)` instead of two separate wallet cards for the same address.
-
-When `system` is selected, the system dev wallet is treated as managed holdings only: no private key export, no wallet-page custody actions, no inclusion in user SOL totals, and no volume-bot usage. The system dev is added to `managedLaunchWallets` for post-launch and failed-launch SOL cleanup, but failed-launch reclaim is capped to the launch-funded top-up recorded for that attempt so pre-existing system-wallet SOL is not swept to the user. When selling system dev holdings, realized SOL is read from confirmed transaction metadata and swept immediately to the user's main wallet.
 
 ### Bundler Wallets
 
@@ -143,11 +197,11 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 ## Launch Job Steps (Short)
 
 1. **Initialize**: mark launch RUNNING, set `startedAt`, progress to 2.
-2. **Validate**: enforce minimum buy thresholds (`0.05` SOL for dev buy, `0.1` SOL for bundle buy amount per wallet) and bundle wallet limit (max `8` bundler wallets).
-3. **Wallets**: load main wallet, resolve dev wallet, generate bundler and distribution wallets if enabled.
+2. **Validate**: enforce minimum buy thresholds and bundle wallet limit from `lib/config/launch.config.ts` (`MIN_BUY_AMOUNT_SOL` / `MAX_BUNDLE_WALLETS`; currently `0.05` SOL and `8` bundler wallets). System creator Wallet is rejected.
+3. **Wallets**: load main wallet and Managed Launch Wallet keypairs from the persisted plan (keys created during planning). Persist `LaunchRecoveryWallet` rows from the plan before funding.
 4. **Callback Registration**: when `SHYFT_API_KEY` and `APP_URL` are set, register Shyft transaction callbacks for bundler, distribution, and dev wallet addresses (events: SWAP, TOKEN_TRANSFER, SOL_TRANSFER). Best-effort — failures do not block the launch.
-5. **Funding**: transfer required SOL to dev and bundler wallets before on-chain work, including ATA rent, volume accumulator rent, distribution ATA rent, and fee buffers.
-6. **Metadata + Mint**: resolve image, build metadata, reserve vanity mint if requested.
+5. **Funding**: transfer SOL to reach plan required-balance targets before venue submission. Snapshot actual top-ups onto `fundedLamports`.
+6. **Metadata + Mint**: resolve image, build pump venue metadata, resolve mint via `optionsOutcomes.plannedMintId`, consume vanity reservation from the plan when present.
    - Metadata description appends `Launched with ballistik.app` by default.
    - Attribution is appended after two line breaks when user description exists.
    - If description is empty, metadata uses only `Launched with ballistik.app`.
@@ -158,8 +212,10 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
    - Launch input media is normalized before persistence: `tokenImage`/`tokenBanner` data URLs are uploaded to Pinata and replaced with gateway URLs in `Launch.input`.
    - If media upload cannot produce a URL, launch queueing fails and no launch record is created.
    - `Token.imageUrl` stores the same normalized media URL.
-8. **Create + Buy**: create token and execute dev/bundler buys (bundle via Jito if enabled).
+8. **Create + Buy**: create token and execute creator/bundler buys.
+   - Non-bundled launches run through Platform execute (`runNonBundledPumpfunLaunchJob`): raw create or create+dev-buy only, allocations from the persisted plan, Launch-owned AppTransaction rows. PumpFunSDK is not used on this path.
    - The non-bundled create-time dev buy uses the same raw `buy_exact_sol_in` transaction builder as the newer Pump flow, including the volume accumulator accounts and the trailing `bonding_curve_v2` account required by the on-chain program after the Cashback upgrade.
+   - Bundled launches run through Platform execute (`runBundledPumpfunLaunchJob` → `createAndBuyInBundle` / Jito) using the exact persisted plan and the same raw create/buy builders (no PumpFunSDK). Packing limits and buyer→tx mapping share helpers in `bundle-transaction-builder`.
    - In bundled launches, follow-up buyer ATA creation is hoisted into the first create transaction so later bundle transactions can submit buy-only instructions against the freshly created mint state.
    - Hoisted ATA instructions keep their original buyer payer/owner, and those buyer keypairs are added to the first transaction signer set so the reordered bundle remains signature-valid without shifting rent costs.
    - ATA hoisting is capped by an actual versioned-transaction size estimate; once the first bundle transaction would exceed Solana's raw `1232`-byte limit, remaining buyer ATA creation stays in later bundle transactions.
@@ -173,25 +229,29 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 12. **Post-Launch SOL Sweep**: after a successful launch, transfer excess SOL from managed launch wallets (generated dev wallet, bundler wallets, distribution wallets) back to main wallet. Cleanup tries to use the main wallet as fee payer when possible and otherwise falls back to the existing source-funded transfer.
 13. **Failure Reclaim**: if launch execution fails after recovery wallets were persisted, attempt to return remaining SOL to the main wallet before final UI guidance is shown.
    - Failed-launch reclaim is capped per wallet to `min(current wallet balance, launch-funded lamports for that wallet)`.
-   - The per-wallet funded amount is persisted on `LaunchRecoveryWallet.fundedLamports` after funding succeeds, so shared wallets such as the system dev wallet only return launch-specific top-ups.
+   - The per-wallet funded amount is persisted on `LaunchRecoveryWallet.fundedLamports` after funding succeeds, so recovery never returns more than the plan-funded cap for a Managed Launch Wallet.
 14. **Complete**: mark SUCCEEDED or CANCELED, or mark FAILED after reclaim outcome is recorded, store result metadata, log completion.
 
 ## UI Integration
 
 - Launch form starts via `launch.start` and polls `launch.status`.
+- The launch funnel is owned by the shared `components/launch/launch-funnel-shell.tsx` shell, with shared metadata/review UI under `components/launch/shared/` and pump.fun configuration under `components/launch/platforms/pumpfun/`.
+- Funnel form state is nested as `{ platform, metadata, config }`; flat preset and clone inputs are mapped into that shape at initialization.
+- Both the inline Review and the overview dialog use `launch.previewCosts` through `toPreviewMoneyDisplay` for active fee/reserve amounts. Inactive toggles may still show nominal catalog fee amounts (struck through) from `usage-fees.config` for UX continuity.
 - Progress dialog renders launch status and logs.
 - The app header shows active launch progress beside the sidebar trigger via `activeProcess.list`; clicking the header pill opens the same launch progress dialog.
 - Resume uses local storage or `launch.getActive` for in-progress launches only.
 - User can request cancellation.
-- Manage Tokens table is powered by `launch.getUserLaunches`, mapping launch statuses to display statuses (SUCCEEDED -> ACTIVE, RUNNING/PENDING -> PENDING, FAILED/CANCELED -> FAILED).
-- Reclaim actions remain owned by Manage Tokens row actions (shown only when `hasRecoveryWallets` is true); the launch progress dialog does not open a reclaim dialog during launch.
+- Launch history (`/launches`) is powered by `launch.getUserLaunches` and shows every attempt, including pre-mint failures, with Launch statuses and retry lineage.
+- My Tokens (`/tokens`) is powered by `token.getAllUserTokens` and lists persisted Tokens only.
+- Reclaim actions are available from Launch history (including pre-mint attempts by `launchId`) and from My Tokens (token-scoped); the launch progress dialog does not open a reclaim dialog during launch.
 - During long launch work, the progress dialog surfaces helper copy: `Token creation may take couple of minutes. Please be patient.`
 - Progress activity is rendered newest-first, with the most recent row visually emphasized and raw log levels hidden from the user-facing list.
 - Failed launch progress first attempts automatic reclaim and shows reclaim as launch activity.
 - If automatic reclaim succeeds, the failed dialog keeps a visible reclaimed-funds step and does not show manual reclaim guidance.
-- If automatic reclaim fails, failed launch progress surfaces retry and Manage Tokens guidance for manual reclaim.
+- If automatic reclaim fails, failed launch progress surfaces retry and Launch history guidance for manual reclaim.
 - Shared main/dev launches with no generated recovery wallets are treated as a valid zero-wallet recovery state rather than an error.
-- Retry from progress dialog and Manage Tokens creates a new linked launch attempt and opens progress for the new attempt.
+- Retry from progress dialog and Launch history creates a new linked launch attempt and opens progress for the new attempt.
 
 ### Retry Model (Failed Launches)
 
@@ -236,7 +296,10 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 - `server/solana/pump/transactions.ts`
 - `app/(app)/launch/launch-progress-dialog.tsx`
 - `app/(app)/launch/launch-overview-dialog.tsx`
-- `app/(app)/launch/launch-form.tsx`
+- `components/launch/launch-funnel-shell.tsx` (shared funnel shell)
+- `components/launch/shared/` (platform selector, shared metadata, normalized review)
+- `components/launch/platforms/pumpfun/` (pump.fun config fields + flat→nested mapping)
+- `app/(app)/launch/launch-form.tsx` (re-exports shell as `LaunchForm`)
 
 ## Environment Requirements
 
@@ -261,27 +324,29 @@ When `distributionWalletMultiplier > 1`, server generates `DISTRIBUTION` wallets
 
 Launch uses a hybrid quote model:
 
-- Edit-time estimate in the form for responsive feedback.
-- Confirm-time server quote (`launch.previewCosts`) as the source of truth.
+- Edit-time estimate in the form for responsive fee totals (client-side usage-fee helpers).
+- Server quote (`launch.previewCosts` → Platform `preview`) as the source of truth for review/overview and temporary reserves.
 
-The server quote groups values into:
+The normalized `money` summary groups values into:
 
-- `chargedNowSol`: immediate debit from main wallet when launch starts.
-- `temporaryFundingSol`: operational wallet funding and reserves expected to return later.
-- `expectedReturnSol`: estimated SOL returned after post-launch cleanup.
-- `permanentSpendSol`: expected non-recoverable spend.
-- `netMainWalletDeltaNowSol`: immediate impact.
-- `netMainWalletDeltaAfterCleanupSol`: expected final impact after return.
+- `immediateRequiredBalanceLamports`: immediate debit from main wallet when launch starts.
+- `temporaryFundingLamports`: operational wallet funding and reserves expected to return later.
+- `expectedReturnLamports`: estimated SOL returned after post-launch cleanup.
+- `permanentSpendLamports`: expected non-recoverable spend.
+- `expectedMainWalletDeltaNowLamports` / `expectedMainWalletDeltaAfterCleanupLamports`: signed main-Wallet deltas (negative = outflow).
+- `usageFeeLamports` plus labeled `lineItems` for fees, buys, tips, rent, buffers, and expected return.
 
 ### Quote Categories
 
-`launch.previewCosts` includes line items for:
+Platform preview line items cover:
 
 - Usage fees (bundle-buy fee, attribution-removal fee, vanity fee, generated-wallet fee).
 - Dev buy and bundle-buy funding requirements.
 - Jito tip (when bundle buy is enabled).
 - Rent and setup funding (ATA rent, user volume accumulator rent, distribution ATA rent).
 - Operational buffers (`createFeeBufferLamports`, `fundingBufferLamports`, `transferFeeBufferLamports`) and creator/main reserves.
+
+The Launch overview dialog reads these fields from the API envelope rather than parallel named SOL objects.
 
 ### Fixed Bundle Spend
 
@@ -304,6 +369,9 @@ The server quote groups values into:
 - Bundle CREATE confirmation timeout is set to 3 minutes (`180_000ms`) in `server/solana/jito-bundle.ts`.
 - Mint account confirmation timeout is set to 5 minutes via `getLaunchConfig().mintConfirmTimeoutMs` in `lib/config/launch.config.ts`.
 - Bundle confirmation uses bounded resend and blockhash-rebuild loops within the 3-minute window.
+- Jito regional `sendBundle` calls time out after `4_000ms` per endpoint; transport failures cool that region for `20_000ms`. Send walks also stop before blockhash expiry (`10_000ms` margin) so failover cannot burn the signed txs.
+- If a confirm-loop resend fails entirely (all regions reject/timeout, or `expired blockhash`), the launch rebuilds with a fresh blockhash (adaptive tip escalate when enabled) instead of waiting out the full confirmation timeout on a dead bundle.
+- Launch form default Jito tip is `0.005 SOL`.
 
 ## Bundle Launch
 
@@ -313,7 +381,7 @@ When bundle buy is enabled, create + dev buy + bundler buys are sent as a Jito b
 
 1. Build the token create transaction as a raw `TransactionInstruction` with the `create` discriminator and Borsh-encoded args (name, symbol, uri, creator pubkey).
 2. Build buy transactions for each buyer using a raw `buy_exact_sol_in` instruction with the SOL amount and `min_tokens_out = 1`.
-3. Pack transactions into a bundle and submit through Jito.
+3. Pack transactions into a bundle and submit through the deep Jito transport (`sendJitoBundle`). Tip placement happens inside Jito; Launch owns AppTransaction meanings from the returned signatures/confirmation/telemetry.
 4. Simulation errors hard-fail — invalid bundles are never sent to Jito.
    - Each transaction is first simulated individually (`simulateTransaction`); only the first (create) transaction's result gates the launch, since buy transactions are expected to fail individual simulation before the mint exists.
    - When `HELIUS_RPC_URL` is set, a sequential `simulateBundle` preflight (Jito-Solana RPC method, `server/solana/simulate-bundle.ts`) simulates all 5 transactions against a single bank so buys see the CREATE state. A sequential failure aborts the launch with per-transaction errors and logs. If the env var is unset or the RPC does not support the method, the preflight is skipped (logged as `bundle_sequential_simulation` with status `unsupported`/`error`). The preflight runs on the initial build only; rebuilds reuse the same instructions with a fresh blockhash.
@@ -353,7 +421,8 @@ Note: No off-chain token amount calculation is needed. The program determines to
 
 ### Jito Tip
 
-- If `jitoTipAmountSol > 0`, a SOL transfer is added to the last bundle transaction.
+- If `jitoTipAmountSol > 0`, tip placement is owned by `sendJitoBundle` (appended to the last transaction; tip account selected internally).
+- Callers pass tip lamports and tipper only; adaptive tip policy is enabled with `enableAdaptiveTip` (multipliers/max escalations stay inside Jito).
 - The tip is paid by the main wallet and sent to a Jito tip account.
 
 ### Jito Block Engine
@@ -397,10 +466,10 @@ Allows users to pre-populate the launch form with configuration from a previous 
 ### tRPC Endpoint
 
 - `launch.getUserLaunches` (query): returns all user launches ordered by `createdAt` desc.
-  - Selects: `id`, `status`, `input`, `tokenPublicKey`, `errorMessage`, `createdAt`, joined `token { name, symbol, imageUrl, websiteUrl, twitterUrl, telegramUrl }`, and `_count { recoveryWallets }`.
+  - Selects: `id`, `status`, `retriedFromLaunchId`, `input`, `tokenPublicKey`, `errorMessage`, `createdAt`, joined `token` metadata, and retry-attempt presence.
   - Extracts `tokenName`, `tokenSymbol`, and social URLs from `input` JSON as fallback when the token relation is null (e.g. launches that failed before token creation).
-  - Returns `hasRecoveryWallets` boolean derived from the recovery wallet count.
-  - Serves as the canonical data source for both the Manage Tokens table and the Clone Token dialog.
+  - Returns lineage fields (`retriedFromLaunchId`, `hasRetryAttempts`) and legacy markers for the Launch history surface and Clone Token dialog.
+  - Serves as the canonical data source for Launch history and the Clone Token dialog. My Tokens uses `token.getAllUserTokens` instead.
 
 ### Clone Behavior
 
@@ -411,7 +480,7 @@ Allows users to pre-populate the launch form with configuration from a previous 
 ### UI Flow
 
 1. User clicks "Clone Token" button in the launch page header.
-2. A dialog opens showing a table of previous launches (reuses the manage tokens table columns minus links/actions, plus single-row selection).
+2. A dialog opens showing a table of previous launches (clone-oriented columns plus single-row selection).
 3. User selects a launch and clicks "Clone".
 4. Dialog closes and the launch form is populated with the selected configuration.
 
@@ -423,18 +492,18 @@ Allows users to pre-populate the launch form with configuration from a previous 
 
 ## Launch Presets
 
-- Launch supports URL-driven presets via the `preset` query parameter.
-- `preset=free` initializes a free configuration (`devWalletOption = system`, bundle buy disabled, vanity disabled, attribution removal disabled).
-- Missing or unknown `preset` values default to the regular preset (`devWalletOption = system`, bundle buy enabled, `bundlerWalletCount = 8`, vanity enabled, attribution removal disabled).
-- Free-tier users are always normalized to `devWalletOption = system` on the server regardless of preset or client input.
-- Preset values are applied before clone values; cloning overrides preset initialization.
+- Launch supports URL-driven presets via the `preset` query parameter (`lib/config/launch-presets.config.ts`).
+- `preset=free` initializes a free configuration (`devWalletOption = generate`, bundle buy disabled, vanity disabled, attribution removal disabled).
+- Missing or unknown `preset` values default to the regular preset (`devWalletOption = generate`, bundle buy enabled, `bundlerWalletCount = 8`, vanity enabled, attribution removal disabled).
+- The server does not coerce `devWalletOption` by plan; presets and submissions use `generate` / `import` / `use_main` only.
+- Preset values are applied before clone values; cloning overrides preset initialization. Clone/preset bags that still carry `system` are remapped to `generate` in the funnel.
 - Unauthenticated visits preserve preset URLs through auth redirects using the `redirect` query param (for example `/launch?preset=free` -> `/auth?redirect=%2Flaunch%3Fpreset%3Dfree` -> back to `/launch?preset=free` after login/signup).
 
 ## Balance Refresh Strategy
 
 - Balances are refreshed on demand only
 - Server enforces a 15-second debounce per wallet
-- The My Tokens page explicitly refetches launches when it mounts so navigation does not reuse a fresh-cache snapshot for too long.
+- Launch history and My Tokens explicitly refetch on mount so navigation does not reuse a fresh-cache snapshot for too long.
 
 ## Failed Launch Reclaim UX
 
@@ -442,16 +511,17 @@ Allows users to pre-populate the launch form with configuration from a previous 
 - Automatic reclaim is logged as launch activity so it appears in the launch progress dialog just like create, confirm, and cleanup steps.
 - Launch state remains `FAILED` even when automatic reclaim succeeds.
 - Automatic reclaim outcome is stored in `Launch.result.failureRecovery` for user-facing messaging.
-- `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Manage Tokens for reclaim.
+- `failureRecovery.manualActionRequired` determines whether the progress dialog should tell the user to go to Launch history for reclaim.
 - Failed-launch reclaim is launch-scoped: each managed wallet can only return the funded top-up recorded for that launch, never more than its current balance.
-- Failed launches without `failureRecovery` metadata fall back to showing My Tokens guidance so older/stale failure records still have a recovery path.
-- Manual reclaim remains available from Manage Tokens row actions and the reclaim dialog.
+- Manual `recoverSol` uses the same funded-cap drain when the Launch has a `plan_funded_cap` recovery policy or a recorded `fundedLamports` top-up. Legacy launches without plan/funding snapshots keep full-balance reclaim.
+- Failed launches without `failureRecovery` metadata fall back to showing Launch history guidance so older/stale failure records still have a recovery path.
+- Manual reclaim remains available from Launch history and My Tokens row actions and the reclaim dialog.
 
-## Manage Tokens Reclaim Dialog
+## Reclaim Dialog
 
 - The reclaim dialog keeps wallet rows in the scrollable region and uses a sticky footer for actions.
 - The sticky footer shows the total reclaimable SOL amount on the left.
-- Successful reclaim invalidates `launch.getUserLaunches` so the My Tokens table refreshes immediately.
+- Successful reclaim invalidates `launch.getUserLaunches` and `token.getAllUserTokens` so Launch history and My Tokens refresh immediately.
 
 ## Mayhem Mode
 
@@ -459,7 +529,7 @@ Optional, beta pump.fun feature that adds an AI trading agent that autonomously 
 
 ### Create Flow
 
-- When `mayhemMode` is true, `runLaunchJob` preflight-checks `Global.create_v2_enabled` / `Global.mayhem_mode_enabled` (`assertMayhemCreateAllowed` in `server/solana/pump/global-account.ts`) right after input validation, before wallets/funding — fails fast with a clear `AppError` if pump.fun has disabled create_v2 or Mayhem mode server-side, since pump.fun frames this as experimental beta with no dedicated toggle and can disable it at any time.
+- When `mayhemMode` is true, Platform execute preflight-checks `Global.create_v2_enabled` / `Global.mayhem_mode_enabled` (`assertMayhemCreateAllowed` in `server/solana/pump/global-account.ts`) right after input validation, before wallets/funding — fails fast with a clear `AppError` if pump.fun has disabled create_v2 or Mayhem mode server-side, since pump.fun frames this as experimental beta with no dedicated toggle and can disable it at any time. Bundled submission uses `intendedEffects.mayhemMode` from the persisted plan.
 - Token creation uses `create_v2` (`buildCreateTokenV2TransactionRaw` in `server/solana/pump/instructions.ts`) instead of `create`: Token-2022 mint, plus 5 extra fixed accounts (Mayhem program, global params, sol vault, mayhem state, mayhem token vault — PDAs derived in `deriveMayhemCreateV2Accounts`).
 - Cashback is passed as `false` by default for Mayhem creates; not exposed as a separate toggle in this pass.
 - Both the bundle path (`bundle-create-and-buy.ts`) and the non-bundle combined create+dev-buy versioned transaction path (`buildCreateAndDevBuyVersionedTransaction` in `server/solana/pump/transactions.ts`) support `isMayhemMode`.

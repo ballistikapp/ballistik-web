@@ -5,37 +5,42 @@ import {
   sensitiveProcedure,
 } from "../trpc";
 import { launchService } from "@/server/services/launch.service";
+import { launchLifecycle } from "@/server/services/launch-lifecycle";
 import {
-  launchPreviewCostsSchema,
   launchRecoverSolByTokenSchema,
   launchRecoverySchema,
   launchRecoveryByTokenSchema,
   launchRetrySchema,
   launchRecoverSolSchema,
-  launchTokenSchema,
   launchStatusSchema,
 } from "@/server/schemas/launch.schema";
+import {
+  versionedLaunchInputSchema,
+  versionedLaunchPreviewInputSchema,
+} from "@/server/schemas/launch-platform.schema";
 
 export const launchRouter = router({
   previewCosts: protectedRateLimitedProcedure
-    .input(launchPreviewCostsSchema)
+    .input(versionedLaunchPreviewInputSchema)
     .query(async ({ input, ctx }) => {
       return await launchService.previewCosts(input, ctx.user);
     }),
-  start: expensiveProtectedProcedure.input(launchTokenSchema).mutation(async ({ input, ctx }) => {
-    return await launchService.startLaunch(input, ctx.user);
-  }),
+  start: expensiveProtectedProcedure
+    .input(versionedLaunchInputSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await launchLifecycle.startLaunch(input, ctx.user);
+    }),
   status: protectedRateLimitedProcedure.input(launchStatusSchema).query(async ({ input, ctx }) => {
-    return await launchService.getLaunchStatus(input.launchId, ctx.user.id);
+    return await launchLifecycle.getLaunchStatus(input.launchId, ctx.user.id);
   }),
   cancel: expensiveProtectedProcedure.input(launchStatusSchema).mutation(async ({ input, ctx }) => {
-    return await launchService.cancelLaunch(input.launchId, ctx.user.id);
+    return await launchLifecycle.cancelLaunch(input.launchId, ctx.user.id);
   }),
   retry: expensiveProtectedProcedure.input(launchRetrySchema).mutation(async ({ input, ctx }) => {
-    return await launchService.retryLaunch(input.launchId, ctx.user);
+    return await launchLifecycle.retryLaunch(input.launchId, ctx.user);
   }),
   getActive: protectedRateLimitedProcedure.query(async ({ ctx }) => {
-    return await launchService.getActiveLaunch(ctx.user.id);
+    return await launchLifecycle.getActiveLaunch(ctx.user.id);
   }),
   getFailedLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getFailedLaunches(ctx.user.id);
@@ -43,6 +48,11 @@ export const launchRouter = router({
   getUserLaunches: protectedRateLimitedProcedure.query(async ({ ctx }) => {
     return await launchService.getUserLaunches(ctx.user.id);
   }),
+  getCloneInput: protectedRateLimitedProcedure
+    .input(launchStatusSchema)
+    .query(async ({ input, ctx }) => {
+      return await launchService.getCloneInput(input.launchId, ctx.user.id);
+    }),
   recoveryWallets: protectedRateLimitedProcedure
     .input(launchRecoverySchema)
     .query(async ({ input, ctx }) => {

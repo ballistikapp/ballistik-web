@@ -1,10 +1,10 @@
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Launches",
+  title: "Launch history",
 };
 
-export default function LaunchesLayout({
+export default function LaunchHistoryLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;

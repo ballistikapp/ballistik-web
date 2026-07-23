@@ -16,6 +16,7 @@ import {
   opsListMarketersSchema,
   opsListTokensSchema,
   opsListUsersSchema,
+  opsListWalletAppTransactionsSchema,
   opsJumpSchema,
   opsListWalletsSchema,
   opsLookupSchema,
@@ -24,6 +25,11 @@ import {
   opsRevealPrivateKeySchema,
   opsUpdateMarketerSchema,
 } from "@/server/schemas/ops.schema";
+import {
+  opsGetMarketerApplicationSchema,
+  opsListMarketerApplicationsSchema,
+  opsRejectMarketerApplicationSchema,
+} from "@/server/schemas/marketer-application.schema";
 
 export const opsRouter = router({
   getOverview: operatorProcedure
@@ -86,6 +92,12 @@ export const opsRouter = router({
       return await opsService.getWallet(ctx.user.id, input.publicKey);
     }),
 
+  listWalletAppTransactions: operatorProcedure
+    .input(opsListWalletAppTransactionsSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listWalletAppTransactions(ctx.user.id, input);
+    }),
+
   refreshWalletBalances: operatorProcedure
     .input(opsRefreshWalletBalancesSchema)
     .mutation(async ({ input, ctx }) => {
@@ -135,5 +147,23 @@ export const opsRouter = router({
     .input(opsUpdateMarketerSchema)
     .mutation(async ({ input, ctx }) => {
       return await opsService.updateMarketer(ctx.user.id, input);
+    }),
+
+  listMarketerApplications: operatorProcedure
+    .input(opsListMarketerApplicationsSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.listMarketerApplications(ctx.user.id, input);
+    }),
+
+  getMarketerApplication: operatorProcedure
+    .input(opsGetMarketerApplicationSchema)
+    .query(async ({ input, ctx }) => {
+      return await opsService.getMarketerApplication(ctx.user.id, input);
+    }),
+
+  rejectMarketerApplication: operatorProcedure
+    .input(opsRejectMarketerApplicationSchema)
+    .mutation(async ({ input, ctx }) => {
+      return await opsService.rejectMarketerApplication(ctx.user.id, input);
     }),
 });

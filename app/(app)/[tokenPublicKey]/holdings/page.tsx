@@ -14,6 +14,7 @@ import { formatRefreshTime } from "@/lib/utils/relative-time";
 import { formatSol, formatTokenCount } from "@/lib/utils/format";
 import { formatBuyHoldingsToast } from "@/lib/utils/buy-holdings-toast-message";
 import { formatSellHoldingsToast } from "@/lib/utils/sell-holdings-toast-message";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { TokenNotFound } from "@/components/placeholders/token-not-found";
 import { DashboardLoading } from "../dashboard/dashboard-loading";
 import { HoldingBuyDialog } from "@/components/holdings/holding-buy-dialog";
@@ -600,17 +601,30 @@ export default function Page() {
           );
         })}
         <div className="flex h-full w-full flex-col items-stretch justify-center gap-2 max-md:mx-auto max-md:flex-row md:ml-auto md:max-w-44">
-          <Button
-            variant="outline"
-            size="lg"
-            className="w-full min-w-0 max-md:flex-1 px-4 text-base font-semibold"
-            type="button"
-              onClick={() => setBuyDialogOpen(true)}
-              disabled={isBuying || !tokenPublicKey}
-          >
-            <span className="flex-1 text-center text-primary">BUY</span>
-            <IconCoins data-icon="inline-end" className="text-primary" />
-          </Button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <span className="block w-full min-w-0 max-md:flex-1">
+                <Button
+                  variant="outline"
+                  size="lg"
+                  className="w-full min-w-0 max-md:flex-1 px-4 text-base font-semibold"
+                  type="button"
+                  onClick={() => setBuyDialogOpen(true)}
+                  disabled={
+                    isBuying || !tokenPublicKey || Boolean(tokenData.isLegacy)
+                  }
+                >
+                  <span className="flex-1 text-center text-primary">BUY</span>
+                  <IconCoins data-icon="inline-end" className="text-primary" />
+                </Button>
+              </span>
+            </TooltipTrigger>
+            {tokenData.isLegacy ? (
+              <TooltipContent side="left" sideOffset={4}>
+                {legacyCapabilityDeniedMessage("new buys")}
+              </TooltipContent>
+            ) : null}
+          </Tooltip>
           <Tooltip>
             <TooltipTrigger asChild>
               <span className="block w-full min-w-0 max-md:flex-1">

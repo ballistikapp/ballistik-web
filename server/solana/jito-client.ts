@@ -97,6 +97,10 @@ const tipCache = new Map<string, TipCacheEntry>();
 // try them (sorted by soonest-to-recover) so the loop is never fully blocked.
 const RATE_LIMIT_DEFAULT_COOLDOWN_MS = 5_000;
 const RATE_LIMIT_MAX_COOLDOWN_MS = 120_000;
+/** Cap how long we wait on a single regional sendBundle before trying the next. */
+export const BUNDLE_SEND_ENDPOINT_TIMEOUT_MS = 4_000;
+/** Skip regions that just timed out / became unreachable for a short window. */
+export const BUNDLE_SEND_TRANSPORT_COOLDOWN_MS = 20_000;
 const endpointCooldowns = new Map<string, number>();
 
 function parseRetryAfterMs(message: string): number | null {
@@ -109,6 +113,13 @@ function parseRetryAfterMs(message: string): number | null {
 
 type JitoClientLogOptions = {
   launchId?: string;
+};
+
+export type JitoSendBundleOptions = JitoClientLogOptions & {
+  /** Stop trying further regions once this timestamp is reached. */
+  walkDeadlineAt?: number;
+  /** Override per-endpoint send timeout (default {@link BUNDLE_SEND_ENDPOINT_TIMEOUT_MS}). */
+  perEndpointTimeoutMs?: number;
 };
 
 function jitoClientLogContext(options?: JitoClientLogOptions) {
@@ -124,10 +135,17 @@ function looksRateLimited(message: string): boolean {
   );
 }
 
-function maybeRecordCooldown(endpoint: string, message: string) {
-  if (!looksRateLimited(message)) return;
-  const retryAfter = parseRetryAfterMs(message);
-  const cooldownMs = retryAfter ?? RATE_LIMIT_DEFAULT_COOLDOWN_MS;
+function looksTransportFailure(message: string): boolean {
+  return /ETIMEDOUT|ECONNRESET|ECONNREFUSED|ENOTFOUND|EAI_AGAIN|unavailable|timed out|socket hang up|connect ETIMEDOUT|read ETIMEDOUT/i.test(
+    message
+  );
+}
+
+function applyEndpointCooldown(
+  endpoint: string,
+  cooldownMs: number,
+  reason: string
+) {
   const until = Date.now() + cooldownMs;
   const existing = endpointCooldowns.get(endpoint) ?? 0;
   if (until > existing) {
@@ -135,8 +153,49 @@ function maybeRecordCooldown(endpoint: string, message: string) {
     logger.warn("Jito endpoint cooldown applied", {
       endpoint,
       cooldownMs,
-      reason: message.slice(0, 200),
+      reason: reason.slice(0, 200),
     });
+  }
+}
+
+function maybeRecordCooldown(endpoint: string, message: string) {
+  if (!looksRateLimited(message)) return;
+  const retryAfter = parseRetryAfterMs(message);
+  const cooldownMs = retryAfter ?? RATE_LIMIT_DEFAULT_COOLDOWN_MS;
+  applyEndpointCooldown(endpoint, cooldownMs, message);
+}
+
+function maybeRecordTransportCooldown(endpoint: string, message: string) {
+  if (!looksTransportFailure(message)) return;
+  applyEndpointCooldown(endpoint, BUNDLE_SEND_TRANSPORT_COOLDOWN_MS, message);
+}
+
+function recordSendFailureCooldown(endpoint: string, message: string) {
+  maybeRecordCooldown(endpoint, message);
+  maybeRecordTransportCooldown(endpoint, message);
+}
+
+async function sendBundleToEndpointWithTimeout(
+  send: () => Promise<JitoSendResult>,
+  timeoutMs: number
+): Promise<JitoSendResult> {
+  // Preferred endpoint is only set after this await returns ok. A late
+  // resolve from a timed-out send cannot pin preferred — the walk has
+  // already moved on.
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      send(),
+      new Promise<never>((_, reject) => {
+        timeoutId = setTimeout(() => {
+          reject(new Error(`send timed out after ${timeoutMs}ms`));
+        }, timeoutMs);
+      }),
+    ]);
+  } finally {
+    if (timeoutId !== undefined) {
+      clearTimeout(timeoutId);
+    }
   }
 }
 
@@ -435,22 +494,42 @@ export type JitoSendRejection = { endpoint: string; error: string };
 
 export async function sendBundle(
   bundleToSend: import("jito-ts").bundle.Bundle,
-  options?: JitoClientLogOptions
+  options?: JitoSendBundleOptions
 ) {
   const logContext = jitoClientLogContext(options);
+  const walkDeadlineAt = options?.walkDeadlineAt;
+  const perEndpointTimeoutMs =
+    options?.perEndpointTimeoutMs ?? BUNDLE_SEND_ENDPOINT_TIMEOUT_MS;
   let lastError: JitoSendResult | null = null;
   const rejections: JitoSendRejection[] = [];
   for (const entry of orderedClients()) {
+    if (walkDeadlineAt !== undefined && Date.now() >= walkDeadlineAt) {
+      const message = "send walk deadline reached before endpoint attempt";
+      rejections.push({ endpoint: entry.endpoint, error: message });
+      lastError = {
+        ok: false,
+        error: `endpoint=${entry.endpoint} ${message}`,
+      };
+      logger.warn("Jito bundle send walk deadline reached", {
+        ...logContext,
+        endpoint: entry.endpoint,
+        walkDeadlineAt,
+        rejectionCount: rejections.length,
+      });
+      break;
+    }
     try {
-      const response = (await entry.client.sendBundle(
-        bundleToSend
-      )) as JitoSendResult;
+      const response = await sendBundleToEndpointWithTimeout(
+        () =>
+          entry.client.sendBundle(bundleToSend) as Promise<JitoSendResult>,
+        perEndpointTimeoutMs
+      );
       if (response.ok) {
         setPreferredEndpoint(entry.endpoint);
         return { ...response, endpoint: entry.endpoint, rejections };
       }
       const message = normalizeError(response.error);
-      maybeRecordCooldown(entry.endpoint, message);
+      recordSendFailureCooldown(entry.endpoint, message);
       rejections.push({ endpoint: entry.endpoint, error: message });
       lastError = {
         ok: false,
@@ -463,7 +542,7 @@ export async function sendBundle(
       });
     } catch (error) {
       const message = normalizeError(error);
-      maybeRecordCooldown(entry.endpoint, message);
+      recordSendFailureCooldown(entry.endpoint, message);
       rejections.push({ endpoint: entry.endpoint, error: message });
       lastError = {
         ok: false,

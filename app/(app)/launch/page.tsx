@@ -4,6 +4,12 @@ import * as React from "react";
 import { Copy, Loader2 } from "lucide-react";
 import { LaunchForm } from "./launch-form";
 import { CloneTokenDialog } from "./clone-token-dialog";
+import { createDefaultLaunchFunnelFormValues } from "@/components/launch/launch-funnel-form-values";
+import {
+  applyPumpfunPresetToConfig,
+  applyPumpfunPresetToOptions,
+  mapFlatInitialToLaunchFunnelValues,
+} from "@/components/launch/platforms/pumpfun/map-flat-initial-values";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
 import {
@@ -16,6 +22,7 @@ import {
   getLaunchPresetName,
   getLaunchPresetValues,
 } from "@/lib/config/launch-presets.config";
+import { legacyCapabilityDeniedMessage } from "@/lib/launch/legacy-capability";
 import { useSearchParams } from "next/navigation";
 
 export default function LaunchPage() {
@@ -34,18 +41,25 @@ export default function LaunchPage() {
   const { data: launches, isLoading: isLoadingLaunches } =
     trpc.launch.getUserLaunches.useQuery();
 
-  const hasTokens =
-    launches?.some((launch) => Boolean(launch.tokenPublicKey)) ?? false;
-  const isPassive = !isLoadingLaunches && !hasTokens;
+  const hasCloneableLaunches =
+    launches?.some(
+      (launch) => !launch.isLegacy && launch.input != null
+    ) ?? false;
+  const hasOnlyLegacyLaunches =
+    !hasCloneableLaunches &&
+    (launches?.some((launch) => launch.isLegacy) ?? false);
+  const isPassive = !isLoadingLaunches && !hasCloneableLaunches;
 
   const handleClone = (input: Record<string, unknown>) => {
     setCloneValues(input);
     setFormKey((k) => k + 1);
   };
-  const initialValues = React.useMemo(
-    () => ({ ...presetValues, ...(cloneValues ?? {}) }),
-    [presetValues, cloneValues]
-  );
+  const initialValues = React.useMemo(() => {
+    const base = createDefaultLaunchFunnelFormValues();
+    base.config = applyPumpfunPresetToConfig(base.config, presetValues);
+    base.options = applyPumpfunPresetToOptions(base.options, presetValues);
+    return mapFlatInitialToLaunchFunnelValues(cloneValues, base);
+  }, [presetValues, cloneValues]);
 
   return (
     <div className="flex flex-col gap-12">
@@ -77,14 +91,19 @@ export default function LaunchPage() {
             </TooltipTrigger>
             {isPassive && (
               <TooltipContent>
-                No previous tokens to clone
+                {hasOnlyLegacyLaunches
+                  ? legacyCapabilityDeniedMessage("clone")
+                  : "No previous tokens to clone"}
               </TooltipContent>
             )}
           </Tooltip>
         }
       />
 
-      <LaunchForm key={`${presetName}-${formKey}`} initialValues={initialValues} />
+      <LaunchForm
+        key={`${presetName}-${formKey}`}
+        initialValues={initialValues}
+      />
 
       <CloneTokenDialog
         open={cloneDialogOpen}

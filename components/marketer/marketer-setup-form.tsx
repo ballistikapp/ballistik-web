@@ -17,6 +17,7 @@ type MarketerSetup = {
 
 type MarketerSetupFormProps = {
   setup: MarketerSetup;
+  readOnly?: boolean;
 };
 
 function isValidPublicKey(value: string) {
@@ -36,7 +37,10 @@ function buildReferralAuthUrl(code: string) {
   return `${origin}/auth?ref=${encodeURIComponent(code)}`;
 }
 
-export function MarketerSetupForm({ setup }: MarketerSetupFormProps) {
+export function MarketerSetupForm({
+  setup,
+  readOnly = false,
+}: MarketerSetupFormProps) {
   const utils = trpc.useUtils();
   const [referralCode, setReferralCode] = useState(setup.referralCode ?? "");
   const [feeCollectorPublicKey, setFeeCollectorPublicKey] = useState(
@@ -121,11 +125,15 @@ export function MarketerSetupForm({ setup }: MarketerSetupFormProps) {
           placeholder="my-code"
           autoComplete="off"
           spellCheck={false}
+          readOnly={readOnly}
+          disabled={readOnly}
         />
-        <p className="text-muted-foreground text-xs">
-          Lowercase letters, numbers, and hyphens. Changing the code stops old
-          links from attributing new Users.
-        </p>
+        {!readOnly ? (
+          <p className="text-muted-foreground text-xs">
+            Lowercase letters, numbers, and hyphens. Changing the code stops old
+            links from attributing new Users.
+          </p>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-2">
@@ -138,11 +146,15 @@ export function MarketerSetupForm({ setup }: MarketerSetupFormProps) {
           autoComplete="off"
           spellCheck={false}
           className="font-mono text-sm"
+          readOnly={readOnly}
+          disabled={readOnly}
         />
-        <p className="text-muted-foreground text-xs">
-          Referral Payouts are sent to this wallet when referred Users pay
-          platform fees.
-        </p>
+        {!readOnly ? (
+          <p className="text-muted-foreground text-xs">
+            Referral Payouts are sent to this wallet when referred Users pay
+            platform fees.
+          </p>
+        ) : null}
       </div>
 
       {referralAuthUrl ? (
@@ -166,19 +178,23 @@ export function MarketerSetupForm({ setup }: MarketerSetupFormProps) {
         </div>
       ) : (
         <p className="text-muted-foreground text-sm">
-          Set a referral code to get a copyable auth link.
+          {readOnly
+            ? "No referral code was set."
+            : "Set a referral code to get a copyable auth link."}
         </p>
       )}
 
-      {formError ? (
+      {readOnly ? null : formError ? (
         <p className="text-destructive text-sm">{formError}</p>
       ) : null}
 
-      <div>
-        <Button type="submit" disabled={updateMutation.isPending}>
-          {updateMutation.isPending ? "Saving…" : "Save"}
-        </Button>
-      </div>
+      {readOnly ? null : (
+        <div>
+          <Button type="submit" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? "Saving…" : "Save"}
+          </Button>
+        </div>
+      )}
     </form>
   );
 }

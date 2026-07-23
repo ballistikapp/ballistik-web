@@ -6,7 +6,6 @@ import { useRouter } from "next/navigation";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
 import { trpc } from "@/lib/trpc/client";
-import { copyToClipboard } from "@/lib/utils";
 import {
   DataTable,
   DataTablePagination,
@@ -15,32 +14,14 @@ import {
 } from "@/components/data-table";
 import { PageHeader } from "@/components/layout/sections";
 import { Button } from "@/components/ui/button";
+import { createLaunchHistoryColumns } from "./columns";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogFooter,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Textarea } from "@/components/ui/textarea";
-import { Spinner } from "@/components/ui/spinner";
-import {
-  createColumns,
-  type TokenTableRow,
-  type TokenRowStatus,
-} from "./columns";
-import { TokenReclaimDialog } from "./token-reclaim-dialog";
+  mapUserLaunchToHistoryRow,
+  type LaunchHistoryRow,
+} from "./launch-history-rows";
+import { TokenReclaimDialog } from "@/components/launch/token-reclaim-dialog";
 
-const LAUNCH_STATUS_MAP: Record<string, TokenRowStatus> = {
-  SUCCEEDED: "ACTIVE",
-  RUNNING: "PENDING",
-  PENDING: "PENDING",
-  FAILED: "FAILED",
-  CANCELED: "FAILED",
-};
-
-export default function ManageLaunchesPage() {
+export default function LaunchHistoryPage() {
   const router = useRouter();
   const { data: launches, isLoading } = trpc.launch.getUserLaunches.useQuery(
     undefined,
@@ -48,7 +29,6 @@ export default function ManageLaunchesPage() {
       refetchOnMount: "always",
     }
   );
-  const getPrivateKeyMutation = trpc.token.getPrivateKey.useMutation();
   const retryLaunchMutation = trpc.launch.retry.useMutation({
     onSuccess: () => {
       toast.message("Retry started", {
@@ -67,66 +47,21 @@ export default function ManageLaunchesPage() {
     tokenPublicKey?: string;
     launchId?: string;
   } | null>(null);
-  const [privateKeyDialogOpen, setPrivateKeyDialogOpen] = React.useState(false);
-  const [privateKey, setPrivateKey] = React.useState<string | null>(null);
-  const [privateKeyTarget, setPrivateKeyTarget] =
-    React.useState<TokenTableRow | null>(null);
 
-  const tableRows: TokenTableRow[] = React.useMemo(() => {
+  const tableRows: LaunchHistoryRow[] = React.useMemo(() => {
     if (!launches) return [];
-    return launches.map((launch) => ({
-      id: launch.id,
-      name: launch.tokenName,
-      symbol: launch.tokenSymbol,
-      status: LAUNCH_STATUS_MAP[launch.status] ?? "PENDING",
-      publicKey: launch.tokenPublicKey,
-      imageUrl: launch.imageUrl,
-      websiteUrl: launch.websiteUrl,
-      twitterUrl: launch.twitterUrl,
-      telegramUrl: launch.telegramUrl,
-      createdAt: launch.createdAt,
-      launchId: launch.id,
-      errorMessage: launch.errorMessage,
-    }));
+    return launches.map(mapUserLaunchToHistoryRow);
   }, [launches]);
-
-  const handlePrivateKeyDialogChange = (open: boolean) => {
-    setPrivateKeyDialogOpen(open);
-    if (!open) {
-      setPrivateKey(null);
-      setPrivateKeyTarget(null);
-      getPrivateKeyMutation.reset();
-    }
-  };
-
-  const handleGetPrivateKey = async () => {
-    const tokenPublicKey = privateKeyTarget?.publicKey;
-    if (!tokenPublicKey) return;
-    try {
-      const result = await getPrivateKeyMutation.mutateAsync({
-        publicKey: tokenPublicKey,
-      });
-      setPrivateKey(result.privateKey);
-    } catch (error) {
-      const message =
-        error instanceof Error ? error.message : "Failed to fetch private key";
-      toast.error(message);
-    }
-  };
 
   const columns = React.useMemo(
     () =>
-      createColumns({
+      createLaunchHistoryColumns({
         onReclaim: (row) => {
           if (row.publicKey) {
             setReclaimTarget({ tokenPublicKey: row.publicKey });
           } else {
             setReclaimTarget({ launchId: row.launchId });
           }
-        },
-        onShowPrivateKey: (row) => {
-          setPrivateKeyTarget(row);
-          setPrivateKeyDialogOpen(true);
         },
         onRetry: (row) => {
           retryLaunchMutation.mutate({ launchId: row.launchId });
@@ -138,7 +73,7 @@ export default function ManageLaunchesPage() {
   return (
     <div className="flex flex-col gap-6">
       <PageHeader
-        title="Launches"
+        title="Launch history"
         rightContent={
           <Button asChild>
             <Link href="/launch">
@@ -159,7 +94,7 @@ export default function ManageLaunchesPage() {
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <DataTableSearch
               table={table}
-              placeholder="Search launches..."
+              placeholder="Search launch history..."
               className="w-full sm:max-w-sm"
             />
             <DataTableViewOptions table={table} />
@@ -177,62 +112,6 @@ export default function ManageLaunchesPage() {
         tokenPublicKey={reclaimTarget?.tokenPublicKey ?? null}
         launchId={reclaimTarget?.launchId ?? null}
       />
-      <Dialog
-        open={privateKeyDialogOpen}
-        onOpenChange={handlePrivateKeyDialogChange}
-      >
-        <DialogContent className="sm:max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Private key</DialogTitle>
-            <DialogDescription>
-              Fetch and copy the private key for this token.
-            </DialogDescription>
-          </DialogHeader>
-          <div className="grid gap-3">
-            {privateKey ? (
-              <Textarea
-                readOnly
-                rows={4}
-                value={privateKey}
-                className="font-mono text-xs"
-              />
-            ) : (
-              <div className="text-sm text-muted-foreground">
-                Click get private key to fetch it from the server.
-              </div>
-            )}
-          </div>
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => handlePrivateKeyDialogChange(false)}
-              disabled={getPrivateKeyMutation.isPending}
-            >
-              Close
-            </Button>
-            {privateKey ? (
-              <Button
-                onClick={() => copyToClipboard(privateKey, "Private key")}
-              >
-                Copy private key
-              </Button>
-            ) : (
-              <Button
-                onClick={handleGetPrivateKey}
-                disabled={
-                  getPrivateKeyMutation.isPending ||
-                  !privateKeyTarget?.publicKey
-                }
-              >
-                {getPrivateKeyMutation.isPending && (
-                  <Spinner className="mr-2 size-4" />
-                )}
-                Get private key
-              </Button>
-            )}
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </div>
   );
 }

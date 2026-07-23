@@ -35,8 +35,6 @@ test("buildLaunchActivityItems shows newest entries first and marks the newest r
 test("getLaunchFailureGuidance hides manual reclaim guidance after successful auto reclaim", () => {
   const guidance = getLaunchFailureGuidance({
     status: "FAILED",
-    errorMessage:
-      "Bundle sent but CREATE transaction not confirmed on-chain (found=0 confirmed=0 failed=0 notFound=5 createStatus=not_found)",
     result: {
       failureRecovery: {
         attempted: true,
@@ -47,14 +45,14 @@ test("getLaunchFailureGuidance hides manual reclaim guidance after successful au
     },
   });
 
-  assert.equal(guidance.showManageTokensAction, false);
+  assert.equal(guidance.showLaunchHistoryAction, false);
   assert.equal(guidance.description, null);
+  assert.equal(guidance.href, "/launches");
 });
 
-test("getLaunchFailureGuidance shows Manage Tokens guidance when auto reclaim needs manual follow-up", () => {
+test("getLaunchFailureGuidance shows Launch history guidance when auto reclaim needs manual follow-up", () => {
   const guidance = getLaunchFailureGuidance({
     status: "FAILED",
-    errorMessage: "Automatic reclaim could not return all wallet SOL.",
     result: {
       failureRecovery: {
         attempted: true,
@@ -65,17 +63,18 @@ test("getLaunchFailureGuidance shows Manage Tokens guidance when auto reclaim ne
     },
   });
 
-  assert.equal(guidance.showManageTokensAction, true);
-  assert.match(guidance.description ?? "", /My Tokens page/i);
+  assert.equal(guidance.showLaunchHistoryAction, true);
+  assert.equal(guidance.href, "/launches");
+  assert.match(guidance.description ?? "", /Launch history/i);
 });
 
-test("getLaunchFailureGuidance falls back to manual guidance for failed launches without recovery metadata", () => {
+test("getLaunchFailureGuidance falls back to Launch history guidance for failed launches without recovery metadata", () => {
   const guidance = getLaunchFailureGuidance({
     status: "FAILED",
-    errorMessage: "Launch timed out",
     result: null,
   });
 
-  assert.equal(guidance.showManageTokensAction, true);
-  assert.match(guidance.description ?? "", /My Tokens page/i);
+  assert.equal(guidance.showLaunchHistoryAction, true);
+  assert.equal(guidance.href, "/launches");
+  assert.match(guidance.description ?? "", /Launch history/i);
 });
