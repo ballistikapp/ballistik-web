@@ -2,11 +2,7 @@
 
 import type { ChangeEvent, RefObject } from "react";
 import { ImagePlus, X } from "lucide-react";
-import {
-  Field,
-  FieldError,
-  FieldLabel,
-} from "@/components/ui/field";
+import { Field, FieldError, FieldLabel } from "@/components/ui/field";
 import { Input } from "@/components/ui/input";
 import {
   InputGroup,
@@ -213,69 +209,16 @@ export function TokenMetadataFields({
           }}
         </form.Field>
 
-        <form.Field name="metadata.tokenBanner">
-          {() => (
-            <Field>
-              <FieldLabel>Banner</FieldLabel>
-              <div className="flex flex-col items-start gap-4 sm:flex-row">
-                <div
-                  className={cn(
-                    "relative flex h-24 w-full max-w-72 shrink-0 items-center justify-center rounded-xl border-2 border-dashed transition-colors",
-                    bannerPreview
-                      ? "border-transparent"
-                      : "border-muted-foreground/25 hover:border-muted-foreground/50"
-                  )}
-                >
-                  {bannerPreview ? (
-                    <>
-                      <img
-                        src={bannerPreview}
-                        alt="Banner preview"
-                        className="h-full w-full rounded-xl object-cover"
-                      />
-                      <button
-                        type="button"
-                        onClick={onRemoveBanner}
-                        className="absolute -right-2 -top-2 flex h-6 w-6 items-center justify-center rounded-full bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90"
-                        aria-label="Remove banner"
-                      >
-                        <X className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => bannerInputRef.current?.click()}
-                      className="flex h-full w-full flex-col items-center justify-center gap-1 text-muted-foreground hover:text-foreground"
-                    >
-                      <ImagePlus className="h-6 w-6" />
-                      <span className="text-xs">Upload</span>
-                    </button>
-                  )}
-                </div>
-                <input
-                  ref={bannerInputRef}
-                  type="file"
-                  accept="image/png, image/jpeg, image/gif"
-                  onChange={onBannerUpload}
-                  className="hidden"
-                />
-                <div className="space-y-1 text-sm text-muted-foreground">
-                  <p>Optional; only available during creation.</p>
-                  <p>JPG, GIF or PNG; max 4.3MB.</p>
-                  <p>3:1 aspect ratio, at least 1500x500px.</p>
-                </div>
-              </div>
-            </Field>
-          )}
-        </form.Field>
-
         <div className="pt-2">
           <p className="mb-3 text-sm font-medium">Social Links</p>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {(
               [
-                ["metadata.twitter", "Twitter/X", "https://twitter.com/yourtoken"],
+                [
+                  "metadata.twitter",
+                  "Twitter/X",
+                  "https://twitter.com/yourtoken",
+                ],
                 ["metadata.telegram", "Telegram", "https://t.me/yourtoken"],
                 ["metadata.website", "Website", "https://yourtoken.com"],
               ] as const

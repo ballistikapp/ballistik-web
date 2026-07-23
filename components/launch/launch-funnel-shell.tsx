@@ -118,9 +118,7 @@ function FunnelReview({
   );
 }
 
-export function LaunchFunnelShell({
-  initialValues,
-}: LaunchFunnelShellProps) {
+export function LaunchFunnelShell({ initialValues }: LaunchFunnelShellProps) {
   const router = useRouter();
   const utils = trpc.useUtils();
   const [imagePreview, setImagePreview] = React.useState<string | null>(null);
@@ -319,10 +317,7 @@ export function LaunchFunnelShell({
       } else {
         const { width, height } = await readVideoDimensions(file);
         const ratio = width / height;
-        if (
-          Math.abs(ratio - 16 / 9) > 0.1 &&
-          Math.abs(ratio - 9 / 16) > 0.1
-        ) {
+        if (Math.abs(ratio - 16 / 9) > 0.1 && Math.abs(ratio - 9 / 16) > 0.1) {
           toast.message("Video aspect ratio recommendation", {
             description: "16:9 or 9:16 is recommended.",
           });
@@ -368,11 +363,7 @@ export function LaunchFunnelShell({
     }
     try {
       const { width, height } = await readImageDimensions(file);
-      if (
-        width < 1500 ||
-        height < 500 ||
-        Math.abs(width / height - 3) > 0.05
-      ) {
+      if (width < 1500 || height < 500 || Math.abs(width / height - 3) > 0.05) {
         toast.error("Banner must be at least 1500x500px with a 3:1 ratio.");
         resetBannerInput();
         return;
